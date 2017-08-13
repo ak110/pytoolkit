@@ -12,6 +12,9 @@ def test_create_tee_logger(tmpdir):
     with open(log_path, encoding='utf-8') as f:
         assert f.read() == 'あいうえお\n'
 
+    tk.close_logger(logger)
+    os.remove(log_path)
+
 
 def test_memorized(tmpdir):
     cache_path = str(tmpdir.join('cache.pkl'))

@@ -34,6 +34,14 @@ def create_tee_logger(output_path, name=None, append=True, fmt=None):
     return logger
 
 
+def close_logger(logger):
+    """loggerが持っているhandlerを全部closeしてremoveする。"""
+    handlers = logger.handlers[:]
+    for handler in handlers:
+        handler.close()
+        logger.removeHandler(handler)
+
+
 def memorized(cache_path, func):
     """結果をcache_pathにキャッシュする処理
 
