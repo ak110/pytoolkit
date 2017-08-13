@@ -1,0 +1,18 @@
+[MASTER]
+ignore=tests,tests_strict
+extension-pkg-whitelist=numpy,hyperopt
+
+[MESSAGES CONTROL]
+# C0103:Invalid attribute name
+# MC0001:too complex
+disable=C0103,MC0001
+    ,locally-disabled
+    ,too-many-instance-attributes
+    ,too-many-arguments
+
+[FORMAT]
+max-line-length=256
+
+[TYPECHECK]
+ignored-modules=__init__
+ignored-classes=pathlib.PurePath

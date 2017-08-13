@@ -1,0 +1,3 @@
+*.bat eol=crlf encoding=cp932
+*.py eol=lf
+*.cfg eol=lf
