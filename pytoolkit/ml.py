@@ -85,3 +85,21 @@ class WeakModel(object):
             }
             with model_json_file.open('w') as f:
                 json.dump(self.data_, f, indent=4, sort_keys=True)
+
+
+def plot_cm(cm, to_file='confusion_matrix.png'):
+    """Confusion matrixを画像化する。"""
+    import matplotlib.pyplot as plt
+
+    cm = np.array(cm, dtype=np.float32)
+    cm /= cm.sum(axis=1)  # 正規化
+
+    size = int((len(cm) + 3) / 4)
+    fig = plt.figure(figsize=(size + 1, size + 1), dpi=96)
+    plt.clf()
+    ax = fig.add_subplot(111)
+    ax.set_aspect(1)
+    res = ax.imshow(cm / cm.sum(axis=1), cmap='magma', interpolation='nearest')
+    fig.colorbar(res)
+    plt.savefig(to_file)
+    plt.close()
