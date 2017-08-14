@@ -6,8 +6,10 @@ importしただけではkerasがimportされないように作っている。
 """
 import csv
 import pathlib
+import warnings
 
 import numpy as np
+import pandas as pd
 
 
 def my_callback_factory():
@@ -213,3 +215,59 @@ def session(config=None, gpu_options=None):
                 K.clear_session()
 
     return _Scope(config=config, gpu_options=gpu_options)
+
+
+def learning_curve_plotter_factory():
+    """Learning Curvesの描画を行う。
+
+    # 引数
+    - filename: 保存先ファイル名。「{metric}」はmetricの値に置換される。
+    - metric: 対象とするmetric名。lossとかaccとか。
+
+    # 「Invalid DISPLAY variable」対策
+    最初の方に以下のコードを記述する。
+    ```
+    import matplotlib as mpl
+    mpl.use('Agg')
+    ```
+    """
+    import keras
+
+    class _LearningCurvePlotter(keras.callbacks.Callback):
+
+        def __init__(self, filename, metric='loss'):
+            self.filename = filename
+            self.metric = metric
+            self.met_list = []
+            self.val_met_list = []
+            super().__init__()
+
+        def on_epoch_end(self, epoch, logs=None):
+            try:
+                self._plot(logs)
+            except:
+                import traceback
+                warnings.warn(traceback.format_exc(), RuntimeWarning)
+
+        def _plot(self, logs):
+            met = logs.get(self.metric)
+            if met is None:
+                warnings.warn('LearningCurvePlotter requires {} available!'.format(self.metric), RuntimeWarning)
+            val_met = logs.get('val_{}'.format(self.metric))
+
+            self.met_list.append(met)
+            self.val_met_list.append(val_met)
+
+            if len(self.met_list) > 1:
+                df = pd.DataFrame()
+                df[self.metric] = self.met_list
+                if val_met is not None:
+                    df['val_{}'.format(self.metric)] = self.val_met_list
+
+                df.plot()
+
+                import matplotlib.pyplot as plt
+                plt.savefig(str(self.filename).format(metric=self.metric))
+                plt.close()
+
+    return _LearningCurvePlotter
