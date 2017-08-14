@@ -1,4 +1,5 @@
 """機械学習(主にsklearn)関連。"""
+import itertools
 import json
 import multiprocessing as mp
 import pathlib
@@ -87,19 +88,46 @@ class WeakModel(object):
                 json.dump(self.data_, f, indent=4, sort_keys=True)
 
 
-def plot_cm(cm, to_file='confusion_matrix.png'):
-    """Confusion matrixを画像化する。"""
+def plot_cm(cm, to_file='confusion_matrix.png', classes=None, normalize=True, title='Confusion matrix'):
+    """Confusion matrixを画像化する。
+
+    参考: http://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html
+    """
     import matplotlib.pyplot as plt
 
-    cm = np.array(cm, dtype=np.float32)
-    cm /= cm.sum(axis=1)  # 正規化
+    if classes is None:
+        classes = ['class_{}'.format(i) for i in range(len(cm))]
+
+    if normalize:
+        cm = np.array(cm, dtype=np.float32)
+        cm /= cm.sum(axis=1)[:, np.newaxis]  # normalize
+    else:
+        cm = np.array(cm)
 
     size = int((len(cm) + 3) / 4)
-    fig = plt.figure(figsize=(size + 1, size + 1), dpi=96)
+    fig = plt.figure(figsize=(size + 5, size + 4), dpi=96)
     plt.clf()
+
     ax = fig.add_subplot(111)
     ax.set_aspect(1)
-    res = ax.imshow(cm / cm.sum(axis=1), cmap='magma', interpolation='nearest')
+    res = ax.imshow(cm / cm.sum(axis=1), cmap=plt.cm.Blues, interpolation='nearest')
     fig.colorbar(res)
+
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=45)
+    plt.yticks(tick_marks, classes)
+
+    fmt = '.2f' if normalize else 'd'
+    thresh = cm.max() / 2.
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j, i, format(cm[i, j], fmt),
+                 horizontalalignment='center',
+                 color='white' if cm[i, j] > thresh else 'black')
+
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.title(title)
+
     plt.savefig(to_file)
     plt.close()
