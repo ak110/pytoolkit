@@ -5,7 +5,6 @@ importしただけではkerasがimportされないように作っている。
 
 """
 import csv
-import os
 import pathlib
 
 import numpy as np
@@ -81,8 +80,8 @@ def my_callback_factory():
 
         def on_train_begin(self, logs=None):
             # ログファイル作成
-            os.makedirs(self.log_dir, exist_ok=True)
             d = pathlib.Path(self.log_dir)
+            d.mkdir(parents=True, exist_ok=True)
             self.batch_log_file = d.joinpath(self.batch_log_name).open('w')
             self.epoch_log_file = d.joinpath(self.epoch_log_name).open('w')
             self.batch_log_writer = csv.writer(self.batch_log_file, delimiter='\t')

@@ -25,7 +25,7 @@ def create_tee_logger(output_path, name=None, append=True, fmt=None):
     logger.addHandler(handler)
 
     if output_path is not None:
-        handler = FileHandler(output_path, 'a' if append else 'w', encoding='utf-8')
+        handler = FileHandler(str(output_path), 'a' if append else 'w', encoding='utf-8')
     handler.setLevel(DEBUG)
     if fmt:
         handler.setFormatter(Formatter(fmt))
