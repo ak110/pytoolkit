@@ -8,7 +8,7 @@ import numpy as np
 import sklearn.externals.joblib
 
 
-def create_tee_logger(output_path, name=None, append=True, fmt=None):
+def create_tee_logger(output_path, name=None, append=False, fmt=None):
     """標準出力とファイルに内容を出力するloggerを作成して返す。"""
     from logging import DEBUG, StreamHandler, FileHandler, getLogger, Formatter
 
