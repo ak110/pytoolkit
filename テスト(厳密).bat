@@ -6,7 +6,7 @@ title %~nx0
 :Retry
 
 cls
-pytest tests_strict tests -n 2
+pytest tests_strict tests -n 4
 
 pause
 goto :Retry

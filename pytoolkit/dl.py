@@ -12,36 +12,136 @@ import numpy as np
 import pandas as pd
 
 
+def destandarization_layer_factory():
+    """クラスを作って返す。"""
+    import keras
+    import keras.backend as K
+
+    class Destandarization(keras.engine.topology.Layer):
+        """事前に求めた平均と標準偏差を元に出力を標準化するレイヤー。
+
+        # Arguments
+            - mean: 平均 (float).
+            - std: 標準偏差 (positive float).
+
+        # Input shape
+            Arbitrary. Use the keyword argument `input_shape`
+            (tuple of integers, does not include the samples axis)
+            when using this layer as the first layer in a model.
+
+        # Output shape
+            Same shape as input.
+        """
+
+        def __init__(self, mean=0, std=0.3, **kwargs):
+            self.supports_masking = True
+            self.mean = K.cast_to_floatx(mean)
+            self.std = K.cast_to_floatx(std)
+            if self.std <= K.epsilon():
+                self.std = 1.  # 怪しい安全装置
+            super().__init__(**kwargs)
+
+        def call(self, inputs, **kwargs):
+            return inputs * self.std + self.mean
+
+        def get_config(self):
+            config = {'mean': float(self.mean), 'std': float(self.std)}
+            base_config = super().get_config()
+            return dict(list(base_config.items()) + list(config.items()))
+
+    return Destandarization
+
+
+def weighted_mean_layer_factory():
+    """クラスを作って返す。"""
+    import keras
+    import keras.backend as K
+
+    class WeightedMean(keras.engine.topology.Layer):
+        """入力の加重平均を取るレイヤー。"""
+
+        def __init__(self,
+                     kernel_initializer=keras.initializers.constant(0.1),
+                     kernel_regularizer=None,
+                     kernel_constraint='non_neg',
+                     **kwargs):
+            self.supports_masking = True
+            self.kernel = None
+            self.kernel_initializer = keras.initializers.get(kernel_initializer)
+            self.kernel_regularizer = keras.regularizers.get(kernel_regularizer)
+            self.kernel_constraint = keras.constraints.get(kernel_constraint)
+            super().__init__(**kwargs)
+
+        def build(self, input_shape):
+            self.kernel = self.add_weight(shape=(len(input_shape),),
+                                          name='kernel',
+                                          initializer=self.kernel_initializer,
+                                          regularizer=self.kernel_regularizer,
+                                          constraint=self.kernel_constraint)
+            super().build(input_shape)
+
+        def call(self, inputs, **kwargs):
+            ot = K.zeros_like(inputs[0])
+            for i, inp in enumerate(inputs):
+                ot += inp * self.kernel[i]
+            ot /= K.sum(self.kernel) + K.epsilon()
+            return ot
+
+        def compute_output_shape(self, input_shape):
+            assert input_shape and len(input_shape) >= 2
+            return input_shape[0]
+
+        def get_config(self):
+            config = {
+                'kernel_initializer': keras.initializers.serialize(self.kernel_initializer),
+                'kernel_regularizer': keras.regularizers.serialize(self.kernel_regularizer),
+                'kernel_constraint': keras.constraints.serialize(self.kernel_constraint),
+            }
+            base_config = super().get_config()
+            return dict(list(base_config.items()) + list(config.items()))
+
+    return WeightedMean
+
+
+def get_custom_objects():
+    """独自レイヤーのdictを返す。"""
+    return {
+        'Destandarization': destandarization_layer_factory(),
+        'WeightedMean': weighted_mean_layer_factory(),
+    }
+
+
 def my_callback_factory():
-    """色々入りのKerasのCallbackクラスを作って返す。
-
-    TerminateOnNaN+ReduceLROnPlateau+EarlyStopping+CSVLoggerのようなもの。
-
-    lossを監視して学習率を制御して、十分学習できたら終了する。
-    ついでにログも出す。(ミニバッチ単位＆エポック単位)
-
-    # 引数
-
-    - log_dir: ログ出力先
-    - batch_log_name: ミニバッチ単位のログファイル名
-    - epoch_log_name: エポック単位のログファイル名
-
-    - lr_list: epoch毎の学習率のリスト (base_lrと排他)
-
-    - base_lr: 学習率の自動調整のベースとする学習率 (lr_listと排他)
-    - max_reduces: 学習率の自動調整時、最大で何回学習率を減らすのか
-    - reduce_factor: 学習率の自動調整時、学習率を減らしていく割合
-    - beta1: lossを監視する際の指数移動平均の係数
-    - beta2: lossを監視する際の指数移動平均の係数
-    - margin_iterations: 学習率の自動調整時、このバッチ数分までは誤差を考慮して学習率を下げない
-
-    - verbose: 学習率などをprintするなら1
-
-    """
+    """クラスを作って返す。"""
     import keras
     import keras.backend as K
 
     class _MyCallback(keras.callbacks.Callback):
+        """色々入りのKerasのCallbackクラスを作って返す。
+
+        TerminateOnNaN+ReduceLROnPlateau+EarlyStopping+CSVLoggerのようなもの。
+
+        lossを監視して学習率を制御して、十分学習できたら終了する。
+        ついでにログも出す。(ミニバッチ単位＆エポック単位)
+
+        # 引数
+
+        - log_dir: ログ出力先
+        - batch_log_name: ミニバッチ単位のログファイル名
+        - epoch_log_name: エポック単位のログファイル名
+
+        - lr_list: epoch毎の学習率のリスト (base_lrと排他)
+
+        - base_lr: 学習率の自動調整のベースとする学習率 (lr_listと排他)
+        - max_reduces: 学習率の自動調整時、最大で何回学習率を減らすのか
+        - reduce_factor: 学習率の自動調整時、学習率を減らしていく割合
+        - beta1: lossを監視する際の指数移動平均の係数
+        - beta2: lossを監視する際の指数移動平均の係数
+        - margin_iterations: 学習率の自動調整時、このバッチ数分までは誤差を考慮して学習率を下げない
+
+        - verbose: 学習率などをprintするなら1
+
+        """
 
         def __init__(self, log_dir='.',
                      lr_list=None,
@@ -271,3 +371,31 @@ def learning_curve_plotter_factory():
                 plt.close()
 
     return _LearningCurvePlotter
+
+
+def plot_model_params(model, to_file='model.params.png', skip_bn=True):
+    """パラメータ数を棒グラフ化"""
+    import keras
+    import keras.backend as K
+    rows = []
+    for layer in model.layers:
+        if skip_bn and isinstance(layer, keras.layers.BatchNormalization):
+            continue
+        pc = sum([K.count_params(p) for p in layer.trainable_weights])
+        if pc <= 0:
+            continue
+        rows.append([layer.name, pc])
+
+    df = pd.DataFrame(data=rows, columns=['name', 'params'])
+    df.plot(x='name', y='params', kind='barh', figsize=(16, 12))
+
+    import matplotlib.pyplot as plt
+    plt.gca().invert_yaxis()
+    plt.savefig(to_file)
+    plt.close()
+
+
+def count_trainable_params(model):
+    """modelのtrainable paramsを数える"""
+    import keras.backend as K
+    return sum([sum([K.count_params(p) for p in layer.trainable_weights]) for layer in model.layers])
