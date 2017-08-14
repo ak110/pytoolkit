@@ -391,7 +391,7 @@ def plot_model_params(model, to_file='model.params.png', skip_bn=True):
 
     import matplotlib.pyplot as plt
     plt.gca().invert_yaxis()
-    plt.savefig(to_file)
+    plt.savefig(str(to_file))
     plt.close()
 
 

@@ -129,5 +129,5 @@ def plot_cm(cm, to_file='confusion_matrix.png', classes=None, normalize=True, ti
     plt.xlabel('Predicted label')
     plt.title(title)
 
-    plt.savefig(to_file)
+    plt.savefig(str(to_file))
     plt.close()
