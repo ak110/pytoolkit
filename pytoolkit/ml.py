@@ -96,7 +96,7 @@ def plot_cm(cm, to_file='confusion_matrix.png', classes=None, normalize=True, ti
     import matplotlib.pyplot as plt
 
     if classes is None:
-        classes = ['class_{}'.format(i) for i in range(len(cm))]
+        classes = ['class {}'.format(i) for i in range(len(cm))]
 
     if normalize:
         cm = np.array(cm, dtype=np.float32)
@@ -104,13 +104,13 @@ def plot_cm(cm, to_file='confusion_matrix.png', classes=None, normalize=True, ti
     else:
         cm = np.array(cm)
 
-    size = int((len(cm) + 3) / 4)
-    fig = plt.figure(figsize=(size + 5, size + 4), dpi=96)
+    size = (len(cm) + 1) // 2
+    fig = plt.figure(figsize=(size + 4, size + 2), dpi=96)
     plt.clf()
 
     ax = fig.add_subplot(111)
     ax.set_aspect(1)
-    res = ax.imshow(cm / cm.sum(axis=1), cmap=plt.cm.Blues, interpolation='nearest')
+    res = ax.imshow(cm, cmap='Blues', interpolation='nearest')
     fig.colorbar(res)
 
     tick_marks = np.arange(len(classes))
@@ -129,5 +129,5 @@ def plot_cm(cm, to_file='confusion_matrix.png', classes=None, normalize=True, ti
     plt.xlabel('Predicted label')
     plt.title(title)
 
-    plt.savefig(str(to_file))
+    plt.savefig(str(to_file), bbox_inches='tight')
     plt.close()
