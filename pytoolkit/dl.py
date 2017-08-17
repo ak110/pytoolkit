@@ -10,6 +10,7 @@ import warnings
 
 import numpy as np
 import pandas as pd
+import sklearn.utils
 
 
 def destandarization_layer_factory():
@@ -399,3 +400,58 @@ def count_trainable_params(model):
     """modelのtrainable paramsを数える"""
     import keras.backend as K
     return sum([sum([K.count_params(p) for p in layer.trainable_weights]) for layer in model.layers])
+
+
+class Generator(object):
+    """`fit_generator`などに渡すgeneratorを作るためのベースクラス。"""
+
+    def flow(self, X, y=None, weights=None, batch_size=32, shuffle=True, random_state=None):
+        """`fit_generator`などに渡すgenerator。"""
+        length = len(X[0]) if isinstance(X, list) else len(X)
+        if y is not None:
+            assert length == (len(y[0]) if isinstance(y, list) else len(y))
+
+        for ix in self._flow_indices(length, batch_size, shuffle, random_state):
+            if isinstance(X, list):
+                x_ = [t[ix] for t in X]  # multiple input
+            else:
+                x_ = X[ix]
+            if y is not None:
+                if isinstance(y, list):
+                    y_ = [t[ix] for t in y]  # multiple output
+                else:
+                    y_ = y[ix]
+
+            if y is None:
+                assert weights is None
+                yield self._prepare(x_)[0]
+            elif weights is None:
+                yield self._prepare(x_, y_)[:2]
+            else:
+                yield self._prepare(x_, y_, weights[ix])
+
+    def _flow_indices(self, data_count, batch_size, shuffle, random_state=None):
+        """データのindexを列挙し続けるgenerator。"""
+        if shuffle:
+            random_state = sklearn.utils.check_random_state(random_state)
+
+        spe = self.steps_per_epoch(data_count, batch_size)
+        ix = np.arange(data_count)
+        while True:
+            if shuffle:
+                random_state.shuffle(ix)
+            for bi in np.array_split(ix, spe):
+                yield bi
+
+    @staticmethod
+    def steps_per_epoch(data_count, batch_size):
+        """1epochが何ステップかを算出して返す"""
+        return (data_count + batch_size - 1) // batch_size
+
+    def _prepare(self, X, y=None, weights=None):
+        """何か前処理が必要な場合はこれをオーバーライドして使う。
+
+        画像の読み込みとかDataAugmentationとか。
+        yやweightsは使わない場合そのまま返せばOK。(使う場合はテスト時とかのNoneに注意。)
+        """
+        return X, y, weights
