@@ -405,8 +405,8 @@ def count_trainable_params(model):
 class Generator(object):
     """`fit_generator`などに渡すgeneratorを作るためのベースクラス。"""
 
-    def flow(self, X, y=None, weights=None, batch_size=32, shuffle=True, random_state=None):
-        """`fit_generator`などに渡すgenerator。"""
+    def flow(self, X, y=None, weights=None, batch_size=32, shuffle=False, random_state=None, **kargs):
+        """`fit_generator`などに渡すgenerator。kargsはそのままprepareに渡される。"""
         length = len(X[0]) if isinstance(X, list) else len(X)
         if y is not None:
             assert length == (len(y[0]) if isinstance(y, list) else len(y))
@@ -424,11 +424,11 @@ class Generator(object):
 
             if y is None:
                 assert weights is None
-                yield self._prepare(x_)[0]
+                yield self._prepare(x_, **kargs)[0]
             elif weights is None:
-                yield self._prepare(x_, y_)[:2]
+                yield self._prepare(x_, y_, **kargs)[:2]
             else:
-                yield self._prepare(x_, y_, weights[ix])
+                yield self._prepare(x_, y_, weights[ix], **kargs)
 
     def _flow_indices(self, data_count, batch_size, shuffle, random_state=None):
         """データのindexを列挙し続けるgenerator。"""
@@ -448,7 +448,7 @@ class Generator(object):
         """1epochが何ステップかを算出して返す"""
         return (data_count + batch_size - 1) // batch_size
 
-    def _prepare(self, X, y=None, weights=None):
+    def _prepare(self, X, y=None, weights=None, **kargs):
         """何か前処理が必要な場合はこれをオーバーライドして使う。
 
         画像の読み込みとかDataAugmentationとか。
