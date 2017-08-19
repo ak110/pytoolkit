@@ -6,6 +6,7 @@ import numpy as np
 import PIL
 import PIL.Image
 import PIL.ImageFilter
+import scipy.ndimage
 import sklearn.utils
 
 from .dl import Generator
@@ -30,16 +31,19 @@ class ImageDataGenerator(Generator):
                  padding_on_resize=True,
                  crop_range=(0.9, 1.0),
                  aspect_ratio_list=(1, 3 / 4),
-                 rotate_prob=0.25,
+                 rotate_prob=0.125,
                  rotate_degree=5,
                  rotate90_prob=0,
-                 blur_prob=0.25, blur_radius=0.5,
+                 blur_prob=0.125, blur_radius=1.0,
+                 median_prob=0.125,
                  mirror_prob=0.5,
-                 noise_prob=0.25, noise_scale=2,
-                 saturation_prob=0.25, saturation_var=0.2,
-                 brightness_prob=0.25, brightness_var=0.2,
-                 contrast_prob=0.25, contrast_var=0.2,
-                 lighting_prob=0.25, lighting_std=0.2):
+                 noise_prob=0.125, noise_scale=2,
+                 saturation_prob=0.125, saturation_var=0.2,
+                 brightness_prob=0.125, brightness_var=0.2,
+                 contrast_prob=0.125, contrast_var=0.2,
+                 lighting_prob=0.125, lighting_std=0.2):
+        assert len(crop_range) == 2 and crop_range[0] <= crop_range[1]
+        assert all([ar <= 1 for ar in aspect_ratio_list])
         # 出力の設定
         self.image_size = image_size
         self.grayscale = grayscale
@@ -55,6 +59,7 @@ class ImageDataGenerator(Generator):
         self.rotate90_prob = rotate90_prob
         self.blur_prob = blur_prob
         self.blur_radius = blur_radius
+        self.median_prob = median_prob
         self.mirror_prob = mirror_prob
         self.noise_prob = noise_prob
         self.noise_scale = noise_scale
@@ -132,7 +137,6 @@ class ImageDataGenerator(Generator):
                 img = img.transpose(PIL.Image.ROTATE_90)
             elif r < self.rotate90_prob * 2:
                 img = img.transpose(PIL.Image.ROTATE_270)
-
         # 回転
         image_size = img.size
         if rand.rand() < self.rotate_prob:
@@ -144,7 +148,6 @@ class ImageDataGenerator(Generator):
                 bg = PIL.Image.new('RGBA', img.size, color=self.padding_color + (255,))
                 img = PIL.Image.composite(img, bg, img)
                 img = img.convert(color_mode)
-
         # Padding
         if self.padding_ratio:
             pad_h = int(round(image_size[0] * self.padding_ratio))
@@ -165,10 +168,6 @@ class ImageDataGenerator(Generator):
         crop_x = rand.randint(0, image_size[0] - crop_w + 1)
         crop_y = rand.randint(0, image_size[1] - crop_h + 1)
         img = img.crop((crop_x, crop_y, crop_x + crop_w, crop_y + crop_h))
-
-        # ぼかし
-        if self.blur_prob and rand.rand() < self.blur_prob:
-            img = img.filter(PIL.ImageFilter.GaussianBlur(radius=self.blur_radius * rand.rand()))
         return img
 
     def _resize(self, img):
@@ -200,20 +199,24 @@ class ImageDataGenerator(Generator):
         if self.mirror_prob and rand.rand() < self.mirror_prob:
             x = x[:, ::-1, :]
         # 色など
-        color_jitters = []
+        jitters = []
+        if rand.rand() < self.blur_prob:
+            jitters.append(lambda x, rand: scipy.ndimage.gaussian_filter(x, self.blur_radius * rand.rand()))
+        if rand.rand() < self.median_prob:
+            jitters.append(lambda x, rand: scipy.ndimage.median_filter(x, size=2 if rand.rand() < 0.5 else 3))
         if rand.rand() < self.noise_prob:
-            color_jitters.append(lambda x, rand: gaussian_noise(x, rand, self.noise_scale))
+            jitters.append(lambda x, rand: gaussian_noise(x, rand, self.noise_scale))
         if rand.rand() < self.saturation_prob:
-            color_jitters.append(lambda x, rand: saturation(x, rand, self.saturation_var))
+            jitters.append(lambda x, rand: saturation(x, rand, self.saturation_var))
         if rand.rand() < self.brightness_prob:
-            color_jitters.append(lambda x, rand: brightness(x, rand, self.brightness_var))
+            jitters.append(lambda x, rand: brightness(x, rand, self.brightness_var))
         if rand.rand() < self.contrast_prob:
-            color_jitters.append(lambda x, rand: contrast(x, rand, self.contrast_var))
+            jitters.append(lambda x, rand: contrast(x, rand, self.contrast_var))
         if rand.rand() < self.lighting_prob:
-            color_jitters.append(lambda x, rand: lighting_noise(x, rand, self.lighting_std))
-        if color_jitters:
-            rand.shuffle(color_jitters)
-            for jitter in color_jitters:
+            jitters.append(lambda x, rand: lighting_noise(x, rand, self.lighting_std))
+        if jitters:
+            rand.shuffle(jitters)
+            for jitter in jitters:
                 x = jitter(x, rand)
         # 色が範囲外になっていたら補正(飽和)
         x = np.clip(x, 0, 255)
