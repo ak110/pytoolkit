@@ -10,6 +10,21 @@ import sklearn.model_selection
 import sklearn.utils
 
 
+def iou(boxes, box):
+    """IOU(Intersection over union)とかJaccard係数とかいう重なり具合を示す係数。(0～1)"""
+    # intersection
+    inter_upleft = np.maximum(boxes[:, 0:2], box[0:2])
+    inter_botright = np.minimum(boxes[:, 2:4], box[2:4])
+    inter_wh = np.maximum(inter_botright - inter_upleft, 0)
+    inter = inter_wh[:, 0] * inter_wh[:, 1]
+    # union
+    area_pred = (box[2] - box[0]) * (box[3] - box[1])
+    area_gt = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
+    union = area_pred + area_gt - inter
+    # iou
+    return inter / union
+
+
 class WeakModel(object):
     """CVしたりout-of-folds predictionを作ったりするクラス。"""
 

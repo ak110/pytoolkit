@@ -1,6 +1,20 @@
 import pathlib
 
+import numpy as np
+import pytest
+
 import pytoolkit as tk
+
+
+def test_iou():
+    boxes = np.array([
+        [0, 0, 200, 200],
+        [1000, 1000, 1001, 1001],
+    ])
+    iou = tk.ml.iou(boxes, np.array([100, 100, 300, 300]))
+    assert len(iou) == 2
+    assert iou[0] == pytest.approx(100 * 100 / (200 * 200 * 2 - 100 * 100))
+    assert iou[1] == 0
 
 
 def test_plot_cm(tmpdir):
