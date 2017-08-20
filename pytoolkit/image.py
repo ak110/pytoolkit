@@ -1,18 +1,16 @@
 """画像処理関連"""
-import pathlib
-
 import joblib  # pip install joblib
 import numpy as np
 import PIL
 import PIL.Image
 import PIL.ImageFilter
-import scipy.ndimage
 import sklearn.utils
 
-from .dl import Generator
+from . import dl
+from . import ndimage
 
 
-class ImageDataGenerator(Generator):
+class ImageDataGenerator(dl.Generator):
     """画像データのgenerator。
 
     Xは画像のファイルパスの配列またはndarray。
@@ -37,11 +35,11 @@ class ImageDataGenerator(Generator):
                  blur_prob=0.125, blur_radius=1.0,
                  median_prob=0.125,
                  mirror_prob=0.5,
-                 noise_prob=0.125, noise_scale=2,
-                 saturation_prob=0.125, saturation_var=0.2,
-                 brightness_prob=0.125, brightness_var=0.2,
-                 contrast_prob=0.125, contrast_var=0.2,
-                 lighting_prob=0.125, lighting_std=0.2):
+                 noise_prob=0.125, noise_scale=5,
+                 saturation_prob=0.125, saturation_var=0.25,
+                 brightness_prob=0.125, brightness_var=0.25,
+                 contrast_prob=0.125, contrast_var=0.25,
+                 lighting_prob=0.125, lighting_std=0.5):
         assert len(crop_range) == 2 and crop_range[0] <= crop_range[1]
         assert all([ar <= 1 for ar in aspect_ratio_list])
         # 出力の設定
@@ -98,7 +96,7 @@ class ImageDataGenerator(Generator):
 
         # 画像の読み込み
         color_mode = 'L' if self.grayscale else 'RGB'
-        img = load_image(x, color_mode)
+        img = ndimage.load_pillow(x, color_mode)
 
         # Data Augmentationその1 (PILでの処理)
         if data_augmentation:
@@ -201,19 +199,19 @@ class ImageDataGenerator(Generator):
         # 色など
         jitters = []
         if rand.rand() < self.blur_prob:
-            jitters.append(lambda x, rand: scipy.ndimage.gaussian_filter(x, self.blur_radius * rand.rand()))
+            jitters.append(lambda x, rand: ndimage.blur(x, self.blur_radius * rand.rand()))
         if rand.rand() < self.median_prob:
-            jitters.append(lambda x, rand: scipy.ndimage.median_filter(x, size=2 if rand.rand() < 0.5 else 3))
+            jitters.append(lambda x, rand: ndimage.median(x, size=2 if rand.rand() < 0.5 else 3))
         if rand.rand() < self.noise_prob:
-            jitters.append(lambda x, rand: gaussian_noise(x, rand, self.noise_scale))
+            jitters.append(lambda x, rand: ndimage.gaussian_noise(x, rand, self.noise_scale))
         if rand.rand() < self.saturation_prob:
-            jitters.append(lambda x, rand: saturation(x, rand, self.saturation_var))
+            jitters.append(lambda x, rand: ndimage.saturation(x, rand.uniform(1 - self.saturation_var, 1 + self.saturation_var)))
         if rand.rand() < self.brightness_prob:
-            jitters.append(lambda x, rand: brightness(x, rand, self.brightness_var))
+            jitters.append(lambda x, rand: ndimage.brightness(x, rand.uniform(1 - self.brightness_var, 1 + self.brightness_var)))
         if rand.rand() < self.contrast_prob:
-            jitters.append(lambda x, rand: contrast(x, rand, self.contrast_var))
+            jitters.append(lambda x, rand: ndimage.contrast(x, rand.uniform(1 - self.contrast_var, 1 + self.contrast_var)))
         if rand.rand() < self.lighting_prob:
-            jitters.append(lambda x, rand: lighting_noise(x, rand, self.lighting_std))
+            jitters.append(lambda x, rand: ndimage.lighting(x, rand.randn(3) * self.lighting_std))
         if jitters:
             rand.shuffle(jitters)
             for jitter in jitters:
@@ -223,69 +221,7 @@ class ImageDataGenerator(Generator):
         return x
 
 
-def load_image(x, color_mode) -> PIL.Image:
-    """画像の読み込み。xはパスまたはndarray。"""
-    if isinstance(x, (str, pathlib.Path)):
-        img = PIL.Image.open(x)
-        img = img.convert(color_mode)
-    elif isinstance(x, np.ndarray):
-        # 無駄だけどいったんPILに変換
-        assert x.shape[-1] == (1 if color_mode == 'L' else 3)
-        img = PIL.Image.fromarray(x, color_mode)
-    else:
-        raise ValueError('Invalid type: {}'.format(x))
-    return img
-
-
-def gaussian_noise(rgb: np.ndarray, rand: np.random.RandomState, scale: float):
-    """ガウシアンノイズ。"""
-    return rgb + rand.normal(0, scale, size=rgb.shape)
-
-# 以下は https://github.com/rykov8/ssd_keras/blob/master/SSD_training.ipynb から拝借。
-
-
-def saturation(rgb: np.ndarray, rand: np.random.RandomState, var: float):
-    """彩度の変更。"""
-    gs = to_grayscale(rgb)
-    alpha = 2 * rand.rand() * var
-    alpha += 1 - var
-    rgb = rgb * alpha + (1 - alpha) * gs[:, :, None]
-    return rgb
-
-
-def brightness(rgb: np.ndarray, rand: np.random.RandomState, var: float):
-    """明るさの変更。"""
-    alpha = 2 * rand.rand() * var
-    alpha += 1 - var
-    rgb = rgb * alpha
-    return rgb
-
-
-def contrast(rgb: np.ndarray, rand: np.random.RandomState, var: float):
-    """コントラストの変更。"""
-    gs = to_grayscale(rgb).mean() * np.ones_like(rgb)
-    alpha = 2 * rand.rand() * var
-    alpha += 1 - var
-    rgb = rgb * alpha + (1 - alpha) * gs
-    return rgb
-
-
-def lighting_noise(rgb: np.ndarray, rand: np.random.RandomState, std: float):
-    """Lightning noise。"""
-    cov = np.cov(rgb.reshape(-1, 3) / 255.0, rowvar=False)
-    eigval, eigvec = np.linalg.eigh(cov)
-    noise = rand.randn(3) * std
-    noise = eigvec.dot(eigval * noise) * 255
-    rgb += noise
-    return rgb
-
-
-def to_grayscale(rgb: np.ndarray):
-    """グレースケール化。"""
-    return rgb.dot([0.299, 0.587, 0.114])
-
-
-def preprocess_input_mean(x):
+def preprocess_input_mean(x: np.ndarray):
     """RGBそれぞれ平均値(定数)を引き算。
 
     `keras.applications.imagenet_utils.preprocess_input` のようなもの。(ただし `channels_last` 限定)
@@ -300,7 +236,7 @@ def preprocess_input_mean(x):
     return x
 
 
-def preprocess_input_abs1(x):
+def preprocess_input_abs1(x: np.ndarray):
     """0～255を-1～1に変換。
 
     `keras.applications`のInceptionV3/Xceptionで使われる。
