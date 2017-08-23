@@ -10,19 +10,90 @@ import sklearn.model_selection
 import sklearn.utils
 
 
-def iou(boxes, box):
-    """IOU(Intersection over union)とかJaccard係数とかいう重なり具合を示す係数。(0～1)"""
-    # intersection
-    inter_upleft = np.maximum(boxes[:, 0:2], box[0:2])
-    inter_botright = np.minimum(boxes[:, 2:4], box[2:4])
-    inter_wh = np.maximum(inter_botright - inter_upleft, 0)
-    inter = inter_wh[:, 0] * inter_wh[:, 1]
-    # union
-    area_pred = (box[2] - box[0]) * (box[3] - box[1])
-    area_gt = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
-    union = area_pred + area_gt - inter
-    # iou
-    return inter / union
+def compute_map(gt_classes_list, gt_bboxes_list, gt_difficults_list,
+                pred_classes_list, pred_bboxes_list,
+                iou_threshold=0.5, use_voc2007_metric=False):
+    """`mAP`の算出。
+
+    - gt_classes_list: 正解のbounding box毎のクラス。shape=(画像数, bbox数)
+    - gt_bboxes_list: 正解のbounding boxの座標(x1,y1,x2,y2。0～1)。shape=(画像数, bbox数, 4)
+    - gt_difficults_list: 正解のbounding boxにdifficultフラグがついているか否か。shape=(画像数, bbox数)
+    - pred_classes_list: 予測結果のbounding box毎のクラス。shape=(画像数, bbox数)
+    - pred_bboxes_list: 予測結果のbounding boxの座標(x1,y1,x2,y2。0～1)。shape=(画像数, bbox数, 4)
+    """
+    assert len(gt_classes_list) == len(gt_bboxes_list)
+    assert len(gt_classes_list) == len(gt_difficults_list)
+    assert len(gt_classes_list) == len(pred_classes_list)
+    assert len(gt_classes_list) == len(pred_bboxes_list)
+
+    matches = []
+    for gt_classes, gt_bboxes, gt_difficults, pred_classes, pred_bboxes in zip(
+            gt_classes_list, gt_bboxes_list, gt_difficults_list, pred_classes_list, pred_bboxes_list):
+        if len(pred_bboxes) == 0:
+            continue
+        if len(gt_bboxes) == 0:
+            matches.extend([0] * pred_bboxes.shape[0])
+            continue
+
+        iou_values = iou(pred_bboxes, gt_bboxes)
+        pred_indices = iou_values.argmax(axis=0)
+        gt_indices = iou_values.argmax(axis=1)
+        gt_indices[iou_values.max(axis=1) < iou_threshold] = -1  # 不一致
+
+        detected = np.zeros(len(gt_indices), dtype=bool)
+        for gt_i in gt_indices:
+            if gt_i >= 0 and pred_classes[pred_indices[gt_i]] == gt_classes[gt_i]:
+                if gt_difficults[gt_i]:
+                    matches.append(-1)  # skip
+                else:
+                    matches.append(0 if detected[gt_i] else 1)
+                detected[gt_i] = True  # 2回目以降は不一致扱い
+            else:
+                matches.append(0)  # 不一致
+
+    npos = sum([np.logical_not(gt_difficults).sum() for gt_difficults in gt_difficults_list])
+    matches = np.array(matches)
+    tp = np.cumsum(matches == 1)
+    fp = np.cumsum(matches == 0)
+    recall = tp / npos
+    precision = tp / (fp + tp)
+    ap = compute_ap(recall, precision, use_voc2007_metric)
+    return ap
+
+
+def compute_ap(recall, precision, use_voc2007_metric=False):
+    """Average precisionの算出。"""
+    if use_voc2007_metric:
+        ap = 0.
+        for t in np.arange(0., 1.1, 0.1):
+            if np.sum(recall >= t) == 0:
+                p = 0
+            else:
+                p = np.max(precision[recall >= t])
+            ap += p / 11.
+    else:
+        mrec = np.concatenate(([0.], recall, [1.]))
+        mpre = np.concatenate(([0.], precision, [0.]))
+
+        mpre = np.maximum.accumulate(mpre[::-1])[::-1]
+
+        i = np.where(mrec[1:] != mrec[:-1])[0]
+
+        ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
+    return ap
+
+
+def iou(bboxes_a, bboxes_b):
+    """IOU(Intersection over union、Jaccard係数)の算出。
+
+    重なり具合を示す係数。(0～1)
+    """
+    xy1 = np.maximum(bboxes_a[:, np.newaxis, :2], bboxes_b[:, :2])
+    xy2 = np.minimum(bboxes_a[:, np.newaxis, 2:], bboxes_b[:, 2:])
+    area_ab = np.prod(xy2 - xy1, axis=2) * (xy1 < xy2).all(axis=2)
+    area_a = np.prod(bboxes_a[:, 2:] - bboxes_a[:, :2], axis=1)
+    area_b = np.prod(bboxes_b[:, 2:] - bboxes_b[:, :2], axis=1)
+    return area_ab / (area_a[:, np.newaxis] + area_b - area_ab)
 
 
 class WeakModel(object):
