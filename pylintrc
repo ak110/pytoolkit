@@ -4,15 +4,17 @@ extension-pkg-whitelist=numpy,hyperopt
 
 [MESSAGES CONTROL]
 # C0103:Invalid attribute name
-# MC0001:too complex
-disable=C0103,MC0001
+disable=C0103
     ,locally-disabled
     ,too-many-instance-attributes
     ,too-many-arguments
+    ,too-many-locals
+    ,len-as-condition
+    ,bare-except
 
 [FORMAT]
 max-line-length=256
 
 [TYPECHECK]
-ignored-modules=__init__
+ignored-modules=__init__,numpy
 ignored-classes=pathlib.PurePath

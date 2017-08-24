@@ -448,7 +448,7 @@ class Generator(object):
         """1epochが何ステップかを算出して返す"""
         return (data_count + batch_size - 1) // batch_size
 
-    def _prepare(self, X, y=None, weights=None, **kargs):
+    def _prepare(self, X, y=None, weights=None, **_):  # pylint: disable=no-self-use
         """何か前処理が必要な場合はこれをオーバーライドして使う。
 
         画像の読み込みとかDataAugmentationとか。

@@ -1,9 +1,6 @@
 import pathlib
-import shutil
 
 import numpy as np
-import PIL.Image
-import sklearn.externals.joblib
 
 import pytoolkit as tk
 

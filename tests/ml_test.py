@@ -35,7 +35,7 @@ def test_iou():
     bboxes_b = np.array([
         [100, 100, 300, 300]
     ])
-    iou = tk.ml.iou(bboxes_a, bboxes_b)
+    iou = tk.ml.compute_iou(bboxes_a, bboxes_b)
     assert iou.shape == (2, 1)
     assert iou[0][0] == pytest.approx(100 * 100 / (200 * 200 * 2 - 100 * 100))
     assert iou[1][0] == 0

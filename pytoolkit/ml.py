@@ -35,10 +35,10 @@ def compute_map(gt_classes_list, gt_bboxes_list, gt_difficults_list,
             matches.extend([0] * pred_bboxes.shape[0])
             continue
 
-        iou_values = iou(pred_bboxes, gt_bboxes)
-        pred_indices = iou_values.argmax(axis=0)
-        gt_indices = iou_values.argmax(axis=1)
-        gt_indices[iou_values.max(axis=1) < iou_threshold] = -1  # 不一致
+        iou = compute_iou(pred_bboxes, gt_bboxes)
+        pred_indices = iou.argmax(axis=0)
+        gt_indices = iou.argmax(axis=1)
+        gt_indices[iou.max(axis=1) < iou_threshold] = -1  # 不一致
 
         detected = np.zeros(len(gt_indices), dtype=bool)
         for gt_i in gt_indices:
@@ -83,7 +83,7 @@ def compute_ap(recall, precision, use_voc2007_metric=False):
     return ap
 
 
-def iou(bboxes_a, bboxes_b):
+def compute_iou(bboxes_a, bboxes_b):
     """IOU(Intersection over union、Jaccard係数)の算出。
 
     重なり具合を示す係数。(0～1)
