@@ -1,13 +1,55 @@
 """画像処理関連"""
+import abc
+import collections
+import pathlib
+
 import joblib  # pip install joblib
 import numpy as np
-import PIL
-import PIL.Image
-import PIL.ImageFilter
 import sklearn.utils
 
-from . import dl
-from . import ndimage
+from . import dl, ndimage
+
+# Augmentorと確率
+AugmentorEntry = collections.namedtuple('AugmentorEntry', 'probability,augmentor')
+
+
+class Augmentor(metaclass=abc.ABCMeta):
+    """DataAugmentationを行うクラス。
+
+    # 引数
+    - partial: Trueにした場合、画像内のランダムな矩形を対象に処理を行う
+
+    """
+
+    def __init__(self, partial=False):
+        self.partial = partial
+
+    def execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+        """DataAugmentationの実行。"""
+        if self.partial:
+            x1, x2 = self._get_partial_1d(rand, 0, rgb.shape[1])
+            y1, y2 = self._get_partial_1d(rand, 0, rgb.shape[0])
+            rgb[x1:x2, y1:y2, :] = self._execute(rgb[x1:x2, y1:y2, :], rand)
+        else:
+            rgb = self._execute(rgb, rand)
+        assert rgb.dtype == np.float32
+        return rgb
+
+    @staticmethod
+    def _get_partial_1d(rand, min_value: int, max_value: int):
+        """`min_value`以上`max_value`未満の区間(幅1以上)をランダムに作って返す。"""
+        assert min_value + 1 < max_value
+        while True:
+            v1 = rand.randint(min_value, max_value)
+            v2 = rand.randint(min_value, max_value)
+            if abs(v1 - v2) <= 1:
+                continue
+            return (v1, v2) if v1 < v2 else (v2, v1)
+
+    @abc.abstractmethod
+    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+        """DataAugmentationの実装。"""
+        pass
 
 
 class ImageDataGenerator(dl.Generator):
@@ -21,54 +63,43 @@ class ImageDataGenerator(dl.Generator):
     - grayscale: グレースケールで読み込むならTrue、RGBならFalse
     - preprocess_input: 前処理を行う関数。Noneなら`keras.application.inception_v3.preprocess_input`風処理。(画素値を-1～+1に線形変換)
 
+    # 使用例
+    ```
+    gen = tk.image.ImageDataGenerator((300, 300))
+    gen.add(0.5, tk.image.FlipLR())
+    gen.add(0.125, tk.image.RandomBlur())
+    gen.add(0.125, tk.image.RandomBlur(partial=True))
+    gen.add(0.125, tk.image.RandomUnsharpMask())
+    gen.add(0.125, tk.image.RandomUnsharpMask(partial=True))
+    gen.add(0.125, tk.image.RandomMedian())
+    gen.add(0.125, tk.image.RandomMedian(partial=True))
+    gen.add(0.125, tk.image.GaussianNoise())
+    gen.add(0.125, tk.image.GaussianNoise(partial=True))
+    gen.add(0.125, tk.image.RandomSaturation())
+    gen.add(0.125, tk.image.RandomBrightness())
+    gen.add(0.125, tk.image.RandomContrast())
+    gen.add(0.125, tk.image.RandomLighting())
+    ```
+
     """
 
     def __init__(self, image_size=(300, 300), grayscale=False, preprocess_input=None,
-                 padding_ratio=0.1,
-                 padding_color=(0, 0, 0),
-                 padding_on_resize=True,
-                 crop_range=(0.9, 1.0),
-                 aspect_ratio_list=(1, 3 / 4),
-                 rotate_prob=0.125,
-                 rotate_degree=5,
-                 rotate90_prob=0,
-                 blur_prob=0.125, blur_radius=1.0,
-                 median_prob=0.125,
-                 mirror_prob=0.5,
-                 noise_prob=0.125, noise_scale=5,
-                 saturation_prob=0.125, saturation_var=0.25,
-                 brightness_prob=0.125, brightness_var=0.25,
-                 contrast_prob=0.125, contrast_var=0.25,
-                 lighting_prob=0.125, lighting_std=0.5):
-        assert len(crop_range) == 2 and crop_range[0] <= crop_range[1]
-        assert all([ar <= 1 for ar in aspect_ratio_list])
-        # 出力の設定
+                 rotate_prob=0.125, rotate_degrees=15,
+                 padding_rate=0.1, crop_rate=0.1,
+                 aspect_rations=(1, 1, 3 / 4, 4 / 3)):
         self.image_size = image_size
         self.grayscale = grayscale
         self.preprocess_input = preprocess_input
-        # DataAugmentation関連
-        self.padding_ratio = padding_ratio
-        self.padding_color = padding_color
-        self.padding_on_resize = padding_on_resize
-        self.crop_range = crop_range
-        self.aspect_ratio_list = aspect_ratio_list
         self.rotate_prob = rotate_prob
-        self.rotate_degree = rotate_degree
-        self.rotate90_prob = rotate90_prob
-        self.blur_prob = blur_prob
-        self.blur_radius = blur_radius
-        self.median_prob = median_prob
-        self.mirror_prob = mirror_prob
-        self.noise_prob = noise_prob
-        self.noise_scale = noise_scale
-        self.saturation_prob = saturation_prob
-        self.saturation_var = saturation_var
-        self.brightness_prob = brightness_prob
-        self.brightness_var = brightness_var
-        self.contrast_prob = contrast_prob
-        self.contrast_var = contrast_var
-        self.lighting_prob = lighting_prob
-        self.lighting_std = lighting_std
+        self.rotate_degrees = rotate_degrees
+        self.padding_rate = padding_rate
+        self.crop_rate = crop_rate
+        self.aspect_rations = aspect_rations
+        self.augmentors = []
+
+    def add(self, probability: float, augmentor: Augmentor):
+        """Augmentorの追加"""
+        self.augmentors.append(AugmentorEntry(probability=probability, augmentor=augmentor))
 
     def flow(self, X, y=None, weights=None, batch_size=32, shuffle=False, random_state=None, data_augmentation=False):  # pylint: disable=arguments-differ
         """`fit_generator`などに渡すgenerator。
@@ -95,130 +126,50 @@ class ImageDataGenerator(dl.Generator):
         rand = np.random.RandomState(seed)  # 再現性やスレッドセーフ性に自信がないのでここではこれを使う。
 
         # 画像の読み込み
-        color_mode = 'L' if self.grayscale else 'RGB'
-        img = ndimage.load_pillow(x, color_mode)
+        rgb = self._load_image(x)
 
-        # Data Augmentationその1 (PILでの処理)
+        # Data Augmentation
         if data_augmentation:
-            img = self._data_augmentation1(rand, img, color_mode)
-        # リサイズ
-        if self.image_size != img.size[::-1]:
-            img = self._resize(img)
-        # numpy配列化
-        x = np.asarray(img, dtype=np.float32)
-        if len(x.shape) == 3:
-            pass
-        elif len(x.shape) == 2:
-            x = x.reshape((x.shape[0], x.shape[1], 1))
+            rgb = self._transform(rgb, rand)
+            # シャッフルして色々な順で適用
+            augmentors = self.augmentors[:]
+            rand.shuffle(augmentors)
+            for a in augmentors:
+                if rand.rand() <= a.probability:
+                    rgb = a.augmentor.execute(rgb, rand)
+            # 色が範囲外になっていたら補正(飽和)
+            rgb = np.clip(rgb, 0, 255)
         else:
-            raise ValueError('Unsupported image shape: ', x.shape)
-
-        # Data Augmentationその2 (numpy配列化後の処理)
-        if data_augmentation:
-            x = self._data_augmentation2(rand, x)
-        # elif mirror:
-        #   x = x[:, ::-1, :]
+            rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=None)
 
         # preprocess_input
         pi = self.preprocess_input if self.preprocess_input else preprocess_input_abs1
-        x = np.expand_dims(x, axis=0)
-        x = pi(x)
-        x = np.squeeze(x, axis=0)
-        return x
+        rgb = np.expand_dims(rgb, axis=0)
+        rgb = pi(rgb)
+        rgb = np.squeeze(rgb, axis=0)
+        return rgb
 
-    def _data_augmentation1(self, rand, img, color_mode):
-        """DAその1 (numpy配列化前の処理)"""
-        # ±90度回転
-        if self.rotate90_prob:
-            r = rand.rand()
-            if r < self.rotate90_prob:
-                img = img.transpose(PIL.Image.ROTATE_90)
-            elif r < self.rotate90_prob * 2:
-                img = img.transpose(PIL.Image.ROTATE_270)
+    def _load_image(self, x):
+        """画像の読み込み"""
+        if isinstance(x, np.ndarray):
+            rgb = x.astype(np.float32)
+            assert rgb.shape[-1] == (1 if self.grayscale else 3)
+        else:
+            assert isinstance(x, (str, pathlib.Path))
+            color_mode = 'L' if self.grayscale else 'RGB'
+            rgb = ndimage.load(x, color_mode)
+        return rgb
+
+    def _transform(self, rgb, rand):
+        """変形を伴うAugmentation。"""
         # 回転
-        image_size = img.size
-        if rand.rand() < self.rotate_prob:
-            # アスペクト比が極端じゃない場合のみ回転可とする
-            if img.height < img.width * 3 and img.width < img.height * 3:
-                rotate_deg = (rand.rand() * 2 - 1) * self.rotate_degree
-                img = img.convert('RGBA')
-                img = img.rotate(rotate_deg, resample=PIL.Image.BILINEAR, expand=True)
-                bg = PIL.Image.new('RGBA', img.size, color=self.padding_color + (255,))
-                img = PIL.Image.composite(img, bg, img)
-                img = img.convert(color_mode)
-        # Padding
-        if self.padding_ratio:
-            pad_h = int(round(image_size[0] * self.padding_ratio))
-            pad_v = int(round(image_size[1] * self.padding_ratio))
-            bg = PIL.Image.new(color_mode, (img.width + pad_h, img.height + pad_v), color=self.padding_color)
-            bg.paste(img, (pad_h // 2, pad_v // 2, pad_h // 2 + img.width, pad_v // 2 + img.height))
-            img = bg
-
-        # Scale Augmentation / Aspect Ratio Augmentation
-        ar = rand.choice(self.aspect_ratio_list) if self.aspect_ratio_list else 1
-        crop_rate = (self.crop_range[1] - self.crop_range[0]) * rand.rand() + self.crop_range[0]
-        if rand.rand() < 0.5:
-            crop_w = int(round(image_size[0] * crop_rate * ar))
-            crop_h = int(round(image_size[1] * crop_rate))
-        else:
-            crop_w = int(round(image_size[0] * crop_rate))
-            crop_h = int(round(image_size[1] * crop_rate * ar))
-        crop_x = rand.randint(0, image_size[0] - crop_w + 1)
-        crop_y = rand.randint(0, image_size[1] - crop_h + 1)
-        img = img.crop((crop_x, crop_y, crop_x + crop_w, crop_y + crop_h))
-        return img
-
-    def _resize(self, img):
-        """imgのサイズをself.image_sizeに合わせる。
-
-        `padding_on_resize`がTrueならアスペクト比を維持するようにパディングする。(中央寄せ)
-        Falseなら維持しないで無理やり全体にリサイズ。
-        """
-        if self.padding_on_resize:
-            resize_rate_w = self.image_size[1] / img.width
-            resize_rate_h = self.image_size[0] / img.height
-            resize_rate = min(resize_rate_w, resize_rate_h)
-            resized_size = (int(img.width * resize_rate), int(img.height * resize_rate))
-        else:
-            resized_size = (img.width, img.height)
-        if self.image_size == resized_size[::-1]:
-            img = img.resize((self.image_size[1], self.image_size[0]), resample=PIL.Image.LANCZOS)
-        else:
-            black = PIL.Image.new(img.mode, self.image_size)
-            img = img.resize(resized_size, resample=PIL.Image.LANCZOS)
-            paste_xy = (self.image_size[1] - img.width) // 2, (self.image_size[0] - img.height) // 2
-            black.paste(img, paste_xy + (paste_xy[0] + img.width, paste_xy[1] + img.height))
-            img = black
-        return img
-
-    def _data_augmentation2(self, rand, x):
-        """DAその2 (numpy配列化後の処理)"""
-        # 左右反転
-        if self.mirror_prob and rand.rand() < self.mirror_prob:
-            x = x[:, ::-1, :]
-        # 色など
-        jitters = []
-        if rand.rand() < self.blur_prob:
-            jitters.append(lambda x, rand: ndimage.blur(x, self.blur_radius * rand.rand()))
-        if rand.rand() < self.median_prob:
-            jitters.append(lambda x, rand: ndimage.median(x, size=2 if rand.rand() < 0.5 else 3))
-        if rand.rand() < self.noise_prob:
-            jitters.append(lambda x, rand: ndimage.gaussian_noise(x, rand, self.noise_scale))
-        if rand.rand() < self.saturation_prob:
-            jitters.append(lambda x, rand: ndimage.saturation(x, rand.uniform(1 - self.saturation_var, 1 + self.saturation_var)))
-        if rand.rand() < self.brightness_prob:
-            jitters.append(lambda x, rand: ndimage.brightness(x, rand.uniform(1 - self.brightness_var, 1 + self.brightness_var)))
-        if rand.rand() < self.contrast_prob:
-            jitters.append(lambda x, rand: ndimage.contrast(x, rand.uniform(1 - self.contrast_var, 1 + self.contrast_var)))
-        if rand.rand() < self.lighting_prob:
-            jitters.append(lambda x, rand: ndimage.lighting(x, rand.randn(3) * self.lighting_std))
-        if jitters:
-            rand.shuffle(jitters)
-            for jitter in jitters:
-                x = jitter(x, rand)
-        # 色が範囲外になっていたら補正(飽和)
-        x = np.clip(x, 0, 255)
-        return x
+        if rand.rand() <= self.rotate_prob:
+            rgb = ndimage.random_rotate(rgb, rand, degrees=self.rotate_degrees)
+        # padding+crop
+        rgb = ndimage.random_crop(rgb, rand, self.padding_rate, self.crop_rate, aspect_rations=self.aspect_rations)
+        # リサイズ
+        rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=None)
+        return rgb
 
 
 def preprocess_input_mean(x: np.ndarray):
@@ -244,3 +195,109 @@ def preprocess_input_abs1(x: np.ndarray):
     x /= 127.5
     x -= 1
     return x
+
+
+class FlipLR(Augmentor):
+    """左右反転。"""
+
+    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+        assert rand is not None  # noqa
+        return ndimage.flip_lr(rgb)
+
+
+class FlipTB(Augmentor):
+    """上下反転。"""
+
+    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+        assert rand is not None  # noqa
+        return ndimage.flip_tb(rgb)
+
+
+class RandomBlur(Augmentor):
+    """ぼかし。"""
+
+    def __init__(self, radius=1, partial=False):
+        self.radius = radius
+        super().__init__(partial)
+
+    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+        return ndimage.blur(rgb, self.radius * rand.rand())
+
+
+class RandomUnsharpMask(Augmentor):
+    """シャープ化。"""
+
+    def __init__(self, sigma=0.5, min_alpha=1, max_alpha=2, partial=False):
+        self.sigma = sigma
+        self.min_alpha = min_alpha
+        self.max_alpha = max_alpha
+        super().__init__(partial)
+
+    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+        return ndimage.unsharp_mask(rgb, self.sigma, rand.uniform(self.min_alpha, self.max_alpha))
+
+
+class RandomMedian(Augmentor):
+    """メディアンフィルタ。"""
+
+    def __init__(self, sizes=(2, 3), partial=False):
+        self.sizes = sizes
+        super().__init__(partial)
+
+    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+        return ndimage.median(rgb, rand.choice(self.sizes))
+
+
+class GaussianNoise(Augmentor):
+    """ガウシアンノイズ。"""
+
+    def __init__(self, scale=5, partial=False):
+        self.scale = scale
+        super().__init__(partial)
+
+    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+        return ndimage.gaussian_noise(rgb, rand, self.scale)
+
+
+class RandomSaturation(Augmentor):
+    """彩度の変更。"""
+
+    def __init__(self, var=0.25):
+        self.var = var
+        super().__init__()
+
+    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+        return ndimage.saturation(rgb, rand.uniform(1 - self.var, 1 + self.var))
+
+
+class RandomBrightness(Augmentor):
+    """明度の変更。"""
+
+    def __init__(self, var=0.25):
+        self.var = var
+        super().__init__()
+
+    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+        return ndimage.brightness(rgb, rand.uniform(1 - self.var, 1 + self.var))
+
+
+class RandomContrast(Augmentor):
+    """コントラストの変更。"""
+
+    def __init__(self, var=0.25):
+        self.var = var
+        super().__init__()
+
+    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+        return ndimage.contrast(rgb, rand.uniform(1 - self.var, 1 + self.var))
+
+
+class RandomLighting(Augmentor):
+    """コントラストの変更。"""
+
+    def __init__(self, std=0.5):
+        self.std = std
+        super().__init__()
+
+    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+        return ndimage.lighting(rgb, rand.randn(3) * self.std)

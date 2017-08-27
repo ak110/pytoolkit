@@ -12,9 +12,17 @@ def test_filters():
     rand = np.random.RandomState(1234)
     filters = [
         ('original', lambda rgb: rgb),
+        ('pad', lambda rgb: tk.ndimage.pad(rgb, 300, 300)),
+        ('rotate', lambda rgb: tk.ndimage.rotate(rgb, 15)),
+        ('rotate', lambda rgb: tk.ndimage.rotate(rgb, -15)),
+        ('crop', lambda rgb: tk.ndimage.crop(rgb, 30, 30, 200, 200)),
+        ('flip_lr', tk.ndimage.flip_lr),
+        ('flip_tb', tk.ndimage.flip_tb),
+        ('resize', lambda rgb: tk.ndimage.resize(rgb, 128, 64)),
+        ('resize', lambda rgb: tk.ndimage.resize(rgb, 128, 64, padding=None)),
         ('gaussian_noise', lambda rgb: tk.ndimage.gaussian_noise(rgb, rand, 5)),
-        ('blur', lambda rgb: tk.ndimage.blur(rgb, 1)),
-        ('unsharp_mask', lambda rgb: tk.ndimage.unsharp_mask(rgb, 1, 2)),
+        ('blur', lambda rgb: tk.ndimage.blur(rgb, 0.5)),
+        ('unsharp_mask', lambda rgb: tk.ndimage.unsharp_mask(rgb, 0.5, 1.5)),
         ('median_2', lambda rgb: tk.ndimage.median(rgb, 2)),
         ('median_3', lambda rgb: tk.ndimage.median(rgb, 3)),
         ('saturation_075', lambda rgb: tk.ndimage.saturation(rgb, 0.75)),
@@ -28,7 +36,7 @@ def test_filters():
         ('lighting_ppp', lambda rgb: tk.ndimage.lighting(rgb, np.array([+1, +1, +1]))),
     ]
 
-    rgb = tk.ndimage.load(base_dir.joinpath('data', 'Lenna.png'))
+    rgb = tk.ndimage.load(base_dir.joinpath('data', 'Lenna.png'))  # 256x256の某有名画像
     save_dir.mkdir(parents=True, exist_ok=True)
     for cp in save_dir.iterdir():
         cp.unlink()
