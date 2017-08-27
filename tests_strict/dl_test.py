@@ -48,7 +48,7 @@ def test_xor(tmpdir):
         model.fit(
             X.repeat(3200, axis=0),
             y.repeat(3200, axis=0),
-            epochs=len(lr_list),
+            epochs=100,
             verbose=2,
             callbacks=[tk.dl.my_callback_factory()(str(tmpdir), lr_list=lr_list)])
         pred = model.predict(X)
