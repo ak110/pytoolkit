@@ -130,10 +130,13 @@ class ImageDataGenerator(dl.Generator):
 
         # Data Augmentation
         if data_augmentation:
+            # 変形を伴うData Augmentation
             rgb = self._transform(rgb, rand)
-            # シャッフルして色々な順で適用
+            # リサイズ
+            rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=None)
+            # 変形を伴わないData Augmentation
             augmentors = self.augmentors[:]
-            rand.shuffle(augmentors)
+            rand.shuffle(augmentors)  # シャッフルして色々な順で適用
             for a in augmentors:
                 if rand.rand() <= a.probability:
                     rgb = a.augmentor.execute(rgb, rand)
@@ -167,8 +170,6 @@ class ImageDataGenerator(dl.Generator):
             rgb = ndimage.random_rotate(rgb, rand, degrees=self.rotate_degrees)
         # padding+crop
         rgb = ndimage.random_crop(rgb, rand, self.padding_rate, self.crop_rate, aspect_rations=self.aspect_rations)
-        # リサイズ
-        rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=None)
         return rgb
 
 
