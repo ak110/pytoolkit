@@ -272,7 +272,7 @@ def my_callback_factory():
                     lr = self.base_lr * self.reduce_factor ** self.reduces
                     K.set_value(self.model.optimizer.lr, float(lr))
                     self.iterations_per_reduce = 0  # 安全装置のリセット
-            elif len(self.lr_list) - 1 <= epoch:
+            if self.lr_list is not None and len(self.lr_list) - 1 <= epoch:
                 # リストの最後まで来ていたら終了 (epochsをちゃんと設定すべきだが、安全装置として)
                 self.stopped_epoch = epoch
                 self.model.stop_training = True

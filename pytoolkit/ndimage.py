@@ -108,10 +108,15 @@ def resize(rgb: np.ndarray, width: int, height: int, padding=None, interp='lancz
         resized_w = int(rgb.shape[0] * resize_rate)
         resized_h = int(rgb.shape[1] * resize_rate)
         if rgb.shape[1] != resized_w or rgb.shape[0] != resized_h:
-            rgb = scipy.misc.imresize(rgb, (resized_h, resized_w), interp=interp).astype(np.float32)
+            rgb = resize(rgb, resized_w, resized_h, padding=None, interp=interp)
         return pad(rgb, width, height)
     # パディングせずリサイズ (縦横比無視)
-    return scipy.misc.imresize(rgb, (height, width), interp=interp).astype(np.float32)
+    if rgb.shape[-1] == 1:
+        rgb = rgb.reshape(rgb.shape[:2])
+    rgb = scipy.misc.imresize(rgb, (height, width), interp=interp).astype(np.float32)
+    if len(rgb.shape) == 2:
+        rgb = rgb.reshape(rgb.shape + (1,))
+    return rgb
 
 
 def gaussian_noise(rgb: np.ndarray, rand: np.random.RandomState, scale: float) -> np.ndarray:
