@@ -85,7 +85,7 @@ class ImageDataGenerator(dl.Generator):
 
     def __init__(self, image_size=(300, 300), grayscale=False, preprocess_input=None,
                  rotate_prob=0.125, rotate_degrees=15,
-                 padding_rate=0.1, crop_rate=0.1,
+                 padding_rate=0.25, crop_rate=0.125,
                  aspect_rations=(1, 1, 3 / 4, 4 / 3)):
         self.image_size = image_size
         self.grayscale = grayscale
@@ -217,7 +217,7 @@ class FlipTB(Augmentor):
 class RandomBlur(Augmentor):
     """ぼかし。"""
 
-    def __init__(self, radius=1, partial=False):
+    def __init__(self, radius=0.75, partial=False):
         self.radius = radius
         super().__init__(partial)
 
@@ -241,7 +241,7 @@ class RandomUnsharpMask(Augmentor):
 class RandomMedian(Augmentor):
     """メディアンフィルタ。"""
 
-    def __init__(self, sizes=(2, 3), partial=False):
+    def __init__(self, sizes=(2,), partial=False):
         self.sizes = sizes
         super().__init__(partial)
 

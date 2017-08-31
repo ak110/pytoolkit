@@ -34,23 +34,20 @@ def random_rotate(rgb: np.ndarray, rand: np.random.RandomState, degrees: float, 
 
 
 def random_crop(rgb: np.ndarray, rand: np.random.RandomState,
-                padding_rate=0.125, crop_rate=0.125,
+                padding_rate=0.25, crop_rate=0.125,
                 aspect_rations=(1, 1, 3 / 4, 4 / 3), padding='same') -> np.ndarray:
     """パディング＋ランダム切り抜き。"""
-    start_w = rgb.shape[1]
-    start_h = rgb.shape[0]
+    cr = rand.uniform(1 - crop_rate, 1)
     ar = np.sqrt(rand.choice(aspect_rations))
-    cropped_w = int(round(start_w * (1 - crop_rate) * ar))  # 元のサイズに対する割合
-    cropped_h = int(round(start_h * (1 - crop_rate) / ar))
-    padded_w = max(int(np.ceil(start_w * (1 + padding_rate))), cropped_w)
-    padded_h = max(int(np.ceil(start_h * (1 + padding_rate))), cropped_h)
+    cropped_w = int(round(rgb.shape[1] * cr * ar))  # 元のサイズに対する割合
+    cropped_h = int(round(rgb.shape[0] * cr / ar))
+    padded_w = max(int(round(rgb.shape[1] * (1 + padding_rate))), cropped_w)
+    padded_h = max(int(round(rgb.shape[0] * (1 + padding_rate))), cropped_h)
     # パディング
     rgb = pad(rgb, padded_w, padded_h, padding=padding)
     # 切り抜き
-    x_max = rgb.shape[1] - cropped_w
-    y_max = rgb.shape[0] - cropped_h
-    x = int(round(rand.triangular(0, x_max / 2, x_max)))
-    y = int(round(rand.triangular(0, y_max / 2, y_max)))  # 中央寄りの三角分布にしてみる
+    x = rand.randint(0, rgb.shape[1] - cropped_w)
+    y = rand.randint(0, rgb.shape[0] - cropped_h)
     return crop(rgb, x, y, cropped_w, cropped_h)
 
 
@@ -66,6 +63,8 @@ def rotate(rgb: np.ndarray, degrees: float, padding='same') -> np.ndarray:
 
 def pad(rgb: np.ndarray, width: int, height: int, padding='same') -> np.ndarray:
     """パディング。width/heightはpadding後のサイズ。(左右/上下均等、端数は右と下につける)"""
+    assert width >= 0
+    assert height >= 0
     assert padding in ('same', 'zero')
     if padding == 'same':
         padding = 'edge'
@@ -82,6 +81,12 @@ def pad(rgb: np.ndarray, width: int, height: int, padding='same') -> np.ndarray:
 
 def crop(rgb: np.ndarray, x: int, y: int, width: int, height: int) -> np.ndarray:
     """切り抜き。"""
+    assert 0 <= x < rgb.shape[1]
+    assert 0 <= y < rgb.shape[0]
+    assert width >= 0
+    assert height >= 0
+    assert 0 <= x + width < rgb.shape[1]
+    assert 0 <= y + height < rgb.shape[0]
     return rgb[y:y + height, x:x + width, :]
 
 
