@@ -187,8 +187,8 @@ def my_callback_factory():
             d.mkdir(parents=True, exist_ok=True)
             self.batch_log_file = d.joinpath(self.batch_log_name).open('w')
             self.epoch_log_file = d.joinpath(self.epoch_log_name).open('w')
-            self.batch_log_writer = csv.writer(self.batch_log_file, delimiter='\t')
-            self.epoch_log_writer = csv.writer(self.epoch_log_file, delimiter='\t')
+            self.batch_log_writer = csv.writer(self.batch_log_file, delimiter='\t', lineterminator='\n')
+            self.epoch_log_writer = csv.writer(self.epoch_log_file, delimiter='\t', lineterminator='\n')
             self.batch_log_writer.writerow(['epoch', 'batch', 'loss', 'delta_ema'])
             self.keys = None
             # 学習率の設定(base_lr)
