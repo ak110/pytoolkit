@@ -150,7 +150,7 @@ def my_callback_factory():
                      verbose=1,
                      batch_log_name='batchlog.tsv',
                      epoch_log_name='epochlog.tsv',
-                     max_reduces=6, reduce_factor=1 / np.sqrt(10),
+                     max_reduces=2, reduce_factor=0.1,
                      beta1=0.998, beta2=0.999, margin_iterations=100):
             super().__init__()
             # 設定
