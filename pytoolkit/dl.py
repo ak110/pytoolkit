@@ -195,7 +195,7 @@ def my_callback_factory():
             if self.base_lr is not None:
                 K.set_value(self.model.optimizer.lr, float(self.base_lr))
                 if self.verbose >= 1:
-                    print('lr = {}'.format(float(K.get_value(self.model.optimizer.lr))))
+                    print('lr = {:.1e}'.format(float(K.get_value(self.model.optimizer.lr))))
             # 色々初期化
             self.iterations = 0
             self.iterations_per_reduce = 0
@@ -210,11 +210,11 @@ def my_callback_factory():
                 lr = self.lr_list[epoch]
                 if self.verbose >= 1:
                     if epoch == 0 or lr != self.lr_list[epoch - 1]:
-                        print('lr = {}'.format(float(lr)))
+                        print('lr = {:.1e}'.format(float(lr)))
                 K.set_value(self.model.optimizer.lr, float(lr))
             elif self.reduce_on_epoch_end:
                 if self.verbose >= 1:
-                    print('lr = {}'.format(float(K.get_value(self.model.optimizer.lr))))
+                    print('lr = {:.1e}'.format(float(K.get_value(self.model.optimizer.lr))))
             # 色々初期化
             self.epoch = epoch
             self.reduce_on_epoch_end = False
@@ -247,7 +247,7 @@ def my_callback_factory():
                     self.reduce_on_epoch_end = True
 
             # batchログ出力
-            self.batch_log_writer.writerow([self.epoch + 1, batch + 1, loss, delta_ema])
+            self.batch_log_writer.writerow([self.epoch + 1, batch + 1, '{:.4f}'.format(loss), '{:.5f}'.format(delta_ema)])
 
         def on_epoch_end(self, epoch, logs=None):
             # batchログ出力
@@ -257,8 +257,8 @@ def my_callback_factory():
                 self.keys = sorted(logs.keys())
                 self.epoch_log_writer.writerow(['epoch', 'lr'] + self.keys)
             lr = K.get_value(self.model.optimizer.lr)
-            metrics = [logs.get(k) for k in self.keys]
-            self.epoch_log_writer.writerow([epoch + 1, lr] + metrics)
+            metrics = ['{:.4f}'.format(logs.get(k)) for k in self.keys]
+            self.epoch_log_writer.writerow([epoch + 1, '{:.1e}'.format(lr)] + metrics)
             self.epoch_log_file.flush()
             # 学習率を減らす/限界まで下がっていたら学習終了
             if self.reduce_on_epoch_end:
