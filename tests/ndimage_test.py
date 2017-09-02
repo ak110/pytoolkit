@@ -23,6 +23,8 @@ def test_filters():
         ('gaussian_noise', lambda rgb: tk.ndimage.gaussian_noise(rgb, rand, 5)),
         ('blur', lambda rgb: tk.ndimage.blur(rgb, 0.5)),
         ('unsharp_mask', lambda rgb: tk.ndimage.unsharp_mask(rgb, 0.5, 1.5)),
+        ('sharp', lambda rgb: tk.ndimage.sharp(rgb)),
+        ('soft', lambda rgb: tk.ndimage.soft(rgb)),
         ('median_2', lambda rgb: tk.ndimage.median(rgb, 2)),
         ('median_3', lambda rgb: tk.ndimage.median(rgb, 3)),
         ('saturation_075', lambda rgb: tk.ndimage.saturation(rgb, 0.75)),

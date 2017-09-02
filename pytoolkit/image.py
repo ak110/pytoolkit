@@ -71,6 +71,10 @@ class ImageDataGenerator(dl.Generator):
     gen.add(0.125, tk.image.RandomBlur(partial=True))
     gen.add(0.125, tk.image.RandomUnsharpMask())
     gen.add(0.125, tk.image.RandomUnsharpMask(partial=True))
+    gen.add(0.125, tk.image.Sharp())
+    gen.add(0.125, tk.image.Sharp(partial=True))
+    gen.add(0.125, tk.image.Soft())
+    gen.add(0.125, tk.image.Soft(partial=True))
     gen.add(0.125, tk.image.RandomMedian())
     gen.add(0.125, tk.image.RandomMedian(partial=True))
     gen.add(0.125, tk.image.GaussianNoise())
@@ -236,6 +240,22 @@ class RandomUnsharpMask(Augmentor):
 
     def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
         return ndimage.unsharp_mask(rgb, self.sigma, rand.uniform(self.min_alpha, self.max_alpha))
+
+
+class Sharp(Augmentor):
+    """3x3のシャープ化。"""
+
+    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+        assert rand is not None  # noqa
+        return ndimage.sharp(rgb)
+
+
+class Soft(Augmentor):
+    """3x3のぼかし。"""
+
+    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+        assert rand is not None  # noqa
+        return ndimage.soft(rgb)
 
 
 class RandomMedian(Augmentor):

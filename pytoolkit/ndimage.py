@@ -6,8 +6,9 @@ import pathlib
 from typing import Union
 
 import numpy as np
-import scipy.misc
+import scipy
 import scipy.ndimage
+import scipy.signal
 
 
 def load(path: Union[str, pathlib.Path], color_mode='RGB') -> np.ndarray:
@@ -138,6 +139,32 @@ def unsharp_mask(rgb: np.ndarray, sigma: float, alpha=2.0) -> np.ndarray:
     """シャープ化。sigmaは0～1程度、alphaは1～2程度がよい？"""
     blured = blur(rgb, sigma)
     return rgb + (rgb - blured) * alpha
+
+
+def sharp(rgb: np.ndarray) -> np.ndarray:
+    """3x3のシャープ化。"""
+    k = np.array([
+        [+0.0, -0.2, +0.0],
+        [-0.2, +1.8, -0.2],
+        [+0.0, -0.2, +0.0],
+    ], dtype=np.float32)
+    channels = []
+    for ch in range(rgb.shape[-1]):
+        channels.append(scipy.signal.convolve2d(rgb[:, :, ch], k, mode='same', boundary='wrap'))
+    return np.stack(channels, axis=2)
+
+
+def soft(rgb: np.ndarray) -> np.ndarray:
+    """3x3のぼかし。"""
+    k = np.array([
+        [0.0, 0.2, 0.0],
+        [0.2, 0.2, 0.2],
+        [0.0, 0.2, 0.0],
+    ], dtype=np.float32)
+    channels = []
+    for ch in range(rgb.shape[-1]):
+        channels.append(scipy.signal.convolve2d(rgb[:, :, ch], k, mode='same', boundary='wrap'))
+    return np.stack(channels, axis=2)
 
 
 def median(rgb: np.ndarray, size: int) -> np.ndarray:
