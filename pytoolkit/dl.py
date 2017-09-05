@@ -176,6 +176,7 @@ def my_callback_factory():
             self.iterations_per_reduce = 0
             self.ema1 = 0
             self.ema2 = 0
+            self.delta_ema = 0
             self.reduces = 0
             self.stopped_epoch = 0
             self.epoch = 0
@@ -239,15 +240,15 @@ def my_callback_factory():
             self.iterations += 1
             hm1 = self.ema1 / (1 - self.beta1 ** self.iterations)
             hm2 = self.ema2 / (1 - self.beta2 ** self.iterations)
-            delta_ema = hm2 - hm1
+            self.delta_ema = hm2 - hm1
             if self.base_lr is not None:
                 # lossの減少が止まってそうなら次のepochから学習率を減らす。
                 self.iterations_per_reduce += 1
-                if delta_ema <= 0 and self.margin_iterations <= self.iterations_per_reduce:
+                if self.delta_ema <= 0 and self.margin_iterations <= self.iterations_per_reduce:
                     self.reduce_on_epoch_end = True
 
             # batchログ出力
-            self.batch_log_writer.writerow([self.epoch + 1, batch + 1, '{:.4f}'.format(loss), '{:.5f}'.format(delta_ema)])
+            self.batch_log_writer.writerow([self.epoch + 1, batch + 1, '{:.4f}'.format(loss), '{:.5f}'.format(self.delta_ema)])
 
         def on_epoch_end(self, epoch, logs=None):
             # batchログ出力
@@ -255,10 +256,10 @@ def my_callback_factory():
             # epochログ出力
             if not self.keys:
                 self.keys = sorted(logs.keys())
-                self.epoch_log_writer.writerow(['epoch', 'lr'] + self.keys)
+                self.epoch_log_writer.writerow(['epoch', 'lr'] + self.keys + ['delta_ema'])
             lr = K.get_value(self.model.optimizer.lr)
             metrics = ['{:.4f}'.format(logs.get(k)) for k in self.keys]
-            self.epoch_log_writer.writerow([epoch + 1, '{:.1e}'.format(lr)] + metrics)
+            self.epoch_log_writer.writerow([epoch + 1, '{:.1e}'.format(lr)] + metrics + ['{:.5f}'.format(self.delta_ema)])
             self.epoch_log_file.flush()
             # 学習率を減らす/限界まで下がっていたら学習終了
             if self.reduce_on_epoch_end:
