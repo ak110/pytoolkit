@@ -40,7 +40,7 @@ def compute_map(gt_classes_list, gt_bboxes_list, gt_difficults_list,
         gt_indices = iou.argmax(axis=1)
         gt_indices[iou.max(axis=1) < iou_threshold] = -1  # 不一致
 
-        detected = np.zeros(len(gt_indices), dtype=bool)
+        detected = np.zeros(len(gt_bboxes), dtype=bool)
         for gt_i in gt_indices:
             if gt_i >= 0 and pred_classes[pred_indices[gt_i]] == gt_classes[gt_i]:
                 if gt_difficults[gt_i]:
