@@ -17,5 +17,5 @@ disable=C0103
 max-line-length=256
 
 [TYPECHECK]
-ignored-modules=__init__,numpy
+ignored-modules=__init__,numpy,matplotlib.cm
 ignored-classes=pathlib.PurePath

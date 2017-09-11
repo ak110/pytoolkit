@@ -1,13 +1,45 @@
 """機械学習(主にsklearn)関連。"""
+import collections
 import itertools
 import json
 import multiprocessing as mp
 import pathlib
+import xml.etree
 
 import numpy as np
+import scipy.misc
 import sklearn.base
 import sklearn.model_selection
 import sklearn.utils
+
+# VOC2007などのアノテーションデータを持つためのnamedtuple
+# classes、bboxes、difficultsはそれぞれbounding boxの数分の配列。
+ObjectsAnnotation = collections.namedtuple(
+    'ObjectsAnnotation', 'folder,filename,width,height,classes,bboxes,difficults')
+
+# VOC2007のクラス名のリスト (20クラス)
+VOC_CLASS_NAMES = [
+    'aeroplane',
+    'bicycle',
+    'bird',
+    'boat',
+    'bottle',
+    'bus',
+    'car',
+    'cat',
+    'chair',
+    'cow',
+    'diningtable',
+    'dog',
+    'horse',
+    'motorbike',
+    'person',
+    'pottedplant',
+    'sheep',
+    'sofa',
+    'train',
+    'tvmonitor',
+]
 
 
 def compute_map(gt_classes_list, gt_bboxes_list, gt_difficults_list,
@@ -88,12 +120,17 @@ def compute_iou(bboxes_a, bboxes_b):
 
     重なり具合を示す係数。(0～1)
     """
+    assert bboxes_a.shape[0] > 0
+    assert bboxes_b.shape[0] > 0
+    assert bboxes_a.shape == (len(bboxes_a), 4)
+    assert bboxes_b.shape == (len(bboxes_b), 4)
     xy1 = np.maximum(bboxes_a[:, np.newaxis, :2], bboxes_b[:, :2])
     xy2 = np.minimum(bboxes_a[:, np.newaxis, 2:], bboxes_b[:, 2:])
-    area_ab = np.prod(xy2 - xy1, axis=2) * (xy1 < xy2).all(axis=2)
+    area_inter = np.prod(xy2 - xy1, axis=2) * (xy1 < xy2).all(axis=2)
     area_a = np.prod(bboxes_a[:, 2:] - bboxes_a[:, :2], axis=1)
     area_b = np.prod(bboxes_b[:, 2:] - bboxes_b[:, :2], axis=1)
-    return area_ab / (area_a[:, np.newaxis] + area_b - area_ab)
+    area_union = area_a[:, np.newaxis] + area_b - area_inter
+    return area_inter / area_union
 
 
 class WeakModel(object):
@@ -216,4 +253,91 @@ def plot_cm(cm, to_file='confusion_matrix.png', classes=None, normalize=True, ti
     plt.title(title)
 
     plt.savefig(str(to_file), bbox_inches='tight')
+    plt.close()
+
+
+def load_voc_annotations(annotations_dir, class_name_to_id):
+    """VOC2007などのアノテーションデータの読み込み。
+
+    結果は「画像ファイル名拡張子なし」とObjectsAnnotationのdict。
+    """
+    data = {}
+    for f in pathlib.Path(annotations_dir).iterdir():
+        root = xml.etree.ElementTree.parse(str(f)).getroot()
+        folder = root.find('folder').text
+        filename = root.find('filename').text
+        size_tree = root.find('size')
+        width = float(size_tree.find('width').text)
+        height = float(size_tree.find('height').text)
+        classes = []
+        bboxes = []
+        difficults = []
+        for object_tree in root.findall('object'):
+            class_id = class_name_to_id[object_tree.find('name').text]
+            bndbox = object_tree.find('bndbox')
+            xmin = float(bndbox.find('xmin').text) / width
+            ymin = float(bndbox.find('ymin').text) / height
+            xmax = float(bndbox.find('xmax').text) / width
+            ymax = float(bndbox.find('ymax').text) / height
+            difficult = object_tree.find('difficult').text == '1'
+            classes.append(class_id)
+            bboxes.append([xmin, ymin, xmax, ymax])
+            difficults.append(difficult)
+        data[f.stem] = ObjectsAnnotation(
+            folder=folder,
+            filename=filename,
+            width=width,
+            height=height,
+            classes=np.array(classes),
+            bboxes=np.array(bboxes),
+            difficults=np.array(difficults))
+    return data
+
+
+def plot_objects(base_image_path, save_path, classes, confs, locs, class_names):
+    """画像＋オブジェクト([class_id + confidence + xmin/ymin/xmax/ymax]×n)を画像化する。
+
+    # 引数
+    - base_image_path: 元画像ファイルのパス
+    - save_path: 保存先画像ファイルのパス
+    - classes: クラスIDのリスト
+    - confs: confidenceのリスト (None可)
+    - locs: xmin/ymin/xmax/ymaxのリスト (それぞれ0.0 ～ 1.0)
+    - class_names: クラスID→クラス名のリスト  (None可)
+
+    """
+    import matplotlib.pyplot as plt
+
+    if confs is None:
+        confs = [None] * len(classes)
+    assert len(classes) == len(confs)
+    assert len(classes) == len(locs)
+    if class_names is not None:
+        assert 0 <= np.min(classes) < len(class_names)
+        assert 0 <= np.max(classes) < len(class_names)
+
+    colors = plt.cm.hsv(np.linspace(0, 1, len(class_names))).tolist()
+
+    img = scipy.misc.imread(str(base_image_path), mode='RGB')
+    plt.imshow(img / 255.)
+    gca = plt.gca()
+    for classid, conf, loc in zip(classes, confs, locs):
+        xmin = int(round(loc[0] * img.shape[1]))
+        ymin = int(round(loc[1] * img.shape[0]))
+        xmax = int(round(loc[2] * img.shape[1]))
+        ymax = int(round(loc[3] * img.shape[0]))
+        label = class_names[classid] if class_names else str(classid)
+        if conf is None:
+            txt = label
+        else:
+            txt = '{:0.2f}, {}'.format(conf, label)
+        color = colors[classid]
+        gca.add_patch(plt.Rectangle(
+            (xmin, ymin), xmax - xmin + 1, ymax - ymin + 1,
+            fill=False, edgecolor=color, linewidth=2))
+        gca.text(xmin, ymin, txt, bbox={'facecolor': color, 'alpha': 0.5})
+
+    save_path = pathlib.Path(save_path)
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(str(save_path))
     plt.close()

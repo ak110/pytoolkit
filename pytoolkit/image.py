@@ -132,13 +132,15 @@ class ImageDataGenerator(dl.Generator):
         # 画像の読み込み
         rgb = self._load_image(x)
 
-        # Data Augmentation
+        # 変形を伴うData Augmentation
         if data_augmentation:
-            # 変形を伴うData Augmentation
             rgb = self._transform(rgb, rand)
-            # リサイズ
-            rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=None)
-            # 変形を伴わないData Augmentation
+
+        # リサイズ
+        rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=None)
+
+        # 変形を伴わないData Augmentation
+        if data_augmentation:
             augmentors = self.augmentors[:]
             rand.shuffle(augmentors)  # シャッフルして色々な順で適用
             for a in augmentors:
@@ -146,8 +148,6 @@ class ImageDataGenerator(dl.Generator):
                     rgb = a.augmentor.execute(rgb, rand)
             # 色が範囲外になっていたら補正(飽和)
             rgb = np.clip(rgb, 0, 255)
-        else:
-            rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=None)
 
         # preprocess_input
         pi = self.preprocess_input if self.preprocess_input else preprocess_input_abs1
