@@ -467,7 +467,8 @@ def categorical_focal_loss(y_true, y_pred, nb_classes, alpha=0.25, gamma=2.0):
     import keras.backend as K
     y_pred = K.clip(y_pred, K.epsilon(), 1 - K.epsilon())
 
-    class_weights = np.array([alpha] * 1 + [(1 - alpha)] * (nb_classes - 1))
+    class_weights = np.array([1 - alpha] * 1 + [alpha] * (nb_classes - 1))
+    class_weights *= nb_classes / class_weights.sum()  # normalize
     class_weights = np.reshape(class_weights, (1, 1, -1))
 
     loss_conf = -K.sum(K.pow(1 - y_pred, gamma) * y_true * K.log(y_pred) * class_weights, axis=-1)
@@ -475,19 +476,39 @@ def categorical_focal_loss(y_true, y_pred, nb_classes, alpha=0.25, gamma=2.0):
 
 
 def focal_loss_kernel_initializer():
-    """"focal loss用の最後のクラス分類のconvのkernelのinitializer。"""
+    """"focal loss用の最後のクラス分類のkernel_initializer。"""
     import keras
-    # return keras.initializers.normal(0, 0.01)
-    return keras.initializers.zeros()
+    return keras.initializers.normal(0, 0.01)
 
 
 def focal_loss_bias_initializer(nb_classes):
-    """"focal loss用の最後のクラス分類のconvのbiasのinitializer。nb_classesは背景を含むクラス数。0が背景。"""
-    pi = 0.01
-    x = np.log(((nb_classes - 1) * (1 - pi)) / pi) / 2
-    bias = [x] + [-x] * (nb_classes - 1)  # 背景が0.99%になるような値。21クラス分類なら±3.8くらい。(結構大きい…)
+    """"focal loss用の最後のクラス分類のbias_initializer。nb_classesは背景を含むクラス数。0が背景。"""
     import keras
-    return keras.initializers.constant(bias)
+
+    class FocalLossBiasInitializer(keras.initializers.Initializer):
+        """"focal loss用の最後のクラス分類のbias_initializer。
+
+        # 引数
+        - nb_classes: 背景を含むクラス数。class 0が背景。
+        """
+
+        def __init__(self, nb_classes=None):
+            self.nb_classes = nb_classes
+
+        def __call__(self, shape, dtype=None):
+            assert len(shape) == 1
+            assert shape[0] % self.nb_classes == 0
+            pi = 0.01
+            x = np.log(((nb_classes - 1) * (1 - pi)) / pi) / 2
+            bias = [x] + [-x] * (nb_classes - 1)  # 背景が0.99%になるような値。21クラス分類なら±3.8くらい。(結構大きい…)
+            bias = bias * (shape[0] // self.nb_classes)
+            import keras.backend as K
+            return K.constant(bias, shape=shape, dtype=dtype)
+
+        def get_config(self):
+            return {'nb_classes': self.nb_classes}
+
+    return FocalLossBiasInitializer(nb_classes)
 
 
 def l1_smooth_loss(y_true, y_pred):
@@ -499,9 +520,3 @@ def l1_smooth_loss(y_true, y_pred):
     l1_loss = tf.where(K.less(abs_loss, 1.0), sq_loss, abs_loss - 0.5)
     l1_loss = K.sum(l1_loss, axis=-1)
     return l1_loss
-
-
-def drop_epsilon(loss_values):
-    """`K.epsilon()`未満の値を0にしてしまう。これを使うと数値的に安定すると思いたい。"""
-    import keras.backend as K
-    return loss_values * K.cast(K.greater_equal(loss_values, K.epsilon()), K.floatx())
