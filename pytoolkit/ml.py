@@ -12,11 +12,6 @@ import sklearn.base
 import sklearn.model_selection
 import sklearn.utils
 
-# VOC2007などのアノテーションデータを持つためのnamedtuple
-# classes、bboxes、difficultsはそれぞれbounding boxの数分の配列。
-ObjectsAnnotation = collections.namedtuple(
-    'ObjectsAnnotation', 'folder,filename,width,height,classes,bboxes,difficults')
-
 # VOC2007のクラス名のリスト (20クラス)
 VOC_CLASS_NAMES = [
     'aeroplane',
@@ -40,6 +35,59 @@ VOC_CLASS_NAMES = [
     'train',
     'tvmonitor',
 ]
+
+
+class ObjectsAnnotation(object):
+    """VOC2007などのアノテーションデータを持つためのクラス。"""
+
+    def __init__(self, folder, filename, width, height, classes, bboxes, difficults=None):
+        assert len(classes) == len(bboxes)
+        assert difficults is None or len(classes) == len(difficults)
+        self.folder = folder
+        self.filename = filename
+        self.width = width
+        self.height = height
+        self.classes = np.array(classes)
+        self.bboxes = np.array(bboxes)
+        self.difficults = np.array(difficults) if difficults is not None else np.zeros(len(classes))
+
+    @staticmethod
+    def load_voc(annotations_dir, class_name_to_id):
+        """VOC2007などのアノテーションデータの読み込み。
+
+        結果は「画像ファイル名拡張子なし」とObjectsAnnotationのdict。
+        """
+        data = {}
+        for f in pathlib.Path(annotations_dir).iterdir():
+            root = xml.etree.ElementTree.parse(str(f)).getroot()
+            folder = root.find('folder').text
+            filename = root.find('filename').text
+            size_tree = root.find('size')
+            width = float(size_tree.find('width').text)
+            height = float(size_tree.find('height').text)
+            classes = []
+            bboxes = []
+            difficults = []
+            for object_tree in root.findall('object'):
+                class_id = class_name_to_id[object_tree.find('name').text]
+                bndbox = object_tree.find('bndbox')
+                xmin = float(bndbox.find('xmin').text) / width
+                ymin = float(bndbox.find('ymin').text) / height
+                xmax = float(bndbox.find('xmax').text) / width
+                ymax = float(bndbox.find('ymax').text) / height
+                difficult = object_tree.find('difficult').text == '1'
+                classes.append(class_id)
+                bboxes.append([xmin, ymin, xmax, ymax])
+                difficults.append(difficult)
+            data[f.stem] = ObjectsAnnotation(
+                folder=folder,
+                filename=filename,
+                width=width,
+                height=height,
+                classes=classes,
+                bboxes=bboxes,
+                difficults=difficults)
+        return data
 
 
 def compute_map(gt_classes_list, gt_bboxes_list, gt_difficults_list,
