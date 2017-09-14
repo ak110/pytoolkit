@@ -53,6 +53,43 @@ def destandarization_layer_factory():
     return Destandarization
 
 
+def l2normalization_layer():
+    """クラスを作って返す。"""
+    import keras
+    import keras.backend as K
+
+    class L2Normalization(keras.layers.Layer):
+        """L2 Normalizationレイヤー"""
+
+        def __init__(self, scale=1, **kargs):
+            self.scale = scale
+            self.gamma = None
+            super().__init__(**kargs)
+
+        def build(self, input_shape):
+            ch_axis = 3 if K.image_data_format() == 'channels_last' else 1
+            shape = (input_shape[ch_axis],)
+            init_gamma = self.scale * np.ones(shape)
+            self.gamma = self.add_weight(name='gamma',
+                                         shape=shape,
+                                         initializer=keras.initializers.constant(init_gamma),
+                                         trainable=True)
+            return super().build(input_shape)
+
+        def call(self, inputs, **kwargs):
+            ch_axis = 3 if K.image_data_format() == 'channels_last' else 1
+            output = K.l2_normalize(inputs, ch_axis)
+            output *= self.gamma
+            return output
+
+        def get_config(self):
+            config = {'scale': self.scale}
+            base_config = super().get_config()
+            return dict(list(base_config.items()) + list(config.items()))
+
+    return L2Normalization
+
+
 def weighted_mean_layer_factory():
     """クラスを作って返す。"""
     import keras
@@ -109,6 +146,7 @@ def get_custom_objects():
     return {
         'Destandarization': destandarization_layer_factory(),
         'WeightedMean': weighted_mean_layer_factory(),
+        'L2Normalization': l2normalization_layer(),
     }
 
 
@@ -462,10 +500,23 @@ class Generator(object):
         return X, y, weights
 
 
+def categorical_crossentropy(y_true, y_pred, nb_classes, alpha=0.9):
+    """αによるclass=0とそれ以外の重み可変ありのcategorical_crossentropy。"""
+    import keras.backend as K
+    y_pred = K.maximum(y_pred, K.epsilon())
+
+    class_weights = np.array([1 - alpha] * 1 + [alpha] * (nb_classes - 1))
+    class_weights *= nb_classes / class_weights.sum()  # normalize
+    class_weights = np.reshape(class_weights, (1, 1, -1))
+
+    loss_conf = -K.sum(y_true * K.log(y_pred), axis=-1)
+    return loss_conf
+
+
 def categorical_focal_loss(y_true, y_pred, nb_classes, alpha=0.25, gamma=2.0):
     """多クラス分類用focal loss (https://arxiv.org/pdf/1708.02002v1.pdf)。"""
     import keras.backend as K
-    y_pred = K.clip(y_pred, K.epsilon(), 1 - K.epsilon())
+    y_pred = K.maximum(y_pred, K.epsilon())
 
     class_weights = np.array([1 - alpha] * 1 + [alpha] * (nb_classes - 1))
     class_weights *= nb_classes / class_weights.sum()  # normalize
@@ -499,8 +550,8 @@ def focal_loss_bias_initializer(nb_classes):
             assert len(shape) == 1
             assert shape[0] % self.nb_classes == 0
             pi = 0.01
-            x = np.log(((nb_classes - 1) * (1 - pi)) / pi) / 2
-            bias = [x] + [-x] * (nb_classes - 1)  # 背景が0.99%になるような値。21クラス分類なら±3.8くらい。(結構大きい…)
+            x = np.log(((nb_classes - 1) * (1 - pi)) / pi)
+            bias = [x] + [0] * (nb_classes - 1)  # 背景が0.99%になるような値。21クラス分類なら7.6くらい。(結構大きい…)
             bias = bias * (shape[0] // self.nb_classes)
             import keras.backend as K
             return K.constant(bias, shape=shape, dtype=dtype)
