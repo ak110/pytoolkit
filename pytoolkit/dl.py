@@ -500,40 +500,38 @@ class Generator(object):
         return X, y, weights
 
 
-def categorical_crossentropy(y_true, y_pred, nb_classes, alpha=0.9):
+def categorical_crossentropy(y_true, y_pred, alpha=0.9):
     """αによるclass=0とそれ以外の重み可変ありのcategorical_crossentropy。"""
     import keras.backend as K
-    y_pred = K.maximum(y_pred, K.epsilon())
 
+    assert K.image_data_format() == 'channels_last'
+    nb_classes = K.int_shape(y_pred)[-1]
     class_weights = np.array([1 - alpha] * 1 + [alpha] * (nb_classes - 1))
     class_weights *= nb_classes / class_weights.sum()  # normalize
     class_weights = np.reshape(class_weights, (1, 1, -1))
+    class_weights = -class_weights  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
 
-    loss_conf = -K.sum(y_true * K.log(y_pred), axis=-1)
-    return loss_conf
+    y_pred = K.maximum(y_pred, K.epsilon())
+    return K.sum(y_true * K.log(y_pred), axis=-1)
 
 
-def categorical_focal_loss(y_true, y_pred, nb_classes, alpha=0.25, gamma=2.0):
+def categorical_focal_loss(y_true, y_pred, alpha=0.25, gamma=2.0):
     """多クラス分類用focal loss (https://arxiv.org/pdf/1708.02002v1.pdf)。"""
     import keras.backend as K
-    y_pred = K.maximum(y_pred, K.epsilon())
 
+    assert K.image_data_format() == 'channels_last'
+    nb_classes = K.int_shape(y_pred)[-1]
     class_weights = np.array([1 - alpha] * 1 + [alpha] * (nb_classes - 1))
     class_weights *= nb_classes / class_weights.sum()  # normalize
     class_weights = np.reshape(class_weights, (1, 1, -1))
+    class_weights = -class_weights  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
 
-    loss_conf = -K.sum(K.pow(1 - y_pred, gamma) * y_true * K.log(y_pred) * class_weights, axis=-1)
-    return loss_conf
-
-
-def focal_loss_kernel_initializer():
-    """"focal loss用の最後のクラス分類のkernel_initializer。"""
-    import keras
-    return keras.initializers.normal(0, 0.01)
+    y_pred = K.maximum(y_pred, K.epsilon())
+    return K.sum(K.pow(1 - y_pred, gamma) * y_true * K.log(y_pred) * class_weights, axis=-1)
 
 
-def focal_loss_bias_initializer(nb_classes):
-    """"focal loss用の最後のクラス分類のbias_initializer。nb_classesは背景を含むクラス数。0が背景。"""
+def od_bias_initializer(nb_classes, pi=0.01):
+    """"Object Detectionの最後のクラス分類のbias_initializer。nb_classesは背景を含むクラス数。0が背景。"""
     import keras
 
     class FocalLossBiasInitializer(keras.initializers.Initializer):
@@ -543,14 +541,14 @@ def focal_loss_bias_initializer(nb_classes):
         - nb_classes: 背景を含むクラス数。class 0が背景。
         """
 
-        def __init__(self, nb_classes=None):
+        def __init__(self, nb_classes=None, pi=0.01):
             self.nb_classes = nb_classes
+            self.pi = pi
 
         def __call__(self, shape, dtype=None):
             assert len(shape) == 1
             assert shape[0] % self.nb_classes == 0
-            pi = 0.01
-            x = np.log(((nb_classes - 1) * (1 - pi)) / pi)
+            x = np.log(((nb_classes - 1) * (1 - self.pi)) / self.pi)
             bias = [x] + [0] * (nb_classes - 1)  # 背景が0.99%になるような値。21クラス分類なら7.6くらい。(結構大きい…)
             bias = bias * (shape[0] // self.nb_classes)
             import keras.backend as K
@@ -559,7 +557,7 @@ def focal_loss_bias_initializer(nb_classes):
         def get_config(self):
             return {'nb_classes': self.nb_classes}
 
-    return FocalLossBiasInitializer(nb_classes)
+    return FocalLossBiasInitializer(nb_classes, pi)
 
 
 def l1_smooth_loss(y_true, y_pred):
