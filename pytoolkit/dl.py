@@ -531,11 +531,11 @@ def categorical_focal_loss(y_true, y_pred, alpha=0.25, gamma=2.0):
 
 
 def od_bias_initializer(nb_classes, pi=0.01):
-    """"Object Detectionの最後のクラス分類のbias_initializer。nb_classesは背景を含むクラス数。0が背景。"""
+    """Object Detectionの最後のクラス分類のbias_initializer。nb_classesは背景を含むクラス数。0が背景。"""
     import keras
 
     class FocalLossBiasInitializer(keras.initializers.Initializer):
-        """"focal loss用の最後のクラス分類のbias_initializer。
+        """focal loss用の最後のクラス分類のbias_initializer。
 
         # 引数
         - nb_classes: 背景を含むクラス数。class 0が背景。
