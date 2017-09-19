@@ -13,6 +13,19 @@ import pandas as pd
 import sklearn.utils
 
 
+def conv2d(filters, kernel_size, activation, name, use_bn=True, **kargs):
+    """Conv2D+BN+Activationの簡単なヘルパー。"""
+    import keras
+    if use_bn:
+        x = inputs = keras.layers.Input((None, None, None))
+        x = keras.layers.Conv2D(filters, kernel_size, use_bias=False, name=name, **kargs)(x)
+        x = keras.layers.BatchNormalization(name=name + '_bn')(x)
+        x = keras.layers.Activation(activation, name=name + '_act')(x)
+        return keras.engine.topology.Container(inputs, x, name)
+    else:
+        return keras.layers.Conv2D(filters, kernel_size, activation=activation, name=name, **kargs)
+
+
 def destandarization_layer_factory():
     """クラスを作って返す。"""
     import keras
