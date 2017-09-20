@@ -41,7 +41,17 @@ def sepconv2d(filters, kernel_size, activation, name, use_bn=True, **kargs):
         return keras.layers.Conv2D(filters, kernel_size, activation=activation, name=name, **kargs)
 
 
-def destandarization_layer_factory():
+def get_custom_objects():
+    """独自レイヤーのdictを返す。"""
+    return {
+        'Destandarization': destandarization_layer(),
+        'StocasticAdd': stocastic_add_layer(),
+        'L2Normalization': l2normalization_layer(),
+        'WeightedMean': weighted_mean_layer(),
+    }
+
+
+def destandarization_layer():
     """クラスを作って返す。"""
     import keras
     import keras.backend as K
@@ -81,12 +91,71 @@ def destandarization_layer_factory():
     return Destandarization
 
 
+def stocastic_add_layer():
+    """クラスを作って返す。"""
+    import keras
+    import keras.backend as K
+
+    class StocasticAdd(keras.engine.topology.Layer):
+        """Stocastic Depthのための確率的な加算。
+
+        # 引数
+        - p: survival probability。1だとdropせず、0.5だと1/2の確率でdrop
+
+        """
+
+        def __init__(self, survival_prob, calibration=True, **kargs):
+            assert 0 < survival_prob <= 1
+            self.survival_prob = float(survival_prob)
+            self.calibration = calibration
+            super().__init__(**kargs)
+
+        def call(self, inputs, training=None, **kwargs):
+            assert len(inputs) == 2
+
+            if self.survival_prob >= 1:
+                return inputs[0] + inputs[1]
+
+            def _add():
+                return inputs[0] + inputs[1]
+
+            def _drop():
+                return inputs[0]
+
+            def _stocastic_add():
+                r = K.random_uniform((1,), 0, 1)[0]
+                return K.switch(K.less_equal(r, self.survival_prob), _add, _drop)
+
+            def _calibrated_add():
+                if self.calibration:
+                    return inputs[0] + inputs[1] * self.survival_prob
+                else:
+                    return inputs[0] + inputs[1]
+
+            return K.in_train_phase(_stocastic_add, _calibrated_add, training=training)
+
+        def compute_output_shape(self, input_shape):
+            assert input_shape and len(input_shape) == 2
+            assert input_shape[0] == input_shape[1]
+            return input_shape[0]
+
+        def get_config(self):
+            config = {
+                'survival_prob': self.survival_prob,
+                'calibration': self.calibration,
+            }
+            base_config = super().get_config()
+            return dict(list(base_config.items()) + list(config.items()))
+
+    return StocasticAdd
+
+
 def l2normalization_layer():
     """クラスを作って返す。"""
     import keras
     import keras.backend as K
 
-    class L2Normalization(keras.layers.Layer):
+    class L2Normalization(keras.engine.topology.Layer):
         """L2 Normalizationレイヤー"""
 
         def __init__(self, scale=1, **kargs):
@@ -118,7 +187,7 @@ def l2normalization_layer():
     return L2Normalization
 
 
-def weighted_mean_layer_factory():
+def weighted_mean_layer():
     """クラスを作って返す。"""
     import keras
     import keras.backend as K
@@ -167,15 +236,6 @@ def weighted_mean_layer_factory():
             return dict(list(base_config.items()) + list(config.items()))
 
     return WeightedMean
-
-
-def get_custom_objects():
-    """独自レイヤーのdictを返す。"""
-    return {
-        'Destandarization': destandarization_layer_factory(),
-        'WeightedMean': weighted_mean_layer_factory(),
-        'L2Normalization': l2normalization_layer(),
-    }
 
 
 def my_callback_factory():
