@@ -27,6 +27,20 @@ def conv2d(filters, kernel_size, activation, name, use_bn=True, **kargs):
         return keras.layers.Conv2D(filters, kernel_size, activation=activation, name=name, **kargs)
 
 
+def sepconv2d(filters, kernel_size, activation, name, use_bn=True, **kargs):
+    """SeparableConv2D+BN+Activationの簡単なヘルパー。"""
+    import keras
+    if use_bn:
+        def _conv2d(x):
+            x = keras.layers.SeparableConv2D(filters, kernel_size, use_bias=False, name=name, **kargs)(x)
+            x = keras.layers.BatchNormalization(name=name + '_bn')(x)
+            x = keras.layers.Activation(activation, name=name + '_act')(x)
+            return x
+        return _conv2d
+    else:
+        return keras.layers.Conv2D(filters, kernel_size, activation=activation, name=name, **kargs)
+
+
 def destandarization_layer_factory():
     """クラスを作って返す。"""
     import keras
