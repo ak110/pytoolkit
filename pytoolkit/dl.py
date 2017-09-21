@@ -13,13 +13,17 @@ import pandas as pd
 import sklearn.utils
 
 
-def conv2d(filters, kernel_size, activation, name, use_bn=True, **kargs):
+def conv2d(filters, kernel_size, activation, name, use_bn=True, use_batch_renorm=False, **kargs):
     """Conv2D+BN+Activationの簡単なヘルパー。"""
     import keras
     if use_bn:
         def _conv2d(x):
             x = keras.layers.Conv2D(filters, kernel_size, use_bias=False, name=name, **kargs)(x)
-            x = keras.layers.BatchNormalization(name=name + '_bn')(x)
+            if use_batch_renorm:
+                import keras_contrib
+                x = keras_contrib.layers.BatchRenormalization(name=name + '_brn')(x)
+            else:
+                x = keras.layers.BatchNormalization(name=name + '_bn')(x)
             x = keras.layers.Activation(activation, name=name + '_act')(x)
             return x
         return _conv2d
@@ -27,13 +31,17 @@ def conv2d(filters, kernel_size, activation, name, use_bn=True, **kargs):
         return keras.layers.Conv2D(filters, kernel_size, activation=activation, name=name, **kargs)
 
 
-def sepconv2d(filters, kernel_size, activation, name, use_bn=True, **kargs):
+def sepconv2d(filters, kernel_size, activation, name, use_bn=True, use_batch_renorm=False, **kargs):
     """SeparableConv2D+BN+Activationの簡単なヘルパー。"""
     import keras
     if use_bn:
         def _conv2d(x):
             x = keras.layers.SeparableConv2D(filters, kernel_size, use_bias=False, name=name, **kargs)(x)
-            x = keras.layers.BatchNormalization(name=name + '_bn')(x)
+            if use_batch_renorm:
+                import keras_contrib
+                x = keras_contrib.layers.BatchRenormalization(name=name + '_brn')(x)
+            else:
+                x = keras.layers.BatchNormalization(name=name + '_bn')(x)
             x = keras.layers.Activation(activation, name=name + '_act')(x)
             return x
         return _conv2d
@@ -588,19 +596,18 @@ class Generator(object):
         return X, y, weights
 
 
-def categorical_crossentropy(y_true, y_pred, alpha=0.9):
+def categorical_crossentropy(y_true, y_pred, alpha=0.75):
     """αによるclass=0とそれ以外の重み可変ありのcategorical_crossentropy。"""
     import keras.backend as K
 
     assert K.image_data_format() == 'channels_last'
     nb_classes = K.int_shape(y_pred)[-1]
-    class_weights = np.array([1 - alpha] * 1 + [alpha] * (nb_classes - 1))
-    class_weights *= nb_classes / class_weights.sum()  # normalize
+    class_weights = np.array([(1 - alpha) * 2] * 1 + [alpha * 2] * (nb_classes - 1))
     class_weights = np.reshape(class_weights, (1, 1, -1))
     class_weights = -class_weights  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
 
     y_pred = K.maximum(y_pred, K.epsilon())
-    return K.sum(y_true * K.log(y_pred), axis=-1)
+    return K.sum(y_true * K.log(y_pred) * class_weights, axis=-1)
 
 
 def categorical_focal_loss(y_true, y_pred, alpha=0.25, gamma=2.0):
@@ -609,8 +616,7 @@ def categorical_focal_loss(y_true, y_pred, alpha=0.25, gamma=2.0):
 
     assert K.image_data_format() == 'channels_last'
     nb_classes = K.int_shape(y_pred)[-1]
-    class_weights = np.array([1 - alpha] * 1 + [alpha] * (nb_classes - 1))
-    class_weights *= nb_classes / class_weights.sum()  # normalize
+    class_weights = np.array([(1 - alpha) * 2] * 1 + [alpha * 2] * (nb_classes - 1))
     class_weights = np.reshape(class_weights, (1, 1, -1))
     class_weights = -class_weights  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
 
