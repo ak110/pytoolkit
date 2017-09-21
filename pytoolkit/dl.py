@@ -4,6 +4,7 @@ kerasをimportしてしまうとTensorFlowの初期化が始まって重いの�
 importしただけではkerasがimportされないように作っている。
 
 """
+import os
 import csv
 import pathlib
 import warnings
@@ -445,6 +446,8 @@ def session(config=None, gpu_options=None):
                 import tensorflow as tf
                 self.config.update({'allow_soft_placement': True})
                 self.gpu_options.update({'allow_growth': True})
+                if 'OMP_NUM_THREADS' in os.environ and 'intra_op_parallelism_threads' not in self.config:
+                    self.config['intra_op_parallelism_threads'] = int(os.environ['OMP_NUM_THREADS'])
                 K.set_session(
                     tf.Session(
                         config=tf.ConfigProto(
@@ -663,3 +666,62 @@ def l1_smooth_loss(y_true, y_pred):
     l1_loss = tf.where(K.less(abs_loss, 1.0), sq_loss, abs_loss - 0.5)
     l1_loss = K.sum(l1_loss, axis=-1)
     return l1_loss
+
+
+def load_weights(model, filepath, where_fn=None):
+    """重みの読み込み。
+
+    model.load_weights()は重みの形が違うと読み込めないが、
+    警告を出しつつ読むようにしたもの。
+
+    # 引数
+    - model: 読み込み先モデル。
+    - filepath: モデルのファイルパス。(str or pathlib.Path)
+    - where_fn: 読み込むレイヤー名を受け取り、読み込むか否かを返すcallable。
+    """
+    import h5py
+    import keras
+    import keras.backend as K
+    with h5py.File(str(filepath), mode='r') as f:
+        if 'layer_names' not in f.attrs and 'model_weights' in f:
+            f = f['model_weights']
+        if 'keras_version' in f.attrs:
+            original_keras_version = f.attrs['keras_version'].decode('utf8')
+        else:
+            original_keras_version = '1'
+        if 'backend' in f.attrs:
+            original_backend = f.attrs['backend'].decode('utf8')
+        else:
+            original_backend = None
+
+        layer_names = [n.decode('utf8') for n in f.attrs['layer_names']]
+
+        weight_value_tuples = []
+        for k, name in enumerate(layer_names):
+            if where_fn is not None and not where_fn(name):
+                continue
+
+            try:
+                layer = model.get_layer(name=name)
+            except ValueError as e:
+                warnings.warn(str(e))
+                continue
+
+            g = f[name]
+            weight_names = [n.decode('utf8') for n in g.attrs['weight_names']]
+            weight_values = [g[weight_name] for weight_name in weight_names]
+
+            symbolic_weights = layer.weights
+            weight_values = keras.engine.topology.preprocess_weights_for_loading(
+                layer,
+                weight_values,
+                original_keras_version,
+                original_backend)
+            if len(weight_values) != len(symbolic_weights):
+                warnings.warn('Layer #' + str(k) + ' (named "' + layer.name + '") expects ' +
+                              str(len(symbolic_weights)) + ' weight(s), but the saved weights' +
+                              ' have ' + str(len(weight_values)) + ' element(s).')
+                continue
+            for s, w in zip(symbolic_weights, weight_values):
+                weight_value_tuples.append((s, w))
+        K.batch_set_value(weight_value_tuples)
