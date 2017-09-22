@@ -662,7 +662,7 @@ def categorical_crossentropy(y_true, y_pred, alpha=0.75):
     class_weights = np.reshape(class_weights, (1, 1, -1))
     class_weights = -class_weights  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
 
-    y_pred = K.maximum(y_pred, K.epsilon())
+    y_pred = K.maximum(y_pred, 1e-2)  # 勾配があまり大きくならなくしておく。1e-2で4.6。1e-7だと16.1。
     return K.sum(y_true * K.log(y_pred) * class_weights, axis=-1)
 
 
@@ -676,7 +676,7 @@ def categorical_focal_loss(y_true, y_pred, alpha=0.25, gamma=2.0):
     class_weights = np.reshape(class_weights, (1, 1, -1))
     class_weights = -class_weights  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
 
-    y_pred = K.maximum(y_pred, K.epsilon())
+    y_pred = K.maximum(y_pred, 1e-2)  # 勾配があまり大きくならなくしておく。1e-2で4.6。1e-7だと16.1。
     return K.sum(K.pow(1 - y_pred, gamma) * y_true * K.log(y_pred) * class_weights, axis=-1)
 
 
