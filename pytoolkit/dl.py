@@ -4,14 +4,67 @@ kerasをimportしてしまうとTensorFlowの初期化が始まって重いの�
 importしただけではkerasがimportされないように作っている。
 
 """
-import os
 import csv
+import os
 import pathlib
 import warnings
 
 import numpy as np
 import pandas as pd
 import sklearn.utils
+
+from . import utils
+
+
+def create_data_parallel_model(model, gpu_count=None):
+    """複数GPUでデータ並列するモデルを作成する。"""
+    import keras
+    import keras.backend as K
+    import tensorflow as tf
+
+    if gpu_count is None:
+        gpu_count = utils.get_gpu_count()
+    if gpu_count <= 1:
+        return model
+
+    assert isinstance(model.inputs, list)
+    assert isinstance(model.outputs, list)
+
+    tower_outputs = []
+    for gpu in range(gpu_count):
+        with tf.device('/gpu:%d' % gpu):
+            with tf.name_scope('tower_%d' % gpu):  # pylint: disable=E1129
+
+                def _slice(index, count):
+                    def _func(x):
+                        input_shape = K.shape(x)
+                        sliced_batch_size = input_shape[0] // count
+                        if index == count - 1:
+                            return x[sliced_batch_size * index:]
+                        return x[sliced_batch_size * index:sliced_batch_size * (index + 1)]
+                    return _func
+
+                sliced_inputs = [keras.layers.Lambda(_slice(gpu, gpu_count))(x)
+                                 for x in model.inputs]
+
+                if len(sliced_inputs) == 1:
+                    sliced_inputs = sliced_inputs[0]
+                outputs = model(sliced_inputs)
+
+                if not isinstance(outputs, list):
+                    outputs = [outputs]
+                tower_outputs.append(outputs)
+
+    with tf.device('/cpu:0'):
+
+        def _concat(inputs):
+            return K.concatenate(inputs, axis=0)
+
+        merged = [keras.layers.Lambda(_concat)([to[i] for to in tower_outputs])
+                  for i
+                  in range(len(model.outputs))]
+
+        return keras.models.Model(model.inputs, merged, model.name + '_multi')
 
 
 def conv2d(filters, kernel_size, activation, name, use_bn=True, use_batch_renorm=False, **kargs):

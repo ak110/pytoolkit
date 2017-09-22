@@ -74,6 +74,8 @@ def nvidia_smi(*args):
 
 def get_gpu_count():
     """GPU数の取得。"""
+    if 'CUDA_VISIBLE_DEVICES' in os.environ:
+        return len(np.unique(os.environ['CUDA_VISIBLE_DEVICES'].split(',')))
     return int(ET.fromstring(nvidia_smi('-q', '-x')).find('./attached_gpus').text)
 
 
