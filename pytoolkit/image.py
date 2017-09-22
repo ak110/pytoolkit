@@ -1,6 +1,7 @@
 """画像処理関連"""
 import abc
 import collections
+import copy
 import pathlib
 
 import joblib  # pip install joblib
@@ -118,23 +119,23 @@ class ImageDataGenerator(dl.Generator):
                                     parallel=parallel, data_augmentation=data_augmentation, rand=random_state2):
                 yield tpl
 
-    def _prepare(self, X, y=None, weights=None, parallel=None, data_augmentation=False, rand=None):  # pylint: disable=arguments-differ
+    def _prepare(self, X, y, weights, parallel=None, data_augmentation=False, rand=None):  # pylint: disable=arguments-differ
         """画像の読み込みとDataAugmentation。"""
         seeds = rand.randint(0, 2 ** 31, len(X))
-        jobs = [joblib.delayed(self._load)(x, data_augmentation, seed) for x, seed in zip(X, seeds)]
-        X = np.array(parallel(jobs))
-        return super()._prepare(X, y, weights)
+        jobs = [joblib.delayed(self._load)(x, y_, w, data_augmentation, seed) for x, y_, w, seed in zip(X, y, weights, seeds)]
+        X, y, weights = zip(*parallel(jobs))
+        return super()._prepare(np.array(X), np.array(y), np.array(weights))
 
-    def _load(self, x, data_augmentation, seed):
+    def _load(self, x, y, w, data_augmentation, seed):
         """画像の読み込みとDataAugmentation。(単数)"""
         rand = np.random.RandomState(seed)  # 再現性やスレッドセーフ性に自信がないのでここではこれを使う。
 
         # 画像の読み込み
-        rgb = self._load_image(x)
+        rgb, y, w = self._load_image(x, copy.deepcopy(y), copy.deepcopy(w))
 
         # 変形を伴うData Augmentation
         if data_augmentation:
-            rgb = self._transform(rgb, rand)
+            rgb, y, w = self._transform(rgb, y, w, rand)
 
         # リサイズ
         rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=None)
@@ -154,9 +155,9 @@ class ImageDataGenerator(dl.Generator):
         rgb = np.expand_dims(rgb, axis=0)
         rgb = pi(rgb)
         rgb = np.squeeze(rgb, axis=0)
-        return rgb
+        return rgb, y, w
 
-    def _load_image(self, x):
+    def _load_image(self, x, y, w):
         """画像の読み込み"""
         if isinstance(x, np.ndarray):
             rgb = x.astype(np.float32)
@@ -165,16 +166,16 @@ class ImageDataGenerator(dl.Generator):
             assert isinstance(x, (str, pathlib.Path))
             color_mode = 'L' if self.grayscale else 'RGB'
             rgb = ndimage.load(x, color_mode)
-        return rgb
+        return rgb, y, w
 
-    def _transform(self, rgb, rand):
+    def _transform(self, rgb: np.ndarray, y, w, rand: np.random.RandomState):
         """変形を伴うAugmentation。"""
         # 回転
         if rand.rand() <= self.rotate_prob:
             rgb = ndimage.random_rotate(rgb, rand, degrees=self.rotate_degrees)
         # padding+crop
         rgb = ndimage.random_crop(rgb, rand, self.padding_rate, self.crop_rate, aspect_rations=self.aspect_rations)
-        return rgb
+        return rgb, y, w
 
 
 def preprocess_input_mean(x: np.ndarray):
@@ -199,6 +200,13 @@ def preprocess_input_abs1(x: np.ndarray):
     """
     x /= 127.5
     x -= 1
+    return x
+
+
+def unpreprocess_input_abs1(x: np.ndarray):
+    """`preprocess_input_abs1`の逆変換。"""
+    x += 1
+    x *= 127.5
     return x
 
 

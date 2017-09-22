@@ -67,17 +67,23 @@ def pad(rgb: np.ndarray, width: int, height: int, padding='same') -> np.ndarray:
     assert width >= 0
     assert height >= 0
     assert padding in ('same', 'zero')
+    x1 = max(0, (width - rgb.shape[1]) // 2)
+    y1 = max(0, (height - rgb.shape[0]) // 2)
+    x2 = width - rgb.shape[1] - x1
+    y2 = height - rgb.shape[0] - y1
+    rgb = pad_ltrb(rgb, x1, y1, x2, y2, width, height, padding)
+    assert rgb.shape[1] == width and rgb.shape[0] == height
+    return rgb
+
+
+def pad_ltrb(rgb: np.ndarray, x1: int, y1: int, x2: int, y2: int, padding='same'):
+    """パディング。x1/y1/x2/y2は左/上/右/下のパディング量。"""
+    assert padding in ('same', 'zero')
     if padding == 'same':
         padding = 'edge'
     elif padding == 'zero':
         padding = 'constant'
-    h1 = max(0, (width - rgb.shape[1]) // 2)
-    v1 = max(0, (height - rgb.shape[0]) // 2)
-    h2 = width - rgb.shape[1] - h1
-    v2 = height - rgb.shape[0] - v1
-    rgb = np.pad(rgb, ((v1, v2), (h1, h2), (0, 0)), mode=padding)
-    assert rgb.shape[1] == width and rgb.shape[0] == height
-    return rgb
+    return np.pad(rgb, ((y1, y2), (x1, x2), (0, 0)), mode=padding)
 
 
 def crop(rgb: np.ndarray, x: int, y: int, width: int, height: int) -> np.ndarray:

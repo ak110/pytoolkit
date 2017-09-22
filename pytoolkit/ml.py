@@ -341,11 +341,11 @@ def load_voc_annotations(annotations_dir, class_name_to_id):
     return data
 
 
-def plot_objects(base_image_path, save_path, classes, confs, locs, class_names):
+def plot_objects(base_image, save_path, classes, confs, locs, class_names):
     """画像＋オブジェクト([class_id + confidence + xmin/ymin/xmax/ymax]×n)を画像化する。
 
     # 引数
-    - base_image_path: 元画像ファイルのパス
+    - base_image: 元画像ファイルのパスまたはndarray
     - save_path: 保存先画像ファイルのパス
     - classes: クラスIDのリスト
     - confs: confidenceのリスト (None可)
@@ -365,7 +365,12 @@ def plot_objects(base_image_path, save_path, classes, confs, locs, class_names):
 
     colors = plt.cm.hsv(np.linspace(0, 1, len(class_names))).tolist()
 
-    img = scipy.misc.imread(str(base_image_path), mode='RGB')
+    if isinstance(base_image, (str, pathlib.Path)):
+        img = scipy.misc.imread(str(base_image), mode='RGB')
+    elif isinstance(base_image, np.ndarray):
+        img = base_image
+    else:
+        raise ValueError('type error: type(base_image)={}'.format(type(base_image)))
     plt.imshow(img / 255.)
     gca = plt.gca()
     for classid, conf, loc in zip(classes, confs, locs):

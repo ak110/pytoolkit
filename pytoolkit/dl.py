@@ -501,10 +501,8 @@ def session(config=None, gpu_options=None):
                 self.gpu_options.update({'allow_growth': True})
                 if 'OMP_NUM_THREADS' in os.environ and 'intra_op_parallelism_threads' not in self.config:
                     self.config['intra_op_parallelism_threads'] = int(os.environ['OMP_NUM_THREADS'])
-                K.set_session(
-                    tf.Session(
-                        config=tf.ConfigProto(
-                            **self.config, gpu_options=tf.GPUOptions(**self.gpu_options))))
+                config = tf.ConfigProto(gpu_options=tf.GPUOptions(**self.gpu_options), **self.config)
+                K.set_session(tf.Session(config=config))
 
         def __exit__(self, *exc_info):
             if K.backend() == 'tensorflow':
@@ -619,9 +617,9 @@ class Generator(object):
 
             if y is None:
                 assert weights is None
-                yield self._prepare(x_, **kargs)[0]
+                yield self._prepare(x_, np.array([None] * len(x_)), np.array([None] * len(x_)), **kargs)[0]
             elif weights is None:
-                yield self._prepare(x_, y_, **kargs)[:2]
+                yield self._prepare(x_, y_, np.array([None] * len(x_)), **kargs)[:2]
             else:
                 yield self._prepare(x_, y_, weights[ix], **kargs)
 
@@ -643,12 +641,17 @@ class Generator(object):
         """1epochが何ステップかを算出して返す"""
         return (data_count + batch_size - 1) // batch_size
 
-    def _prepare(self, X, y=None, weights=None, **_):  # pylint: disable=no-self-use
+    def _prepare(self, X, y, weights, **_):  # pylint: disable=no-self-use
         """何か前処理が必要な場合はこれをオーバーライドして使う。
 
         画像の読み込みとかDataAugmentationとか。
         yやweightsは使わない場合そのまま返せばOK。(使う場合はテスト時とかのNoneに注意。)
         """
+        assert isinstance(X, np.ndarray)
+        assert isinstance(y, np.ndarray)
+        assert isinstance(weights, np.ndarray)
+        assert X.shape[0] == y.shape[0]
+        assert X.shape[0] == weights.shape[0]
         return X, y, weights
 
 
