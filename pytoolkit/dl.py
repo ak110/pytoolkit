@@ -17,7 +17,13 @@ from . import utils
 
 
 def create_data_parallel_model(model, gpu_count=None):
-    """複数GPUでデータ並列するモデルを作成する。"""
+    """複数GPUでデータ並列するモデルを作成する。
+
+    # 参考
+    https://github.com/fchollet/keras/issues/2436
+    https://github.com/kuza55/keras-extras/blob/master/utils/multi_gpu.py
+
+    """
     import keras
     import keras.backend as K
     import tensorflow as tf
@@ -30,33 +36,36 @@ def create_data_parallel_model(model, gpu_count=None):
     assert isinstance(model.inputs, list)
     assert isinstance(model.outputs, list)
 
-    tower_outputs = []
-    for gpu in range(gpu_count):
-        with tf.device('/gpu:%d' % gpu):
-            with tf.name_scope('tower_%d' % gpu):  # pylint: disable=E1129
-
-                def _slice(index, count):
-                    def _func(x):
-                        input_shape = K.shape(x)
-                        sliced_batch_size = input_shape[0] // count
-                        if index == count - 1:
-                            return x[sliced_batch_size * index:]
-                        return x[sliced_batch_size * index:sliced_batch_size * (index + 1)]
-                    return _func
-
-                sliced_inputs = [keras.layers.Lambda(_slice(gpu, gpu_count))(x)
-                                 for x in model.inputs]
-
-                if len(sliced_inputs) == 1:
-                    sliced_inputs = sliced_inputs[0]
-                outputs = model(sliced_inputs)
-
-                if not isinstance(outputs, list):
-                    outputs = [outputs]
-                tower_outputs.append(outputs)
-
+    # 入力をGPU数分に分割する。(CPU側で)
+    tower_inputs = []
     with tf.device('/cpu:0'):
+        for gpu in range(gpu_count):
+            def _slice(x, index, count):
+                input_shape = K.shape(x)
+                sliced_batch_size = input_shape[0] // count
+                if index == count - 1:
+                    return x[sliced_batch_size * index:]
+                return x[sliced_batch_size * index:sliced_batch_size * (index + 1)]
 
+            args = {'index': gpu, 'count': gpu_count}
+            tower_inputs.append([keras.layers.Lambda(_slice, arguments=args)(x)
+                                 for x in model.inputs])
+
+    # 各GPUでモデルを実行
+    tower_outputs = []
+    for gpu, sliced_inputs in zip(range(gpu_count), tower_inputs):
+        with tf.device('/gpu:%d' % gpu), tf.name_scope('tower_%d' % gpu):  # pylint: disable=E1129
+
+            if len(sliced_inputs) == 1:
+                sliced_inputs = sliced_inputs[0]
+            outputs = model(sliced_inputs)
+            if not isinstance(outputs, list):
+                outputs = [outputs]
+
+            tower_outputs.append(outputs)
+
+    # CPUで結果をマージ
+    with tf.device('/cpu:0'):
         def _concat(inputs):
             return K.concatenate(inputs, axis=0)
 
@@ -64,7 +73,17 @@ def create_data_parallel_model(model, gpu_count=None):
                   for i
                   in range(len(model.outputs))]
 
-        return keras.models.Model(model.inputs, merged, model.name + '_multi')
+        parallel_model = keras.models.Model(model.inputs, merged, model.name + '_parallel')
+
+    # Model.saveの置き換え
+    # https://github.com/fchollet/keras/issues/2436#issuecomment-294243024
+    def _save(self_, filepath, overwrite=True):
+        assert self_ is not None  # noqa
+        model.save(filepath, overwrite)
+
+    parallel_model.save = type(model.save)(_save, parallel_model)
+
+    return parallel_model
 
 
 def conv2d(filters, kernel_size, activation, name, use_bn=True, use_batch_renorm=False, **kargs):
