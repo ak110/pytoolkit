@@ -71,7 +71,7 @@ def pad(rgb: np.ndarray, width: int, height: int, padding='same') -> np.ndarray:
     y1 = max(0, (height - rgb.shape[0]) // 2)
     x2 = width - rgb.shape[1] - x1
     y2 = height - rgb.shape[0] - y1
-    rgb = pad_ltrb(rgb, x1, y1, x2, y2, width, height, padding)
+    rgb = pad_ltrb(rgb, x1, y1, x2, y2, padding)
     assert rgb.shape[1] == width and rgb.shape[0] == height
     return rgb
 
