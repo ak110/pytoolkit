@@ -38,7 +38,7 @@ def create_data_parallel_model(model, gpu_count=None):
 
     # 各GPUでモデルを実行
     tower_outputs = []
-        for gpu in range(gpu_count):
+    for gpu in range(gpu_count):
         with tf.device('/gpu:%d' % gpu), tf.name_scope('tower_%d' % gpu):  # pylint: disable=E1129
             def _slice(x, index, count):
                 input_shape = K.shape(x)
@@ -186,7 +186,7 @@ def stocastic_add_layer():
             self.calibration = calibration
             super().__init__(**kargs)
 
-        def call(self, inputs, training=None, **kwargs):
+        def call(self, inputs, training=None, **kwargs):  # pylint: disable=arguments-differ
             assert len(inputs) == 2
 
             if self.survival_prob >= 1:
@@ -388,8 +388,8 @@ def my_callback_factory():
             # ログファイル作成
             d = pathlib.Path(self.log_dir)
             d.mkdir(parents=True, exist_ok=True)
-            self.batch_log_file = d.joinpath(self.batch_log_name).open('w')
-            self.epoch_log_file = d.joinpath(self.epoch_log_name).open('w')
+            self.batch_log_file = d.joinpath(self.batch_log_name).open('w', buffering=65536)
+            self.epoch_log_file = d.joinpath(self.epoch_log_name).open('w', buffering=65536)
             self.batch_log_writer = csv.writer(self.batch_log_file, delimiter='\t', lineterminator='\n')
             self.epoch_log_writer = csv.writer(self.epoch_log_file, delimiter='\t', lineterminator='\n')
             self.batch_log_writer.writerow(['epoch', 'batch', 'loss', 'delta_ema'])
@@ -553,7 +553,7 @@ def learning_curve_plotter_factory():
         def on_epoch_end(self, epoch, logs=None):
             try:
                 self._plot(logs)
-            except:
+            except:  # noqa
                 import traceback
                 warnings.warn(traceback.format_exc(), RuntimeWarning)
 
@@ -764,7 +764,7 @@ def load_weights(model, filepath, where_fn=None):
         else:
             original_backend = None
 
-        layer_names = [n.decode('utf8') for n in f.attrs['layer_names']]
+        layer_names = [n.decode('utf8') for n in f.attrs['layer_names']]  # noqa
 
         weight_value_tuples = []
         for k, name in enumerate(layer_names):
