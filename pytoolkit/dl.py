@@ -36,10 +36,10 @@ def create_data_parallel_model(model, gpu_count=None):
     assert isinstance(model.inputs, list)
     assert isinstance(model.outputs, list)
 
-    # 入力をGPU数分に分割する。(CPU側で)
-    tower_inputs = []
-    with tf.device('/cpu:0'):
+    # 各GPUでモデルを実行
+    tower_outputs = []
         for gpu in range(gpu_count):
+        with tf.device('/gpu:%d' % gpu), tf.name_scope('tower_%d' % gpu):  # pylint: disable=E1129
             def _slice(x, index, count):
                 input_shape = K.shape(x)
                 sliced_batch_size = input_shape[0] // count
@@ -48,13 +48,8 @@ def create_data_parallel_model(model, gpu_count=None):
                 return x[sliced_batch_size * index:sliced_batch_size * (index + 1)]
 
             args = {'index': gpu, 'count': gpu_count}
-            tower_inputs.append([keras.layers.Lambda(_slice, arguments=args)(x)
-                                 for x in model.inputs])
-
-    # 各GPUでモデルを実行
-    tower_outputs = []
-    for gpu, sliced_inputs in zip(range(gpu_count), tower_inputs):
-        with tf.device('/gpu:%d' % gpu), tf.name_scope('tower_%d' % gpu):  # pylint: disable=E1129
+            sliced_inputs = [keras.layers.Lambda(_slice, arguments=args)(x)
+                             for x in model.inputs]
 
             if len(sliced_inputs) == 1:
                 sliced_inputs = sliced_inputs[0]
@@ -64,7 +59,7 @@ def create_data_parallel_model(model, gpu_count=None):
 
             tower_outputs.append(outputs)
 
-    # CPUで結果をマージ
+    # 結果をマージ
     with tf.device('/cpu:0'):
         def _concat(inputs):
             return K.concatenate(inputs, axis=0)
@@ -77,9 +72,9 @@ def create_data_parallel_model(model, gpu_count=None):
 
     # Model.saveの置き換え
     # https://github.com/fchollet/keras/issues/2436#issuecomment-294243024
-    def _save(self_, filepath, overwrite=True):
+    def _save(self_, *args, **kargs):
         assert self_ is not None  # noqa
-        model.save(filepath, overwrite)
+        model.save(*args, **kargs)
 
     parallel_model.save = type(model.save)(_save, parallel_model)
 
