@@ -792,6 +792,15 @@ def load_weights(model, filepath, where_fn=None):
                               str(len(symbolic_weights)) + ' weight(s), but the saved weights' +
                               ' have ' + str(len(weight_values)) + ' element(s).')
                 continue
+            is_match_shapes = True
+            for s, w in zip(symbolic_weights, weight_values):
+                if s.shape != w.shape:
+                    warnings.warn('Layer #' + str(k) + ' (named "' + layer.name + '") expects ' +
+                                  str(s.shape) + ' weight(s), but the saved weights' +
+                                  ' have ' + str(w.shape) + ' element(s).')
+                    is_match_shapes = False
+                    continue
+            if is_match_shapes:
             for s, w in zip(symbolic_weights, weight_values):
                 weight_value_tuples.append((s, w))
         K.batch_set_value(weight_value_tuples)
