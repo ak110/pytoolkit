@@ -1,4 +1,5 @@
 """機械学習(主にsklearn)関連。"""
+import collections
 import itertools
 import json
 import multiprocessing as mp
@@ -90,66 +91,97 @@ class ObjectsAnnotation(object):
 
 
 def compute_map(gt_classes_list, gt_bboxes_list, gt_difficults_list,
-                pred_classes_list, pred_bboxes_list,
+                pred_classes_list, pred_confs_list, pred_bboxes_list,
                 iou_threshold=0.5, use_voc2007_metric=False):
     """`mAP`の算出。
 
+    # 引数
     - gt_classes_list: 正解のbounding box毎のクラス。shape=(画像数, bbox数)
     - gt_bboxes_list: 正解のbounding boxの座標(x1,y1,x2,y2。0～1)。shape=(画像数, bbox数, 4)
     - gt_difficults_list: 正解のbounding boxにdifficultフラグがついているか否か。shape=(画像数, bbox数)
     - pred_classes_list: 予測結果のbounding box毎のクラス。shape=(画像数, bbox数)
+    - pred_confs_list: 予測結果のbounding box毎のconfidence。shape=(画像数, bbox数)
     - pred_bboxes_list: 予測結果のbounding boxの座標(x1,y1,x2,y2。0～1)。shape=(画像数, bbox数, 4)
+
     """
     assert len(gt_classes_list) == len(gt_bboxes_list)
     assert len(gt_classes_list) == len(gt_difficults_list)
     assert len(gt_classes_list) == len(pred_classes_list)
+    assert len(gt_classes_list) == len(pred_confs_list)
     assert len(gt_classes_list) == len(pred_bboxes_list)
 
-    matches = []
-    for gt_classes, gt_bboxes, gt_difficults, pred_classes, pred_bboxes in zip(
-            gt_classes_list, gt_bboxes_list, gt_difficults_list, pred_classes_list, pred_bboxes_list):
-        if len(pred_bboxes) == 0:
-            continue
-        if len(gt_bboxes) == 0:
-            matches.extend([0] * pred_bboxes.shape[0])
-            continue
+    npos_dict = collections.defaultdict(int)
+    scores = collections.defaultdict(list)
+    matches = collections.defaultdict(list)
 
-        iou = compute_iou(pred_bboxes, gt_bboxes)
-        pred_indices = iou.argmax(axis=0)
-        gt_indices = iou.argmax(axis=1)
-        gt_indices[iou.max(axis=1) < iou_threshold] = -1  # 不一致
+    for gt_classes, gt_bboxes, gt_difficults, pred_classes, pred_confs, pred_bboxes in zip(
+            gt_classes_list, gt_bboxes_list, gt_difficults_list, pred_classes_list, pred_confs_list, pred_bboxes_list):
 
-        detected = np.zeros(len(gt_bboxes), dtype=bool)
-        for gt_i in gt_indices:
-            if gt_i >= 0 and pred_classes[pred_indices[gt_i]] == gt_classes[gt_i]:
-                if gt_difficults[gt_i]:
-                    matches.append(-1)  # skip
+        for class_id in np.unique(np.concatenate([gt_classes, pred_classes])):
+            pred_mask = pred_classes == class_id
+            pred_confs_class = pred_confs[pred_mask]
+            pred_bboxes_class = pred_bboxes[pred_mask]
+            order = pred_confs_class.argsort()[::-1]
+            pred_confs_class = pred_confs_class[order]
+            pred_bboxes_class = pred_bboxes_class[order]
+
+            gt_mask = gt_classes == class_id
+            gt_bboxes_class = gt_bboxes[gt_mask]
+            gt_difficults_class = gt_difficults[gt_mask]
+
+            npos_dict[class_id] += np.logical_not(gt_difficults_class).sum()
+            scores[class_id].extend(pred_confs_class)
+
+            if len(pred_bboxes_class) == 0:
+                continue
+            if len(gt_bboxes_class) == 0:
+                matches[class_id].extend([0] * len(pred_bboxes_class))
+                continue
+
+            iou = compute_iou(pred_bboxes_class, gt_bboxes_class)
+            gt_indices = iou.argmax(axis=1)
+            gt_indices[iou.max(axis=1) < iou_threshold] = -1  # 不一致
+
+            detected = np.zeros(len(gt_bboxes_class), dtype=bool)
+            for gt_i in gt_indices:
+                if gt_i >= 0:
+                    if gt_difficults_class[gt_i]:
+                        matches[class_id].append(-1)  # skip
+                    else:
+                        matches[class_id].append(0 if detected[gt_i] else 1)
+                        detected[gt_i] = True  # 2回目以降は不一致扱い
                 else:
-                    matches.append(0 if detected[gt_i] else 1)
-                detected[gt_i] = True  # 2回目以降は不一致扱い
-            else:
-                matches.append(0)  # 不一致
+                    matches[class_id].append(0)  # 不一致
 
-    npos = sum([np.logical_not(gt_difficults).sum() for gt_difficults in gt_difficults_list])
-    matches = np.array(matches)
-    tp = np.cumsum(matches == 1)
-    fp = np.cumsum(matches == 0)
-    recall = tp / npos
-    precision = tp / (fp + tp)
-    ap = compute_ap(recall, precision, use_voc2007_metric)
-    return ap
+    precision = []
+    recall = []
+    for class_id, npos in npos_dict.items():
+        order = np.array(scores[class_id]).argsort()[::-1]
+        matches_class = np.array(matches[class_id])[order]
+
+        tp = np.cumsum(matches_class == 1)
+        fp = np.cumsum(matches_class == 0)
+
+        precision.append(tp / (fp + tp))
+        recall.append(None if npos == 0 else tp / npos)
+
+    ap = [compute_ap(prec, rec, use_voc2007_metric) for prec, rec in zip(precision, recall)]
+    return np.nanmean(ap)
 
 
-def compute_ap(recall, precision, use_voc2007_metric=False):
+def compute_ap(precision, recall, use_voc2007_metric=False):
     """Average precisionの算出。"""
+    if precision is None or recall is None:
+        return np.nan
     if use_voc2007_metric:
         ap = 0.
         for t in np.arange(0., 1.1, 0.1):
             if np.sum(recall >= t) == 0:
                 p = 0
             else:
-                p = np.max(precision[recall >= t])
-            ap += p / 11.
+                p = np.max(np.nan_to_num(precision)[recall >= t])
+            ap += p
+        ap /= 11
     else:
         mrec = np.concatenate(([0.], recall, [1.]))
         mpre = np.concatenate(([0.], precision, [0.]))
@@ -171,13 +203,49 @@ def compute_iou(bboxes_a, bboxes_b):
     assert bboxes_b.shape[0] > 0
     assert bboxes_a.shape == (len(bboxes_a), 4)
     assert bboxes_b.shape == (len(bboxes_b), 4)
-    xy1 = np.maximum(bboxes_a[:, np.newaxis, :2], bboxes_b[:, :2])
-    xy2 = np.minimum(bboxes_a[:, np.newaxis, 2:], bboxes_b[:, 2:])
-    area_inter = np.prod(xy2 - xy1, axis=2) * (xy1 < xy2).all(axis=2)
+    lt = np.maximum(bboxes_a[:, np.newaxis, :2], bboxes_b[:, :2])
+    rb = np.minimum(bboxes_a[:, np.newaxis, 2:], bboxes_b[:, 2:])
+    area_inter = np.prod(rb - lt, axis=2) * (lt < rb).all(axis=2)
     area_a = np.prod(bboxes_a[:, 2:] - bboxes_a[:, :2], axis=1)
     area_b = np.prod(bboxes_b[:, 2:] - bboxes_b[:, :2], axis=1)
     area_union = area_a[:, np.newaxis] + area_b - area_inter
     return area_inter / area_union
+
+
+def non_maximum_suppression(boxes, scores, top_k=200, iou_threshold=0.45):
+    """`iou_threshold`分以上重なっている場合、スコアの大きい方のみ採用する。
+
+    # 引数
+    - boxes: ボックスの座標。shape=(ボックス数, 4)
+    - scores: スコア。shape=(ボックス数,)
+    - top_k: 最大何個の結果を返すか。
+    - iou_threshold: 重なりの閾値。
+
+    # 戻り値
+    インデックス。
+
+    """
+    assert len(boxes) == len(scores)
+    assert boxes.shape == (len(scores), 4)
+    sorted_indices = scores.argsort()[::-1]
+    boxes = boxes[sorted_indices]
+    boxes_area = np.prod(boxes[:, 2:] - boxes[:, :2], axis=1)
+
+    selected = np.zeros(len(boxes), dtype=bool)
+    for i, b in enumerate(boxes):
+        if (b[2:] - b[:2] <= 0).any():
+            continue  # 面積のないboxはskip
+        lt = np.maximum(b[:2], boxes[selected, :2])
+        rb = np.minimum(b[2:], boxes[selected, 2:])
+        area_inter = np.prod(rb - lt, axis=1) * (lt < rb).all(axis=1)
+        iou = area_inter / (boxes_area[i] + boxes_area[selected] - area_inter)
+        if (iou >= iou_threshold).any():
+            continue  # 重なっているのでskip
+        selected[i] = True
+        if np.count_nonzero(selected) >= top_k:
+            break
+
+    return sorted_indices[selected]
 
 
 class WeakModel(object):
