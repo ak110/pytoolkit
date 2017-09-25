@@ -81,40 +81,60 @@ def create_data_parallel_model(model, gpu_count=None):
     return parallel_model
 
 
-def conv2d(filters, kernel_size, activation, name, use_bn=True, use_batch_renorm=False, **kargs):
+def conv2d(filters, kernel_size, activation, name, use_bn=True, use_batch_renorm=False, preact=False, **kargs):
     """Conv2D+BN+Activationの簡単なヘルパー。"""
     import keras
     if use_bn:
         def _conv2d(x):
-            x = keras.layers.Conv2D(filters, kernel_size, use_bias=False, name=name, **kargs)(x)
+            if not preact:
+                x = keras.layers.Conv2D(filters, kernel_size, use_bias=False, name=name, **kargs)(x)
             if use_batch_renorm:
                 import keras_contrib
                 x = keras_contrib.layers.BatchRenormalization(name=name + '_brn')(x)
             else:
                 x = keras.layers.BatchNormalization(name=name + '_bn')(x)
             x = keras.layers.Activation(activation, name=name + '_act')(x)
+            if preact:
+                x = keras.layers.Conv2D(filters, kernel_size, use_bias=False, name=name, **kargs)(x)
             return x
         return _conv2d
     else:
-        return keras.layers.Conv2D(filters, kernel_size, activation=activation, name=name, **kargs)
+        if preact:
+            def _conv2d(x):
+                x = keras.layers.Activation(activation, name=name + '_act')(x)
+                x = keras.layers.Conv2D(filters, kernel_size, name=name, **kargs)(x)
+                return x
+            return _conv2d
+        else:
+            return keras.layers.Conv2D(filters, kernel_size, activation=activation, name=name, **kargs)
 
 
-def sepconv2d(filters, kernel_size, activation, name, use_bn=True, use_batch_renorm=False, **kargs):
+def sepconv2d(filters, kernel_size, activation, name, use_bn=True, use_batch_renorm=False, preact=False, **kargs):
     """SeparableConv2D+BN+Activationの簡単なヘルパー。"""
     import keras
     if use_bn:
         def _conv2d(x):
-            x = keras.layers.SeparableConv2D(filters, kernel_size, use_bias=False, name=name, **kargs)(x)
+            if not preact:
+                x = keras.layers.SeparableConv2D(filters, kernel_size, use_bias=False, name=name, **kargs)(x)
             if use_batch_renorm:
                 import keras_contrib
                 x = keras_contrib.layers.BatchRenormalization(name=name + '_brn')(x)
             else:
                 x = keras.layers.BatchNormalization(name=name + '_bn')(x)
             x = keras.layers.Activation(activation, name=name + '_act')(x)
+            if preact:
+                x = keras.layers.SeparableConv2D(filters, kernel_size, use_bias=False, name=name, **kargs)(x)
             return x
         return _conv2d
     else:
-        return keras.layers.Conv2D(filters, kernel_size, activation=activation, name=name, **kargs)
+        if preact:
+            def _conv2d(x):
+                x = keras.layers.Activation(activation, name=name + '_act')(x)
+                x = keras.layers.SeparableConv2D(filters, kernel_size, name=name, **kargs)(x)
+                return x
+            return _conv2d
+        else:
+            return keras.layers.SeparableConv2D(filters, kernel_size, activation=activation, name=name, **kargs)
 
 
 def get_custom_objects():
@@ -801,6 +821,6 @@ def load_weights(model, filepath, where_fn=None):
                     is_match_shapes = False
                     continue
             if is_match_shapes:
-            for s, w in zip(symbolic_weights, weight_values):
-                weight_value_tuples.append((s, w))
+                for s, w in zip(symbolic_weights, weight_values):
+                    weight_value_tuples.append((s, w))
         K.batch_set_value(weight_value_tuples)
