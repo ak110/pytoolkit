@@ -427,7 +427,7 @@ def plot_objects(base_image, save_path, classes, confs, locs, class_names):
         confs = [None] * len(classes)
     assert len(classes) == len(confs)
     assert len(classes) == len(locs)
-    if class_names is not None:
+    if class_names is not None and any(classes):
         assert 0 <= np.min(classes) < len(class_names)
         assert 0 <= np.max(classes) < len(class_names)
 

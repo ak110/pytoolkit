@@ -615,7 +615,7 @@ def plot_model_params(model, to_file='model.params.png', skip_bn=True):
         rows.append([layer.name, pc])
 
     df = pd.DataFrame(data=rows, columns=['name', 'params'])
-    df.plot(x='name', y='params', kind='barh', figsize=(16, 12))
+    df.plot(x='name', y='params', kind='barh', figsize=(16, 4 * (len(rows) // 32 + 1)))
 
     import matplotlib.pyplot as plt
     plt.gca().invert_yaxis()
@@ -627,6 +627,21 @@ def count_trainable_params(model):
     """modelのtrainable paramsを数える"""
     import keras.backend as K
     return sum([sum([K.count_params(p) for p in layer.trainable_weights]) for layer in model.layers])
+
+
+def count_network_depth(model):
+    """重みを持っている層の数を数える。
+
+    「kernel」を持っているレイヤーを数える。
+    ConvやDenseなど。ResNet界隈(?)ではDenseは含めないのでずれてしまうが…。
+    """
+    count = 0
+    for layer in model.layers:
+        if hasattr(layer, 'kernel'):
+            count += 1
+        elif hasattr(layer, 'layers'):
+            count += count_network_depth(layer)
+    return count
 
 
 class Generator(object):
