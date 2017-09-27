@@ -161,8 +161,10 @@ def compute_map(gt_classes_list, gt_bboxes_list, gt_difficults_list,
 
         tp = np.cumsum(matches_class == 1)
         fp = np.cumsum(matches_class == 0)
+        tpfp = fp + tp
+        tpfp = np.where(tpfp == 0, [np.nan] * len(tpfp), tpfp)  # 警告対策 (0ならnanにする)
 
-        precision.append(tp / (fp + tp))
+        precision.append(tp / tpfp)
         recall.append(None if npos == 0 else tp / npos)
 
     ap = [compute_ap(prec, rec, use_voc2007_metric) for prec, rec in zip(precision, recall)]

@@ -9,7 +9,7 @@ import pytoolkit as tk
 def test_destandarization_layer():
     import keras
 
-    Destandarization = tk.dl.destandarization_layer_factory()
+    Destandarization = tk.dl.destandarization_layer()
     inp = x = keras.layers.Input(shape=(1,))
     x = Destandarization(3, 5)(x)
     model = keras.models.Model(inputs=inp, outputs=x)
@@ -20,7 +20,7 @@ def test_destandarization_layer():
 def test_weighted_mean_layer():
     import keras
 
-    WeightedMean = tk.dl.weighted_mean_layer_factory()
+    WeightedMean = tk.dl.weighted_mean_layer()
     inp = x = [
         keras.layers.Input(shape=(1,)),
         keras.layers.Input(shape=(1,)),
@@ -58,8 +58,10 @@ def test_xor(tmpdir):
 
 def test_get_custom_objects():
     custom_objects = tk.dl.get_custom_objects()
-    assert str(custom_objects['Destandarization']) == str(tk.dl.destandarization_layer_factory())
-    assert str(custom_objects['WeightedMean']) == str(tk.dl.weighted_mean_layer_factory())
+    assert str(custom_objects['Destandarization']) == str(tk.dl.destandarization_layer())
+    assert str(custom_objects['StocasticAdd']) == str(tk.dl.stocastic_add_layer())
+    assert str(custom_objects['L2Normalization']) == str(tk.dl.l2normalization_layer())
+    assert str(custom_objects['WeightedMean']) == str(tk.dl.weighted_mean_layer())
 
 
 def test_params(tmpdir):

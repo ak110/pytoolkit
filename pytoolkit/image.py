@@ -122,7 +122,8 @@ class ImageDataGenerator(dl.Generator):
     def _prepare(self, X, y, weights, parallel=None, data_augmentation=False, rand=None):  # pylint: disable=arguments-differ
         """画像の読み込みとDataAugmentation。"""
         seeds = rand.randint(0, 2 ** 31, len(X))
-        jobs = [joblib.delayed(self._load)(x, y_, w, data_augmentation, seed) for x, y_, w, seed in zip(X, y, weights, seeds)]
+        jobs = [joblib.delayed(self._load, check_pickle=False)(x, y_, w, data_augmentation, seed)
+                for x, y_, w, seed in zip(X, y, weights, seeds)]
         X, y, weights = zip(*parallel(jobs))
         return super()._prepare(np.array(X), np.array(y), np.array(weights))
 

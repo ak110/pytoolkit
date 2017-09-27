@@ -393,7 +393,6 @@ def my_callback_factory():
             self.epoch_log_file = None
             self.batch_log_writer = None
             self.epoch_log_writer = None
-            self.keys = None
             self.iterations = 0
             self.iterations_per_reduce = 0
             self.ema1 = 0
@@ -413,7 +412,7 @@ def my_callback_factory():
             self.batch_log_writer = csv.writer(self.batch_log_file, delimiter='\t', lineterminator='\n')
             self.epoch_log_writer = csv.writer(self.epoch_log_file, delimiter='\t', lineterminator='\n')
             self.batch_log_writer.writerow(['epoch', 'batch', 'loss', 'delta_ema'])
-            self.keys = None
+            self.epoch_log_writer.writerow(['epoch', 'lr'] + self.params['metrics'] + ['delta_ema'])
             # 学習率の設定(base_lr)
             if self.base_lr is not None:
                 K.set_value(self.model.optimizer.lr, float(self.base_lr))
@@ -476,11 +475,8 @@ def my_callback_factory():
             # batchログ出力
             self.batch_log_file.flush()
             # epochログ出力
-            if not self.keys:
-                self.keys = sorted(logs.keys())
-                self.epoch_log_writer.writerow(['epoch', 'lr'] + self.keys + ['delta_ema'])
             lr = K.get_value(self.model.optimizer.lr)
-            metrics = ['{:.4f}'.format(logs.get(k)) for k in self.keys]
+            metrics = ['{:.4f}'.format(logs.get(k)) for k in self.params['metrics']]
             self.epoch_log_writer.writerow([epoch + 1, '{:.1e}'.format(lr)] + metrics + ['{:.5f}'.format(self.delta_ema)])
             self.epoch_log_file.flush()
             # 学習率を減らす/限界まで下がっていたら学習終了
@@ -714,7 +710,7 @@ def categorical_crossentropy(y_true, y_pred, alpha=0.75):
     class_weights = np.reshape(class_weights, (1, 1, -1))
     class_weights = -class_weights  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
 
-    y_pred = K.maximum(y_pred, 1e-2)  # 勾配があまり大きくならなくしておく。1e-2で4.6。1e-7だと16.1。
+    y_pred = K.maximum(y_pred, K.epsilon())
     return K.sum(y_true * K.log(y_pred) * class_weights, axis=-1)
 
 
@@ -728,7 +724,7 @@ def categorical_focal_loss(y_true, y_pred, alpha=0.25, gamma=2.0):
     class_weights = np.reshape(class_weights, (1, 1, -1))
     class_weights = -class_weights  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
 
-    y_pred = K.maximum(y_pred, 1e-2)  # 勾配があまり大きくならなくしておく。1e-2で4.6。1e-7だと16.1。
+    y_pred = K.maximum(y_pred, K.epsilon())
     return K.sum(K.pow(1 - y_pred, gamma) * y_true * K.log(y_pred) * class_weights, axis=-1)
 
 
