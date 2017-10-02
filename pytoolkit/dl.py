@@ -372,6 +372,7 @@ def my_callback_factory():
                      verbose=1,
                      batch_log_name='batchlog.tsv',
                      epoch_log_name='epochlog.tsv',
+                     append=False,
                      max_reduces=2, reduce_factor=0.1,
                      beta1=0.998, beta2=0.999, margin_iterations=100):
             super().__init__()
@@ -380,6 +381,7 @@ def my_callback_factory():
             self.log_dir = log_dir
             self.batch_log_name = batch_log_name
             self.epoch_log_name = epoch_log_name
+            self.append = append
             self.lr_list = lr_list
             self.base_lr = base_lr
             self.max_reduces = max_reduces
@@ -407,8 +409,8 @@ def my_callback_factory():
             # ログファイル作成
             d = pathlib.Path(self.log_dir)
             d.mkdir(parents=True, exist_ok=True)
-            self.batch_log_file = d.joinpath(self.batch_log_name).open('w', buffering=65536)
-            self.epoch_log_file = d.joinpath(self.epoch_log_name).open('w', buffering=65536)
+            self.batch_log_file = d.joinpath(self.batch_log_name).open('a' if self.append else 'w', buffering=65536)
+            self.epoch_log_file = d.joinpath(self.epoch_log_name).open('a' if self.append else 'w', buffering=65536)
             self.batch_log_writer = csv.writer(self.batch_log_file, delimiter='\t', lineterminator='\n')
             self.epoch_log_writer = csv.writer(self.epoch_log_file, delimiter='\t', lineterminator='\n')
             self.batch_log_writer.writerow(['epoch', 'batch', 'loss', 'delta_ema'])
