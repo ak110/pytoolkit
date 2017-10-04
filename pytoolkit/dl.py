@@ -7,6 +7,7 @@ importしただけではkerasがimportされないように作っている。
 import csv
 import os
 import pathlib
+import time
 import warnings
 
 import numpy as np
@@ -403,6 +404,7 @@ def my_callback_factory():
             self.reduces = 0
             self.stopped_epoch = 0
             self.epoch = 0
+            self.epoch_start_time = 0
             self.reduce_on_epoch_end = False
 
         def on_train_begin(self, logs=None):
@@ -414,7 +416,7 @@ def my_callback_factory():
             self.batch_log_writer = csv.writer(self.batch_log_file, delimiter='\t', lineterminator='\n')
             self.epoch_log_writer = csv.writer(self.epoch_log_file, delimiter='\t', lineterminator='\n')
             self.batch_log_writer.writerow(['epoch', 'batch', 'loss', 'delta_ema'])
-            self.epoch_log_writer.writerow(['epoch', 'lr'] + self.params['metrics'] + ['delta_ema'])
+            self.epoch_log_writer.writerow(['epoch', 'lr'] + self.params['metrics'] + ['time', 'delta_ema'])
             # 学習率の設定(base_lr)
             if self.base_lr is not None:
                 K.set_value(self.model.optimizer.lr, float(self.base_lr))
@@ -441,6 +443,7 @@ def my_callback_factory():
                     print('lr = {:.1e}'.format(float(K.get_value(self.model.optimizer.lr))))
             # 色々初期化
             self.epoch = epoch
+            self.epoch_start_time = time.time()
             self.reduce_on_epoch_end = False
 
         def on_batch_begin(self, batch, logs=None):
@@ -479,7 +482,9 @@ def my_callback_factory():
             # epochログ出力
             lr = K.get_value(self.model.optimizer.lr)
             metrics = ['{:.4f}'.format(logs.get(k)) for k in self.params['metrics']]
-            self.epoch_log_writer.writerow([epoch + 1, '{:.1e}'.format(lr)] + metrics + ['{:.5f}'.format(self.delta_ema)])
+            elapsed_time = time.time() - self.epoch_start_time
+            self.epoch_log_writer.writerow([epoch + 1, '{:.1e}'.format(lr)] + metrics +
+                                           [str(int(np.ceil(elapsed_time))), '{:.5f}'.format(self.delta_ema)])
             self.epoch_log_file.flush()
             # 学習率を減らす/限界まで下がっていたら学習終了
             if self.reduce_on_epoch_end:
