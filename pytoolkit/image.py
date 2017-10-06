@@ -68,16 +68,14 @@ class ImageDataGenerator(dl.Generator):
     ```
     gen = tk.image.ImageDataGenerator((300, 300))
     gen.add(0.5, tk.image.FlipLR())
+    gen.add(0.5, tk.image.RandomErasing())
     gen.add(0.125, tk.image.RandomBlur())
     gen.add(0.125, tk.image.RandomBlur(partial=True))
     gen.add(0.125, tk.image.RandomUnsharpMask())
     gen.add(0.125, tk.image.RandomUnsharpMask(partial=True))
     gen.add(0.125, tk.image.Sharp())
-    gen.add(0.125, tk.image.Sharp(partial=True))
     gen.add(0.125, tk.image.Soft())
-    gen.add(0.125, tk.image.Soft(partial=True))
     gen.add(0.125, tk.image.RandomMedian())
-    gen.add(0.125, tk.image.RandomMedian(partial=True))
     gen.add(0.125, tk.image.GaussianNoise())
     gen.add(0.125, tk.image.GaussianNoise(partial=True))
     gen.add(0.125, tk.image.RandomSaturation())
@@ -331,3 +329,33 @@ class RandomLighting(Augmentor):
 
     def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
         return ndimage.lighting(rgb, rand.randn(3) * self.std)
+
+
+class RandomErasing(Augmentor):
+    """Random Erasing。
+
+    https://arxiv.org/abs/1708.04896
+    """
+
+    def __init__(self, scale_low=0.02, scale_high=0.4, rate_1=1 / 3, rate_2=3):
+        assert scale_low <= scale_high
+        assert rate_1 <= rate_2
+        self.scale_low = scale_low
+        self.scale_high = scale_high
+        self.rate_1 = rate_1
+        self.rate_2 = rate_2
+        super().__init__()
+
+    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+        while True:
+            s = rgb.shape[0] * rgb.shape[1] * rand.uniform(self.scale_low, self.scale_high)
+            r = np.exp(rand.uniform(np.log(self.rate_1), np.log(self.rate_2)))
+            w = int(np.sqrt(s / r))
+            h = int(np.sqrt(s * r))
+            if w >= rgb.shape[1] or h >= rgb.shape[0]:
+                continue
+            x = rand.randint(0, rgb.shape[1] - w)
+            y = rand.randint(0, rgb.shape[0] - h)
+            rgb[y:y + h, x:x + w, :] = rand.randint(0, 255, size=(h, w, rgb.shape[2]))
+            break
+        return rgb
