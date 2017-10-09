@@ -10,6 +10,7 @@ import pathlib
 import time
 import warnings
 
+import joblib  # pip install joblib
 import numpy as np
 import pandas as pd
 import sklearn.utils
@@ -648,11 +649,33 @@ def count_network_depth(model):
 
 
 class Generator(object):
-    """`fit_generator`などに渡すgeneratorを作るためのベースクラス。"""
+    """`fit_generator`などに渡すgeneratorを作るためのベースクラス。
+
+    # 引数
+    - data_encoder: Xの変換を行う関数
+    - label_encoder: yの変換を行う関数
+    - parallel: _prepareにjoblib.Parallelを渡すならTrue
+
+    """
+
+    def __init__(self, data_encoder=None, label_encoder=None, parallel=False):
+        self.data_encoder = data_encoder
+        self.label_encoder = label_encoder
+        self.parallel = parallel
 
     def flow(self, X, y=None, weights=None, batch_size=32, shuffle=False, random_state=None, **kargs):
         """`fit_generator`などに渡すgenerator。kargsはそのままprepareに渡される。"""
+        if self.parallel:
+            with joblib.Parallel(n_jobs=batch_size, backend='threading') as parallel:
+                return self._flow(X, y, weights, batch_size, shuffle, random_state, parallel, **kargs)
+        else:
+            return self._flow(X, y, weights, batch_size, shuffle, random_state, None, **kargs)
+
+    def _flow(self, X, y, weights, batch_size, shuffle, random_state, parallel, **kargs):
+        """`fit_generator`などに渡すgenerator。kargsはそのままprepareに渡される。"""
+        random_state = sklearn.utils.check_random_state(random_state)
         length = len(X[0]) if isinstance(X, list) else len(X)
+
         if y is not None:
             assert length == (len(y[0]) if isinstance(y, list) else len(y))
 
@@ -669,11 +692,11 @@ class Generator(object):
 
             if y is None:
                 assert weights is None
-                yield self._prepare(x_, np.array([None] * len(x_)), np.array([None] * len(x_)), **kargs)[0]
+                yield self._prepare(x_, np.array([None] * len(x_)), np.array([None] * len(x_)), parallel, **kargs)[0]
             elif weights is None:
-                yield self._prepare(x_, y_, np.array([None] * len(x_)), **kargs)[:2]
+                yield self._prepare(x_, y_, np.array([None] * len(x_)), parallel, **kargs)[:2]
             else:
-                yield self._prepare(x_, y_, weights[ix], **kargs)
+                yield self._prepare(x_, y_, weights[ix], parallel, **kargs)
 
     def _flow_indices(self, data_count, batch_size, shuffle, random_state=None):
         """データのindexを列挙し続けるgenerator。"""
@@ -693,7 +716,7 @@ class Generator(object):
         """1epochが何ステップかを算出して返す"""
         return (data_count + batch_size - 1) // batch_size
 
-    def _prepare(self, X, y, weights, **_):  # pylint: disable=no-self-use
+    def _prepare(self, X, y, weights, parallel, **_):
         """何か前処理が必要な場合はこれをオーバーライドして使う。
 
         画像の読み込みとかDataAugmentationとか。
@@ -704,6 +727,11 @@ class Generator(object):
         assert isinstance(weights, np.ndarray)
         assert X.shape[0] == y.shape[0]
         assert X.shape[0] == weights.shape[0]
+        assert self.parallel == (parallel is not None)
+        if self.data_encoder:
+            X = self.data_encoder(X)
+        if self.label_encoder:
+            y = self.label_encoder(y)
         return X, y, weights
 
 

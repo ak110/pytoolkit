@@ -25,14 +25,14 @@ class Augmentor(metaclass=abc.ABCMeta):
     def __init__(self, partial=False):
         self.partial = partial
 
-    def execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+    def execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
         """DataAugmentationの実行。"""
         if self.partial:
             x1, x2 = self._get_partial_1d(rand, 0, rgb.shape[1])
             y1, y2 = self._get_partial_1d(rand, 0, rgb.shape[0])
-            rgb[x1:x2, y1:y2, :] = self._execute(rgb[x1:x2, y1:y2, :], rand)
+            rgb[x1:x2, y1:y2, :] = self._execute(rgb[x1:x2, y1:y2, :], y, w, rand)
         else:
-            rgb = self._execute(rgb, rand)
+            rgb = self._execute(rgb, y, w, rand)
         assert rgb.dtype == np.float32
         return rgb
 
@@ -48,7 +48,7 @@ class Augmentor(metaclass=abc.ABCMeta):
             return (v1, v2) if v1 < v2 else (v2, v1)
 
     @abc.abstractmethod
-    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
         """DataAugmentationの実装。"""
         pass
 
@@ -89,7 +89,8 @@ class ImageDataGenerator(dl.Generator):
     def __init__(self, image_size=(300, 300), grayscale=False, preprocess_input=None,
                  rotate_prob=0.125, rotate_degrees=15,
                  padding_rate=0.25, crop_rate=0.125,
-                 aspect_rations=(1, 1, 3 / 4, 4 / 3)):
+                 aspect_rations=(1, 1, 3 / 4, 4 / 3),
+                 data_encoder=None, label_encoder=None):
         self.image_size = image_size
         self.grayscale = grayscale
         self.preprocess_input = preprocess_input
@@ -99,6 +100,7 @@ class ImageDataGenerator(dl.Generator):
         self.crop_rate = crop_rate
         self.aspect_rations = aspect_rations
         self.augmentors = []
+        super().__init__(data_encoder, label_encoder, parallel=True)
 
     def add(self, probability: float, augmentor: Augmentor):
         """Augmentorの追加"""
@@ -111,19 +113,17 @@ class ImageDataGenerator(dl.Generator):
         - data_augmentation: Data Augmentationを行うか否か。
         """
         random_state = sklearn.utils.check_random_state(random_state)
-        random_state2 = np.random.RandomState(random_state.randint(0, 2 ** 31))
-        with joblib.Parallel(n_jobs=batch_size, backend='threading') as parallel:
-            for tpl in super().flow(X, y, weights, batch_size, shuffle, random_state,
-                                    parallel=parallel, data_augmentation=data_augmentation, rand=random_state2):
-                yield tpl
+        rand = np.random.RandomState(random_state.randint(0, 2 ** 31))
+        return super().flow(X, y, weights, batch_size, shuffle, random_state,
+                            data_augmentation=data_augmentation, rand=rand)
 
-    def _prepare(self, X, y, weights, parallel=None, data_augmentation=False, rand=None):  # pylint: disable=arguments-differ
+    def _prepare(self, X, y, weights, parallel, data_augmentation=False, rand=None):  # pylint: disable=arguments-differ
         """画像の読み込みとDataAugmentation。"""
         seeds = rand.randint(0, 2 ** 31, len(X))
         jobs = [joblib.delayed(self._load, check_pickle=False)(x, y_, w, data_augmentation, seed)
                 for x, y_, w, seed in zip(X, y, weights, seeds)]
         X, y, weights = zip(*parallel(jobs))
-        return super()._prepare(np.array(X), np.array(y), np.array(weights))
+        return super()._prepare(np.array(X), np.array(y), np.array(weights), parallel)
 
     def _load(self, x, y, w, data_augmentation, seed):
         """画像の読み込みとDataAugmentation。(単数)"""
@@ -145,7 +145,7 @@ class ImageDataGenerator(dl.Generator):
             rand.shuffle(augmentors)  # シャッフルして色々な順で適用
             for a in augmentors:
                 if rand.rand() <= a.probability:
-                    rgb = a.augmentor.execute(rgb, rand)
+                    rgb = a.augmentor.execute(rgb, y, w, rand)
             # 色が範囲外になっていたら補正(飽和)
             rgb = np.clip(rgb, 0, 255)
 
@@ -212,7 +212,7 @@ def unpreprocess_input_abs1(x: np.ndarray):
 class FlipLR(Augmentor):
     """左右反転。"""
 
-    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
         assert rand is not None  # noqa
         return ndimage.flip_lr(rgb)
 
@@ -220,7 +220,7 @@ class FlipLR(Augmentor):
 class FlipTB(Augmentor):
     """上下反転。"""
 
-    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
         assert rand is not None  # noqa
         return ndimage.flip_tb(rgb)
 
@@ -232,7 +232,7 @@ class RandomBlur(Augmentor):
         self.radius = radius
         super().__init__(partial)
 
-    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
         return ndimage.blur(rgb, self.radius * rand.rand())
 
 
@@ -245,14 +245,14 @@ class RandomUnsharpMask(Augmentor):
         self.max_alpha = max_alpha
         super().__init__(partial)
 
-    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
         return ndimage.unsharp_mask(rgb, self.sigma, rand.uniform(self.min_alpha, self.max_alpha))
 
 
 class Sharp(Augmentor):
     """3x3のシャープ化。"""
 
-    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
         assert rand is not None  # noqa
         return ndimage.sharp(rgb)
 
@@ -260,7 +260,7 @@ class Sharp(Augmentor):
 class Soft(Augmentor):
     """3x3のぼかし。"""
 
-    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
         assert rand is not None  # noqa
         return ndimage.soft(rgb)
 
@@ -272,7 +272,7 @@ class RandomMedian(Augmentor):
         self.sizes = sizes
         super().__init__(partial)
 
-    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
         return ndimage.median(rgb, rand.choice(self.sizes))
 
 
@@ -283,7 +283,7 @@ class GaussianNoise(Augmentor):
         self.scale = scale
         super().__init__(partial)
 
-    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
         return ndimage.gaussian_noise(rgb, rand, self.scale)
 
 
@@ -294,7 +294,7 @@ class RandomSaturation(Augmentor):
         self.var = var
         super().__init__()
 
-    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
         return ndimage.saturation(rgb, rand.uniform(1 - self.var, 1 + self.var))
 
 
@@ -305,7 +305,7 @@ class RandomBrightness(Augmentor):
         self.var = var
         super().__init__()
 
-    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
         return ndimage.brightness(rgb, rand.uniform(1 - self.var, 1 + self.var))
 
 
@@ -316,7 +316,7 @@ class RandomContrast(Augmentor):
         self.var = var
         super().__init__()
 
-    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
         return ndimage.contrast(rgb, rand.uniform(1 - self.var, 1 + self.var))
 
 
@@ -327,7 +327,7 @@ class RandomLighting(Augmentor):
         self.std = std
         super().__init__()
 
-    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
         return ndimage.lighting(rgb, rand.randn(3) * self.std)
 
 
@@ -346,7 +346,7 @@ class RandomErasing(Augmentor):
         self.rate_2 = rate_2
         super().__init__()
 
-    def _execute(self, rgb: np.ndarray, rand: np.random.RandomState) -> np.ndarray:
+    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
         while True:
             s = rgb.shape[0] * rgb.shape[1] * rand.uniform(self.scale_low, self.scale_high)
             r = np.exp(rand.uniform(np.log(self.rate_1), np.log(self.rate_2)))

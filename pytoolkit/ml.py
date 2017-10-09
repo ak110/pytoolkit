@@ -90,6 +90,18 @@ class ObjectsAnnotation(object):
         return data
 
 
+def to_categorical(y, nb_classes=None):
+    """クラスラベルのone-hot encoding化。"""
+    y = np.array(y)
+    assert len(y.shape) == 1
+    if not nb_classes:
+        nb_classes = np.max(y) + 1
+        assert nb_classes == len(np.unique(y))
+    cat = np.zeros((len(y), nb_classes))
+    cat[np.arange(len(y)), y] = 1
+    return cat
+
+
 def compute_map(gt_classes_list, gt_bboxes_list, gt_difficults_list,
                 pred_classes_list, pred_confs_list, pred_bboxes_list,
                 iou_threshold=0.5, use_voc2007_metric=False):
