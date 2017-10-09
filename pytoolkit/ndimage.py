@@ -36,10 +36,11 @@ def random_rotate(rgb: np.ndarray, rand: np.random.RandomState, degrees: float, 
 
 def random_crop(rgb: np.ndarray, rand: np.random.RandomState,
                 padding_rate=0.25, crop_rate=0.15625,
-                aspect_rations=(1, 1, 3 / 4, 4 / 3), padding='same') -> np.ndarray:
+                aspect_prob=0.5, aspect_rations=(3 / 4, 4 / 3),
+                padding='same') -> np.ndarray:
     """パディング＋ランダム切り抜き。"""
     cr = rand.uniform(1 - crop_rate, 1)
-    ar = np.sqrt(rand.choice(aspect_rations))
+    ar = np.sqrt(rand.choice(aspect_rations)) if rand.rand() <= aspect_prob else 1
     cropped_w = int(np.floor(rgb.shape[1] * cr * ar))  # 元のサイズに対する割合
     cropped_h = int(np.floor(rgb.shape[0] * cr / ar))
     padded_w = max(int(np.ceil(rgb.shape[1] * (1 + padding_rate))), cropped_w)

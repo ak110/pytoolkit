@@ -18,7 +18,7 @@ def test_filters():
         (0, 'crop', lambda rgb: tk.ndimage.crop(rgb, 30, 30, 200, 200)),
         (0, 'flip_lr', tk.ndimage.flip_lr),
         (0, 'flip_tb', tk.ndimage.flip_tb),
-        (0, 'resize', lambda rgb: tk.ndimage.resize(rgb, 128, 64)),
+        (0, 'resize', lambda rgb: tk.ndimage.resize(rgb, 128, 64, padding='same')),
         (0, 'resize', lambda rgb: tk.ndimage.resize(rgb, 128, 64, padding=None)),
         (1, 'gaussian_noise', lambda rgb: tk.ndimage.gaussian_noise(rgb, rand, 5)),
         (1, 'blur', lambda rgb: tk.ndimage.blur(rgb, 0.5)),

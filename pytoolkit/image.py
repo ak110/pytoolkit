@@ -89,7 +89,8 @@ class ImageDataGenerator(dl.Generator):
     def __init__(self, image_size=(300, 300), grayscale=False, preprocess_input=None,
                  rotate_prob=0.125, rotate_degrees=15,
                  padding_rate=0.25, crop_rate=0.15625,
-                 aspect_rations=(1, 1, 3 / 4, 4 / 3),
+                 aspect_prob=0.5,
+                 aspect_rations=(3 / 4, 4 / 3),
                  data_encoder=None, label_encoder=None):
         self.image_size = image_size
         self.grayscale = grayscale
@@ -98,6 +99,7 @@ class ImageDataGenerator(dl.Generator):
         self.rotate_degrees = rotate_degrees
         self.padding_rate = padding_rate
         self.crop_rate = crop_rate
+        self.aspect_prob = aspect_prob
         self.aspect_rations = aspect_rations
         self.augmentors = []
         super().__init__(data_encoder, label_encoder, parallel=True)
@@ -173,7 +175,7 @@ class ImageDataGenerator(dl.Generator):
         if rand.rand() <= self.rotate_prob:
             rgb = ndimage.random_rotate(rgb, rand, degrees=self.rotate_degrees)
         # padding+crop
-        rgb = ndimage.random_crop(rgb, rand, self.padding_rate, self.crop_rate, aspect_rations=self.aspect_rations)
+        rgb = ndimage.random_crop(rgb, rand, self.padding_rate, self.crop_rate, self.aspect_prob, self.aspect_rations)
         return rgb, y, w
 
 

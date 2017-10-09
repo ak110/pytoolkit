@@ -722,15 +722,13 @@ class Generator(object):
         画像の読み込みとかDataAugmentationとか。
         yやweightsは使わない場合そのまま返せばOK。(使う場合はテスト時とかのNoneに注意。)
         """
-        assert isinstance(X, np.ndarray)
-        assert isinstance(y, np.ndarray)
+        assert isinstance(X, (np.ndarray, list))
+        assert isinstance(y, (np.ndarray, list))
         assert isinstance(weights, np.ndarray)
-        assert X.shape[0] == y.shape[0]
-        assert X.shape[0] == weights.shape[0]
         assert self.parallel == (parallel is not None)
         if self.data_encoder:
             X = self.data_encoder(X)
-        if self.label_encoder:
+        if self.label_encoder and y[0] is not None:
             y = self.label_encoder(y)
         return X, y, weights
 
