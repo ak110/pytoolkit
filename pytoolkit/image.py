@@ -88,7 +88,7 @@ class ImageDataGenerator(dl.Generator):
 
     def __init__(self, image_size=(300, 300), grayscale=False, preprocess_input=None,
                  rotate_prob=0.125, rotate_degrees=15,
-                 padding_rate=0.25, crop_rate=0.125,
+                 padding_rate=0.25, crop_rate=0.15625,
                  aspect_rations=(1, 1, 3 / 4, 4 / 3),
                  data_encoder=None, label_encoder=None):
         self.image_size = image_size
