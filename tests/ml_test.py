@@ -46,6 +46,21 @@ def test_iou():
     assert iou[1][0] == 0
 
 
+def test_is_in_box():
+    boxes_a = np.array([
+        [100, 100, 300, 300]
+    ])
+    boxes_b = np.array([
+        [150, 150, 250, 250],
+        [100, 100, 300, 300],
+        [50, 50, 350, 350],
+        [150, 150, 350, 350],
+    ])
+    is_in = tk.ml.is_in_box(boxes_a, boxes_b)
+    assert is_in.shape == (len(boxes_a), len(boxes_b))
+    assert (is_in == [[False, True, True, False]]).all()
+
+
 def test_non_maximum_suppression():
     boxes = np.array([
         [200, 0, 200, 200],  # empty

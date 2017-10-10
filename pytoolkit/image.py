@@ -3,6 +3,7 @@ import abc
 import collections
 import copy
 import pathlib
+import warnings
 
 import joblib  # pip install joblib
 import numpy as np
@@ -130,9 +131,11 @@ class ImageDataGenerator(dl.Generator):
     def _load(self, x, y, w, data_augmentation, seed):
         """画像の読み込みとDataAugmentation。(単数)"""
         rand = np.random.RandomState(seed)  # 再現性やスレッドセーフ性に自信がないのでここではこれを使う。
+        y = copy.deepcopy(y)
+        w = copy.deepcopy(w)
 
         # 画像の読み込み
-        rgb, y, w = self._load_image(x, copy.deepcopy(y), copy.deepcopy(w))
+        rgb, y, w = self._load_image(x, y, w)
 
         # 変形を伴うData Augmentation
         if data_augmentation:
@@ -337,27 +340,90 @@ class RandomErasing(Augmentor):
     """Random Erasing。
 
     https://arxiv.org/abs/1708.04896
+
+    # 引数
+    - object_aware: yがObjectsAnnotationのとき、各オブジェクト内でRandom Erasing。(論文によるとTrueとFalseの両方をやるのが良い)
+    - object_aware_prob: 各オブジェクト毎のRandom Erasing率。全体の確率は1.0にしてこちらで制御する。
+
     """
 
-    def __init__(self, scale_low=0.02, scale_high=0.4, rate_1=1 / 3, rate_2=3):
+    def __init__(self, scale_low=0.02, scale_high=0.4, rate_1=1 / 3, rate_2=3, object_aware=False, object_aware_prob=0.5, max_tries=30):
         assert scale_low <= scale_high
         assert rate_1 <= rate_2
         self.scale_low = scale_low
         self.scale_high = scale_high
         self.rate_1 = rate_1
         self.rate_2 = rate_2
+        self.object_aware = object_aware
+        self.object_aware_prob = object_aware_prob
+        self.max_tries = max_tries
         super().__init__()
 
     def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
-        while True:
+        from . import ml
+        bboxes = np.round(y.bboxes * np.array(rgb.shape)[[1, 0, 1, 0]]) if isinstance(y, ml.ObjectsAnnotation) else None
+        if self.object_aware:
+            assert bboxes is not None
+            # bboxes同士の重なり判定
+            inter = ml.is_intersection(bboxes, bboxes)
+            inter[range(len(bboxes)), range(len(bboxes))] = False  # 自分同士は重なってないことにする
+            # 各box内でrandom erasing。
+            for i, b in enumerate(bboxes):
+                if (b[2:] - b[:2] <= 1).any():
+                    warnings.warn('bboxサイズが不正: {}, {}'.format(y.filename, b))
+                    continue  # 安全装置：サイズが無いboxはskip
+                if rand.rand() <= self.object_aware_prob:
+                    b = np.copy(b).astype(int)
+                    # box内に含まれる他のboxを考慮
+                    inter_boxes = np.copy(bboxes[inter[i]])
+                    inter_boxes -= np.expand_dims(np.tile(b[:2], 2), axis=0)  # bに合わせて平行移動
+                    # random erasing
+                    rgb[b[1]:b[3], b[0]:b[2], :] = self._erase_random(rgb[b[1]:b[3], b[0]:b[2], :], rand, inter_boxes)
+
+            return rgb
+        else:
+            # 画像全体でrandom erasing。
+            return self._erase_random(rgb, rand, bboxes)
+
+    def _erase_random(self, rgb, rand, bboxes):
+        # from . import ml
+
+        if bboxes is not None:
+            bb_lt = bboxes[:, :2]  # 左上
+            bb_rb = bboxes[:, 2:]  # 右下
+            bb_lb = bboxes[:, (0, 3)]  # 左下
+            bb_rt = bboxes[:, (1, 2)]  # 右上
+
+        for _ in range(self.max_tries):
             s = rgb.shape[0] * rgb.shape[1] * rand.uniform(self.scale_low, self.scale_high)
             r = np.exp(rand.uniform(np.log(self.rate_1), np.log(self.rate_2)))
             w = int(np.sqrt(s / r))
             h = int(np.sqrt(s * r))
-            if w >= rgb.shape[1] or h >= rgb.shape[0]:
+            if w <= 0 or h <= 0 or w >= rgb.shape[1] or h >= rgb.shape[0]:
                 continue
             x = rand.randint(0, rgb.shape[1] - w)
             y = rand.randint(0, rgb.shape[0] - h)
+
+            if bboxes is not None:
+                box_lt = np.array([[x, y]])
+                box_rb = np.array([[x + w, y + h]])
+                # bboxの頂点のうち2つ以上を含んでいたらNGとする
+                count = np.zeros((len(bboxes),), dtype=int)
+                count += np.logical_and(box_lt <= bb_lt, bb_lt <= box_rb).all(axis=-1)
+                count += np.logical_and(box_lt <= bb_rb, bb_rb <= box_rb).all(axis=-1)
+                count += np.logical_and(box_lt <= bb_lb, bb_lb <= box_rb).all(axis=-1)
+                count += np.logical_and(box_lt <= bb_rt, bb_rt <= box_rb).all(axis=-1)
+                if (count >= 2).any():
+                    continue
+                # 面積チェック。塗りつぶされるのがbboxの面積の25%を超えていたらNGとする
+                lt = np.maximum(bb_lt, box_lt)
+                rb = np.minimum(bb_rb, box_rb)
+                area_inter = np.prod(rb - lt, axis=-1) * (lt < rb).all(axis=-1)
+                area_bb = np.prod(bb_rb - bb_lt, axis=-1)
+                if (area_inter >= area_bb * 0.25).any():
+                    continue
+
             rgb[y:y + h, x:x + w, :] = rand.randint(0, 255, size=(h, w, rgb.shape[2]))
             break
+
         return rgb

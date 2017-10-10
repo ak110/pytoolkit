@@ -225,6 +225,26 @@ def compute_iou(bboxes_a, bboxes_b):
     return area_inter / area_union
 
 
+def is_intersection(bboxes_a, bboxes_b):
+    """boxes_aとboxes_bでそれぞれ交差している部分が存在するか否かを返す。"""
+    assert bboxes_a.shape[0] > 0
+    assert bboxes_b.shape[0] > 0
+    assert bboxes_a.shape == (len(bboxes_a), 4)
+    assert bboxes_b.shape == (len(bboxes_b), 4)
+    lt = np.maximum(bboxes_a[:, np.newaxis, :2], bboxes_b[:, :2])
+    rb = np.minimum(bboxes_a[:, np.newaxis, 2:], bboxes_b[:, 2:])
+    return (lt < rb).all(axis=-1)
+
+
+def is_in_box(boxes_a, boxes_b):
+    """boxes_aがboxes_bの中に完全に入っているならtrue。"""
+    assert boxes_a.shape == (len(boxes_a), 4)
+    assert boxes_b.shape == (len(boxes_b), 4)
+    lt = boxes_a[:, np.newaxis, :2] >= boxes_b[:, :2]
+    rb = boxes_a[:, np.newaxis, 2:] <= boxes_b[:, 2:]
+    return np.logical_and(lt, rb).all(axis=-1)
+
+
 def non_maximum_suppression(boxes, scores, top_k=200, iou_threshold=0.45):
     """`iou_threshold`分以上重なっている場合、スコアの大きい方のみ採用する。
 

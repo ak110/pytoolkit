@@ -48,8 +48,8 @@ def random_crop(rgb: np.ndarray, rand: np.random.RandomState,
     # パディング
     rgb = pad(rgb, padded_w, padded_h, padding=padding)
     # 切り抜き
-    x = rand.randint(0, rgb.shape[1] - cropped_w)
-    y = rand.randint(0, rgb.shape[0] - cropped_h)
+    x = rand.randint(0, rgb.shape[1] - cropped_w + 1)
+    y = rand.randint(0, rgb.shape[0] - cropped_h + 1)
     return crop(rgb, x, y, cropped_w, cropped_h)
 
 
@@ -93,8 +93,8 @@ def crop(rgb: np.ndarray, x: int, y: int, width: int, height: int) -> np.ndarray
     assert 0 <= y < rgb.shape[0]
     assert width >= 0
     assert height >= 0
-    assert 0 <= x + width < rgb.shape[1]
-    assert 0 <= y + height < rgb.shape[0]
+    assert 0 <= x + width <= rgb.shape[1]
+    assert 0 <= y + height <= rgb.shape[0]
     return rgb[y:y + height, x:x + width, :]
 
 
