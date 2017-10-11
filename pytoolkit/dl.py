@@ -95,7 +95,8 @@ def conv2d(filters, kernel_size, activation, name, use_bn=True, use_batch_renorm
                 x = keras_contrib.layers.BatchRenormalization(name=name + '_brn')(x)
             else:
                 x = keras.layers.BatchNormalization(name=name + '_bn')(x)
-            x = keras.layers.Activation(activation, name=name + '_act')(x)
+            if activation is not None:
+                x = keras.layers.Activation(activation, name=name + '_act')(x)
             if preact:
                 x = keras.layers.Conv2D(filters, kernel_size, use_bias=False, name=name, **kargs)(x)
             return x
@@ -103,7 +104,8 @@ def conv2d(filters, kernel_size, activation, name, use_bn=True, use_batch_renorm
     else:
         if preact:
             def _conv2d(x):
-                x = keras.layers.Activation(activation, name=name + '_act')(x)
+                if activation is not None:
+                    x = keras.layers.Activation(activation, name=name + '_act')(x)
                 x = keras.layers.Conv2D(filters, kernel_size, name=name, **kargs)(x)
                 return x
             return _conv2d
