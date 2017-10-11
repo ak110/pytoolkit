@@ -393,6 +393,7 @@ class RandomErasing(Augmentor):
             bb_rb = bboxes[:, 2:]  # 右下
             bb_lb = bboxes[:, (0, 3)]  # 左下
             bb_rt = bboxes[:, (1, 2)]  # 右上
+            bb_c = (bb_lt + bb_rb) / 2  # 中央
 
         for _ in range(self.max_tries):
             s = rgb.shape[0] * rgb.shape[1] * rand.uniform(self.scale_low, self.scale_high)
@@ -407,13 +408,12 @@ class RandomErasing(Augmentor):
             if bboxes is not None:
                 box_lt = np.array([[x, y]])
                 box_rb = np.array([[x + w, y + h]])
-                # bboxの頂点のうち2つ以上を含んでいたらNGとする
-                count = np.zeros((len(bboxes),), dtype=int)
-                count += np.logical_and(box_lt <= bb_lt, bb_lt <= box_rb).all(axis=-1)
-                count += np.logical_and(box_lt <= bb_rb, bb_rb <= box_rb).all(axis=-1)
-                count += np.logical_and(box_lt <= bb_lb, bb_lb <= box_rb).all(axis=-1)
-                count += np.logical_and(box_lt <= bb_rt, bb_rt <= box_rb).all(axis=-1)
-                if (count >= 2).any():
+                # bboxの頂点および中央を1つでも含んでいたらNGとする
+                if np.logical_and(box_lt <= bb_lt, bb_lt <= box_rb).all(axis=-1).any() or \
+                   np.logical_and(box_lt <= bb_rb, bb_rb <= box_rb).all(axis=-1).any() or \
+                   np.logical_and(box_lt <= bb_lb, bb_lb <= box_rb).all(axis=-1).any() or \
+                   np.logical_and(box_lt <= bb_rt, bb_rt <= box_rb).all(axis=-1).any() or \
+                   np.logical_and(box_lt <= bb_c, bb_c <= box_rb).all(axis=-1).any():
                     continue
                 # 面積チェック。塗りつぶされるのがbboxの面積の25%を超えていたらNGとする
                 lt = np.maximum(bb_lt, box_lt)
