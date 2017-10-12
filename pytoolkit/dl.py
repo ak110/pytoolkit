@@ -142,12 +142,13 @@ def sepconv2d(filters, kernel_size, activation, name, use_bn=True, use_batch_ren
 
 
 def get_custom_objects():
-    """独自レイヤーのdictを返す。"""
+    """独自オブジェクトのdictを返す。"""
     return {
         'Destandarization': destandarization_layer(),
         'StocasticAdd': stocastic_add_layer(),
         'L2Normalization': l2normalization_layer(),
         'WeightedMean': weighted_mean_layer(),
+        'NSGD': nsgd(),
     }
 
 
@@ -336,6 +337,67 @@ def weighted_mean_layer():
             return dict(list(base_config.items()) + list(config.items()))
 
     return WeightedMean
+
+
+def nsgd():
+    """重み別に学習率の係数を設定できるSGD+Nesterov momentum Optimizer。"""
+    import keras
+    import keras.backend as K
+
+    class NSGD(keras.optimizers.SGD):
+        """重み別に学習率の係数を設定できるSGD+Nesterov momentum Optimizer。
+
+        lr_multipliersは、Layer.trainable_weights[i]をキーとし、学習率の係数を値としたdict。
+
+        # 例
+
+        ```py
+        lr_multipliers = {}
+        for layer in basenet.layers:
+            w = layer.trainable_weights
+            lr_multipliers.update(zip(w, [0.1] * len(w)))
+        ```
+
+        """
+
+        def __init__(self, lr=0.1, lr_multipliers=None, momentum=0.9, decay=0., nesterov=True, **kwargs):
+            super().__init__(lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, **kwargs)
+            self.lr_multipliers = lr_multipliers
+
+        @keras.legacy.interfaces.legacy_get_updates_support
+        def get_updates(self, loss, params):
+            grads = self.get_gradients(loss, params)
+            self.updates = []
+
+            lr = self.lr
+            if self.initial_decay > 0:
+                lr *= (1. / (1. + self.decay * self.iterations))
+                self.updates.append(K.update_add(self.iterations, 1))
+
+            # momentum
+            shapes = [K.get_variable_shape(p) for p in params]
+            moments = [K.zeros(shape) for shape in shapes]
+            self.weights = [self.iterations] + moments
+            for p, g, m in zip(params, grads, moments):
+                mlr = lr * self.lr_multipliers.pop(p) if p in self.lr_multipliers else lr
+                v = self.momentum * m - mlr * g  # velocity
+                self.updates.append(K.update(m, v))
+
+                if self.nesterov:
+                    new_p = p + self.momentum * v - mlr * g
+                else:
+                    new_p = p + v
+
+                # Apply constraints.
+                if getattr(p, 'constraint', None) is not None:
+                    new_p = p.constraint(new_p)
+
+                self.updates.append(K.update(p, new_p))
+
+            assert len(self.lr_multipliers) == 0, 'Invalid lr_multipliers: {}'.format(self.lr_multipliers)
+            return self.updates
+
+    return NSGD
 
 
 def my_callback_factory():
