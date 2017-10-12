@@ -365,6 +365,7 @@ def my_callback_factory():
         - beta1: lossを監視する際の指数移動平均の係数
         - beta2: lossを監視する際の指数移動平均の係数
         - margin_iterations: 学習率の自動調整時、このバッチ数分までは誤差を考慮して学習率を下げない
+        - reset_on_reduce: 学習率を減らすとき、optimizerのmomentumなどをリセットする。
 
         - verbose: 学習率などをprintするなら1
 
@@ -378,7 +379,8 @@ def my_callback_factory():
                      epoch_log_name='epochlog.tsv',
                      append=False,
                      max_reduces=2, reduce_factor=0.1,
-                     beta1=0.998, beta2=0.999, margin_iterations=100):
+                     beta1=0.998, beta2=0.999, margin_iterations=100,
+                     reset_on_reduce=True):
             super().__init__()
             # 設定
             assert (lr_list is None) != (base_lr is None)  # どちらか片方のみ必須
@@ -393,6 +395,7 @@ def my_callback_factory():
             self.beta1 = beta1
             self.beta2 = beta2
             self.margin_iterations = margin_iterations
+            self.reset_on_reduce = reset_on_reduce
             self.verbose = verbose
             # あとで使うものたち
             self.batch_log_file = None
@@ -409,6 +412,7 @@ def my_callback_factory():
             self.epoch = 0
             self.epoch_start_time = 0
             self.reduce_on_epoch_end = False
+            self.initial_optimizer_weights = None
 
         def on_train_begin(self, logs=None):
             # ログファイル作成
@@ -432,6 +436,7 @@ def my_callback_factory():
             self.ema2 = 0
             self.reduces = 0
             self.stopped_epoch = 0
+            self.initial_optimizer_weights = self.model.optimizer.get_weights() if self.reset_on_reduce else None
 
         def on_epoch_begin(self, epoch, logs=None):
             if self.lr_list is not None:
@@ -441,6 +446,9 @@ def my_callback_factory():
                     if epoch == 0 or lr != self.lr_list[epoch - 1]:
                         print('lr = {:.1e}'.format(float(lr)))
                 K.set_value(self.model.optimizer.lr, float(lr))
+                if self.reset_on_reduce:
+                    if epoch > 0 and lr != self.lr_list[epoch - 1]:
+                        self.model.optimizer.set_weights(self.initial_optimizer_weights)
             elif self.reduce_on_epoch_end:
                 if self.verbose >= 1:
                     print('lr = {:.1e}'.format(float(K.get_value(self.model.optimizer.lr))))
@@ -500,6 +508,8 @@ def my_callback_factory():
                     self.reduces += 1
                     lr = self.base_lr * self.reduce_factor ** self.reduces
                     K.set_value(self.model.optimizer.lr, float(lr))
+                    if self.reset_on_reduce:
+                        self.model.optimizer.set_weights(self.initial_optimizer_weights)
                     self.iterations_per_reduce = 0  # 安全装置のリセット
             if self.lr_list is not None and len(self.lr_list) - 1 <= epoch:
                 # リストの最後まで来ていたら終了 (epochsをちゃんと設定すべきだが、安全装置として)
