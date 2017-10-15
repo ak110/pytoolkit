@@ -9,6 +9,7 @@ import xml.etree
 import numpy as np
 import scipy.misc
 import sklearn.base
+import sklearn.cluster
 import sklearn.model_selection
 import sklearn.utils
 
@@ -243,6 +244,38 @@ def is_in_box(boxes_a, boxes_b):
     lt = boxes_a[:, np.newaxis, :2] >= boxes_b[:, :2]
     rb = boxes_a[:, np.newaxis, 2:] <= boxes_b[:, 2:]
     return np.logical_and(lt, rb).all(axis=-1)
+
+
+def cluster_by_iou(X, n_clusters, **kwargs):
+    """`1 - IoU`の値によるクラスタリング。
+
+    YOLO9000のDimension Clustersで使用されているもの。
+    KMeansのモデルのインスタンスを返す。
+    """
+    def _iou_distances(X, Y=None, Y_norm_squared=None, squared=False, X_norm_squared=None):
+        """`1 - IoU`を返す。"""
+        if Y is None:
+            return _iou_distances(X, X, Y_norm_squared, squared, X_norm_squared)
+        if len(X.shape) == 1:
+            return _iou_distances(np.expand_dims(X, 0), Y, Y_norm_squared, squared, X_norm_squared)
+        assert X.shape == (len(X), 2)
+        assert Y.shape == (len(Y), 2)
+        inter_wh = np.minimum(X[:, np.newaxis, :], Y)
+        area_inter = np.prod(inter_wh, axis=-1)
+        area_x = np.prod(X, axis=-1)
+        area_y = np.prod(Y, axis=-1)
+        area_union = area_x[:, np.newaxis] + area_y - area_inter
+        iou = area_inter / area_union
+        dist = 1 - iou
+        return np.square(dist) if squared else dist
+
+    from sklearn.cluster import k_means_
+    old = k_means_.euclidean_distances
+    k_means_.euclidean_distances = _iou_distances  # monkey-patch
+    model = sklearn.cluster.KMeans(n_clusters=n_clusters, **kwargs)
+    model.fit(X)
+    k_means_.euclidean_distances = old
+    return model
 
 
 def non_maximum_suppression(boxes, scores, top_k=200, iou_threshold=0.45):
