@@ -53,42 +53,49 @@ class ObjectsAnnotation(object):
         self.difficults = np.array(difficults) if difficults is not None else np.zeros(len(classes))
 
     @staticmethod
-    def load_voc(annotations_dir, class_name_to_id):
+    def load_voc(annotations_dir, names, class_name_to_id, without_difficult=False):
         """VOC2007などのアノテーションデータの読み込み。
 
-        結果は「画像ファイル名拡張子なし」とObjectsAnnotationのdict。
+        namesは「画像ファイル名拡張子なし」のリスト。
+        戻り値はObjectsAnnotationの配列。
         """
-        data = {}
-        for f in pathlib.Path(annotations_dir).iterdir():
-            root = xml.etree.ElementTree.parse(str(f)).getroot()
-            folder = root.find('folder').text
-            filename = root.find('filename').text
-            size_tree = root.find('size')
-            width = float(size_tree.find('width').text)
-            height = float(size_tree.find('height').text)
-            classes = []
-            bboxes = []
-            difficults = []
-            for object_tree in root.findall('object'):
-                class_id = class_name_to_id[object_tree.find('name').text]
-                bndbox = object_tree.find('bndbox')
-                xmin = float(bndbox.find('xmin').text) / width
-                ymin = float(bndbox.find('ymin').text) / height
-                xmax = float(bndbox.find('xmax').text) / width
-                ymax = float(bndbox.find('ymax').text) / height
-                difficult = object_tree.find('difficult').text == '1'
-                classes.append(class_id)
-                bboxes.append([xmin, ymin, xmax, ymax])
-                difficults.append(difficult)
-            data[f.stem] = ObjectsAnnotation(
-                folder=folder,
-                filename=filename,
-                width=width,
-                height=height,
-                classes=classes,
-                bboxes=bboxes,
-                difficults=difficults)
-        return data
+        d = pathlib.Path(annotations_dir)
+        return [ObjectsAnnotation._load_voc(d.joinpath(name + '.xml'), class_name_to_id, without_difficult)
+                for name in names]
+
+    @staticmethod
+    def _load_voc(f, class_name_to_id, without_difficult):
+        root = xml.etree.ElementTree.parse(str(f)).getroot()
+        folder = root.find('folder').text
+        filename = root.find('filename').text
+        size_tree = root.find('size')
+        width = float(size_tree.find('width').text)
+        height = float(size_tree.find('height').text)
+        classes = []
+        bboxes = []
+        difficults = []
+        for object_tree in root.findall('object'):
+            difficult = object_tree.find('difficult').text == '1'
+            if without_difficult and difficult:
+                continue
+            class_id = class_name_to_id[object_tree.find('name').text]
+            bndbox = object_tree.find('bndbox')
+            xmin = float(bndbox.find('xmin').text) / width
+            ymin = float(bndbox.find('ymin').text) / height
+            xmax = float(bndbox.find('xmax').text) / width
+            ymax = float(bndbox.find('ymax').text) / height
+            classes.append(class_id)
+            bboxes.append([xmin, ymin, xmax, ymax])
+            difficults.append(difficult)
+        annotation = ObjectsAnnotation(
+            folder=folder,
+            filename=filename,
+            width=width,
+            height=height,
+            classes=classes,
+            bboxes=bboxes,
+            difficults=difficults)
+        return annotation
 
 
 def to_categorical(nb_classes):

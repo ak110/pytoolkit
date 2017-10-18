@@ -807,15 +807,18 @@ class Generator(object):
         return X, y, weights
 
 
-def categorical_crossentropy(y_true, y_pred, alpha=0.75):
+def categorical_crossentropy(y_true, y_pred, alpha=None):
     """αによるclass=0とそれ以外の重み可変ありのcategorical_crossentropy。"""
     import keras.backend as K
-
     assert K.image_data_format() == 'channels_last'
-    nb_classes = K.int_shape(y_pred)[-1]
-    class_weights = np.array([(1 - alpha) * 2] * 1 + [alpha * 2] * (nb_classes - 1))
-    class_weights = np.reshape(class_weights, (1, 1, -1))
-    class_weights = -class_weights  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
+
+    if alpha is None:
+        class_weights = -1  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
+    else:
+        nb_classes = K.int_shape(y_pred)[-1]
+        class_weights = np.array([(1 - alpha) * 2] * 1 + [alpha * 2] * (nb_classes - 1))
+        class_weights = np.reshape(class_weights, (1, 1, -1))
+        class_weights = -class_weights  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
 
     y_pred = K.maximum(y_pred, K.epsilon())
     return K.sum(y_true * K.log(y_pred) * class_weights, axis=-1)
