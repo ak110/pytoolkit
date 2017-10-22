@@ -18,7 +18,7 @@ import sklearn.utils
 from . import utils
 
 
-def create_data_parallel_model(model, gpu_count=None):
+def create_data_parallel_model(model, batch_size, gpu_count=None):
     """複数GPUでデータ並列するモデルを作成する。
 
     # 参考
@@ -33,7 +33,7 @@ def create_data_parallel_model(model, gpu_count=None):
     if gpu_count is None:
         gpu_count = utils.get_gpu_count()
     if gpu_count <= 1:
-        return model
+        return model, batch_size
 
     assert isinstance(model.inputs, list)
     assert isinstance(model.outputs, list)
@@ -80,7 +80,7 @@ def create_data_parallel_model(model, gpu_count=None):
 
     parallel_model.save = type(model.save)(_save, parallel_model)
 
-    return parallel_model
+    return parallel_model, batch_size * gpu_count
 
 
 def conv2d(filters, kernel_size, activation, name, use_bn=True, use_batch_renorm=False, preact=False, **kargs):
