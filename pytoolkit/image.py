@@ -137,12 +137,15 @@ class ImageDataGenerator(dl.Generator):
         # 画像の読み込み
         rgb, y, w = self._load_image(x, y, w)
 
-        # 変形を伴うData Augmentation
         if data_augmentation:
+            # 変形を伴うData Augmentation
             rgb, y, w = self._transform(rgb, y, w, rand)
-
-        # リサイズ
-        rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=None)
+            # リサイズ
+            interp = rand.choice(['nearest', 'lanczos', 'bilinear', 'bicubic'])
+            rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=None, interp=interp)
+        else:
+            # リサイズ
+            rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=None)
 
         # 変形を伴わないData Augmentation
         if data_augmentation:
