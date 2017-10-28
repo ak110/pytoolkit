@@ -28,7 +28,7 @@ def test_image_data_generator():
     gen.add(0.125, tk.image.RandomSaturation())
     gen.add(0.125, tk.image.RandomBrightness())
     gen.add(0.125, tk.image.RandomContrast())
-    gen.add(0.125, tk.image.RandomLighting())
+    gen.add(0.125, tk.image.RandomHue())
 
     X = np.array([sklearn.externals.joblib.load(str(data_dir.joinpath('cifar.pkl')))])
     g = gen.flow(X, batch_size=1, data_augmentation=True, random_state=123)

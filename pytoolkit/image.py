@@ -295,26 +295,15 @@ class GaussianNoise(Augmentor):
         return ndimage.gaussian_noise(rgb, rand, self.scale)
 
 
-class RandomSaturation(Augmentor):
-    """彩度の変更。"""
-
-    def __init__(self, var=0.25):
-        self.var = var
-        super().__init__()
-
-    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
-        return ndimage.saturation(rgb, rand.uniform(1 - self.var, 1 + self.var))
-
-
 class RandomBrightness(Augmentor):
     """明度の変更。"""
 
-    def __init__(self, var=0.25):
-        self.var = var
+    def __init__(self, shift=32):
+        self.shift = shift
         super().__init__()
 
     def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
-        return ndimage.brightness(rgb, rand.uniform(1 - self.var, 1 + self.var))
+        return ndimage.brightness(rgb, rand.uniform(-self.shift, self.shift))
 
 
 class RandomContrast(Augmentor):
@@ -328,15 +317,26 @@ class RandomContrast(Augmentor):
         return ndimage.contrast(rgb, rand.uniform(1 - self.var, 1 + self.var))
 
 
-class RandomLighting(Augmentor):
-    """コントラストの変更。"""
+class RandomSaturation(Augmentor):
+    """彩度の変更。"""
 
-    def __init__(self, std=0.5):
-        self.std = std
+    def __init__(self, var=0.5):
+        self.var = var
         super().__init__()
 
     def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
-        return ndimage.lighting(rgb, rand.randn(3) * self.std)
+        return ndimage.saturation(rgb, rand.uniform(1 - self.var, 1 + self.var))
+
+
+class RandomHue(Augmentor):
+    """色相の変更。"""
+
+    def __init__(self, shift=0.1):
+        self.shift = shift
+        super().__init__()
+
+    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
+        return ndimage.hue(rgb, rand.uniform(- self.shift, + self.shift))
 
 
 class RandomErasing(Augmentor):

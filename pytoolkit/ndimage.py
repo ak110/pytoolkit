@@ -9,6 +9,7 @@ import numpy as np
 import scipy
 import scipy.ndimage
 import scipy.signal
+import skimage.color
 
 
 def load(path: Union[str, pathlib.Path], color_mode='RGB') -> np.ndarray:
@@ -182,34 +183,34 @@ def median(rgb: np.ndarray, size: int) -> np.ndarray:
     return np.stack(channels, axis=2)
 
 
-def saturation(rgb: np.ndarray, alpha: float) -> np.ndarray:
-    """彩度の変更。alphaは(0.5～1.5)程度がよい。例：`np.random.uniform(0.5, 1.5)`"""
-    gs = to_grayscale(rgb)
-    rgb = rgb * alpha + (1 - alpha) * gs[:, :, None]
-    return rgb
-
-
-def brightness(rgb: np.ndarray, alpha: float) -> np.ndarray:
-    """明度の変更。alphaは(0.5～1.5)程度がよい。例：`np.random.uniform(0.5, 1.5)`"""
-    rgb = rgb * alpha
+def brightness(rgb: np.ndarray, beta: float) -> np.ndarray:
+    """明度の変更。betaの例：`np.random.uniform(-32, +32)`"""
+    rgb += beta
     return rgb
 
 
 def contrast(rgb: np.ndarray, alpha: float) -> np.ndarray:
-    """コントラストの変更。alphaは(0.5～1.5)程度がよい。例：`np.random.uniform(0.5, 1.5)`"""
-    gs = to_grayscale(rgb).mean() * np.ones_like(rgb)
-    rgb = rgb * alpha + (1 - alpha) * gs
+    """コントラストの変更。alphaの例：`np.random.uniform(0.75, 1.25)`"""
+    rgb *= alpha
     return rgb
 
 
-def lighting(rgb: np.ndarray, rgb_noise: np.ndarray) -> np.ndarray:
-    """rgb_noiseは(-1～+1)程度の値の3要素の配列。例：`np.random.randn(3) * 0.5`"""
-    cov = np.cov(rgb.reshape(-1, 3) / 255.0, rowvar=False)
-    eigval, eigvec = np.linalg.eigh(cov)
-    rgb += eigvec.dot(eigval * rgb_noise) * 255
+def saturation(rgb: np.ndarray, alpha: float) -> np.ndarray:
+    """彩度の変更。alphaの例：`np.random.uniform(0.5, 1.5)`"""
+    gs = to_grayscale(rgb)
+    rgb *= alpha
+    rgb += (1 - alpha) * gs[:, :, np.newaxis]
     return rgb
+
+
+def hue(rgb: np.ndarray, beta: float) -> np.ndarray:
+    """色相の変更。betaの例：`np.random.uniform(-0.1, +0.1)`"""
+    hsv = skimage.color.rgb2hsv(np.clip(rgb, 0, 255) / 255)
+    hsv[:, :, 0] += beta
+    hsv[:, :, 0] %= 1.0
+    return skimage.color.hsv2rgb(hsv).astype(np.float32) * 255
 
 
 def to_grayscale(rgb: np.ndarray) -> np.ndarray:
     """グレースケール化。"""
-    return rgb.dot([0.299, 0.587, 0.114]).astype(rgb.dtype)
+    return rgb.dot([0.299, 0.587, 0.114])

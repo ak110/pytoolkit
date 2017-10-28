@@ -27,15 +27,14 @@ def test_filters():
         (1, 'soft', lambda rgb: tk.ndimage.soft(rgb)),
         (1, 'median_2', lambda rgb: tk.ndimage.median(rgb, 2)),
         (1, 'median_3', lambda rgb: tk.ndimage.median(rgb, 3)),
-        (1, 'saturation_075', lambda rgb: tk.ndimage.saturation(rgb, 0.75)),
-        (1, 'saturation_125', lambda rgb: tk.ndimage.saturation(rgb, 1.25)),
-        (1, 'brightness_075', lambda rgb: tk.ndimage.brightness(rgb, 0.75)),
-        (1, 'brightness_125', lambda rgb: tk.ndimage.brightness(rgb, 1.25)),
-        (1, 'contrast_075', lambda rgb: tk.ndimage.contrast(rgb, 0.75)),
-        (1, 'contrast_125', lambda rgb: tk.ndimage.contrast(rgb, 1.25)),
-        (1, 'lighting_pnn', lambda rgb: tk.ndimage.lighting(rgb, np.array([+1, -1, -1]))),
-        (1, 'lighting_n0p', lambda rgb: tk.ndimage.lighting(rgb, np.array([-1, +0, +1]))),
-        (1, 'lighting_ppp', lambda rgb: tk.ndimage.lighting(rgb, np.array([+1, +1, +1]))),
+        (1, 'brightness_n', lambda rgb: tk.ndimage.brightness(rgb, -32)),
+        (1, 'brightness_p', lambda rgb: tk.ndimage.brightness(rgb, 32)),
+        (1, 'saturation_l', lambda rgb: tk.ndimage.saturation(rgb, 0.5)),
+        (1, 'saturation_h', lambda rgb: tk.ndimage.saturation(rgb, 1.5)),
+        (1, 'contrast_l', lambda rgb: tk.ndimage.contrast(rgb, 0.75)),
+        (1, 'contrast_h', lambda rgb: tk.ndimage.contrast(rgb, 1.25)),
+        (1, 'hue_n', lambda rgb: tk.ndimage.hue(rgb, -0.1)),
+        (1, 'hue_p', lambda rgb: tk.ndimage.hue(rgb, +0.1)),
     ]
 
     rgb = tk.ndimage.load(base_dir.joinpath('data', 'Lenna.png'))  # 256x256の某有名画像
