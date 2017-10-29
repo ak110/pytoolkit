@@ -81,6 +81,12 @@ def test_non_maximum_suppression():
     idx = tk.ml.non_maximum_suppression(boxes, scores, 200, 0.45)
     assert (idx == np.array([5, 3])).all()
 
+    idx = tk.ml.non_maximum_suppression(np.array([[0, 0, 200, 200]]), np.array([0.2]), 200, 0.45)
+    assert (idx == np.array([0])).all()
+
+    idx = tk.ml.non_maximum_suppression(np.array([[200, 0, 200, 200]]), np.array([0.1]), 200, 0.45)
+    assert idx.shape == (0,)
+
 
 def test_plot_cm(tmpdir):
     filepath = str(tmpdir.join('confusion_matrix.png'))

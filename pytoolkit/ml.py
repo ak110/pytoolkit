@@ -304,19 +304,22 @@ def non_maximum_suppression(boxes, scores, top_k=200, iou_threshold=0.45):
     boxes = boxes[sorted_indices]
     boxes_area = np.prod(boxes[:, 2:] - boxes[:, :2], axis=1)
 
-    selected = np.zeros(len(boxes), dtype=bool)
+    selected = []
     for i, b in enumerate(boxes):
         if (b[2:] - b[:2] <= 0).any():
             continue  # 面積のないboxはskip
-        lt = np.maximum(b[:2], boxes[selected, :2])
-        rb = np.minimum(b[2:], boxes[selected, 2:])
-        area_inter = np.prod(rb - lt, axis=1) * (lt < rb).all(axis=1)
-        iou = area_inter / (boxes_area[i] + boxes_area[selected] - area_inter)
-        if (iou >= iou_threshold).any():
-            continue  # 重なっているのでskip
-        selected[i] = True
-        if np.count_nonzero(selected) >= top_k:
-            break
+        if len(selected) == 0:
+            selected.append(i)
+        else:
+            lt = np.maximum(b[:2], boxes[selected, :2])
+            rb = np.minimum(b[2:], boxes[selected, 2:])
+            area_inter = np.prod(rb - lt, axis=1) * (lt < rb).all(axis=1)
+            iou = area_inter / (boxes_area[i] + boxes_area[selected] - area_inter)
+            if (iou >= iou_threshold).any():
+                continue  # 重なっているのでskip
+            selected.append(i)
+            if len(selected) >= top_k:
+                break
 
     return sorted_indices[selected]
 
