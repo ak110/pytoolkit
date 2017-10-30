@@ -10,8 +10,6 @@ def test_image_data_generator():
     """画像の変換のテスト。目視したいので結果を`../___check/image[12]/`に保存しちゃう。"""
     base_dir = pathlib.Path(__file__).resolve().parent
     data_dir = base_dir.joinpath('data')
-    save_dir = base_dir.parent.joinpath('___check', 'image1')
-    save_dir.mkdir(parents=True, exist_ok=True)
 
     gen = tk.image.ImageDataGenerator((64, 64))
     gen.add(0.5, tk.image.FlipLR())
@@ -30,20 +28,16 @@ def test_image_data_generator():
     gen.add(0.125, tk.image.RandomContrast())
     gen.add(0.125, tk.image.RandomHue())
 
-    X = np.array([sklearn.externals.joblib.load(str(data_dir.joinpath('cifar.pkl')))])
-    g = gen.flow(X, batch_size=1, data_augmentation=True, random_state=123)
-    for i, X_batch in enumerate(g):
-        assert X_batch.shape == (1, 64, 64, 3)
-        tk.ndimage.save(save_dir.joinpath('{}.png'.format(i)), X_batch[0])
-        if i >= 31:
-            break
-
-    save_dir = base_dir.parent.joinpath('___check', 'image2')
-    save_dir.mkdir(parents=True, exist_ok=True)
-    X = np.array([str(data_dir.joinpath('Lenna.png'))])
-    g = gen.flow(X, batch_size=1, data_augmentation=True, random_state=456)
-    for i, X_batch in enumerate(g):
-        assert X_batch.shape == (1, 64, 64, 3)
-        tk.ndimage.save(save_dir.joinpath('{}.png'.format(i)), X_batch[0])
-        if i >= 31:
-            break
+    X_list = [
+        np.array([sklearn.externals.joblib.load(str(data_dir.joinpath('cifar.pkl')))]),
+        np.array([str(data_dir.joinpath('Lenna.png'))]),
+    ]
+    for X, dir_name in zip(X_list, ['image1', 'image2']):
+        save_dir = base_dir.parent.joinpath('___check', dir_name)
+        save_dir.mkdir(parents=True, exist_ok=True)
+        g = gen.flow(X, batch_size=1, data_augmentation=True, random_state=123)
+        for i, X_batch in enumerate(g):
+            assert X_batch.shape == (1, 64, 64, 3)
+            tk.ndimage.save(save_dir.joinpath('{}.png'.format(i)), X_batch[0])
+            if i >= 31:
+                break
