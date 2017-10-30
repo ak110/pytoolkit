@@ -18,6 +18,16 @@ import sklearn.utils
 from . import utils
 
 
+def device(cpu=False, gpu=False):
+    """`tf.device('/cpu:0')` などの簡単なラッパー。"""
+    assert cpu != gpu
+    import tensorflow as tf
+    if cpu:
+        return tf.device('/cpu:0')
+    else:
+        return tf.device('/gpu:0')
+
+
 def create_data_parallel_model(model, batch_size, gpu_count=None):
     """複数GPUでデータ並列するモデルを作成する。
 
