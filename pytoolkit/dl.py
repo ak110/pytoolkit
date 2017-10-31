@@ -10,9 +10,9 @@ import pathlib
 import time
 import warnings
 
-import joblib  # pip install joblib
 import numpy as np
 import pandas as pd
+import sklearn.externals.joblib as joblib
 import sklearn.utils
 
 from . import utils
@@ -749,11 +749,10 @@ class Generator(object):
 
     def flow(self, X, y=None, weights=None, batch_size=32, shuffle=False, random_state=None, **kargs):
         """`fit_generator`などに渡すgenerator。kargsはそのままprepareに渡される。"""
-        if self.parallel:
-            with joblib.Parallel(n_jobs=batch_size, backend='threading') as parallel:
-                return self._flow(X, y, weights, batch_size, shuffle, random_state, parallel, **kargs)
-        else:
-            return self._flow(X, y, weights, batch_size, shuffle, random_state, None, **kargs)
+        n_jobs = batch_size if self.parallel else 1
+        with joblib.Parallel(n_jobs=n_jobs, backend='threading') as parallel:
+            for r in self._flow(X, y, weights, batch_size, shuffle, random_state, parallel, **kargs):
+                yield r
 
     def _flow(self, X, y, weights, batch_size, shuffle, random_state, parallel, **kargs):
         """`fit_generator`などに渡すgenerator。kargsはそのままprepareに渡される。"""

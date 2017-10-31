@@ -5,8 +5,8 @@ import copy
 import pathlib
 import warnings
 
-import joblib  # pip install joblib
 import numpy as np
+import sklearn.externals.joblib as joblib
 import sklearn.utils
 
 from . import dl, ndimage
