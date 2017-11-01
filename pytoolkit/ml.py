@@ -98,15 +98,22 @@ class ObjectsAnnotation(object):
         return annotation
 
 
-def to_categorical(nb_classes):
-    """クラスラベルのone-hot encoding化を行う関数を返す。"""
-    def _to_categorical(y):
+class _ToCategorical(object):
+    """クラスラベルのone-hot encoding化を行うクラス。"""
+
+    def __init__(self, nb_classes):
+        self.nb_classes = nb_classes
+
+    def __call__(self, y):
         y = np.ravel(y)
-        cat = np.zeros((len(y), nb_classes))
+        cat = np.zeros((len(y), self.nb_classes))
         cat[np.arange(len(y)), y] = 1
         return cat
 
-    return _to_categorical
+
+def to_categorical(nb_classes):
+    """クラスラベルのone-hot encoding化を行う関数を返す。"""
+    return _ToCategorical(nb_classes)
 
 
 def compute_map(gt_classes_list, gt_bboxes_list, gt_difficults_list,
