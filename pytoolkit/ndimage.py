@@ -9,6 +9,7 @@ import numpy as np
 import scipy
 import scipy.ndimage
 import scipy.signal
+import scipy.stats
 import skimage.color
 
 
@@ -209,6 +210,15 @@ def hue(rgb: np.ndarray, beta: float) -> np.ndarray:
     hsv[:, :, 0] += beta
     hsv[:, :, 0] %= 1.0
     return skimage.color.hsv2rgb(hsv).astype(np.float32) * 255
+
+
+def hue_lite(rgb: np.ndarray, alpha: np.ndarray, beta: np.ndarray) -> np.ndarray:
+    """色相の変更の適当バージョン。"""
+    assert alpha.shape == (3,)
+    assert beta.shape == (3,)
+    rgb *= alpha / scipy.stats.hmean(alpha)
+    rgb += beta - np.mean(beta)
+    return rgb
 
 
 def to_grayscale(rgb: np.ndarray) -> np.ndarray:

@@ -331,12 +331,15 @@ class RandomSaturation(Augmentor):
 class RandomHue(Augmentor):
     """色相の変更。"""
 
-    def __init__(self, shift=0.1):
+    def __init__(self, var=0.25, shift=32):
+        self.var = var
         self.shift = shift
         super().__init__()
 
     def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
-        return ndimage.hue(rgb, rand.uniform(- self.shift, + self.shift))
+        alpha = rand.uniform(1 - self.var, 1 + self.var, (3,))
+        beta = rand.uniform(- self.shift, + self.shift, (3,))
+        return ndimage.hue_lite(rgb, alpha, beta)
 
 
 class RandomErasing(Augmentor):
