@@ -774,7 +774,7 @@ class Generator(object):
         assert isinstance(X, (np.ndarray, list))
         assert isinstance(y, (np.ndarray, list))
         assert isinstance(weights, np.ndarray)
-        assert self.parallel == (parallel is not None)
+        assert parallel is not None
         if self.data_encoder:
             X = self.data_encoder(X)
         if self.label_encoder and y[0] is not None:
