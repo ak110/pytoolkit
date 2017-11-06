@@ -36,10 +36,6 @@ def create_data_parallel_model(model, batch_size, gpu_count=None):
     https://github.com/kuza55/keras-extras/blob/master/utils/multi_gpu.py
 
     """
-    import keras
-    import keras.backend as K
-    import tensorflow as tf
-
     if gpu_count is None:
         gpu_count = utils.get_gpu_count()
     if gpu_count <= 1:
@@ -48,39 +44,9 @@ def create_data_parallel_model(model, batch_size, gpu_count=None):
     assert isinstance(model.inputs, list)
     assert isinstance(model.outputs, list)
 
-    # 各GPUでモデルを実行
-    tower_outputs = []
-    for gpu in range(gpu_count):
-        with tf.device('/gpu:%d' % gpu), tf.name_scope('tower_%d' % gpu):  # pylint: disable=E1129
-            def _slice(x, index, count):
-                input_shape = K.shape(x)
-                sliced_batch_size = input_shape[0] // count
-                if index == count - 1:
-                    return x[sliced_batch_size * index:]
-                return x[sliced_batch_size * index:sliced_batch_size * (index + 1)]
+    import keras
 
-            args = {'index': gpu, 'count': gpu_count}
-            sliced_inputs = [keras.layers.Lambda(_slice, arguments=args)(x)
-                             for x in model.inputs]
-
-            if len(sliced_inputs) == 1:
-                sliced_inputs = sliced_inputs[0]
-            outputs = model(sliced_inputs)
-            if not isinstance(outputs, list):
-                outputs = [outputs]
-
-            tower_outputs.append(outputs)
-
-    # 結果をマージ
-    with tf.device('/cpu:0'):
-        def _concat(inputs):
-            return K.concatenate(inputs, axis=0)
-
-        merged = [keras.layers.Lambda(_concat)([to[i] for to in tower_outputs])
-                  for i
-                  in range(len(model.outputs))]
-
-        parallel_model = keras.models.Model(model.inputs, merged, model.name + '_parallel')
+    parallel_model = keras.utils.multi_gpu_model(model, gpu_count)
 
     # Model.saveの置き換え
     # https://github.com/fchollet/keras/issues/2436#issuecomment-294243024
@@ -749,7 +715,7 @@ class Generator(object):
 
     def flow(self, X, y=None, weights=None, batch_size=32, shuffle=False, random_state=None, **kargs):
         """`fit_generator`などに渡すgenerator。kargsはそのままprepareに渡される。"""
-        n_jobs = batch_size if self.parallel else 1
+        n_jobs = 1 if self.parallel else 1
         with joblib.Parallel(n_jobs=n_jobs, backend='threading') as parallel:
             for r in self._flow(X, y, weights, batch_size, shuffle, random_state, parallel, **kargs):
                 yield r
