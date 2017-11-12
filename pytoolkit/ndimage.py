@@ -48,7 +48,7 @@ def random_crop(rgb: np.ndarray, rand: np.random.RandomState,
     padded_w = max(int(np.ceil(rgb.shape[1] * (1 + padding_rate))), cropped_w)
     padded_h = max(int(np.ceil(rgb.shape[0] * (1 + padding_rate))), cropped_h)
     # パディング
-    rgb = pad(rgb, padded_w, padded_h, padding=padding)
+    rgb = pad(rgb, padded_w, padded_h, padding=padding, rand=rand)
     # 切り抜き
     x = rand.randint(0, rgb.shape[1] - cropped_w + 1)
     y = rand.randint(0, rgb.shape[0] - cropped_h + 1)
@@ -57,7 +57,7 @@ def random_crop(rgb: np.ndarray, rand: np.random.RandomState,
 
 def rotate(rgb: np.ndarray, degrees: float, padding='same') -> np.ndarray:
     """回転。"""
-    assert padding in ('same', 'zero')
+    assert padding in ('same', 'zero', 'reflect', 'wrap')
     if padding == 'same':
         padding = 'nearest'
     elif padding == 'zero':
@@ -65,27 +65,38 @@ def rotate(rgb: np.ndarray, degrees: float, padding='same') -> np.ndarray:
     return scipy.ndimage.rotate(rgb, degrees, reshape=True, mode=padding)
 
 
-def pad(rgb: np.ndarray, width: int, height: int, padding='same') -> np.ndarray:
+def pad(rgb: np.ndarray, width: int, height: int, padding='same', rand=None) -> np.ndarray:
     """パディング。width/heightはpadding後のサイズ。(左右/上下均等、端数は右と下につける)"""
     assert width >= 0
     assert height >= 0
-    assert padding in ('same', 'zero')
     x1 = max(0, (width - rgb.shape[1]) // 2)
     y1 = max(0, (height - rgb.shape[0]) // 2)
     x2 = width - rgb.shape[1] - x1
     y2 = height - rgb.shape[0] - y1
-    rgb = pad_ltrb(rgb, x1, y1, x2, y2, padding)
+    rgb = pad_ltrb(rgb, x1, y1, x2, y2, padding, rand)
     assert rgb.shape[1] == width and rgb.shape[0] == height
     return rgb
 
 
-def pad_ltrb(rgb: np.ndarray, x1: int, y1: int, x2: int, y2: int, padding='same'):
+def pad_ltrb(rgb: np.ndarray, x1: int, y1: int, x2: int, y2: int, padding='same', rand=None):
     """パディング。x1/y1/x2/y2は左/上/右/下のパディング量。"""
-    assert padding in ('same', 'zero')
+    assert padding in ('same', 'zero', 'reflect', 'wrap', 'rand')
     if padding == 'same':
         padding = 'edge'
     elif padding == 'zero':
         padding = 'constant'
+    elif padding == 'rand':
+        assert rand is not None
+
+        def _pad_rand(vector, iaxis_pad_width, *_, **__):
+            if iaxis_pad_width[0] > 0:
+                vector[:iaxis_pad_width[0]] = rand.randint(0, 256, size=(iaxis_pad_width[0],))
+            if iaxis_pad_width[1] > 0:
+                vector[-iaxis_pad_width[1]:] = rand.randint(0, 256, size=(iaxis_pad_width[1],))
+            return vector
+
+        padding = _pad_rand
+
     return np.pad(rgb, ((y1, y2), (x1, x2), (0, 0)), mode=padding)
 
 
@@ -148,32 +159,6 @@ def unsharp_mask(rgb: np.ndarray, sigma: float, alpha=2.0) -> np.ndarray:
     """シャープ化。sigmaは0～1程度、alphaは1～2程度がよい？"""
     blured = blur(rgb, sigma)
     return rgb + (rgb - blured) * alpha
-
-
-def sharp(rgb: np.ndarray) -> np.ndarray:
-    """3x3のシャープ化。"""
-    k = np.array([
-        [+0.0, -0.2, +0.0],
-        [-0.2, +1.8, -0.2],
-        [+0.0, -0.2, +0.0],
-    ], dtype=np.float32)
-    channels = []
-    for ch in range(rgb.shape[-1]):
-        channels.append(scipy.signal.convolve2d(rgb[:, :, ch], k, mode='same', boundary='wrap'))
-    return np.stack(channels, axis=2)
-
-
-def soft(rgb: np.ndarray) -> np.ndarray:
-    """3x3のぼかし。"""
-    k = np.array([
-        [0.0, 0.2, 0.0],
-        [0.2, 0.2, 0.2],
-        [0.0, 0.2, 0.0],
-    ], dtype=np.float32)
-    channels = []
-    for ch in range(rgb.shape[-1]):
-        channels.append(scipy.signal.convolve2d(rgb[:, :, ch], k, mode='same', boundary='wrap'))
-    return np.stack(channels, axis=2)
 
 
 def median(rgb: np.ndarray, size: int) -> np.ndarray:

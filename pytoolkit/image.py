@@ -70,25 +70,23 @@ class ImageDataGenerator(dl.Generator):
     gen = tk.image.ImageDataGenerator((300, 300))
     gen.add(0.5, tk.image.FlipLR())
     gen.add(0.5, tk.image.RandomErasing())
-    gen.add(0.125, tk.image.RandomBlur())
-    gen.add(0.125, tk.image.RandomBlur(partial=True))
-    gen.add(0.125, tk.image.RandomUnsharpMask())
-    gen.add(0.125, tk.image.RandomUnsharpMask(partial=True))
-    gen.add(0.125, tk.image.Sharp())
-    gen.add(0.125, tk.image.Soft())
-    gen.add(0.125, tk.image.RandomMedian())
-    gen.add(0.125, tk.image.GaussianNoise())
-    gen.add(0.125, tk.image.GaussianNoise(partial=True))
-    gen.add(0.125, tk.image.RandomSaturation())
-    gen.add(0.125, tk.image.RandomBrightness())
-    gen.add(0.125, tk.image.RandomContrast())
-    gen.add(0.125, tk.image.RandomHue())
+    gen.add(0.25, tk.image.RandomBlur())
+    gen.add(0.25, tk.image.RandomBlur(partial=True))
+    gen.add(0.25, tk.image.RandomUnsharpMask())
+    gen.add(0.25, tk.image.RandomUnsharpMask(partial=True))
+    gen.add(0.25, tk.image.RandomMedian())
+    gen.add(0.25, tk.image.GaussianNoise())
+    gen.add(0.25, tk.image.GaussianNoise(partial=True))
+    gen.add(0.5, tk.image.RandomSaturation())
+    gen.add(0.5, tk.image.RandomBrightness())
+    gen.add(0.5, tk.image.RandomContrast())
+    gen.add(0.5, tk.image.RandomHue())
     ```
 
     """
 
     def __init__(self, image_size=(300, 300), grayscale=False, preprocess_input=None,
-                 rotate_prob=0.125, rotate_degrees=15,
+                 rotate_prob=0.5, rotate_degrees=15,
                  padding_rate=0.25, crop_rate=0.15625,
                  aspect_prob=0.5,
                  aspect_rations=(3 / 4, 4 / 3),
@@ -179,8 +177,10 @@ class ImageDataGenerator(dl.Generator):
         """変形を伴うAugmentation。"""
         # 回転
         if rand.rand() <= self.rotate_prob:
-            rgb = ndimage.random_rotate(rgb, rand, degrees=self.rotate_degrees)
+            padding = rand.choice(('same', 'zero', 'reflect', 'wrap'))
+            rgb = ndimage.random_rotate(rgb, rand, degrees=self.rotate_degrees, padding=padding)
         # padding+crop
+        padding = rand.choice(('same', 'zero', 'reflect', 'wrap', 'rand'))
         rgb = ndimage.random_crop(rgb, rand, self.padding_rate, self.crop_rate, self.aspect_prob, self.aspect_rations)
         return rgb, y, w
 
@@ -255,22 +255,6 @@ class RandomUnsharpMask(Augmentor):
 
     def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
         return ndimage.unsharp_mask(rgb, self.sigma, rand.uniform(self.min_alpha, self.max_alpha))
-
-
-class Sharp(Augmentor):
-    """3x3のシャープ化。"""
-
-    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
-        assert rand is not None  # noqa
-        return ndimage.sharp(rgb)
-
-
-class Soft(Augmentor):
-    """3x3のぼかし。"""
-
-    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
-        assert rand is not None  # noqa
-        return ndimage.soft(rgb)
 
 
 class RandomMedian(Augmentor):
