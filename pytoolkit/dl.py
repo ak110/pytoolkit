@@ -715,7 +715,7 @@ class Generator(object):
 
     def flow(self, X, y=None, weights=None, batch_size=32, shuffle=False, random_state=None, **kargs):
         """`fit_generator`などに渡すgenerator。kargsはそのままprepareに渡される。"""
-        n_jobs = 1 if self.parallel else 1
+        n_jobs = batch_size if self.parallel else 1
         with joblib.Parallel(n_jobs=n_jobs, backend='threading') as parallel:
             for r in self._flow(X, y, weights, batch_size, shuffle, random_state, parallel, **kargs):
                 yield r
