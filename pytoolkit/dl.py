@@ -589,7 +589,9 @@ def session(config=None, gpu_options=None):
                 self.gpu_options.update({'allow_growth': True})
                 if 'OMP_NUM_THREADS' in os.environ and 'intra_op_parallelism_threads' not in self.config:
                     self.config['intra_op_parallelism_threads'] = int(os.environ['OMP_NUM_THREADS'])
-                config = tf.ConfigProto(gpu_options=tf.GPUOptions(**self.gpu_options), **self.config)
+                config = tf.ConfigProto(**self.config)
+                for k, v in self.gpu_options.items():
+                    setattr(config.gpu_options, k, v)
                 K.set_session(tf.Session(config=config))
 
         def __exit__(self, *exc_info):
