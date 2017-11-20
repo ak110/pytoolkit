@@ -8,12 +8,13 @@ import copy
 import csv
 import os
 import pathlib
+import queue
+import threading
 import time
 import warnings
 
 import numpy as np
 import pandas as pd
-import sklearn.externals.joblib as joblib
 import sklearn.utils
 
 from . import utils
@@ -783,78 +784,153 @@ class Generator(object):
 
     """
 
-    def __init__(self, data_encoder=None, label_encoder=None, parallel=False):
+    def __init__(self, data_encoder=None, label_encoder=None):
         self.data_encoder = data_encoder
         self.label_encoder = label_encoder
-        self.parallel = parallel
-
-    def flow(self, X, y=None, weights=None, batch_size=32, shuffle=False, random_state=None, **kargs):
-        """`fit_generator`などに渡すgenerator。kargsはそのままprepareに渡される。"""
-        n_jobs = batch_size if self.parallel else 1
-        with joblib.Parallel(n_jobs=n_jobs, backend='threading') as parallel:
-            for r in self._flow(X, y, weights, batch_size, shuffle, random_state, parallel, **kargs):
-                yield r
-
-    def _flow(self, X, y, weights, batch_size, shuffle, random_state, parallel, **kargs):
-        """`fit_generator`などに渡すgenerator。kargsはそのままprepareに渡される。"""
-        random_state = sklearn.utils.check_random_state(random_state)
-        length = len(X[0]) if isinstance(X, list) else len(X)
-
-        if y is not None:
-            assert length == (len(y[0]) if isinstance(y, list) else len(y))
-
-        for ix in self._flow_indices(length, batch_size, shuffle, random_state):
-            if isinstance(X, list):
-                x_ = [t[ix] for t in X]  # multiple input
-            else:
-                x_ = X[ix]
-            if y is not None:
-                if isinstance(y, list):
-                    y_ = [t[ix] for t in y]  # multiple output
-                else:
-                    y_ = y[ix]
-
-            if y is None:
-                assert weights is None
-                yield self._prepare(x_, np.array([None] * len(x_)), np.array([None] * len(x_)), parallel, **kargs)[0]
-            elif weights is None:
-                yield self._prepare(x_, y_, np.array([None] * len(x_)), parallel, **kargs)[:2]
-            else:
-                yield self._prepare(x_, y_, weights[ix], parallel, **kargs)
-
-    def _flow_indices(self, data_count, batch_size, shuffle, random_state=None):
-        """データのindexを列挙し続けるgenerator。"""
-        if shuffle:
-            random_state = sklearn.utils.check_random_state(random_state)
-
-        spe = self.steps_per_epoch(data_count, batch_size)
-        ix = np.arange(data_count)
-        while True:
-            if shuffle:
-                random_state.shuffle(ix)
-            for bi in np.array_split(ix, spe):
-                yield bi
 
     @staticmethod
     def steps_per_epoch(data_count, batch_size):
         """1epochが何ステップかを算出して返す"""
         return (data_count + batch_size - 1) // batch_size
 
-    def _prepare(self, X, y, weights, parallel, **_):
-        """何か前処理が必要な場合はこれをオーバーライドして使う。
+    def flow(self, X, y=None, weights=None, batch_size=32, shuffle=False, data_augmentation=False, random_state=None):
+        """`fit_generator`などに渡すgenerator。kargsはそのままprepareに渡される。"""
+        random_state = sklearn.utils.check_random_state(random_state)
+        length = len(X[0]) if isinstance(X, list) else len(X)
+        if y is not None:
+            assert length == (len(y[0]) if isinstance(y, list) else len(y))
+
+        cpu_count = os.cpu_count()
+        max_queue_size = max(batch_size * 4, cpu_count * 2)  # 適当に余裕をもったサイズにしておく
+        input_queue = queue.Queue(maxsize=max_queue_size)
+        result_queue = queue.Queue(maxsize=max_queue_size)
+        workers = [threading.Thread(target=self._worker,
+                                    args=(wid, input_queue, result_queue, data_augmentation),
+                                    daemon=True)
+                   for wid in range(cpu_count)]
+        for worker in workers:
+            worker.start()
+        try:
+            gen = self._flow_index(length, shuffle, random_state)
+            result_buffer = []
+            next_seq = 0
+            seq_in = 0
+
+            while True:
+                # キューサイズ >= batch_size * 4になるまでinput_queueにデータを入れる
+                queue_size = input_queue.qsize() + result_queue.qsize()
+                while queue_size < max_queue_size:
+                    ix, seed = next(gen)
+                    x_ = self._pick_one(X, ix)
+                    if y is None:
+                        y_ = None
+                    else:
+                        y_ = self._pick_one(y, ix)
+                    if weights is None:
+                        w_ = None
+                    else:
+                        w_ = weights[ix]
+                    input_queue.put((seq_in, ix, seed, x_, y_, w_))
+                    queue_size += 1
+                    seq_in += 1
+
+                # バッチサイズ分の結果を取り出す
+                remain_size = length - next_seq % length
+                if shuffle or batch_size <= remain_size:
+                    cur_batch_size = batch_size
+                else:
+                    cur_batch_size = remain_size
+                while True:
+                    if len(result_buffer) >= cur_batch_size:
+                        if shuffle:
+                            break
+                        else:
+                            result_buffer.sort(key=lambda x: x[0])
+                            if result_buffer[0][0] == next_seq and \
+                                    result_buffer[cur_batch_size - 1][0] == next_seq + cur_batch_size - 1:
+                                break
+                    result_buffer.append(result_queue.get())
+                _, rx, ry, rw = zip(*result_buffer[:cur_batch_size])
+                result_buffer = result_buffer[cur_batch_size:]
+                next_seq += cur_batch_size
+
+                # 結果を返す
+                if y is None:
+                    assert weights is None
+                    yield self._to_ndaarray(rx, isinstance(X, list))
+                elif weights is None:
+                    yield self._to_ndaarray(rx, isinstance(X, list)), self._to_ndaarray(ry, isinstance(y, list))
+                else:
+                    yield self._to_ndaarray(rx, isinstance(X, list)), self._to_ndaarray(ry, isinstance(y, list)), np.array(rw)
+        except GeneratorExit:
+            pass
+        finally:
+            # 処理中のものをいったんキャンセル
+            try:
+                while True:
+                    input_queue.get_nowait()
+            except queue.Empty:
+                pass
+            # Noneを入れる
+            try:
+                while True:
+                    input_queue.put_nowait((None, None, None, None, None, None))
+            except queue.Full:
+                pass
+            # 全ワーカーが止まるまで一応待つ
+            for worker in workers:
+                worker.join()
+
+    @staticmethod
+    def _pick_one(input_array, ix):
+        if isinstance(input_array, list):
+            return [x[ix] for x in input_array]  # multiple input/output
+        else:
+            return input_array[ix]
+
+    @staticmethod
+    def _to_ndaarray(arr, is_multiple):
+        if is_multiple:
+            return [np.array(a) for a in arr]
+        else:
+            return np.array(arr)
+
+    def _flow_index(self, data_count, shuffle, random_state):
+        """データのindexとseedを列挙し続けるgenerator。"""
+        indices = np.arange(data_count)
+        while True:
+            if shuffle:
+                random_state.shuffle(indices)
+            seeds = random_state.randint(0, 2 ** 31, size=(len(indices),))
+            for index, seed in zip(indices, seeds):
+                yield index, seed
+
+    def _worker(self, wid, input_queue, result_queue, data_augmentation):
+        """ワーカープロセス。"""
+        assert wid >= 0
+        while True:
+            seq, ix, seed, x_, y_, w_ = input_queue.get()
+            if seq is None:
+                break
+            x_, y_, w_ = self.generate(ix, seed, x_, y_, w_, data_augmentation)
+            result_queue.put((seq, x_, y_, w_))
+        # allow_exit_without_flush
+        # result_queue.cancel_join_thread()
+
+    def generate(self, ix, seed, x_, y_, w_, data_augmentation):
+        """1件分の処理。
 
         画像の読み込みとかDataAugmentationとか。
-        yやweightsは使わない場合そのまま返せばOK。(使う場合はテスト時とかのNoneに注意。)
+        y_やw_は使わない場合もそのまま返せばOK。(使う場合はNoneに注意。)
         """
-        assert isinstance(X, (np.ndarray, list))
-        assert isinstance(y, (np.ndarray, list))
-        assert isinstance(weights, np.ndarray)
-        assert parallel is not None
+        assert ix is not None
+        assert seed is not None
+        assert data_augmentation in (True, False)
         if self.data_encoder:
-            X = self.data_encoder(X)
-        if self.label_encoder and y[0] is not None:
-            y = self.label_encoder(y)
-        return X, y, weights
+            x_ = np.squeeze(self.data_encoder(np.expand_dims(x_, 0)), axis=0)
+        if self.label_encoder and y_ is not None:
+            y_ = np.squeeze(self.label_encoder(np.expand_dims(y_, 0)), axis=0)
+        return x_, y_, w_
 
 
 def categorical_crossentropy(y_true, y_pred, alpha=None):

@@ -1,6 +1,7 @@
 """ImageDataGeneratorのチェック用コード。"""
 import pathlib
 
+import better_exceptions
 import numpy as np
 from tqdm import tqdm
 
@@ -10,6 +11,7 @@ _IMAGE_SIZE = (512, 512)
 
 
 def _main():
+    better_exceptions.MAX_LENGTH = 128
     np.random.seed(1234)
 
     base_dir = pathlib.Path(__file__).resolve().parent

@@ -101,43 +101,24 @@ class ImageDataGenerator(dl.Generator):
         self.aspect_prob = aspect_prob
         self.aspect_rations = aspect_rations
         self.augmentors = []
-        super().__init__(data_encoder, label_encoder, parallel=True)
+        super().__init__(data_encoder, label_encoder)
 
     def add(self, probability: float, augmentor: Augmentor):
         """Augmentorの追加"""
         self.augmentors.append(AugmentorEntry(probability=probability, augmentor=augmentor))
 
-    def flow(self, X, y=None, weights=None, batch_size=32, shuffle=False, random_state=None, data_augmentation=False):  # pylint: disable=arguments-differ
-        """`fit_generator`などに渡すgenerator。
-
-        # 引数
-        - data_augmentation: Data Augmentationを行うか否か。
-        """
-        random_state = sklearn.utils.check_random_state(random_state)
-        rand = np.random.RandomState(random_state.randint(0, 2 ** 31))
-        return super().flow(X, y, weights, batch_size, shuffle, random_state,
-                            data_augmentation=data_augmentation, rand=rand)
-
-    def _prepare(self, X, y, weights, parallel, data_augmentation=False, rand=None):  # pylint: disable=arguments-differ
-        """画像の読み込みとDataAugmentation。"""
-        seeds = rand.randint(0, 2 ** 31, len(X))
-        jobs = [joblib.delayed(self._load, check_pickle=False)(x, y_, w, data_augmentation, seed)
-                for x, y_, w, seed in zip(X, y, weights, seeds)]
-        X, y, weights = zip(*parallel(jobs))
-        return super()._prepare(np.array(X), np.array(y), np.array(weights), parallel)
-
-    def _load(self, x, y, w, data_augmentation, seed):
+    def generate(self, ix, seed, x_, y_, w_, data_augmentation):
         """画像の読み込みとDataAugmentation。(単数)"""
         rand = np.random.RandomState(seed)  # 再現性やスレッドセーフ性に自信がないのでここではこれを使う。
-        y = copy.deepcopy(y)
-        w = copy.deepcopy(w)
+        y_ = copy.deepcopy(y_)
+        w_ = copy.deepcopy(w_)
 
         # 画像の読み込み
-        rgb, y, w = self._load_image(x, y, w)
+        rgb, y_, w_ = self._load_image(x_, y_, w_)
 
         if data_augmentation:
             # 変形を伴うData Augmentation
-            rgb, y, w = self._transform(rgb, y, w, rand)
+            rgb, y_, w_ = self._transform(rgb, y_, w_, rand)
             # リサイズ
             interp = rand.choice(['nearest', 'lanczos', 'bilinear', 'bicubic'])
             rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=None, interp=interp)
@@ -151,7 +132,7 @@ class ImageDataGenerator(dl.Generator):
             rand.shuffle(augmentors)  # シャッフルして色々な順で適用
             for a in augmentors:
                 if rand.rand() <= a.probability:
-                    rgb = a.augmentor.execute(rgb, y, w, rand)
+                    rgb = a.augmentor.execute(rgb, y_, w_, rand)
             # 色が範囲外になっていたら補正(飽和)
             rgb = np.clip(rgb, 0, 255)
 
@@ -160,7 +141,7 @@ class ImageDataGenerator(dl.Generator):
         rgb = np.expand_dims(rgb, axis=0)
         rgb = pi(rgb)
         rgb = np.squeeze(rgb, axis=0)
-        return rgb, y, w
+        return super().generate(ix, seed, rgb, y_, w_, data_augmentation)
 
     def _load_image(self, x, y, w):
         """画像の読み込み"""
