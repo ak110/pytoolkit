@@ -8,9 +8,11 @@ import numpy as np
 import sklearn.externals.joblib
 
 
-def create_tee_logger(output_path, name=None, append=False, fmt=None):
+def create_tee_logger(output_path, name=None, append=False,
+                      rotate=False, max_bytes=1048576, backup_count=10, fmt=None):
     """標準出力とファイルに内容を出力するloggerを作成して返す。"""
-    from logging import DEBUG, StreamHandler, FileHandler, getLogger, Formatter
+    from logging import DEBUG, getLogger, StreamHandler, FileHandler, Formatter
+    from logging.handlers import RotatingFileHandler
 
     if name is None:
         name = __name__
@@ -25,7 +27,10 @@ def create_tee_logger(output_path, name=None, append=False, fmt=None):
     logger.addHandler(handler)
 
     if output_path is not None:
-        handler = FileHandler(str(output_path), 'a' if append else 'w', encoding='utf-8')
+        if rotate:
+            handler = RotatingFileHandler(str(output_path), 'a', max_bytes, backup_count, encoding='utf-8')
+        else:
+            handler = FileHandler(str(output_path), 'a' if append else 'w', encoding='utf-8')
     handler.setLevel(DEBUG)
     if fmt:
         handler.setFormatter(Formatter(fmt))
