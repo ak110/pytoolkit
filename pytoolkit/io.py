@@ -1,5 +1,6 @@
 """ファイル・フォルダ関連"""
 import pathlib
+import time
 
 
 def delete_file(file_path):
@@ -31,3 +32,16 @@ def write_all_text(file_path, text, mode='w', encoding='utf-8'):
     """ファイルの全行を書き込み。linesは改行無しの文字列の配列。.NETのSystem.IO.File.WriteAllText()風。"""
     with pathlib.Path(file_path).open(mode, encoding=encoding) as f:
         f.write(text)
+
+
+def do_retry(func, count=10, sleep_seconds=1.0):
+    """リトライ処理。"""
+    retry = 0
+    while True:
+        try:
+            return func()
+        except:
+            if retry >= count:
+                break
+            retry += 1
+            time.sleep(sleep_seconds)
