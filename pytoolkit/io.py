@@ -42,6 +42,6 @@ def do_retry(func, count=10, sleep_seconds=1.0):
             return func()
         except:
             if retry >= count:
-                break
+                raise
             retry += 1
             time.sleep(sleep_seconds)
