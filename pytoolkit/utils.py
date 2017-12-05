@@ -80,8 +80,11 @@ def nvidia_smi(*args):
 def get_gpu_count():
     """GPU数の取得。"""
     if 'CUDA_VISIBLE_DEVICES' in os.environ:
-        return len(np.unique(os.environ['CUDA_VISIBLE_DEVICES'].split(',')))
-    return int(ET.fromstring(nvidia_smi('-q', '-x')).find('./attached_gpus').text)
+        gpus = os.environ['CUDA_VISIBLE_DEVICES'].strip()
+        if gpus == '-1':
+            return 0
+        return len(np.unique(gpus.split(',')))
+    return len(nvidia_smi('--list-gpus').strip().split('\n'))
 
 
 def create_gpu_pool(n_gpus=None, processes_per_gpu=1, initializer=None, initargs=None):
