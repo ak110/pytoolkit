@@ -181,7 +181,8 @@ class ImageDataGenerator(dl.Generator):
             rgb = ndimage.random_rotate(rgb, rand, degrees=self.rotate_degrees, padding=padding)
         # padding+crop
         padding = rand.choice(('same', 'zero', 'reflect', 'wrap', 'rand'))
-        rgb = ndimage.random_crop(rgb, rand, self.padding_rate, self.crop_rate, self.aspect_prob, self.aspect_rations)
+        rgb = ndimage.random_crop(rgb, rand, self.padding_rate, self.crop_rate,
+                                  self.aspect_prob, self.aspect_rations, padding=padding)
         return rgb, y, w
 
 

@@ -82,22 +82,24 @@ def pad_ltrb(rgb: np.ndarray, x1: int, y1: int, x2: int, y2: int, padding='same'
     """パディング。x1/y1/x2/y2は左/上/右/下のパディング量。"""
     assert padding in ('same', 'zero', 'reflect', 'wrap', 'rand')
     if padding == 'same':
-        padding = 'edge'
+        mode = 'edge'
     elif padding == 'zero':
-        padding = 'constant'
+        mode = 'constant'
     elif padding == 'rand':
         assert rand is not None
+        mode = 'constant'
+    else:
+        mode = padding
 
-        def _pad_rand(vector, iaxis_pad_width, *_, **__):
-            if iaxis_pad_width[0] > 0:
-                vector[:iaxis_pad_width[0]] = rand.randint(0, 256, size=(iaxis_pad_width[0],))
-            if iaxis_pad_width[1] > 0:
-                vector[-iaxis_pad_width[1]:] = rand.randint(0, 256, size=(iaxis_pad_width[1],))
-            return vector
+    rgb = np.pad(rgb, ((y1, y2), (x1, x2), (0, 0)), mode=mode)
 
-        padding = _pad_rand
+    if padding == 'rand':
+        rgb[:y1, :, :] = rand.randint(0, 255, size=(y1, rgb.shape[1], rgb.shape[2]))
+        rgb[-y2:, :, :] = rand.randint(0, 255, size=(y2, rgb.shape[1], rgb.shape[2]))
+        rgb[:, :x1, :] = rand.randint(0, 255, size=(rgb.shape[1], x1, rgb.shape[2]))
+        rgb[:, -x2:, :] = rand.randint(0, 255, size=(rgb.shape[1], x2, rgb.shape[2]))
 
-    return np.pad(rgb, ((y1, y2), (x1, x2), (0, 0)), mode=padding)
+    return rgb
 
 
 def crop(rgb: np.ndarray, x: int, y: int, width: int, height: int) -> np.ndarray:
