@@ -1,42 +1,56 @@
 """各種ユーティリティ"""
+import logging
 import multiprocessing as mp
 import os
 import subprocess
-import xml.etree.ElementTree as ET
 
 import numpy as np
 import sklearn.externals.joblib
 
 
 def create_tee_logger(output_path, name=None, append=False,
-                      rotate=False, max_bytes=1048576, backup_count=10, fmt=None):
+                      rotate=False, max_bytes=1048576, backup_count=10,
+                      fmt='%(asctime)s [%(levelname)-5s] %(message)s'):
     """標準出力とファイルに内容を出力するloggerを作成して返す。"""
-    from logging import DEBUG, getLogger, StreamHandler, FileHandler, Formatter
-    from logging.handlers import RotatingFileHandler
+    logger = get_logger(name=name)
+    logger.addHandler(stream_handler(fmt=fmt))
+    if output_path is not None:
+        logger.addHandler(file_handler(
+            output_path, append, rotate, max_bytes, backup_count, fmt=fmt))
+    return logger
 
+
+def get_logger(name=None):
+    """"ロガーを取得して返す。"""
     if name is None:
         name = __name__
-
-    logger = getLogger(name)
-    logger.setLevel(DEBUG)
-
-    handler = StreamHandler()
-    handler.setLevel(DEBUG)
-    if fmt:
-        handler.setFormatter(Formatter(fmt))
-    logger.addHandler(handler)
-
-    if output_path is not None:
-        if rotate:
-            handler = RotatingFileHandler(str(output_path), 'a', max_bytes, backup_count, encoding='utf-8')
-        else:
-            handler = FileHandler(str(output_path), 'a' if append else 'w', encoding='utf-8')
-    handler.setLevel(DEBUG)
-    if fmt:
-        handler.setFormatter(Formatter(fmt))
-    logger.addHandler(handler)
-
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
     return logger
+
+
+def stream_handler(stream=None, level=logging.DEBUG, fmt='%(asctime)s [%(levelname)-5s] %(message)s'):
+    """StreamHandlerを作成して返す。"""
+    handler = logging.StreamHandler(stream=stream)
+    handler.setLevel(level)
+    if fmt:
+        handler.setFormatter(logging.Formatter(fmt))
+    return handler
+
+
+def file_handler(output_path, append=False, rotate=False,
+                 max_bytes=1048576, backup_count=10, encoding='utf-8',
+                 fmt='%(asctime)s [%(levelname)-5s] %(message)s'):
+    """RotatingFileHandler / FileHandlerを作成して返す。"""
+    if rotate:
+        handler = logging.handlers.RotatingFileHandler(
+            str(output_path), 'a', max_bytes, backup_count, encoding=encoding)
+    else:
+        handler = logging.FileHandler(str(output_path), 'a' if append else 'w', encoding=encoding)
+    handler.setLevel(logging.DEBUG)
+    if fmt:
+        handler.setFormatter(logging.Formatter(fmt))
+    return handler
 
 
 def close_logger(logger):
