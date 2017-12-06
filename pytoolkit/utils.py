@@ -1,5 +1,6 @@
 """各種ユーティリティ"""
 import logging
+import logging.handlers
 import multiprocessing as mp
 import os
 import subprocess
