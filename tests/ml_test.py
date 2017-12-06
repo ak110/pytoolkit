@@ -6,6 +6,23 @@ import pytest
 import pytoolkit as tk
 
 
+def test_load_voc_file():
+    base_dir = pathlib.Path(__file__).resolve().parent
+    xml_path = base_dir.joinpath('data', 'VOC2007_000001.xml')
+    class_name_to_id = {class_name: i for i, class_name in enumerate(tk.ml.VOC_CLASS_NAMES)}
+    ann = tk.ml.ObjectsAnnotation.load_voc_file(xml_path, class_name_to_id, without_difficult=False)
+    assert ann.folder == 'VOC2007'
+    assert ann.filename == '000001.jpg'
+    assert ann.width == 353
+    assert ann.height == 500
+    assert len(ann.classes) == 2
+    assert ann.classes[0] == class_name_to_id['dog']
+    assert ann.classes[1] == class_name_to_id['person']
+    assert (ann.difficults == np.array([False, False])).all()
+    assert ann.bboxes[0] == pytest.approx(np.array([48, 240, 195, 371]) / [353, 500, 353, 500])
+    assert ann.bboxes[1] == pytest.approx(np.array([8, 12, 352, 498]) / [353, 500, 353, 500])
+
+
 def test_compute_map():
     gt_classes_list = [np.array([1, 2])]
     gt_bboxes_list = [np.array([

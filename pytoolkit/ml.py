@@ -4,7 +4,7 @@ import itertools
 import json
 import multiprocessing as mp
 import pathlib
-import xml.etree
+import xml.etree.ElementTree
 
 import numpy as np
 import scipy.misc
@@ -60,11 +60,12 @@ class ObjectsAnnotation(object):
         戻り値はObjectsAnnotationの配列。
         """
         d = pathlib.Path(annotations_dir)
-        return [ObjectsAnnotation._load_voc(d.joinpath(name + '.xml'), class_name_to_id, without_difficult)
+        return [ObjectsAnnotation.load_voc_file(d.joinpath(name + '.xml'), class_name_to_id, without_difficult)
                 for name in names]
 
     @staticmethod
-    def _load_voc(f, class_name_to_id, without_difficult):
+    def load_voc_file(f, class_name_to_id, without_difficult):
+        """VOC2007などのアノテーションデータの読み込み。"""
         root = xml.etree.ElementTree.parse(str(f)).getroot()
         folder = root.find('folder').text
         filename = root.find('filename').text
