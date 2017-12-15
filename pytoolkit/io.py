@@ -45,3 +45,22 @@ def do_retry(func, count=10, sleep_seconds=1.0):
                 raise
             retry += 1
             time.sleep(sleep_seconds)
+
+
+def get_all_files(dir_path):
+    """ファイルの列挙。"""
+    import os
+    for root, _, files in os.walk(str(dir_path)):
+        parent = pathlib.Path(root)
+        for file in files:
+            yield parent.joinpath(root, file)
+
+
+def get_all_entries(dir_path):
+    """ファイル・ディレクトリの列挙。"""
+    import os
+    for root, _, files in os.walk(str(dir_path)):
+        parent = pathlib.Path(root)
+        yield parent
+        for file in files:
+            yield parent.joinpath(root, file)
