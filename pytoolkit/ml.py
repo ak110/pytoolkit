@@ -51,6 +51,12 @@ class ObjectsAnnotation(object):
         self.classes = np.array(classes)
         self.bboxes = np.array(bboxes)
         self.difficults = np.array(difficults) if difficults is not None else np.zeros(len(classes))
+        assert (self.classes >= 1).all()
+        assert self.width >= 1
+        assert self.height >= 1
+        assert (self.bboxes >= 0).all()
+        assert (self.bboxes <= 1).all()
+        assert (self.bboxes[:, :2] < self.bboxes[:, 2:]).all()
 
     @staticmethod
     def load_voc(annotations_dir, names, class_name_to_id, without_difficult=False):
