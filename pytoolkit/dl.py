@@ -378,6 +378,9 @@ def nsgd():
 
 def my_callback_factory():
     """クラスを作って返す。"""
+    import warnings
+    warnings.warn('my_callback_factoryは廃止予定!!')
+
     import keras
     import keras.backend as K
 
@@ -601,11 +604,19 @@ def session(config=None, gpu_options=None):
     return _Scope(config=config, gpu_options=gpu_options)
 
 
-def learning_curve_plotter_factory():
+def learning_rate_callback(lr=0.1, epochs=300):
+    """よくある150epoch目と225epoch目に学習率を1/10するコールバックを作って返す。"""
+    assert epochs % 4 == 0
+    import keras
+    lr_list = [lr] * (epochs // 2) + [lr / 10] * (epochs // 4) + [lr / 100] * (epochs // 4)
+    return keras.callbacks.LearningRateScheduler(lambda ep: lr_list[ep])
+
+
+def learning_curve_plot_callback(filename, metric='loss'):
     """Learning Curvesの描画を行う。
 
     # 引数
-    - filename: 保存先ファイル名。「{metric}」はmetricの値に置換される。
+    - filename: 保存先ファイル名。「{metric}」はmetricの値に置換される。str or pathlib.Path
     - metric: 対象とするmetric名。lossとかaccとか。
 
     # 「Invalid DISPLAY variable」対策
@@ -620,7 +631,7 @@ def learning_curve_plotter_factory():
     class _LearningCurvePlotter(keras.callbacks.Callback):
 
         def __init__(self, filename, metric='loss'):
-            self.filename = filename
+            self.filename = pathlib.Path(filename)
             self.metric = metric
             self.met_list = []
             self.val_met_list = []
@@ -651,10 +662,61 @@ def learning_curve_plotter_factory():
                 df.plot()
 
                 import matplotlib.pyplot as plt
+                self.filename.parent.mkdir(parents=True, exist_ok=True)
                 plt.savefig(str(self.filename).format(metric=self.metric))
                 plt.close()
 
-    return _LearningCurvePlotter
+    return _LearningCurvePlotter(filename=filename, metric=metric)
+
+
+def tsv_log_callback(filename, append=False):
+    """ログを保存するコールバック。
+
+    # 引数
+    - filename: 保存先ファイル名。「{metric}」はmetricの値に置換される。str or pathlib.Path
+    - append: 追記するのか否か。
+
+    """
+    import keras
+    import keras.backend as K
+
+    class _TSVLogger(keras.callbacks.Callback):
+
+        def __init__(self, filename, append):
+            self.filename = pathlib.Path(filename)
+            self.append = append
+            self.log_file = None
+            self.log_writer = None
+            self.epoch_start_time = None
+            super().__init__()
+
+        def on_train_begin(self, logs=None):
+            self.filename.parent.mkdir(parents=True, exist_ok=True)
+            self.log_file = self.filename.open('a' if self.append else 'w', buffering=65536)
+            self.log_writer = csv.writer(self.log_file, delimiter='\t', lineterminator='\n')
+            self.log_writer.writerow(['epoch', 'lr'] + self.params['metrics'] + ['time'])
+
+        def on_epoch_begin(self, epoch, logs=None):
+            self.epoch_start_time = time.time()
+
+        def on_epoch_end(self, epoch, logs=None):
+            logs = logs or {}
+            logs['lr'] = K.get_value(self.model.optimizer.lr)
+            elapsed_time = time.time() - self.epoch_start_time
+            metrics = ['{:.4f}'.format(logs.get(k)) for k in self.params['metrics']]
+            self.log_writer.writerow([epoch + 1, '{:.1e}'.format(logs['lr'])] + metrics +
+                                     [str(int(np.ceil(elapsed_time)))])
+            self.log_file.flush()
+
+        def on_train_end(self, logs=None):
+            self.log_file.close()
+
+    return _TSVLogger(filename=filename, append=append)
+
+
+def learning_curve_plotter_factory():
+    warnings.warn('learning_curve_plotter_factoryは廃止予定!!')
+    return learning_curve_plot_callback
 
 
 def plot_model_params(model, to_file='model.params.png', skip_bn=True):

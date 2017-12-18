@@ -37,7 +37,6 @@ def test_xor(tmpdir):
 
     X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
     y = np.array([0, 1, 1, 0])
-    lr_list = [1e-3] * 5 + [1e-4] * 3
 
     with tk.dl.session():
         inp = x = keras.layers.Input(shape=(2,))
@@ -48,9 +47,12 @@ def test_xor(tmpdir):
         model.fit(
             X.repeat(4096, axis=0),
             y.repeat(4096, axis=0),
-            epochs=128,
+            epochs=8,
             verbose=2,
-            callbacks=[tk.dl.my_callback_factory()(str(tmpdir), lr_list=lr_list)])
+            callbacks=[
+                tk.dl.learning_rate_callback(1e-3, epochs=8),
+                tk.dl.learning_curve_plot_callback(str(tmpdir) + 'history.png'),
+            ])
         pred = model.predict(X)
         y_pred = (pred > 0.5).astype(np.int32).reshape(y.shape)
     assert (y_pred == y).all()
