@@ -536,7 +536,7 @@ def plot_objects(base_image, save_path, classes, confs, locs, class_names):
         ymin = int(round(loc[1] * img.shape[0]))
         xmax = int(round(loc[2] * img.shape[1]))
         ymax = int(round(loc[3] * img.shape[0]))
-        label = class_names[classid] if class_names else str(classid)
+        label = class_names[classid] if class_names is not None else str(classid)
         if conf is None:
             txt = label
         else:

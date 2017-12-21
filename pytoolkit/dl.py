@@ -54,7 +54,12 @@ def create_data_parallel_model(model, batch_size, gpu_count=None):
         assert self_ is not None  # noqa
         model.save(*args, **kargs)
 
+    def _save_weights(self_, *args, **kargs):
+        assert self_ is not None  # noqa
+        model.save_weights(*args, **kargs)
+
     parallel_model.save = type(model.save)(_save, parallel_model)
+    parallel_model.save_weights = type(model.save_weights)(_save_weights, parallel_model)
 
     return parallel_model, batch_size * gpu_count
 
@@ -378,7 +383,6 @@ def nsgd():
 
 def my_callback_factory():
     """クラスを作って返す。"""
-    import warnings
     warnings.warn('my_callback_factoryは廃止予定!!')
 
     import keras
