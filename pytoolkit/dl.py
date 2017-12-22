@@ -4,6 +4,7 @@ kerasをimportしてしまうとTensorFlowの初期化が始まって重いの�
 importしただけではkerasがimportされないように作っている。
 
 """
+import copy
 import csv
 import os
 import pathlib
@@ -343,7 +344,7 @@ def nsgd():
 
         def __init__(self, lr=0.1, lr_multipliers=None, momentum=0.9, decay=0., nesterov=True, **kwargs):
             super().__init__(lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, **kwargs)
-            self.lr_multipliers = lr_multipliers
+            self.lr_multipliers = {t if isinstance(t, str) else t.name: mp for t, mp in lr_multipliers.items()}
 
         @keras.legacy.interfaces.legacy_get_updates_support
         def get_updates(self, loss, params):
@@ -359,8 +360,9 @@ def nsgd():
             shapes = [K.get_variable_shape(p) for p in params]
             moments = [K.zeros(shape) for shape in shapes]
             self.weights = [self.iterations] + moments
+            lr_multipliers = copy.deepcopy(self.lr_multipliers)
             for p, g, m in zip(params, grads, moments):
-                mlr = lr * self.lr_multipliers.pop(p) if p in self.lr_multipliers else lr
+                mlr = lr * lr_multipliers.pop(p.name) if p.name in lr_multipliers else lr
                 v = self.momentum * m - mlr * g  # velocity
                 self.updates.append(K.update(m, v))
 
@@ -375,8 +377,13 @@ def nsgd():
 
                 self.updates.append(K.update(p, new_p))
 
-            assert len(self.lr_multipliers) == 0, 'Invalid lr_multipliers: {}'.format(self.lr_multipliers)
+            assert len(lr_multipliers) == 0, 'Invalid lr_multipliers: {}'.format(lr_multipliers)
             return self.updates
+
+        def get_config(self):
+            config = {'lr_multipliers': self.lr_multipliers}
+            base_config = super().get_config()
+            return dict(list(base_config.items()) + list(config.items()))
 
     return NSGD
 

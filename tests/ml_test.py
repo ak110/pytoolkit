@@ -11,7 +11,7 @@ def test_load_voc_file():
     xml_path = base_dir.joinpath('data', 'VOC2007_000001.xml')
     class_name_to_id = {class_name: i for i, class_name in enumerate(tk.ml.VOC_CLASS_NAMES)}
     ann = tk.ml.ObjectsAnnotation.load_voc_file(xml_path, class_name_to_id, without_difficult=False)
-    assert ann.folder == 'VOC2007'
+    assert ann.folder == 'VOCdevkit/VOC2007/JPEGImages'
     assert ann.filename == '000001.jpg'
     assert ann.width == 353
     assert ann.height == 500
