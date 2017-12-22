@@ -53,7 +53,7 @@ def get_all_files(dir_path):
     for root, _, files in os.walk(str(dir_path)):
         parent = pathlib.Path(root)
         for file in files:
-            yield parent.joinpath(root, file)
+            yield parent / file
 
 
 def get_all_entries(dir_path):
@@ -63,4 +63,4 @@ def get_all_entries(dir_path):
         parent = pathlib.Path(root)
         yield parent
         for file in files:
-            yield parent.joinpath(root, file)
+            yield parent / file

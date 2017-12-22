@@ -13,6 +13,8 @@ import sklearn.cluster
 import sklearn.model_selection
 import sklearn.utils
 
+from . import io
+
 # VOC2007のクラス名のリスト (20クラス)
 VOC_CLASS_NAMES = [
     'aeroplane',
@@ -44,12 +46,19 @@ class ObjectsAnnotation(object):
     def __init__(self, folder, filename, width, height, classes, bboxes, difficults=None):
         assert len(classes) == len(bboxes)
         assert difficults is None or len(classes) == len(difficults)
+        # 画像のフォルダパス (データのディレクトリからの相対パス)
         self.folder = folder
+        # ファイル名
         self.filename = filename
+        # 画像の横幅(px)
         self.width = width
+        # 画像の縦幅(px)
         self.height = height
+        # クラスIDの配列
         self.classes = np.array(classes)
+        # bounding box(x1, y1, x2, y2)の配列。(0～1)
         self.bboxes = np.array(bboxes)
+        # difficultフラグの配列。(True or False)
         self.difficults = np.array(difficults) if difficults is not None else np.zeros(len(classes))
         assert (self.classes >= 1).all()
         assert self.width >= 1
@@ -59,14 +68,50 @@ class ObjectsAnnotation(object):
         assert (self.bboxes[:, :2] < self.bboxes[:, 2:]).all()
 
     @staticmethod
-    def load_voc(annotations_dir, names, class_name_to_id, without_difficult=False):
+    def get_path_list(data_dir, y):
+        """画像ファイルのパス(pathlib.Path)のndarrayを作って返す。
+
+        # 引数
+        - data_dir: VOCdevkitディレクトリが置いてあるディレクトリのパス
+        - y: ObjectsAnnotationの配列
+
+        """
+        data_dir = pathlib.Path(data_dir)
+        return np.array([data_dir / y_.folder / y_.filename for y_ in y])
+
+    @classmethod
+    def load_voc_0712(cls, data_dir, class_name_to_id, without_difficult=False):
+        """PASCAL VOCデータセットの、よくある07+12 trainval / 07 testの読み込み。"""
+        y_train1 = cls.load_voc(data_dir, 2007, 'trainval', class_name_to_id, without_difficult=without_difficult)
+        y_train2 = cls.load_voc(data_dir, 2012, 'trainval', class_name_to_id, without_difficult=without_difficult)
+        y_train = np.concatenate([y_train1, y_train2])
+        y_test = cls.load_voc(data_dir, 2007, 'test', class_name_to_id)
+        return y_train, y_test
+
+    @classmethod
+    def load_voc(cls, data_dir, year, set_name, class_name_to_id, without_difficult=False):
+        """PASCAL VOCデータセットの読み込み。
+
+        # 引数
+        - data_dir: VOCdevkitディレクトリが置いてあるディレクトリのパス
+        - year: 2007とか2012とか
+        - set_name: 'trainval'とか'test'とか
+
+        """
+        names = io.read_all_lines(data_dir / 'VOCdevkit/VOC{}/ImageSets/Main/{}.txt'.format(year, set_name))
+        y = cls.load_voc_files(data_dir / 'VOCdevkit/VOC{}/Annotations'.format(year),
+                               names, class_name_to_id, without_difficult)
+        return np.array(y)
+
+    @classmethod
+    def load_voc_files(cls, annotations_dir, names, class_name_to_id, without_difficult=False):
         """VOC2007などのアノテーションデータの読み込み。
 
         namesは「画像ファイル名拡張子なし」のリスト。
         戻り値はObjectsAnnotationの配列。
         """
         d = pathlib.Path(annotations_dir)
-        return [ObjectsAnnotation.load_voc_file(d.joinpath(name + '.xml'), class_name_to_id, without_difficult)
+        return [cls.load_voc_file(d.joinpath(name + '.xml'), class_name_to_id, without_difficult)
                 for name in names]
 
     @staticmethod
@@ -95,7 +140,7 @@ class ObjectsAnnotation(object):
             bboxes.append([xmin, ymin, xmax, ymax])
             difficults.append(difficult)
         annotation = ObjectsAnnotation(
-            folder=folder,
+            folder='VOCdevkit/{}/JPEGImages'.format(folder),
             filename=filename,
             width=width,
             height=height,
