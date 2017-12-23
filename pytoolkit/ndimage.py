@@ -10,16 +10,16 @@ import scipy
 import scipy.ndimage
 import scipy.signal
 import scipy.stats
-import skimage.color
 
 
-def load(path: Union[str, pathlib.Path], color_mode='RGB') -> np.ndarray:
+def load(path: Union[str, pathlib.Path], grayscale=False) -> np.ndarray:
     """画像の読み込み。
 
     やや余計なお世話だけど今後のためにfloat32に変換して返す。
     color_modeは'L'でグレースケール、'RGB'でRGB。
     """
-    return scipy.misc.imread(str(path), mode=color_mode).astype(np.float32)
+    import skimage.io
+    return skimage.io.imread(str(path), as_grey=grayscale).astype(np.float32)
 
 
 def save(path: Union[str, pathlib.Path], rgb: np.ndarray) -> None:
@@ -27,8 +27,9 @@ def save(path: Union[str, pathlib.Path], rgb: np.ndarray) -> None:
 
     やや余計なお世話だけど0～255にクリッピング(飽和)してから保存。
     """
-    rgb = np.clip(rgb, 0, 255)
-    scipy.misc.imsave(str(path), rgb)
+    import skimage.io
+    rgb = np.clip(rgb, 0, 255).astype(np.uint8)
+    skimage.io.imsave(str(path), rgb)
 
 
 def random_rotate(rgb: np.ndarray, rand: np.random.RandomState, degrees: float, padding='same') -> np.ndarray:
@@ -197,6 +198,7 @@ def saturation(rgb: np.ndarray, alpha: float) -> np.ndarray:
 
 def hue(rgb: np.ndarray, beta: float) -> np.ndarray:
     """色相の変更。betaの例：`np.random.uniform(-0.1, +0.1)`"""
+    import skimage.color
     hsv = skimage.color.rgb2hsv(np.clip(rgb, 0, 255) / 255)
     hsv[:, :, 0] += beta
     hsv[:, :, 0] %= 1.0

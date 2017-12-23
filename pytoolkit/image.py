@@ -6,8 +6,6 @@ import pathlib
 import warnings
 
 import numpy as np
-import sklearn.externals.joblib as joblib
-import sklearn.utils
 
 from . import dl, ndimage
 
@@ -150,8 +148,7 @@ class ImageDataGenerator(dl.Generator):
             assert rgb.shape[-1] == (1 if self.grayscale else 3)
         else:
             assert isinstance(x, (str, pathlib.Path))
-            color_mode = 'L' if self.grayscale else 'RGB'
-            rgb = ndimage.load(x, color_mode)
+            rgb = ndimage.load(x, self.grayscale)
         return rgb, y, w
 
     def _transform(self, rgb: np.ndarray, y, w, rand: np.random.RandomState):

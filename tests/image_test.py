@@ -11,7 +11,7 @@ def test_image_data_generator():
     base_dir = pathlib.Path(__file__).resolve().parent
     data_dir = base_dir.joinpath('data')
 
-    gen = tk.image.ImageDataGenerator((64, 64))
+    gen = tk.image.ImageDataGenerator((64, 64), preprocess_input=lambda x: x)
     gen.add(0.5, tk.image.FlipLR())
     gen.add(0.5, tk.image.RandomErasing())
     gen.add(0.25, tk.image.RandomBlur())

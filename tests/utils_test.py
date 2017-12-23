@@ -12,7 +12,7 @@ def test_create_tee_logger(tmpdir):
     with open(log_path, encoding='utf-8') as f:
         assert f.read() == 'あいうえお\n'
 
-    tk.close_logger(logger)
+    tk.log.close(logger)
     os.remove(log_path)
 
 

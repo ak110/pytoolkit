@@ -877,6 +877,12 @@ class Generator(object):
                     input_queue.put_nowait((None, None, None, None, None, None))
             except queue.Full:
                 pass
+            # 結果キューを空にする
+            try:
+                while True:
+                    result_queue.get_nowait()
+            except queue.Empty:
+                pass
             # 全ワーカーが止まるまで一応待つ
             for worker in workers:
                 worker.join()
