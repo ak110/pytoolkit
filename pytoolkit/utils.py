@@ -7,7 +7,7 @@ import numpy as np
 import sklearn.externals.joblib
 
 
-def create_tee_logger(output_path, name=None, append=False,
+def create_tee_logger(output_path, name='__main__', append=False,
                       rotate=False, max_bytes=1048576, backup_count=10,
                       fmt='%(asctime)s [%(levelname)-5s] %(message)s'):
     """標準出力とファイルに内容を出力するloggerを作成して返す。"""
