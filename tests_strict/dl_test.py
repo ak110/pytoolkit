@@ -35,6 +35,9 @@ def test_weighted_mean_layer():
 def test_xor(tmpdir):
     import keras
 
+    logger = tk.log.get('test_xor')
+    logger.addHandler(tk.log.file_handler(str(tmpdir.join('test_xor.log'))))
+
     X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
     y = np.array([0, 1, 1, 0])
 
@@ -52,7 +55,8 @@ def test_xor(tmpdir):
             callbacks=[
                 tk.dl.learning_rate_callback(1e-3, epochs=8),
                 tk.dl.learning_curve_plot_callback(str(tmpdir.join('history.png'))),
-                tk.dl.tsv_log_callback(str(tmpdir.join('history.tsv')))
+                tk.dl.tsv_log_callback(str(tmpdir.join('history.tsv'))),
+                tk.dl.logger_callback('test_xor'),
             ])
         pred = model.predict(X)
         y_pred = (pred > 0.5).astype(np.int32).reshape(y.shape)

@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 import sklearn.utils
 
-from . import utils
+from . import log, utils
 
 
 def device(cpu=False, gpu=False):
@@ -538,6 +538,32 @@ def tsv_log_callback(filename, append=False):
             self.log_file.close()
 
     return _TSVLogger(filename=filename, append=append)
+
+
+def logger_callback(name='__main__'):
+    """`logging.getLogger(name)`にDEBUGログを色々出力するcallback"""
+    import keras
+    import keras.backend as K
+
+    class _Logger(keras.callbacks.Callback):
+
+        def __init__(self, name):
+            self.name = name
+            self.logger = log.get(name)
+            self.epoch_start_time = None
+            super().__init__()
+
+        def on_epoch_begin(self, epoch, logs=None):
+            self.epoch_start_time = time.time()
+
+        def on_epoch_end(self, epoch, logs=None):
+            lr = K.get_value(self.model.optimizer.lr)
+            elapsed_time = time.time() - self.epoch_start_time
+            metrics = " ".join(['{}={:.4f}'.format(k, logs.get(k)) for k in self.params['metrics']])
+            self.logger.debug('Epoch %3d: lr=%.1e %s time=%d',
+                              epoch + 1, lr, metrics, int(np.ceil(elapsed_time)))
+
+    return _Logger(name=name)
 
 
 def plot_model_params(model, to_file='model.params.png', skip_bn=True):
