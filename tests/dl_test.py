@@ -14,3 +14,9 @@ def test_generator():
     assert (g.__next__() == np.array([3])).all()
     assert (g.__next__() == np.array([1, 2])).all()
     g.close()
+
+    g = gen.flow(np.array([1, 2, 3]), batch_size=2, shuffle=True)
+    assert g.__next__().shape == (2,)
+    assert g.__next__().shape == (2,)
+    assert g.__next__().shape == (2,)
+    g.close()

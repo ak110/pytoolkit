@@ -51,7 +51,8 @@ def test_xor(tmpdir):
             verbose=2,
             callbacks=[
                 tk.dl.learning_rate_callback(1e-3, epochs=8),
-                tk.dl.learning_curve_plot_callback(str(tmpdir) + 'history.png'),
+                tk.dl.learning_curve_plot_callback(str(tmpdir.join('history.png'))),
+                tk.dl.tsv_log_callback(str(tmpdir.join('history.tsv')))
             ])
         pred = model.predict(X)
         y_pred = (pred > 0.5).astype(np.int32).reshape(y.shape)

@@ -4,6 +4,7 @@ kerasをimportしてしまうとTensorFlowの初期化が始まって重いの�
 importしただけではkerasがimportされないように作っている。
 
 """
+import contextlib
 import copy
 import csv
 import os
@@ -389,193 +390,6 @@ def nsgd():
     return NSGD
 
 
-def my_callback_factory():
-    """クラスを作って返す。"""
-    warnings.warn('my_callback_factoryは廃止予定!!')
-
-    import keras
-    import keras.backend as K
-
-    class _MyCallback(keras.callbacks.Callback):
-        """色々入りのKerasのCallbackクラスを作って返す。
-
-        TerminateOnNaN+ReduceLROnPlateau+EarlyStopping+CSVLoggerのようなもの。
-
-        lossを監視して学習率を制御して、十分学習できたら終了する。
-        ついでにログも出す。(ミニバッチ単位＆エポック単位)
-
-        # 引数
-
-        - log_dir: ログ出力先
-        - batch_log_name: ミニバッチ単位のログファイル名
-        - epoch_log_name: エポック単位のログファイル名
-
-        - lr_list: epoch毎の学習率のリスト (base_lrと排他)
-
-        - base_lr: 学習率の自動調整のベースとする学習率 (lr_listと排他)
-        - max_reduces: 学習率の自動調整時、最大で何回学習率を減らすのか
-        - reduce_factor: 学習率の自動調整時、学習率を減らしていく割合
-        - beta1: lossを監視する際の指数移動平均の係数
-        - beta2: lossを監視する際の指数移動平均の係数
-        - margin_iterations: 学習率の自動調整時、このバッチ数分までは誤差を考慮して学習率を下げない
-        - reset_on_reduce: 学習率を減らすとき、optimizerのmomentumなどをリセットする。
-
-        - verbose: 学習率などをprintするなら1
-
-        """
-
-        def __init__(self, log_dir='.',
-                     lr_list=None,
-                     base_lr=None,
-                     verbose=1,
-                     batch_log_name='batchlog.tsv',
-                     epoch_log_name='epochlog.tsv',
-                     append=False,
-                     max_reduces=2, reduce_factor=0.1,
-                     beta1=0.998, beta2=0.999, margin_iterations=100,
-                     reset_on_reduce=True):
-            super().__init__()
-            # 設定
-            assert (lr_list is None) != (base_lr is None)  # どちらか片方のみ必須
-            self.log_dir = log_dir
-            self.batch_log_name = batch_log_name
-            self.epoch_log_name = epoch_log_name
-            self.append = append
-            self.lr_list = lr_list
-            self.base_lr = base_lr
-            self.max_reduces = max_reduces
-            self.reduce_factor = reduce_factor
-            self.beta1 = beta1
-            self.beta2 = beta2
-            self.margin_iterations = margin_iterations
-            self.reset_on_reduce = reset_on_reduce
-            self.verbose = verbose
-            # あとで使うものたち
-            self.batch_log_file = None
-            self.epoch_log_file = None
-            self.batch_log_writer = None
-            self.epoch_log_writer = None
-            self.iterations = 0
-            self.iterations_per_reduce = 0
-            self.ema1 = 0
-            self.ema2 = 0
-            self.delta_ema = 0
-            self.reduces = 0
-            self.stopped_epoch = 0
-            self.epoch = 0
-            self.epoch_start_time = 0
-            self.reduce_on_epoch_end = False
-            self.initial_optimizer_weights = None
-
-        def on_train_begin(self, logs=None):
-            # ログファイル作成
-            d = pathlib.Path(self.log_dir)
-            d.mkdir(parents=True, exist_ok=True)
-            self.batch_log_file = d.joinpath(self.batch_log_name).open('a' if self.append else 'w', buffering=65536)
-            self.epoch_log_file = d.joinpath(self.epoch_log_name).open('a' if self.append else 'w', buffering=65536)
-            self.batch_log_writer = csv.writer(self.batch_log_file, delimiter='\t', lineterminator='\n')
-            self.epoch_log_writer = csv.writer(self.epoch_log_file, delimiter='\t', lineterminator='\n')
-            self.batch_log_writer.writerow(['epoch', 'batch', 'loss', 'delta_ema'])
-            self.epoch_log_writer.writerow(['epoch', 'lr'] + self.params['metrics'] + ['time', 'delta_ema'])
-            # 学習率の設定(base_lr)
-            if self.base_lr is not None:
-                K.set_value(self.model.optimizer.lr, float(self.base_lr))
-                if self.verbose >= 1:
-                    print('lr = {:.1e}'.format(float(K.get_value(self.model.optimizer.lr))))
-            # 色々初期化
-            self.iterations = 0
-            self.iterations_per_reduce = 0
-            self.ema1 = 0
-            self.ema2 = 0
-            self.reduces = 0
-            self.stopped_epoch = 0
-            self.initial_optimizer_weights = self.model.optimizer.get_weights() if self.reset_on_reduce else None
-
-        def on_epoch_begin(self, epoch, logs=None):
-            if self.lr_list is not None:
-                # 学習率の設定(lr_list)
-                lr = self.lr_list[epoch]
-                if self.verbose >= 1:
-                    if epoch == 0 or lr != self.lr_list[epoch - 1]:
-                        print('lr = {:.1e}'.format(float(lr)))
-                K.set_value(self.model.optimizer.lr, float(lr))
-                if self.reset_on_reduce:
-                    if epoch > 0 and lr != self.lr_list[epoch - 1]:
-                        self.model.optimizer.set_weights(self.initial_optimizer_weights)
-            elif self.reduce_on_epoch_end:
-                if self.verbose >= 1:
-                    print('lr = {:.1e}'.format(float(K.get_value(self.model.optimizer.lr))))
-            # 色々初期化
-            self.epoch = epoch
-            self.epoch_start_time = time.time()
-            self.reduce_on_epoch_end = False
-
-        def on_batch_begin(self, batch, logs=None):
-            pass
-
-        def on_batch_end(self, batch, logs=None):
-            logs = logs or {}
-            loss = logs.get('loss')
-
-            # nanチェック(一応)
-            if loss is not None:
-                if np.isnan(loss) or np.isinf(loss):
-                    print('Batch %d: Invalid loss, terminating training' % (batch))
-                    self.model.stop_training = True
-
-            # lossの指数移動平均の算出
-            self.ema1 = loss * (1 - self.beta1) + self.ema1 * self.beta1
-            self.ema2 = loss * (1 - self.beta2) + self.ema2 * self.beta2
-            # Adam風補正
-            self.iterations += 1
-            hm1 = self.ema1 / (1 - self.beta1 ** self.iterations)
-            hm2 = self.ema2 / (1 - self.beta2 ** self.iterations)
-            self.delta_ema = hm2 - hm1
-            if self.base_lr is not None:
-                # lossの減少が止まってそうなら次のepochから学習率を減らす。
-                self.iterations_per_reduce += 1
-                if self.delta_ema <= 0 and self.margin_iterations <= self.iterations_per_reduce:
-                    self.reduce_on_epoch_end = True
-
-            # batchログ出力
-            self.batch_log_writer.writerow([self.epoch + 1, batch + 1, '{:.4f}'.format(loss), '{:.5f}'.format(self.delta_ema)])
-
-        def on_epoch_end(self, epoch, logs=None):
-            # batchログ出力
-            self.batch_log_file.flush()
-            # epochログ出力
-            lr = K.get_value(self.model.optimizer.lr)
-            metrics = ['{:.4f}'.format(logs.get(k)) for k in self.params['metrics']]
-            elapsed_time = time.time() - self.epoch_start_time
-            self.epoch_log_writer.writerow([epoch + 1, '{:.1e}'.format(lr)] + metrics +
-                                           [str(int(np.ceil(elapsed_time))), '{:.5f}'.format(self.delta_ema)])
-            self.epoch_log_file.flush()
-            # 学習率を減らす/限界まで下がっていたら学習終了
-            if self.reduce_on_epoch_end:
-                if self.max_reduces <= self.reduces:
-                    # 限界まで下がっていたら学習終了
-                    self.stopped_epoch = epoch
-                    self.model.stop_training = True
-                else:
-                    # 学習率を減らす
-                    self.reduces += 1
-                    lr = self.base_lr * self.reduce_factor ** self.reduces
-                    K.set_value(self.model.optimizer.lr, float(lr))
-                    if self.reset_on_reduce:
-                        self.model.optimizer.set_weights(self.initial_optimizer_weights)
-                    self.iterations_per_reduce = 0  # 安全装置のリセット
-            if self.lr_list is not None and len(self.lr_list) - 1 <= epoch:
-                # リストの最後まで来ていたら終了 (epochsをちゃんと設定すべきだが、安全装置として)
-                self.stopped_epoch = epoch
-                self.model.stop_training = True
-
-        def on_train_end(self, logs=None):
-            self.batch_log_file.close()
-            self.epoch_log_file.close()
-
-    return _MyCallback
-
-
 def session(config=None, gpu_options=None):
     """TensorFlowのセッションの初期化・後始末。
 
@@ -726,11 +540,6 @@ def tsv_log_callback(filename, append=False):
     return _TSVLogger(filename=filename, append=append)
 
 
-def learning_curve_plotter_factory():
-    warnings.warn('learning_curve_plotter_factoryは廃止予定!!')
-    return learning_curve_plot_callback
-
-
 def plot_model_params(model, to_file='model.params.png', skip_bn=True):
     """パラメータ数を棒グラフ化"""
     import keras
@@ -802,12 +611,13 @@ class Generator(object):
 
         cpu_count = os.cpu_count()
         max_queue_size = max(batch_size * 4, cpu_count * 2)  # 適当に余裕をもったサイズにしておく
+        worker_count = min(batch_size * 4, cpu_count * 2)
         input_queue = queue.Queue(maxsize=max_queue_size)
         result_queue = queue.Queue(maxsize=max_queue_size)
         workers = [threading.Thread(target=self._worker,
                                     args=(wid, input_queue, result_queue, data_augmentation),
                                     daemon=True)
-                   for wid in range(cpu_count)]
+                   for wid in range(worker_count)]
         for worker in workers:
             worker.start()
         try:
@@ -817,37 +627,26 @@ class Generator(object):
             seq_in = 0
 
             while True:
-                # キューサイズ >= batch_size * 4になるまでinput_queueにデータを入れる
+                # キューサイズの限界までinput_queueにデータを入れる
                 queue_size = input_queue.qsize() + result_queue.qsize()
                 while queue_size < max_queue_size:
-                    ix, seed = next(gen)
-                    x_ = self._pick_one(X, ix)
-                    if y is None:
-                        y_ = None
-                    else:
-                        y_ = self._pick_one(y, ix)
-                    if weights is None:
-                        w_ = None
-                    else:
-                        w_ = weights[ix]
+                    ix, seed, x_, y_, w_ = self._pick_next(gen, X, y, weights)
                     input_queue.put((seq_in, ix, seed, x_, y_, w_))
                     queue_size += 1
                     seq_in += 1
 
                 # バッチサイズ分の結果を取り出す
                 remain_size = length - next_seq % length
-                if shuffle or batch_size <= remain_size:
-                    cur_batch_size = batch_size
-                else:
-                    cur_batch_size = remain_size
+                cur_batch_size = batch_size if shuffle or batch_size <= remain_size else remain_size
                 while True:
                     if len(result_buffer) >= cur_batch_size:
                         if shuffle:
                             break
                         else:
                             result_buffer.sort(key=lambda x: x[0])
-                            if result_buffer[0][0] == next_seq and \
-                                    result_buffer[cur_batch_size - 1][0] == next_seq + cur_batch_size - 1:
+                            first_seq = result_buffer[0][0]
+                            last_seq = result_buffer[cur_batch_size - 1][0]
+                            if first_seq == next_seq and last_seq == next_seq + cur_batch_size - 1:
                                 break
                     result_buffer.append(result_queue.get())
                 _, rx, ry, rw = zip(*result_buffer[:cur_batch_size])
@@ -855,53 +654,58 @@ class Generator(object):
                 next_seq += cur_batch_size
 
                 # 結果を返す
-                if y is None:
-                    assert weights is None
-                    yield self._to_ndaarray(rx, isinstance(X, list))
-                elif weights is None:
-                    yield self._to_ndaarray(rx, isinstance(X, list)), self._to_ndaarray(ry, isinstance(y, list))
-                else:
-                    yield self._to_ndaarray(rx, isinstance(X, list)), self._to_ndaarray(ry, isinstance(y, list)), np.array(rw)
+                yield self._get_result(X, y, weights, rx, ry, rw)
         except GeneratorExit:
             pass
         finally:
-            # 処理中のものをいったんキャンセル
-            try:
+            # 処理中のものをいったんキャンセルして、
+            # Noneを入れて、結果キューを空にして、join
+            with contextlib.suppress(queue.Empty):
                 while True:
                     input_queue.get_nowait()
-            except queue.Empty:
-                pass
-            # Noneを入れる
-            try:
+            with contextlib.suppress(queue.Full):
                 while True:
                     input_queue.put_nowait((None, None, None, None, None, None))
-            except queue.Full:
-                pass
-            # 結果キューを空にする
-            try:
+            with contextlib.suppress(queue.Empty):
                 while True:
                     result_queue.get_nowait()
-            except queue.Empty:
-                pass
-            # 全ワーカーが止まるまで一応待つ
             for worker in workers:
                 worker.join()
 
     @staticmethod
-    def _pick_one(input_array, ix):
-        if isinstance(input_array, list):
-            return [x[ix] for x in input_array]  # multiple input/output
+    def _pick_next(gen, X, y, weights):
+        """genから1件取り出す。"""
+        def _pick(arr, ix):
+            return [x[ix] for x in arr] if isinstance(arr, list) else arr[ix]
+
+        ix, seed = next(gen)
+        x_ = _pick(X, ix)
+        if y is None:
+            y_ = None
         else:
-            return input_array[ix]
+            y_ = _pick(y, ix)
+        if weights is None:
+            w_ = None
+        else:
+            w_ = weights[ix]
+        return ix, seed, x_, y_, w_
 
     @staticmethod
-    def _to_ndaarray(arr, is_multiple):
-        if is_multiple:
-            return [np.array(a) for a in arr]
-        else:
-            return np.array(arr)
+    def _get_result(X, y, weights, rx, ry, rw):
+        """Kerasに渡すデータを返す。"""
+        def _arr(arr, islist):
+            return [np.array(a) for a in arr] if islist else np.array(arr)
 
-    def _flow_index(self, data_count, shuffle, random_state):
+        if y is None:
+            assert weights is None
+            return _arr(rx, isinstance(X, list))
+        elif weights is None:
+            return _arr(rx, isinstance(X, list)), _arr(ry, isinstance(y, list))
+        else:
+            return _arr(rx, isinstance(X, list)), _arr(ry, isinstance(y, list)), np.array(rw)
+
+    @staticmethod
+    def _flow_index(data_count, shuffle, random_state):
         """データのindexとseedを列挙し続けるgenerator。"""
         indices = np.arange(data_count)
         while True:
@@ -912,7 +716,7 @@ class Generator(object):
                 yield index, seed
 
     def _worker(self, wid, input_queue, result_queue, data_augmentation):
-        """ワーカープロセス。"""
+        """ワーカースレッド。"""
         assert wid >= 0
         while True:
             seq, ix, seed, x_, y_, w_ = input_queue.get()
@@ -1028,14 +832,8 @@ def load_weights(model, filepath, where_fn=None):
     with h5py.File(str(filepath), mode='r') as f:
         if 'layer_names' not in f.attrs and 'model_weights' in f:
             f = f['model_weights']
-        if 'keras_version' in f.attrs:
-            original_keras_version = f.attrs['keras_version'].decode('utf8')
-        else:
-            original_keras_version = '1'
-        if 'backend' in f.attrs:
-            original_backend = f.attrs['backend'].decode('utf8')
-        else:
-            original_backend = None
+        original_keras_version = f.attrs['keras_version'].decode('utf8') if 'keras_version' in f.attrs else '1'
+        original_backend = f.attrs['backend'].decode('utf8') if 'backend' in f.attrs else None
 
         layer_names = [n.decode('utf8') for n in f.attrs['layer_names']]  # noqa
 

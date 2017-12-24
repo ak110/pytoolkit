@@ -1,6 +1,8 @@
 """ログ関連"""
+import functools
 import logging
 import logging.handlers
+import time
 
 
 def get(name='__main__'):
@@ -41,3 +43,26 @@ def close(logger):
     for handler in handlers:
         handler.close()
         logger.removeHandler(handler)
+
+
+def trace(name='__main__'):
+    """関数の開始・終了をログる。
+
+    # 引数
+    - name: ロガーの名前。
+
+    """
+    def _decorator(func):
+        @functools.wraps(func)
+        def _decorated_func(*args, **kwargs):
+            logger = get(name)
+            logger.debug('%s 開始', func.__name__)
+            start_time = time.time()
+            try:
+                return func(*args, **kwargs)
+            finally:
+                elapsed_time = time.time() - start_time
+                logger.debug('%s 終了 (time=%.3f)', func.__name__, elapsed_time)
+
+        return _decorated_func
+    return _decorator

@@ -80,13 +80,16 @@ class ObjectsAnnotation(object):
         return np.array([data_dir / y_.folder / y_.filename for y_ in y])
 
     @classmethod
-    def load_voc_0712(cls, data_dir, class_name_to_id, without_difficult=False):
-        """PASCAL VOCデータセットの、よくある07+12 trainval / 07 testの読み込み。"""
-        y_train1 = cls.load_voc(data_dir, 2007, 'trainval', class_name_to_id, without_difficult=without_difficult)
-        y_train2 = cls.load_voc(data_dir, 2012, 'trainval', class_name_to_id, without_difficult=without_difficult)
-        y_train = np.concatenate([y_train1, y_train2])
-        y_test = cls.load_voc(data_dir, 2007, 'test', class_name_to_id)
-        return y_train, y_test
+    def load_voc_0712_trainval(cls, data_dir, class_name_to_id, without_difficult=False):
+        """PASCAL VOCデータセットの、よくある07+12 trainvalの読み込み。"""
+        y1 = cls.load_voc(data_dir, 2007, 'trainval', class_name_to_id, without_difficult=without_difficult)
+        y2 = cls.load_voc(data_dir, 2012, 'trainval', class_name_to_id, without_difficult=without_difficult)
+        return np.concatenate([y1, y2])
+
+    @classmethod
+    def load_voc_07_test(cls, data_dir, class_name_to_id):
+        """PASCAL VOCデータセットの、よくある07 testの読み込み。"""
+        return cls.load_voc(data_dir, 2007, 'test', class_name_to_id)
 
     @classmethod
     def load_voc(cls, data_dir, year, set_name, class_name_to_id, without_difficult=False):
