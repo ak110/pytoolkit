@@ -23,7 +23,7 @@ def _main():
     sys.path.insert(0, str(base_dir.parent))
     import pytoolkit as tk
 
-    gen = tk.image.ImageDataGenerator(_IMAGE_SIZE)
+    gen = tk.image.ImageDataGenerator(_IMAGE_SIZE, preprocess_input=lambda x: x)
     gen.add(0.5, tk.image.FlipLR())
     gen.add(0.5, tk.image.RandomErasing())
     gen.add(0.25, tk.image.RandomBlur())

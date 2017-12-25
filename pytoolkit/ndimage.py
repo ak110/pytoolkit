@@ -16,7 +16,6 @@ def load(path: Union[str, pathlib.Path], grayscale=False) -> np.ndarray:
     """画像の読み込み。
 
     やや余計なお世話だけど今後のためにfloat32に変換して返す。
-    color_modeは'L'でグレースケール、'RGB'でRGB。
     """
     import skimage.io
     return skimage.io.imread(str(path), as_grey=grayscale).astype(np.float32)
