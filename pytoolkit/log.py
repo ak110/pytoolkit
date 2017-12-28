@@ -1,4 +1,5 @@
 """ログ関連"""
+import contextlib
 import functools
 import logging
 import logging.handlers
@@ -13,9 +14,9 @@ def get(name='__main__'):
 
 
 def stream_handler(stream=None, level=logging.INFO, fmt='[%(levelname)-5s] %(message)s'):
-    """StreamHandlerを作成して返す。"""
+    """StreamHandlerを作成して返す。levelは文字列で'DEBUG'とかも指定可。"""
     handler = logging.StreamHandler(stream=stream)
-    handler.setLevel(level)
+    handler.setLevel(get_level(level))
     if fmt:
         handler.setFormatter(logging.Formatter(fmt))
     return handler
@@ -25,16 +26,24 @@ def file_handler(output_path, append=False, rotate=False,
                  max_bytes=1048576, backup_count=10, encoding='utf-8',
                  level=logging.DEBUG,
                  fmt='%(asctime)s [%(levelname)-5s] [%(filename)s:%(lineno)d] %(message)s'):
-    """RotatingFileHandler / FileHandlerを作成して返す。"""
+    """RotatingFileHandler / FileHandlerを作成して返す。levelは文字列で'INFO'とかも指定可。"""
     if rotate:
         handler = logging.handlers.RotatingFileHandler(
             str(output_path), 'a', max_bytes, backup_count, encoding=encoding)
     else:
         handler = logging.FileHandler(str(output_path), 'a' if append else 'w', encoding=encoding)
-    handler.setLevel(level)
+    handler.setLevel(get_level(level))
     if fmt:
         handler.setFormatter(logging.Formatter(fmt))
     return handler
+
+
+def get_level(level):
+    """文字列だった場合、logging.DEBUGとかの値に変換して返す。"""
+    if isinstance(level, str):
+        assert level in ('CRITICAL', 'FATAL', 'ERROR', 'WARNING', 'WARN', 'INFO', 'DEBUG', 'NOTSET')
+        return logging.__dict__[level]
+    return level
 
 
 def close(logger):
@@ -55,14 +64,26 @@ def trace(name='__main__'):
     def _decorator(func):
         @functools.wraps(func)
         def _decorated_func(*args, **kwargs):
-            logger = get(name)
-            logger.debug('%s 開始', func.__name__)
-            start_time = time.time()
-            try:
+            with trace_scope(func.__name__, name):
                 return func(*args, **kwargs)
-            finally:
-                elapsed_time = time.time() - start_time
-                logger.debug('%s 終了 (time=%.3f)', func.__name__, elapsed_time)
-
         return _decorated_func
     return _decorator
+
+
+@contextlib.contextmanager
+def trace_scope(process_name, name='__main__'):
+    """withで使うと、処理前後でログを出力する。
+
+    # 引数
+    - process_name: ログに出力する処理の名前。
+    - name: ロガーの名前。
+
+    """
+    logger = get(name)
+    logger.debug('%s 開始', process_name)
+    start_time = time.time()
+    try:
+        yield
+    finally:
+        elapsed_time = time.time() - start_time
+        logger.debug('%s 終了 (%.3f[s])', process_name, elapsed_time)
