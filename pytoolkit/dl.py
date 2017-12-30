@@ -67,6 +67,78 @@ def create_data_parallel_model(model, batch_size, gpu_count=None):
     return parallel_model, batch_size * gpu_count
 
 
+class Builder(object):
+    """Kerasでネットワークを作るときのヘルパークラス。"""
+
+    def __init__(self):
+        self.conv_defaults = {'padding': 'same'}
+        self.dense_defaults = {}
+        self.bn_defaults = {}
+        self.act_defaults = {'activation': 'elu'}
+
+    def set_default_l2(self, l=1e-5):
+        """全layerの既定値にL2を設定。"""
+        from keras.regularizers import l2
+        reg = l2(l)
+        self.conv_defaults['kernel_regularizer'] = reg
+        self.dense_defaults['kernel_regularizer'] = reg
+        self.bn_defaults['gamma_regularizer'] = reg
+
+    def conv1d(self, filters, kernel_size, name, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
+        """Conv1D+BN+Act。"""
+        import keras.layers
+        return self._conv(keras.layers.Conv1D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+
+    def conv2d(self, filters, kernel_size, name, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
+        """Conv2D+BN+Act。"""
+        import keras.layers
+        return self._conv(keras.layers.Conv2D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+
+    def conv3d(self, filters, kernel_size, name, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
+        """Conv3D+BN+Act。"""
+        import keras.layers
+        return self._conv(keras.layers.Conv3D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+
+    def _conv(self, conv, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs):
+        """ConvND+BN+Act。"""
+        conv = conv(filters, kernel_size, name=name, **self._params(self.conv_defaults, kwargs))
+        if use_bn:
+            bn = self.bn(name=name + '_bn', **(bn_kwargs or {}))
+        if use_act:
+            act = self.act(name=name + '_act', **(act_kwargs or {}))
+
+        def _pseudo_layer(x):
+            x = conv(x)
+            if use_bn:
+                x = bn(x)
+            if use_act:
+                x = act(x)
+            return x
+
+        return _pseudo_layer
+
+    def bn(self, **kwargs):
+        """BatchNormalization。"""
+        import keras.layers
+        return keras.layers.BatchNormalization(**self._params(self.bn_defaults, kwargs))
+
+    def act(self, **kwargs):
+        """Activation。"""
+        import keras.layers
+        return keras.layers.Activation(**self._params(self.act_defaults, kwargs))
+
+    def dense(self, units, **kwargs):
+        """Dense。"""
+        import keras.layers
+        return keras.layers.Dense(units, **self._params(self.dense_defaults, kwargs))
+
+    @staticmethod
+    def _params(defaults, kwargs):
+        params = copy.copy(defaults)
+        params.update(kwargs)
+        return params
+
+
 def conv2d(filters, kernel_size, activation, name, use_bn=True, use_batch_renorm=False, preact=False, **kargs):
     """Conv2D+BN+Activationの簡単なヘルパー。"""
     import keras
