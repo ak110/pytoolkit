@@ -30,7 +30,7 @@ def test_trace():
     logger = tk.log.get('test_trace')
     logger.addHandler(tk.log.stream_handler(stderr, level=logging.DEBUG, fmt=None))
 
-    @tk.log.trace('test_trace')
+    @tk.log.trace(logger_name='test_trace')
     def _traced_func():
         logger.debug('あいうえお')
 

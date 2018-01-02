@@ -6,7 +6,7 @@ import logging.handlers
 import time
 
 
-def get(name='__main__'):
+def get(name=None):
     """"ロガーを取得して返す。"""
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
@@ -46,32 +46,33 @@ def close(logger):
         logger.removeHandler(handler)
 
 
-def trace(name='__main__'):
-    """関数の開始・終了をログる。
+def trace(process_name=None, logger_name=__name__):
+    """関数の開始・終了をログるdecorator。
 
     # 引数
-    - name: ロガーの名前。
+    - process_name: ログに出力する処理の名前。(Noneなら関数名)
+    - logger_name: ロガーの名前。
 
     """
     def _decorator(func):
         @functools.wraps(func)
         def _decorated_func(*args, **kwargs):
-            with trace_scope(func.__name__, name):
+            with trace_scope(process_name or func.__name__, logger_name):
                 return func(*args, **kwargs)
         return _decorated_func
     return _decorator
 
 
 @contextlib.contextmanager
-def trace_scope(process_name, name='__main__'):
+def trace_scope(process_name, logger_name=__name__):
     """withで使うと、処理前後でログを出力する。
 
     # 引数
     - process_name: ログに出力する処理の名前。
-    - name: ロガーの名前。
+    - logger_name: ロガーの名前。
 
     """
-    logger = get(name)
+    logger = get(logger_name)
     logger.debug('%s 開始', process_name)
     start_time = time.time()
     try:
