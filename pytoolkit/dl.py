@@ -31,6 +31,7 @@ def device(cpu=False, gpu=False):
         return tf.device('/gpu:0')
 
 
+@log.trace()
 def create_data_parallel_model(model, batch_size, gpu_count=None):
     """複数GPUでデータ並列するモデルを作成する。
 
@@ -81,8 +82,11 @@ class Builder(object):
         from keras.regularizers import l2
         reg = l2(l)
         self.conv_defaults['kernel_regularizer'] = reg
+        self.conv_defaults['bias_regularizer'] = reg
         self.dense_defaults['kernel_regularizer'] = reg
+        self.dense_defaults['bias_regularizer'] = reg
         self.bn_defaults['gamma_regularizer'] = reg
+        self.bn_defaults['beta_regularizer'] = reg
 
     def conv1d(self, filters, kernel_size, name, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """Conv1D+BN+Act。"""
@@ -99,20 +103,42 @@ class Builder(object):
         import keras.layers
         return self._conv(keras.layers.Conv3D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
+    def conv2dtr(self, filters, kernel_size, name, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
+        """Conv2DTranspose+BN+Act。"""
+        import keras.layers
+        return self._conv(keras.layers.Conv2DTranspose, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+
     def _conv(self, conv, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs):
         """ConvND+BN+Act。"""
-        conv = conv(filters, kernel_size, name=name, **self._params(self.conv_defaults, kwargs))
+        kwargs = copy.copy(kwargs)
+        bn_kwargs = copy.copy(bn_kwargs) if bn_kwargs is not None else {}
+        act_kwargs = copy.copy(act_kwargs) if act_kwargs is not None else {}
         if use_bn:
-            bn = self.bn(name=name + '_bn', **(bn_kwargs or {}))
-        if use_act:
-            act = self.act(name=name + '_act', **(act_kwargs or {}))
+            kwargs['use_bias'] = False
+        if 'activation' in kwargs:
+            if use_bn:
+                assert 'activation' not in act_kwargs
+                act_kwargs['activation'] = kwargs.pop('activation')
+            else:
+                use_act = False
+
+        if not use_bn:
+            assert len(bn_kwargs) == 0
+        if not use_act:
+            assert len(act_kwargs) == 0
+        if not kwargs.get('use_bias', True):
+            assert 'bias_initializer' not in kwargs
+            assert 'bias_regularizer' not in kwargs
+            assert 'bias_constraint' not in kwargs
+
+        conv = conv(filters, kernel_size, name=name, **self._params(self.conv_defaults, kwargs))
+        bn = self.bn(name=name + '_bn', **bn_kwargs) if use_bn else None
+        act = self.act(name=name + '_act', **act_kwargs) if use_act else None
 
         def _pseudo_layer(x):
             x = conv(x)
-            if use_bn:
-                x = bn(x)
-            if use_act:
-                x = act(x)
+            x = bn(x) if use_bn else x
+            x = act(x) if use_act else x
             return x
 
         return _pseudo_layer
@@ -638,6 +664,7 @@ def logger_callback(name='__main__'):
     return _Logger(name=name)
 
 
+@log.trace()
 def plot_model_params(model, to_file='model.params.png', skip_bn=True):
     """パラメータ数を棒グラフ化"""
     import keras
@@ -913,6 +940,7 @@ def l1_smooth_loss(y_true, y_pred):
     return l1_loss
 
 
+@log.trace()
 def load_weights(model, filepath, where_fn=None):
     """重みの読み込み。
 
