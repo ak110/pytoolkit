@@ -12,8 +12,8 @@ def test_logger(tmpdir):
     stderr = io.StringIO()
 
     logger = tk.log.get('test_logger')
-    logger.addHandler(tk.log.stream_handler(stderr, fmt=None))
-    logger.addHandler(tk.log.file_handler(log_path, fmt=None))
+    logger.addHandler(tk.log.stream_handler(stderr, level='INFO', fmt=None))
+    logger.addHandler(tk.log.file_handler(log_path, level='DEBUG', fmt=None))
 
     logger.info('あいうえお')
     assert stderr.getvalue() == 'あいうえお\n'

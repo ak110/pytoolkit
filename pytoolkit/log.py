@@ -14,9 +14,9 @@ def get(name='__main__'):
 
 
 def stream_handler(stream=None, level=logging.INFO, fmt='[%(levelname)-5s] %(message)s'):
-    """StreamHandlerを作成して返す。levelは文字列で'DEBUG'とかも指定可。"""
+    """StreamHandlerを作成して返す。levelは文字列で'DEBUG'とかも指定可。(Python>=3.2)"""
     handler = logging.StreamHandler(stream=stream)
-    handler.setLevel(get_level(level))
+    handler.setLevel(level)
     if fmt:
         handler.setFormatter(logging.Formatter(fmt))
     return handler
@@ -26,24 +26,16 @@ def file_handler(output_path, append=False, rotate=False,
                  max_bytes=1048576, backup_count=10, encoding='utf-8',
                  level=logging.DEBUG,
                  fmt='%(asctime)s [%(levelname)-5s] [%(filename)s:%(lineno)d] %(message)s'):
-    """RotatingFileHandler / FileHandlerを作成して返す。levelは文字列で'INFO'とかも指定可。"""
+    """RotatingFileHandler / FileHandlerを作成して返す。levelは文字列で'INFO'とかも指定可。(Python>=3.2)"""
     if rotate:
         handler = logging.handlers.RotatingFileHandler(
             str(output_path), 'a', max_bytes, backup_count, encoding=encoding)
     else:
         handler = logging.FileHandler(str(output_path), 'a' if append else 'w', encoding=encoding)
-    handler.setLevel(get_level(level))
+    handler.setLevel(level)
     if fmt:
         handler.setFormatter(logging.Formatter(fmt))
     return handler
-
-
-def get_level(level):
-    """文字列だった場合、logging.DEBUGとかの値に変換して返す。"""
-    if isinstance(level, str):
-        assert level in ('CRITICAL', 'FATAL', 'ERROR', 'WARNING', 'WARN', 'INFO', 'DEBUG', 'NOTSET')
-        return logging.__dict__[level]
-    return level
 
 
 def close(logger):
