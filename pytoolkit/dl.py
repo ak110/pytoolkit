@@ -135,6 +135,9 @@ class Builder(object):
         bn = self.bn(name=name + '_bn', **bn_kwargs) if use_bn else None
         act = self.act(name=name + '_act', **act_kwargs) if use_act else None
 
+        if not use_bn and not use_act:
+            return conv
+
         def _pseudo_layer(x):
             x = conv(x)
             x = bn(x) if use_bn else x
