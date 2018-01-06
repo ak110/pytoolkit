@@ -447,7 +447,7 @@ def nsgd():
 
         def __init__(self, lr=0.1, lr_multipliers=None, momentum=0.9, decay=0., nesterov=True, **kwargs):
             super().__init__(lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, **kwargs)
-            self.lr_multipliers = {t if isinstance(t, str) else t.name: mp for t, mp in lr_multipliers.items()}
+            self.lr_multipliers = {t if isinstance(t, str) else t.name: mp for t, mp in (lr_multipliers or {}).items()}
 
         @keras.legacy.interfaces.legacy_get_updates_support
         def get_updates(self, loss, params):
