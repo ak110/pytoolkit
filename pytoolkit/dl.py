@@ -231,6 +231,7 @@ def get_custom_objects():
     return {
         'Destandarization': destandarization_layer(),
         'StocasticAdd': stocastic_add_layer(),
+        'NormalNoise': normal_noise_layer(),
         'L2Normalization': l2normalization_layer(),
         'WeightedMean': weighted_mean_layer(),
         'NSGD': nsgd(),
@@ -334,6 +335,43 @@ def stocastic_add_layer():
             return dict(list(base_config.items()) + list(config.items()))
 
     return StocasticAdd
+
+
+def normal_noise_layer():
+    """クラスを作って返す。"""
+    import keras
+    import keras.backend as K
+    import tensorflow as tf
+
+    class NormalNoise(keras.engine.topology.Layer):
+        """平均0、分散1のノイズをドロップアウト風に適用する。"""
+
+        def __init__(self, noise_rate=0.25, **kargs):
+            assert 0 <= noise_rate < 1
+            self.noise_rate = noise_rate
+            super().__init__(**kargs)
+
+        def call(self, inputs, training=None, **kwargs):  # pylint: disable=arguments-differ
+            def _passthru():
+                return inputs
+
+            def _erase_random():
+                shape = K.shape(inputs)
+                noise = K.random_normal(shape)
+                noise_mask = K.less(K.random_uniform(shape), self.noise_rate)
+                input_mask = tf.logical_not(noise_mask)
+                return inputs * K.cast(input_mask, K.floatx()) + noise * K.cast(noise_mask, K.floatx())
+
+            return K.in_train_phase(_erase_random, _passthru, training=training)
+
+        def get_config(self):
+            config = {
+                'noise_rate': self.noise_rate,
+            }
+            base_config = super().get_config()
+            return dict(list(base_config.items()) + list(config.items()))
+
+    return NormalNoise
 
 
 def l2normalization_layer():
