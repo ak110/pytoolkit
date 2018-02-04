@@ -351,16 +351,18 @@ def normal_noise_layer():
             self.noise_rate = noise_rate
             super().__init__(**kargs)
 
-        def call(self, inputs, training=None, **kwargs):  # pylint: disable=arguments-differ
+        def call(self, inputs, training=None):  # pylint: disable=arguments-differ
+            if self.noise_rate <= 0:
+                return inputs
+
             def _passthru():
                 return inputs
 
             def _erase_random():
                 shape = K.shape(inputs)
                 noise = K.random_normal(shape)
-                noise_mask = K.less(K.random_uniform(shape), self.noise_rate)
-                input_mask = tf.logical_not(noise_mask)
-                return inputs * K.cast(input_mask, K.floatx()) + noise * K.cast(noise_mask, K.floatx())
+                mask = K.cast(K.greater_equal(K.random_uniform(shape), self.noise_rate), K.floatx())
+                return inputs * mask + noise * (1 - mask)
 
             return K.in_train_phase(_erase_random, _passthru, training=training)
 
