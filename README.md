@@ -5,4 +5,4 @@
 
 いわゆるオレオレライブラリ。
 
-`git submodule` で配置して `import pytoolkit as tk` とかで使う。
+`git submodule add https://github.com/ak110/pytoolkit.git` で配置して `import pytoolkit as tk` とかで使う。
