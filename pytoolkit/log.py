@@ -1,4 +1,9 @@
-"""ログ関連"""
+"""ログ関連。
+
+fmtに色々出したいときはこの辺を参照：
+https://docs.python.jp/3/library/logging.html#logrecord-attributes
+
+"""
 import contextlib
 import functools
 import logging
@@ -25,7 +30,7 @@ def stream_handler(stream=None, level=logging.INFO, fmt='[%(levelname)-5s] %(mes
 def file_handler(output_path, append=False, rotate=False,
                  max_bytes=1048576, backup_count=10, encoding='utf-8',
                  level=logging.DEBUG,
-                 fmt='%(asctime)s [%(levelname)-5s] [%(filename)s:%(lineno)d] %(message)s'):
+                 fmt='[%(levelname)-5s] %(message)s <%(name)s:%(filename)s:%(lineno)d>'):
     """RotatingFileHandler / FileHandlerを作成して返す。levelは文字列で'INFO'とかも指定可。(Python>=3.2)"""
     if rotate:
         handler = logging.handlers.RotatingFileHandler(
