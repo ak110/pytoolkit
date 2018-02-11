@@ -155,8 +155,7 @@ class ImageDataGenerator(dl.Generator):
         """変形を伴うAugmentation。"""
         # 回転
         if rand.rand() <= self.rotate_prob:
-            padding = rand.choice(('same', 'zero', 'reflect', 'wrap'))
-            rgb = ndimage.random_rotate(rgb, rand, degrees=self.rotate_degrees, padding=padding)
+            rgb = ndimage.rotate(rgb, rand.uniform(-self.rotate_degrees, self.rotate_degrees))
         # padding+crop
         padding = rand.choice(('same', 'zero', 'reflect', 'wrap', 'rand'))
         rgb = ndimage.random_crop(rgb, rand, self.padding_rate, self.crop_rate,
@@ -294,7 +293,7 @@ class RandomSaturation(Augmentor):
 class RandomHue(Augmentor):
     """色相の変更。"""
 
-    def __init__(self, var=0.25, shift=32):
+    def __init__(self, var=1 / 16, shift=8):
         self.var = var
         self.shift = shift
         super().__init__()

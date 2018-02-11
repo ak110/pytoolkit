@@ -19,9 +19,6 @@ def test_filters():
         (0, 'pad_rand', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='rand', rand=np.random)),
         (0, 'rotate', lambda rgb: tk.ndimage.rotate(rgb, 15)),
         (0, 'rotate', lambda rgb: tk.ndimage.rotate(rgb, -15)),
-        (0, 'rotate_z', lambda rgb: tk.ndimage.rotate(rgb, -15, padding='zero')),
-        (0, 'rotate_r', lambda rgb: tk.ndimage.rotate(rgb, -15, padding='reflect')),
-        (0, 'rotate_w', lambda rgb: tk.ndimage.rotate(rgb, -15, padding='wrap')),
         (0, 'crop', lambda rgb: tk.ndimage.crop(rgb, 30, 30, 200, 200)),
         (0, 'flip_lr', tk.ndimage.flip_lr),
         (0, 'flip_tb', tk.ndimage.flip_tb),
@@ -38,8 +35,9 @@ def test_filters():
         (1, 'saturation_h', lambda rgb: tk.ndimage.saturation(rgb, 1.5)),
         (1, 'contrast_l', lambda rgb: tk.ndimage.contrast(rgb, 0.75)),
         (1, 'contrast_h', lambda rgb: tk.ndimage.contrast(rgb, 1.25)),
-        (1, 'hue_n', lambda rgb: tk.ndimage.hue(rgb, -0.1)),
-        (1, 'hue_p', lambda rgb: tk.ndimage.hue(rgb, +0.1)),
+        (1, 'hue_lite_b', lambda rgb: tk.ndimage.hue_lite(rgb, np.array([0.95, 0.95, 1.05]), np.array([-8, -8, +8]))),
+        (1, 'hue_lite_g', lambda rgb: tk.ndimage.hue_lite(rgb, np.array([0.95, 1.05, 0.95]), np.array([-8, +8, -8]))),
+        (1, 'hue_lite_r', lambda rgb: tk.ndimage.hue_lite(rgb, np.array([1.05, 0.95, 0.95]), np.array([+8, -8, -8]))),
     ]
 
     rgb = tk.ndimage.load(base_dir.joinpath('data', 'Lenna.png'))  # 256x256の某有名画像

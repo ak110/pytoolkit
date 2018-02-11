@@ -1,14 +1,14 @@
 """主にnumpy配列(rows×cols×channels(RGB))の画像処理関連。
 
-scipy.ndimageの薄いwrapperとか。
+float32でRGBで0～255として扱う。
 """
 import pathlib
 from typing import Union
 
+import cv2
 import numpy as np
 import scipy
 import scipy.ndimage
-import scipy.signal
 import scipy.stats
 
 
@@ -17,8 +17,10 @@ def load(path: Union[str, pathlib.Path], grayscale=False) -> np.ndarray:
 
     やや余計なお世話だけど今後のためにfloat32に変換して返す。
     """
-    import skimage.io
-    return skimage.io.imread(str(path), as_grey=grayscale).astype(np.float32)
+    flags = cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR
+    bgr = cv2.imread(str(path), flags)
+    rgb = bgr[:, :, ::-1]
+    return rgb.astype(np.float32)
 
 
 def save(path: Union[str, pathlib.Path], rgb: np.ndarray) -> None:
@@ -26,14 +28,9 @@ def save(path: Union[str, pathlib.Path], rgb: np.ndarray) -> None:
 
     やや余計なお世話だけど0～255にクリッピング(飽和)してから保存。
     """
-    import skimage.io
     rgb = np.clip(rgb, 0, 255).astype(np.uint8)
-    skimage.io.imsave(str(path), rgb)
-
-
-def random_rotate(rgb: np.ndarray, rand: np.random.RandomState, degrees: float, padding='same') -> np.ndarray:
-    """回転。"""
-    return rotate(rgb, degrees=rand.uniform(-degrees, degrees), padding=padding)
+    bgr = rgb[:, :, ::-1]
+    cv2.imwrite(str(path), bgr)
 
 
 def random_crop(rgb: np.ndarray, rand: np.random.RandomState,
@@ -55,14 +52,13 @@ def random_crop(rgb: np.ndarray, rand: np.random.RandomState,
     return crop(rgb, x, y, cropped_w, cropped_h)
 
 
-def rotate(rgb: np.ndarray, degrees: float, padding='same') -> np.ndarray:
+def rotate(rgb: np.ndarray, degrees: float) -> np.ndarray:
     """回転。"""
-    assert padding in ('same', 'zero', 'reflect', 'wrap')
-    if padding == 'same':
-        padding = 'nearest'
-    elif padding == 'zero':
-        padding = 'constant'
-    return scipy.ndimage.rotate(rgb, degrees, reshape=True, mode=padding)
+    size = (rgb.shape[1], rgb.shape[0])
+    center = (size[0] // 2, size[1] // 2)
+    rotation_matrix = cv2.getRotationMatrix2D(center=center, angle=degrees, scale=1.0)
+    rgb = cv2.warpAffine(rgb, rotation_matrix, size, flags=cv2.INTER_CUBIC)
+    return rgb
 
 
 def pad(rgb: np.ndarray, width: int, height: int, padding='same', rand=None) -> np.ndarray:
@@ -158,6 +154,7 @@ def gaussian_noise(rgb: np.ndarray, rand: np.random.RandomState, scale: float) -
 
 def blur(rgb: np.ndarray, sigma: float) -> np.ndarray:
     """ぼかし。sigmaは0～1程度がよい？"""
+    # rgb = cv2.GaussianBlur(rgb, 4, sigma)
     return scipy.ndimage.gaussian_filter(rgb, [sigma, sigma, 0])
 
 
@@ -169,10 +166,12 @@ def unsharp_mask(rgb: np.ndarray, sigma: float, alpha=2.0) -> np.ndarray:
 
 def median(rgb: np.ndarray, size: int) -> np.ndarray:
     """メディアンフィルタ。sizeは2 or 3程度がよい？"""
+    # rgb = cv2.medianBlur(rgb, size)
     channels = []
     for ch in range(rgb.shape[-1]):
         channels.append(scipy.ndimage.median_filter(rgb[:, :, ch], size))
-    return np.stack(channels, axis=2)
+    rgb = np.stack(channels, axis=2)
+    return rgb
 
 
 def brightness(rgb: np.ndarray, beta: float) -> np.ndarray:
@@ -195,19 +194,11 @@ def saturation(rgb: np.ndarray, alpha: float) -> np.ndarray:
     return rgb
 
 
-def hue(rgb: np.ndarray, beta: float) -> np.ndarray:
-    """色相の変更。betaの例：`np.random.uniform(-0.1, +0.1)`"""
-    import skimage.color
-    hsv = skimage.color.rgb2hsv(np.clip(rgb, 0, 255) / 255)
-    hsv[:, :, 0] += beta
-    hsv[:, :, 0] %= 1.0
-    return skimage.color.hsv2rgb(hsv).astype(np.float32) * 255
-
-
 def hue_lite(rgb: np.ndarray, alpha: np.ndarray, beta: np.ndarray) -> np.ndarray:
     """色相の変更の適当バージョン。"""
     assert alpha.shape == (3,)
     assert beta.shape == (3,)
+    assert (alpha > 0).all()
     rgb *= alpha / scipy.stats.hmean(alpha)
     rgb += beta - np.mean(beta)
     return rgb

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """ImageDataGeneratorのチェック用コード。"""
 import pathlib
 
@@ -7,7 +8,7 @@ from tqdm import tqdm
 
 _BATCH_SIZE = 16
 _ITER = 32
-_IMAGE_SIZE = (512, 512)
+_IMAGE_SIZE = (256, 256)
 
 
 def _main():
@@ -38,17 +39,17 @@ def _main():
     gen.add(0.5, tk.image.RandomContrast())
     gen.add(0.5, tk.image.RandomHue())
 
-    X = np.array([str(data_dir.joinpath('Lenna.png'))] * 16)
+    X = np.array([str(data_dir.joinpath('9ab919332a1dceff9a252b43c0fb34a0_m.jpg'))] * 16)
     g = gen.flow(X, batch_size=_BATCH_SIZE, data_augmentation=True, random_state=123)
     # 適当にループして速度を見る
     with tqdm(total=_BATCH_SIZE * _ITER, unit='f', ascii=True, ncols=100) as pbar:
         for it, X_batch in enumerate(g):
             pbar.update(len(X_batch))
             if it + 1 >= _ITER:
-                # 最後のバッチを保存
-                for ix, x in enumerate(X_batch):
-                    tk.ndimage.save(save_dir.joinpath('{}.png'.format(ix)), x)
                 break
+    # 最後のバッチを保存
+    for ix, x in enumerate(X_batch):
+        tk.ndimage.save(save_dir.joinpath('{}.png'.format(ix)), x)
 
 
 if __name__ == '__main__':
