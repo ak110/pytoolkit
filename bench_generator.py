@@ -16,8 +16,8 @@ def _main():
     np.random.seed(1234)
 
     base_dir = pathlib.Path(__file__).resolve().parent
-    data_dir = base_dir.joinpath('tests', 'data')
-    save_dir = base_dir.joinpath('___check', 'bench')
+    data_dir = base_dir / 'tests' / 'data'
+    save_dir = base_dir / '___check' / 'bench'
     save_dir.mkdir(parents=True, exist_ok=True)
 
     import sys
@@ -39,7 +39,7 @@ def _main():
     gen.add(0.5, tk.image.RandomContrast())
     gen.add(0.5, tk.image.RandomHue())
 
-    X = np.array([str(data_dir.joinpath('9ab919332a1dceff9a252b43c0fb34a0_m.jpg'))] * 16)
+    X = np.array([str(data_dir / '9ab919332a1dceff9a252b43c0fb34a0_m.jpg')] * 16)
     g = gen.flow(X, batch_size=_BATCH_SIZE, data_augmentation=True, random_state=123)
     # 適当にループして速度を見る
     with tqdm(total=_BATCH_SIZE * _ITER, unit='f', ascii=True, ncols=100) as pbar:
@@ -49,7 +49,7 @@ def _main():
                 break
     # 最後のバッチを保存
     for ix, x in enumerate(X_batch):
-        tk.ndimage.save(save_dir.joinpath('{}.png'.format(ix)), x)
+        tk.ndimage.save(save_dir / '{}.png'.format(ix), x)
 
 
 if __name__ == '__main__':

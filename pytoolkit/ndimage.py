@@ -3,16 +3,14 @@
 float32でRGBで0～255として扱う。
 """
 import pathlib
-from typing import Union
+import typing
 
 import cv2
 import numpy as np
-import scipy
-import scipy.ndimage
 import scipy.stats
 
 
-def load(path: Union[str, pathlib.Path], grayscale=False) -> np.ndarray:
+def load(path: typing.Union[str, pathlib.Path], grayscale=False) -> np.ndarray:
     """画像の読み込み。
 
     やや余計なお世話だけど今後のためにfloat32に変換して返す。
@@ -23,7 +21,7 @@ def load(path: Union[str, pathlib.Path], grayscale=False) -> np.ndarray:
     return rgb.astype(np.float32)
 
 
-def save(path: Union[str, pathlib.Path], rgb: np.ndarray) -> None:
+def save(path: typing.Union[str, pathlib.Path], rgb: np.ndarray) -> None:
     """画像の保存。
 
     やや余計なお世話だけど0～255にクリッピング(飽和)してから保存。
@@ -39,9 +37,13 @@ def random_crop(rgb: np.ndarray, rand: np.random.RandomState,
                 padding='same') -> np.ndarray:
     """パディング＋ランダム切り抜き。"""
     cr = rand.uniform(1 - crop_rate, 1)
-    ar = np.sqrt(rand.choice(aspect_rations)) if rand.rand() <= aspect_prob else 1
-    cropped_w = int(np.floor(rgb.shape[1] * cr * ar))  # 元のサイズに対する割合
-    cropped_h = int(np.floor(rgb.shape[0] * cr / ar))
+    ar = rand.choice(aspect_rations) if rand.rand() <= aspect_prob else 1
+    if ar <= 1:
+        cropped_w = int(np.floor(rgb.shape[1] * cr * ar))
+        cropped_h = int(np.floor(rgb.shape[0] * cr))
+    else:
+        cropped_w = int(np.floor(rgb.shape[1] * cr))
+        cropped_h = int(np.floor(rgb.shape[0] * cr / ar))
     padded_w = max(int(np.ceil(rgb.shape[1] * (1 + padding_rate))), cropped_w)
     padded_h = max(int(np.ceil(rgb.shape[0] * (1 + padding_rate))), cropped_h)
     # パディング
@@ -125,6 +127,7 @@ def flip_tb(rgb: np.ndarray) -> np.ndarray:
 
 def resize(rgb: np.ndarray, width: int, height: int, padding=None, interp='lanczos') -> np.ndarray:
     """リサイズ。"""
+    assert interp in ('nearest', 'bilinear', 'bicubic', 'lanczos')
     if rgb.shape[1] == width and rgb.shape[0] == height:
         return rgb
     # パディングしつつリサイズ (縦横比維持)
@@ -139,11 +142,16 @@ def resize(rgb: np.ndarray, width: int, height: int, padding=None, interp='lancz
             rgb = resize(rgb, resized_w, resized_h, padding=None, interp=interp)
         return pad(rgb, width, height)
     # パディングせずリサイズ (縦横比無視)
-    if rgb.shape[-1] == 1:
-        rgb = rgb.reshape(rgb.shape[:2])
-    rgb = scipy.misc.imresize(rgb, (height, width), interp=interp).astype(np.float32)
-    if len(rgb.shape) == 2:
-        rgb = rgb.reshape(rgb.shape + (1,))
+    if rgb.shape[1] >= width and rgb.shape[0] >= height:  # 縮小
+        cv2_interp = cv2.INTER_NEAREST if interp == 'nearest' else cv2.INTER_AREA
+    else:  # 拡大
+        cv2_interp = {
+            'nearest': cv2.INTER_NEAREST,
+            'bilinear': cv2.INTER_LINEAR,
+            'bicubic': cv2.INTER_CUBIC,
+            'lanczos': cv2.INTER_AREA,
+        }[interp]
+    rgb = cv2.resize(rgb, (width, height), interpolation=cv2_interp)
     return rgb
 
 
@@ -154,8 +162,8 @@ def gaussian_noise(rgb: np.ndarray, rand: np.random.RandomState, scale: float) -
 
 def blur(rgb: np.ndarray, sigma: float) -> np.ndarray:
     """ぼかし。sigmaは0～1程度がよい？"""
-    # rgb = cv2.GaussianBlur(rgb, 4, sigma)
-    return scipy.ndimage.gaussian_filter(rgb, [sigma, sigma, 0])
+    rgb = cv2.GaussianBlur(rgb, (5, 5), sigma)
+    return rgb
 
 
 def unsharp_mask(rgb: np.ndarray, sigma: float, alpha=2.0) -> np.ndarray:
@@ -165,12 +173,8 @@ def unsharp_mask(rgb: np.ndarray, sigma: float, alpha=2.0) -> np.ndarray:
 
 
 def median(rgb: np.ndarray, size: int) -> np.ndarray:
-    """メディアンフィルタ。sizeは2 or 3程度がよい？"""
-    # rgb = cv2.medianBlur(rgb, size)
-    channels = []
-    for ch in range(rgb.shape[-1]):
-        channels.append(scipy.ndimage.median_filter(rgb[:, :, ch], size))
-    rgb = np.stack(channels, axis=2)
+    """メディアンフィルタ。sizeは3程度がよい？"""
+    rgb = cv2.medianBlur(rgb, size)
     return rgb
 
 

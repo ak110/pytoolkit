@@ -27,7 +27,6 @@ def test_filters():
         (1, 'gaussian_noise', lambda rgb: tk.ndimage.gaussian_noise(rgb, rand, 5)),
         (1, 'blur', lambda rgb: tk.ndimage.blur(rgb, 0.5)),
         (1, 'unsharp_mask', lambda rgb: tk.ndimage.unsharp_mask(rgb, 0.5, 1.5)),
-        (1, 'median_2', lambda rgb: tk.ndimage.median(rgb, 2)),
         (1, 'median_3', lambda rgb: tk.ndimage.median(rgb, 3)),
         (1, 'brightness_n', lambda rgb: tk.ndimage.brightness(rgb, -32)),
         (1, 'brightness_p', lambda rgb: tk.ndimage.brightness(rgb, 32)),
@@ -45,9 +44,9 @@ def test_filters():
     for cp in save_dir.iterdir():
         cp.unlink()
     for i, (partial, name, filter_func) in enumerate(filters):
+        x = np.copy(rgb)
         if partial:
-            x = np.copy(rgb)
             x[64:-64, 64:-64, :] = filter_func(x[64:-64, 64:-64, :])
         else:
-            x = filter_func(rgb)
+            x = filter_func(x)
         tk.ndimage.save(save_dir.joinpath('{:02d}_{}.png'.format(i, name)), x)

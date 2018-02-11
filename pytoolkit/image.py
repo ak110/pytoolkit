@@ -118,7 +118,7 @@ class ImageDataGenerator(dl.Generator):
             # 変形を伴うData Augmentation
             rgb, y_, w_ = self._transform(rgb, y_, w_, rand)
             # リサイズ
-            interp = rand.choice(['nearest', 'lanczos', 'bilinear', 'bicubic'])
+            interp = rand.choice(['nearest', 'bilinear', 'bicubic', 'lanczos'])
             rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=None, interp=interp)
         else:
             # リサイズ
@@ -238,7 +238,7 @@ class RandomUnsharpMask(Augmentor):
 class RandomMedian(Augmentor):
     """メディアンフィルタ。"""
 
-    def __init__(self, sizes=(2,), partial=False):
+    def __init__(self, sizes=(3,), partial=False):
         self.sizes = sizes
         super().__init__(partial)
 
