@@ -24,20 +24,28 @@ def _main():
     sys.path.insert(0, str(base_dir.parent))
     import pytoolkit as tk
 
-    gen = tk.image.ImageDataGenerator(_IMAGE_SIZE, preprocess_input=lambda x: x)
-    gen.add(0.5, tk.image.FlipLR())
-    gen.add(0.5, tk.image.RandomErasing())
-    gen.add(0.25, tk.image.RandomBlur())
-    gen.add(0.25, tk.image.RandomBlur(partial=True))
-    gen.add(0.25, tk.image.RandomUnsharpMask())
-    gen.add(0.25, tk.image.RandomUnsharpMask(partial=True))
-    gen.add(0.25, tk.image.RandomMedian())
-    gen.add(0.25, tk.image.GaussianNoise())
-    gen.add(0.25, tk.image.GaussianNoise(partial=True))
-    gen.add(0.5, tk.image.RandomSaturation())
-    gen.add(0.5, tk.image.RandomBrightness())
-    gen.add(0.5, tk.image.RandomContrast())
-    gen.add(0.5, tk.image.RandomHue())
+    gen = tk.image.ImageDataGenerator()
+    gen.add(tk.image.RandomPadding(probability=1))
+    gen.add(tk.image.RandomRotate(probability=0.5))
+    gen.add(tk.image.RandomCrop(probability=1))
+    gen.add(tk.image.Resize(_IMAGE_SIZE))
+    gen.add(tk.image.FlipLR(probability=0.5))
+    gen.add(tk.image.RandomAugmentors([
+        tk.image.RandomBlur(probability=0.25),
+        tk.image.RandomBlur(probability=0.25, partial=True),
+        tk.image.RandomUnsharpMask(probability=0.25),
+        tk.image.RandomUnsharpMask(probability=0.25, partial=True),
+        tk.image.RandomMedian(probability=0.25),
+        tk.image.GaussianNoise(probability=0.25),
+        tk.image.GaussianNoise(probability=0.25, partial=True),
+        tk.image.RandomSaturation(probability=0.5),
+        tk.image.RandomBrightness(probability=0.5),
+        tk.image.RandomContrast(probability=0.5),
+        tk.image.RandomHue(probability=0.5),
+    ]))
+    gen.add(tk.image.RandomErasing(probability=0.5))
+    gen.add(tk.image.ProcessInput(lambda x: x))
+    gen.add(tk.image.ProcessOutput(lambda y: y))
 
     X = np.array([str(data_dir / '9ab919332a1dceff9a252b43c0fb34a0_m.jpg')] * 16)
     g = gen.flow(X, batch_size=_BATCH_SIZE, data_augmentation=True, random_state=123)

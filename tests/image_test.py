@@ -10,20 +10,28 @@ data_dir = base_dir / 'data'
 
 
 def _gen():
-    gen = tk.image.ImageDataGenerator((64, 64), preprocess_input=lambda x: x)
-    gen.add(0.5, tk.image.FlipLR())
-    gen.add(0.5, tk.image.RandomErasing())
-    gen.add(0.25, tk.image.RandomBlur())
-    gen.add(0.25, tk.image.RandomBlur(partial=True))
-    gen.add(0.25, tk.image.RandomUnsharpMask())
-    gen.add(0.25, tk.image.RandomUnsharpMask(partial=True))
-    gen.add(0.25, tk.image.RandomMedian())
-    gen.add(0.25, tk.image.GaussianNoise())
-    gen.add(0.25, tk.image.GaussianNoise(partial=True))
-    gen.add(0.5, tk.image.RandomSaturation())
-    gen.add(0.5, tk.image.RandomBrightness())
-    gen.add(0.5, tk.image.RandomContrast())
-    gen.add(0.5, tk.image.RandomHue())
+    gen = tk.image.ImageDataGenerator()
+    gen.add(tk.image.RandomPadding(probability=1))
+    gen.add(tk.image.RandomRotate(probability=0.5))
+    gen.add(tk.image.RandomCrop(probability=1))
+    gen.add(tk.image.Resize((64, 64)))
+    gen.add(tk.image.FlipLR(probability=0.5))
+    gen.add(tk.image.RandomAugmentors([
+        tk.image.RandomBlur(probability=0.25),
+        tk.image.RandomBlur(probability=0.25, partial=True),
+        tk.image.RandomUnsharpMask(probability=0.25),
+        tk.image.RandomUnsharpMask(probability=0.25, partial=True),
+        tk.image.RandomMedian(probability=0.25),
+        tk.image.GaussianNoise(probability=0.25),
+        tk.image.GaussianNoise(probability=0.25, partial=True),
+        tk.image.RandomSaturation(probability=0.5),
+        tk.image.RandomBrightness(probability=0.5),
+        tk.image.RandomContrast(probability=0.5),
+        tk.image.RandomHue(probability=0.5),
+    ]))
+    gen.add(tk.image.RandomErasing(probability=0.5))
+    gen.add(tk.image.ProcessInput(lambda x: x))
+    gen.add(tk.image.ProcessOutput(lambda y: y))
     return gen
 
 

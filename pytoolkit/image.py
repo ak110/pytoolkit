@@ -1,39 +1,48 @@
 """画像処理関連"""
 import abc
-import collections
 import copy
 import pathlib
 import warnings
 
 import numpy as np
 
-from . import dl, ndimage
-
-# Augmentorと確率
-AugmentorEntry = collections.namedtuple('AugmentorEntry', 'probability,augmentor')
+from . import dl, ml, ndimage
 
 
-class Augmentor(metaclass=abc.ABCMeta):
-    """DataAugmentationを行うクラス。
+class Operator(metaclass=abc.ABCMeta):
+    """ImageDataGeneratorで行う操作の基底クラス。"""
+
+    @abc.abstractmethod
+    def execute(self, rgb, y, w, rand, data_augmentation):
+        """処理。"""
+        return rgb, y, w
+
+
+class Augmentor(Operator):
+    """DataAugmentationの基底クラス。
 
     # 引数
     - partial: Trueにした場合、画像内のランダムな矩形を対象に処理を行う
 
     """
 
-    def __init__(self, partial=False):
+    def __init__(self, probability=1, partial=False):
+        assert 0 < probability <= 1
+        assert partial in (True, False)
+        self.probability = probability
         self.partial = partial
 
-    def execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
+    def execute(self, rgb, y, w, rand, data_augmentation):
         """DataAugmentationの実行。"""
-        if self.partial:
-            x1, x2 = self._get_partial_1d(rand, 0, rgb.shape[1])
-            y1, y2 = self._get_partial_1d(rand, 0, rgb.shape[0])
-            rgb[x1:x2, y1:y2, :] = self._execute(rgb[x1:x2, y1:y2, :], y, w, rand)
-        else:
-            rgb = self._execute(rgb, y, w, rand)
-        assert rgb.dtype == np.float32
-        return rgb
+        if data_augmentation:
+            if self.probability >= 1 or rand.rand() <= self.probability:
+                if self.partial:
+                    x1, x2 = self._get_partial_1d(rand, 0, rgb.shape[1])
+                    y1, y2 = self._get_partial_1d(rand, 0, rgb.shape[0])
+                    rgb[x1:x2, y1:y2, :], y, w = self._execute(rgb[x1:x2, y1:y2, :], y, w, rand)
+                else:
+                    rgb, y, w = self._execute(rgb, y, w, rand)
+        return rgb, y, w
 
     @staticmethod
     def _get_partial_1d(rand, min_value: int, max_value: int):
@@ -47,9 +56,9 @@ class Augmentor(metaclass=abc.ABCMeta):
             return (v1, v2) if v1 < v2 else (v2, v1)
 
     @abc.abstractmethod
-    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
+    def _execute(self, rgb, y, w, rand):
         """DataAugmentationの実装。"""
-        pass
+        return rgb, y, w
 
 
 class ImageDataGenerator(dl.Generator):
@@ -65,45 +74,40 @@ class ImageDataGenerator(dl.Generator):
 
     # 使用例
     ```
-    gen = tk.image.ImageDataGenerator((300, 300))
-    gen.add(0.5, tk.image.FlipLR())
-    gen.add(0.5, tk.image.RandomErasing())
-    gen.add(0.25, tk.image.RandomBlur())
-    gen.add(0.25, tk.image.RandomBlur(partial=True))
-    gen.add(0.25, tk.image.RandomUnsharpMask())
-    gen.add(0.25, tk.image.RandomUnsharpMask(partial=True))
-    gen.add(0.25, tk.image.RandomMedian())
-    gen.add(0.25, tk.image.GaussianNoise())
-    gen.add(0.25, tk.image.GaussianNoise(partial=True))
-    gen.add(0.5, tk.image.RandomSaturation())
-    gen.add(0.5, tk.image.RandomBrightness())
-    gen.add(0.5, tk.image.RandomContrast())
-    gen.add(0.5, tk.image.RandomHue())
+    gen = tk.image.ImageDataGenerator()
+    gen.add(tk.image.RandomPadding(probability=1))
+    gen.add(tk.image.RandomRotate(probability=0.5))
+    gen.add(tk.image.RandomCrop(probability=1))
+    gen.add(tk.image.Resize((300, 300)))
+    gen.add(tk.image.FlipLR(probability=0.5))
+    gen.add(tk.image.RandomAugmentors([
+        tk.image.RandomBlur(probability=0.25),
+        tk.image.RandomBlur(probability=0.25, partial=True),
+        tk.image.RandomUnsharpMask(probability=0.25),
+        tk.image.RandomUnsharpMask(probability=0.25, partial=True),
+        tk.image.RandomMedian(probability=0.25),
+        tk.image.GaussianNoise(probability=0.25),
+        tk.image.GaussianNoise(probability=0.25, partial=True),
+        tk.image.RandomSaturation(probability=0.5),
+        tk.image.RandomBrightness(probability=0.5),
+        tk.image.RandomContrast(probability=0.5),
+        tk.image.RandomHue(probability=0.5),
+    ]))
+    gen.add(tk.image.RandomErasing(probability=0.5))
+    gen.add(tk.image.ProcessInput(tk.image.preprocess_input_abs1))
+    gen.add(tk.image.ProcessOutput(tk.ml.to_categorical(num_classes)))
     ```
 
     """
 
-    def __init__(self, image_size=(300, 300), grayscale=False, preprocess_input=None,
-                 rotate_prob=0.5, rotate_degrees=15,
-                 padding_rate=0.25, crop_rate=0.15625,
-                 aspect_prob=0.5,
-                 aspect_rations=(3 / 4, 4 / 3),
-                 data_encoder=None, label_encoder=None):
-        self.image_size = image_size
+    def __init__(self, grayscale=False):
         self.grayscale = grayscale
-        self.preprocess_input = preprocess_input
-        self.rotate_prob = rotate_prob
-        self.rotate_degrees = rotate_degrees
-        self.padding_rate = padding_rate
-        self.crop_rate = crop_rate
-        self.aspect_prob = aspect_prob
-        self.aspect_rations = aspect_rations
-        self.augmentors = []
-        super().__init__(data_encoder, label_encoder)
+        self.operators = []
+        super().__init__()
 
-    def add(self, probability: float, augmentor: Augmentor):
-        """Augmentorの追加"""
-        self.augmentors.append(AugmentorEntry(probability=probability, augmentor=augmentor))
+    def add(self, operator: Operator):
+        """Operatorの追加。"""
+        self.operators.append(operator)
 
     def generate(self, ix, seed, x_, y_, w_, data_augmentation):
         """画像の読み込みとDataAugmentation。(単数)"""
@@ -114,31 +118,10 @@ class ImageDataGenerator(dl.Generator):
         # 画像の読み込み
         rgb, y_, w_ = self._load_image(x_, y_, w_)
 
-        if data_augmentation:
-            # 変形を伴うData Augmentation
-            rgb, y_, w_ = self._transform(rgb, y_, w_, rand)
-            # リサイズ
-            interp = rand.choice(['nearest', 'bilinear', 'bicubic', 'lanczos'])
-            rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=None, interp=interp)
-        else:
-            # リサイズ
-            rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=None)
+        # パイプライン処理
+        for op in self.operators:
+            rgb, y_, w_ = op.execute(rgb, y_, w_, rand, data_augmentation=data_augmentation)
 
-        # 変形を伴わないData Augmentation
-        if data_augmentation:
-            augmentors = self.augmentors[:]
-            rand.shuffle(augmentors)  # シャッフルして色々な順で適用
-            for a in augmentors:
-                if rand.rand() <= a.probability:
-                    rgb = a.augmentor.execute(rgb, y_, w_, rand)
-            # 色が範囲外になっていたら補正(飽和)
-            rgb = np.clip(rgb, 0, 255)
-
-        # preprocess_input
-        pi = self.preprocess_input if self.preprocess_input else preprocess_input_abs1
-        rgb = np.expand_dims(rgb, axis=0)
-        rgb = pi(rgb)
-        rgb = np.squeeze(rgb, axis=0)
         return super().generate(ix, seed, rgb, y_, w_, data_augmentation)
 
     def _load_image(self, x, y, w):
@@ -151,17 +134,6 @@ class ImageDataGenerator(dl.Generator):
             rgb = ndimage.load(x, self.grayscale)
         return rgb, y, w
 
-    def _transform(self, rgb: np.ndarray, y, w, rand: np.random.RandomState):
-        """変形を伴うAugmentation。"""
-        # 回転
-        if rand.rand() <= self.rotate_prob:
-            rgb = ndimage.rotate(rgb, rand.uniform(-self.rotate_degrees, self.rotate_degrees))
-        # padding+crop
-        padding = rand.choice(('same', 'zero', 'reflect', 'wrap', 'rand'))
-        rgb = ndimage.random_crop(rgb, rand, self.padding_rate, self.crop_rate,
-                                  self.aspect_prob, self.aspect_rations, padding=padding)
-        return rgb, y, w
-
 
 def preprocess_input_mean(x: np.ndarray):
     """RGBそれぞれ平均値(定数)を引き算。
@@ -170,11 +142,11 @@ def preprocess_input_mean(x: np.ndarray):
     `keras.applications`のVGG16/VGG19/ResNet50で使われる。
     """
     # 'RGB'->'BGR'
-    x = x[:, :, :, ::-1]
+    x = x[..., ::-1]
     # Zero-center by mean pixel
-    x[:, :, :, 0] -= 103.939
-    x[:, :, :, 1] -= 116.779
-    x[:, :, :, 2] -= 123.68
+    x[..., 0] -= 103.939
+    x[..., 1] -= 116.779
+    x[..., 2] -= 123.68
     return x
 
 
@@ -195,113 +167,270 @@ def unpreprocess_input_abs1(x: np.ndarray):
     return x
 
 
+class Resize(Operator):
+    """画像のリサイズ。
+
+    # 引数
+
+    image_size: (height, width)のタプル
+    """
+
+    def __init__(self, image_size, padding=None, interp='lanczos'):
+        self.image_size = image_size
+        self.padding = padding
+        self.interp = interp
+        assert len(self.image_size) == 2
+
+    def execute(self, rgb, y, w, rand, data_augmentation):
+        """処理。"""
+        rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=self.padding, interp=self.interp)
+        return rgb, y, w
+
+
+class ProcessInput(Operator):
+    """画像に対する任意の処理。
+
+    # 引数
+
+    func: 画像のndarrayを受け取り、処理結果を返す関数
+    batch_axis: Trueの場合、funcに渡されるndarrayのshapeが(1, height, width, channels)になる。Falseなら(height, width, channels)。
+
+    # 例1
+    ```py
+    gen.add(ProcessInput(tk.image.preprocess_input_abs1))
+    ```
+
+    # 例2
+    ```py
+    gen.add(ProcessInput(tk.image.preprocess_input_mean))
+    ```
+
+    # 例3
+    ```py
+    gen.add(ProcessInput(keras.applications.vgg16.preprocess_input, batch_axis=True))
+    ```
+    """
+
+    def __init__(self, func, batch_axis=False):
+        self.func = func
+        self.batch_axis = batch_axis
+
+    def execute(self, rgb, y, w, rand, data_augmentation):
+        """処理。"""
+        assert rand is not None  # noqa
+        assert data_augmentation in (True, False)  # noqa
+        if self.batch_axis:
+            rgb = np.expand_dims(rgb, axis=0)
+            rgb = self.func(rgb)
+            rgb = np.squeeze(rgb, axis=0)
+        else:
+            rgb = self.func(rgb)
+        return rgb, y, w
+
+
+class ProcessOutput(Operator):
+    """ラベルに対する任意の処理。"""
+
+    def __init__(self, func, batch_axis=False):
+        self.func = func
+
+    def execute(self, rgb, y, w, rand, data_augmentation):
+        """処理。"""
+        assert rand is not None  # noqa
+        assert data_augmentation in (True, False)  # noqa
+        y = self.func(y)
+        return rgb, y, w
+
+
+class RandomPadding(Augmentor):
+    """パディング。
+
+    この後のRandomCropを前提に、パディングするサイズは固定。
+    パディングのやり方がランダム。
+    """
+
+    def __init__(self, probability=1, padding_rate=0.25):
+        self.padding_rate = padding_rate
+        super().__init__(probability=probability)
+
+    def _execute(self, rgb, y, w, rand):
+        """処理。"""
+        padding = rand.choice(('same', 'zero', 'reflect', 'wrap', 'rand'))
+        padded_w = int(np.floor(rgb.shape[1] * (1 + self.padding_rate)))
+        padded_h = int(np.floor(rgb.shape[0] * (1 + self.padding_rate)))
+        rgb = ndimage.pad(rgb, padded_w, padded_h, padding, rand)
+        return rgb, y, w
+
+
+class RandomRotate(Augmentor):
+    """回転。"""
+
+    def __init__(self, probability=1, degrees=15):
+        self.degrees = degrees
+        super().__init__(probability=probability)
+
+    def _execute(self, rgb, y, w, rand):
+        rgb = ndimage.rotate(rgb, rand.uniform(-self.degrees, self.degrees))
+        return rgb, y, w
+
+
+class RandomCrop(Augmentor):
+    """切り抜き。"""
+
+    def __init__(self, probability=1, crop_rate=0.25, aspect_prob=0.5, aspect_rations=(3 / 4, 4 / 3)):
+        self.crop_rate = crop_rate
+        self.aspect_prob = aspect_prob
+        self.aspect_rations = aspect_rations
+        super().__init__(probability=probability)
+
+    def _execute(self, rgb, y, w, rand):
+        cr = rand.uniform(1 - self.crop_rate, 1)
+        ar = rand.choice(self.aspect_rations) if rand.rand() <= self.aspect_prob else 1
+        if ar <= 1:
+            cropped_w = int(np.floor(rgb.shape[1] * cr * ar))
+            cropped_h = int(np.floor(rgb.shape[0] * cr))
+        else:
+            cropped_w = int(np.floor(rgb.shape[1] * cr))
+            cropped_h = int(np.floor(rgb.shape[0] * cr / ar))
+        crop_x = rand.randint(0, rgb.shape[1] - cropped_w + 1)
+        crop_y = rand.randint(0, rgb.shape[0] - cropped_h + 1)
+        rgb = ndimage.crop(rgb, crop_x, crop_y, cropped_w, cropped_h)
+        return rgb, y, w
+
+
+class RandomAugmentors(Augmentor):
+    """順番と適用確率をランダムにDataAugmentationを行う。
+
+    # 引数
+    augmentors: Augmentorの配列
+    clip_rgb: RGB値をnp.clip(rgb, 0, 255)するならTrue
+    """
+
+    def __init__(self, augmentors, probability=1, clip_rgb=True):
+        self.augmentors = augmentors
+        self.clip_rgb = clip_rgb
+        super().__init__(probability=probability)
+
+    def _execute(self, rgb, y, w, rand):
+        augmentors = self.augmentors[:]
+        rand.shuffle(augmentors)
+        for a in augmentors:
+            rgb, y, w = a.execute(rgb, y, w, rand, data_augmentation=True)
+            assert rgb.dtype == np.float32
+        # 色が範囲外になっていたら補正(飽和)
+        if self.clip_rgb:
+            rgb = np.clip(rgb, 0, 255)
+        return rgb, y, w
+
+
 class FlipLR(Augmentor):
     """左右反転。"""
 
-    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
+    def _execute(self, rgb, y, w, rand):
         assert rand is not None  # noqa
-        return ndimage.flip_lr(rgb)
+        return ndimage.flip_lr(rgb), y, w
 
 
 class FlipTB(Augmentor):
     """上下反転。"""
 
-    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
+    def _execute(self, rgb, y, w, rand):
         assert rand is not None  # noqa
-        return ndimage.flip_tb(rgb)
+        return ndimage.flip_tb(rgb), y, w
 
 
 class RandomBlur(Augmentor):
     """ぼかし。"""
 
-    def __init__(self, radius=0.75, partial=False):
+    def __init__(self, probability=1, radius=0.75, partial=False):
         self.radius = radius
-        super().__init__(partial)
+        super().__init__(probability=probability, partial=partial)
 
-    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
-        return ndimage.blur(rgb, self.radius * rand.rand())
+    def _execute(self, rgb, y, w, rand):
+        return ndimage.blur(rgb, self.radius * rand.rand()), y, w
 
 
 class RandomUnsharpMask(Augmentor):
     """シャープ化。"""
 
-    def __init__(self, sigma=0.5, min_alpha=1, max_alpha=2, partial=False):
+    def __init__(self, probability=1, sigma=0.5, min_alpha=1, max_alpha=2, partial=False):
         self.sigma = sigma
         self.min_alpha = min_alpha
         self.max_alpha = max_alpha
-        super().__init__(partial)
+        super().__init__(probability=probability, partial=partial)
 
-    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
-        return ndimage.unsharp_mask(rgb, self.sigma, rand.uniform(self.min_alpha, self.max_alpha))
+    def _execute(self, rgb, y, w, rand):
+        rgb = ndimage.unsharp_mask(rgb, self.sigma, rand.uniform(self.min_alpha, self.max_alpha))
+        return rgb, y, w
 
 
 class RandomMedian(Augmentor):
     """メディアンフィルタ。"""
 
-    def __init__(self, sizes=(3,), partial=False):
+    def __init__(self, probability=1, sizes=(3,), partial=False):
         self.sizes = sizes
-        super().__init__(partial)
+        super().__init__(probability=probability, partial=partial)
 
-    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
-        return ndimage.median(rgb, rand.choice(self.sizes))
+    def _execute(self, rgb, y, w, rand):
+        return ndimage.median(rgb, rand.choice(self.sizes)), y, w
 
 
 class GaussianNoise(Augmentor):
     """ガウシアンノイズ。"""
 
-    def __init__(self, scale=5, partial=False):
+    def __init__(self, probability=1, scale=5, partial=False):
         self.scale = scale
-        super().__init__(partial)
+        super().__init__(probability=probability, partial=partial)
 
-    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
-        return ndimage.gaussian_noise(rgb, rand, self.scale)
+    def _execute(self, rgb, y, w, rand):
+        return ndimage.gaussian_noise(rgb, rand, self.scale), y, w
 
 
 class RandomBrightness(Augmentor):
     """明度の変更。"""
 
-    def __init__(self, shift=32):
+    def __init__(self, probability=1, shift=32):
         self.shift = shift
-        super().__init__()
+        super().__init__(probability=probability)
 
-    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
-        return ndimage.brightness(rgb, rand.uniform(-self.shift, self.shift))
+    def _execute(self, rgb, y, w, rand):
+        return ndimage.brightness(rgb, rand.uniform(-self.shift, self.shift)), y, w
 
 
 class RandomContrast(Augmentor):
     """コントラストの変更。"""
 
-    def __init__(self, var=0.25):
+    def __init__(self, probability=1, var=0.25):
         self.var = var
-        super().__init__()
+        super().__init__(probability=probability)
 
-    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
-        return ndimage.contrast(rgb, rand.uniform(1 - self.var, 1 + self.var))
+    def _execute(self, rgb, y, w, rand):
+        return ndimage.contrast(rgb, rand.uniform(1 - self.var, 1 + self.var)), y, w
 
 
 class RandomSaturation(Augmentor):
     """彩度の変更。"""
 
-    def __init__(self, var=0.5):
+    def __init__(self, probability=1, var=0.5):
         self.var = var
-        super().__init__()
+        super().__init__(probability=probability)
 
-    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
-        return ndimage.saturation(rgb, rand.uniform(1 - self.var, 1 + self.var))
+    def _execute(self, rgb, y, w, rand):
+        return ndimage.saturation(rgb, rand.uniform(1 - self.var, 1 + self.var)), y, w
 
 
 class RandomHue(Augmentor):
     """色相の変更。"""
 
-    def __init__(self, var=1 / 16, shift=8):
+    def __init__(self, probability=1, var=1 / 16, shift=8):
         self.var = var
         self.shift = shift
-        super().__init__()
+        super().__init__(probability=probability)
 
-    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
+    def _execute(self, rgb, y, w, rand):
         alpha = rand.uniform(1 - self.var, 1 + self.var, (3,))
         beta = rand.uniform(- self.shift, + self.shift, (3,))
-        return ndimage.hue_lite(rgb, alpha, beta)
+        return ndimage.hue_lite(rgb, alpha, beta), y, w
 
 
 class RandomErasing(Augmentor):
@@ -315,7 +444,7 @@ class RandomErasing(Augmentor):
 
     """
 
-    def __init__(self, scale_low=0.02, scale_high=0.4, rate_1=1 / 3, rate_2=3, object_aware=False, object_aware_prob=0.5, max_tries=30):
+    def __init__(self, probability=1, scale_low=0.02, scale_high=0.4, rate_1=1 / 3, rate_2=3, object_aware=False, object_aware_prob=0.5, max_tries=30):
         assert scale_low <= scale_high
         assert rate_1 <= rate_2
         self.scale_low = scale_low
@@ -325,10 +454,9 @@ class RandomErasing(Augmentor):
         self.object_aware = object_aware
         self.object_aware_prob = object_aware_prob
         self.max_tries = max_tries
-        super().__init__()
+        super().__init__(probability=probability)
 
-    def _execute(self, rgb: np.ndarray, y, w, rand: np.random.RandomState) -> np.ndarray:
-        from . import ml
+    def _execute(self, rgb, y, w, rand):
         bboxes = np.round(y.bboxes * np.array(rgb.shape)[[1, 0, 1, 0]]) if isinstance(y, ml.ObjectsAnnotation) else None
         if self.object_aware:
             assert bboxes is not None
@@ -346,16 +474,13 @@ class RandomErasing(Augmentor):
                     inter_boxes = np.copy(bboxes[inter[i]])
                     inter_boxes -= np.expand_dims(np.tile(b[:2], 2), axis=0)  # bに合わせて平行移動
                     # random erasing
-                    rgb[b[1]:b[3], b[0]:b[2], :] = self._erase_random(rgb[b[1]:b[3], b[0]:b[2], :], rand, inter_boxes)
-
-            return rgb
+                    rgb[b[1]:b[3], b[0]:b[2], :], y, w = self._erase_random(rgb[b[1]:b[3], b[0]:b[2], :], rand, inter_boxes)
+            return rgb, y, w
         else:
             # 画像全体でrandom erasing。
             return self._erase_random(rgb, rand, bboxes)
 
     def _erase_random(self, rgb, rand, bboxes):
-        # from . import ml
-
         if bboxes is not None:
             bb_lt = bboxes[:, :2]  # 左上
             bb_rb = bboxes[:, 2:]  # 右下
@@ -394,4 +519,4 @@ class RandomErasing(Augmentor):
             rgb[y:y + h, x:x + w, :] = rand.randint(0, 255, size=(h, w, rgb.shape[2]))
             break
 
-        return rgb
+        return rgb, y, w

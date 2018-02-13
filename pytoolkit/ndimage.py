@@ -149,7 +149,7 @@ def resize(rgb: np.ndarray, width: int, height: int, padding=None, interp='lancz
             'nearest': cv2.INTER_NEAREST,
             'bilinear': cv2.INTER_LINEAR,
             'bicubic': cv2.INTER_CUBIC,
-            'lanczos': cv2.INTER_AREA,
+            'lanczos': cv2.INTER_LANCZOS4,
         }[interp]
     rgb = cv2.resize(rgb, (width, height), interpolation=cv2_interp)
     return rgb

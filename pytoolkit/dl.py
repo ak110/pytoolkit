@@ -752,23 +752,7 @@ def count_network_depth(model):
 
 
 class Generator(object):
-    """`fit_generator`などに渡すgeneratorを作るためのベースクラス。
-
-    # 引数
-    - data_encoder: Xの変換を行う関数
-    - label_encoder: yの変換を行う関数
-    - parallel: _prepareにjoblib.Parallelを渡すならTrue
-
-    """
-
-    def __init__(self, data_encoder=None, label_encoder=None):
-        self.data_encoder = data_encoder
-        self.label_encoder = label_encoder
-
-    @staticmethod
-    def steps_per_epoch(data_count, batch_size):
-        """1epochが何ステップかを算出して返す"""
-        return (data_count + batch_size - 1) // batch_size
+    """`fit_generator`などに渡すgeneratorを作るためのベースクラス。"""
 
     def flow(self, X, y=None, weights=None, batch_size=32, shuffle=False, data_augmentation=False, random_state=None):
         """`fit_generator`などに渡すgenerator。kargsはそのままprepareに渡される。"""
@@ -904,11 +888,12 @@ class Generator(object):
         assert ix is not None
         assert seed is not None
         assert data_augmentation in (True, False)
-        if self.data_encoder:
-            x_ = np.squeeze(self.data_encoder(np.expand_dims(x_, 0)), axis=0)
-        if self.label_encoder and y_ is not None:
-            y_ = np.squeeze(self.label_encoder(np.expand_dims(y_, 0)), axis=0)
         return x_, y_, w_
+
+    @staticmethod
+    def steps_per_epoch(data_count, batch_size):
+        """1epochが何ステップかを算出して返す"""
+        return (data_count + batch_size - 1) // batch_size
 
 
 def categorical_crossentropy(y_true, y_pred, alpha=None):
