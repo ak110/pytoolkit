@@ -15,7 +15,7 @@ def _gen():
     gen.add(tk.image.RandomRotate(probability=0.5))
     gen.add(tk.image.RandomCrop(probability=1))
     gen.add(tk.image.Resize((64, 64)))
-    gen.add(tk.image.FlipLR(probability=0.5))
+    gen.add(tk.image.RandomFlipLR(probability=0.5))
     gen.add(tk.image.RandomAugmentors([
         tk.image.RandomBlur(probability=0.25),
         tk.image.RandomBlur(probability=0.25, partial=True),

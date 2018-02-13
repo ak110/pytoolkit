@@ -79,7 +79,7 @@ class ImageDataGenerator(dl.Generator):
     gen.add(tk.image.RandomRotate(probability=0.5))
     gen.add(tk.image.RandomCrop(probability=1))
     gen.add(tk.image.Resize((300, 300)))
-    gen.add(tk.image.FlipLR(probability=0.5))
+    gen.add(tk.image.RandomFlipLR(probability=0.5))
     gen.add(tk.image.RandomAugmentors([
         tk.image.RandomBlur(probability=0.25),
         tk.image.RandomBlur(probability=0.25, partial=True),
@@ -323,7 +323,7 @@ class RandomAugmentors(Augmentor):
         return rgb, y, w
 
 
-class FlipLR(Augmentor):
+class RandomFlipLR(Augmentor):
     """左右反転。"""
 
     def _execute(self, rgb, y, w, rand):
@@ -331,12 +331,15 @@ class FlipLR(Augmentor):
         return ndimage.flip_lr(rgb), y, w
 
 
-class FlipTB(Augmentor):
-    """上下反転。"""
+class RandomFlipLRTB(Augmentor):
+    """左右反転 or 上下反転。"""
 
     def _execute(self, rgb, y, w, rand):
-        assert rand is not None  # noqa
-        return ndimage.flip_tb(rgb), y, w
+        if rand.rand() < 0.5:
+            rgb = ndimage.flip_lr(rgb)
+        else:
+            rgb = ndimage.flip_tb(rgb)
+        return rgb, y, w
 
 
 class RandomBlur(Augmentor):
