@@ -15,7 +15,7 @@ class Operator(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def execute(self, rgb, y, w, rand, data_augmentation):
         """処理。"""
-        return rgb, y, w
+        assert False
 
 
 class Augmentor(Operator):
@@ -58,7 +58,7 @@ class Augmentor(Operator):
     @abc.abstractmethod
     def _execute(self, rgb, y, w, rand):
         """DataAugmentationの実装。"""
-        return rgb, y, w
+        assert False
 
 
 class ImageDataGenerator(dl.Generator):
@@ -117,7 +117,7 @@ class ImageDataGenerator(dl.Generator):
 
     def generate(self, ix, seed, x_, y_, w_, data_augmentation):
         """画像の読み込みとDataAugmentation。(単数)"""
-        rand = np.random.RandomState(seed)  # 再現性やスレッドセーフ性に自信がないのでここではこれを使う。
+        rand = np.random.RandomState(seed)
         y_ = copy.deepcopy(y_)
         w_ = copy.deepcopy(w_)
 
@@ -127,13 +127,14 @@ class ImageDataGenerator(dl.Generator):
         # パイプライン処理
         for op in self.operators:
             rgb, y_, w_ = op.execute(rgb, y_, w_, rand, data_augmentation=data_augmentation)
+            assert rgb.dtype == np.float32, 'dtype error: {}'.format(op.__class__)
 
         return super().generate(ix, seed, rgb, y_, w_, data_augmentation)
 
     def _load_image(self, x, y, w):
         """画像の読み込み"""
         if isinstance(x, np.ndarray):
-            rgb = x.astype(np.float32)
+            rgb = np.copy(x).astype(np.float32)
             assert rgb.shape[-1] == (1 if self.grayscale else 3)
         else:
             assert isinstance(x, (str, pathlib.Path))
@@ -181,15 +182,16 @@ class Resize(Operator):
     image_size: (height, width)のタプル
     """
 
-    def __init__(self, image_size, padding=None, interp='lanczos'):
+    def __init__(self, image_size, padding=None):
         self.image_size = image_size
         self.padding = padding
-        self.interp = interp
         assert len(self.image_size) == 2
 
     def execute(self, rgb, y, w, rand, data_augmentation):
         """処理。"""
-        rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=self.padding, interp=self.interp)
+        assert rand is not None  # noqa
+        interp = rand.choice(('nearest', 'bilinear', 'bicubic', 'lanczos')) if data_augmentation else 'lanczos'
+        rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=self.padding, interp=interp)
         return rgb, y, w
 
 
@@ -245,12 +247,13 @@ class ProcessOutput(Operator):
         """処理。"""
         assert rand is not None  # noqa
         assert data_augmentation in (True, False)  # noqa
-        if self.batch_axis:
-            y = np.expand_dims(y, axis=0)
-            y = self.func(y)
-            y = np.squeeze(y, axis=0)
-        else:
-            y = self.func(y)
+        if y is not None:
+            if self.batch_axis:
+                y = np.expand_dims(y, axis=0)
+                y = self.func(y)
+                y = np.squeeze(y, axis=0)
+            else:
+                y = self.func(y)
         return rgb, y, w
 
 
@@ -282,14 +285,15 @@ class RandomRotate(Augmentor):
         super().__init__(probability=probability)
 
     def _execute(self, rgb, y, w, rand):
-        rgb = ndimage.rotate(rgb, rand.uniform(-self.degrees, self.degrees))
+        interp = rand.choice(('nearest', 'bilinear', 'bicubic', 'lanczos'))
+        rgb = ndimage.rotate(rgb, rand.uniform(-self.degrees, self.degrees), interp=interp)
         return rgb, y, w
 
 
 class RandomCrop(Augmentor):
     """切り抜き。"""
 
-    def __init__(self, probability=1, crop_rate=0.25, aspect_prob=0.5, aspect_rations=(3 / 4, 4 / 3)):
+    def __init__(self, probability=1, crop_rate=0.5, aspect_prob=0.5, aspect_rations=(3 / 4, 4 / 3)):
         self.crop_rate = crop_rate
         self.aspect_prob = aspect_prob
         self.aspect_rations = aspect_rations
@@ -328,7 +332,7 @@ class RandomAugmentors(Augmentor):
         rand.shuffle(augmentors)
         for a in augmentors:
             rgb, y, w = a.execute(rgb, y, w, rand, data_augmentation=True)
-            assert rgb.dtype == np.float32
+            assert rgb.dtype == np.float32, 'dtype error: {}'.format(a.__class__)
         # 色が範囲外になっていたら補正(飽和)
         if self.clip_rgb:
             rgb = np.clip(rgb, 0, 255)

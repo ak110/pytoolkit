@@ -31,35 +31,18 @@ def save(path: typing.Union[str, pathlib.Path], rgb: np.ndarray) -> None:
     cv2.imwrite(str(path), bgr)
 
 
-def random_crop(rgb: np.ndarray, rand: np.random.RandomState,
-                padding_rate=0.25, crop_rate=0.15625,
-                aspect_prob=0.5, aspect_rations=(3 / 4, 4 / 3),
-                padding='same') -> np.ndarray:
-    """パディング＋ランダム切り抜き。"""
-    cr = rand.uniform(1 - crop_rate, 1)
-    ar = rand.choice(aspect_rations) if rand.rand() <= aspect_prob else 1
-    if ar <= 1:
-        cropped_w = int(np.floor(rgb.shape[1] * cr * ar))
-        cropped_h = int(np.floor(rgb.shape[0] * cr))
-    else:
-        cropped_w = int(np.floor(rgb.shape[1] * cr))
-        cropped_h = int(np.floor(rgb.shape[0] * cr / ar))
-    padded_w = max(int(np.ceil(rgb.shape[1] * (1 + padding_rate))), cropped_w)
-    padded_h = max(int(np.ceil(rgb.shape[0] * (1 + padding_rate))), cropped_h)
-    # パディング
-    rgb = pad(rgb, padded_w, padded_h, padding=padding, rand=rand)
-    # 切り抜き
-    x = rand.randint(0, rgb.shape[1] - cropped_w + 1)
-    y = rand.randint(0, rgb.shape[0] - cropped_h + 1)
-    return crop(rgb, x, y, cropped_w, cropped_h)
-
-
-def rotate(rgb: np.ndarray, degrees: float) -> np.ndarray:
+def rotate(rgb: np.ndarray, degrees: float, interp='lanczos') -> np.ndarray:
     """回転。"""
+    cv2_interp = {
+        'nearest': cv2.INTER_NEAREST,
+        'bilinear': cv2.INTER_LINEAR,
+        'bicubic': cv2.INTER_CUBIC,
+        'lanczos': cv2.INTER_LANCZOS4,
+    }[interp]
     size = (rgb.shape[1], rgb.shape[0])
     center = (size[0] // 2, size[1] // 2)
     rotation_matrix = cv2.getRotationMatrix2D(center=center, angle=degrees, scale=1.0)
-    rgb = cv2.warpAffine(rgb, rotation_matrix, size, flags=cv2.INTER_CUBIC)
+    rgb = cv2.warpAffine(rgb, rotation_matrix, size, flags=cv2_interp)
     return rgb
 
 
