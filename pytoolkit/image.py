@@ -98,6 +98,12 @@ class ImageDataGenerator(dl.Generator):
     gen.add(tk.image.ProcessOutput(tk.ml.to_categorical(num_classes)))
     ```
 
+    # 例
+
+    padding_rate=0.25、crop_rate=0.25、aspect_rate=3/4で32px四方の画像を処理すると、
+    32*1.25=40なので上下左右に4pxずつpaddingした後に、
+    40*0.75*3/4=22.5なので22pxを切り抜く処理になる。(最悪18pxしか残らない)
+
     """
 
     def __init__(self, grayscale=False):
@@ -256,8 +262,8 @@ class RandomPadding(Augmentor):
     def _execute(self, rgb, y, w, rand):
         """処理。"""
         padding = rand.choice(('same', 'zero', 'reflect', 'wrap', 'rand'))
-        padded_w = int(np.floor(rgb.shape[1] * (1 + self.padding_rate)))
-        padded_h = int(np.floor(rgb.shape[0] * (1 + self.padding_rate)))
+        padded_w = int(np.ceil(rgb.shape[1] * (1 + self.padding_rate)))
+        padded_h = int(np.ceil(rgb.shape[0] * (1 + self.padding_rate)))
         rgb = ndimage.pad(rgb, padded_w, padded_h, padding, rand)
         return rgb, y, w
 

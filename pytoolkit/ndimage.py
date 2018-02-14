@@ -142,15 +142,15 @@ def resize(rgb: np.ndarray, width: int, height: int, padding=None, interp='lancz
             rgb = resize(rgb, resized_w, resized_h, padding=None, interp=interp)
         return pad(rgb, width, height)
     # パディングせずリサイズ (縦横比無視)
-    if rgb.shape[1] >= width and rgb.shape[0] >= height:  # 縮小
-        cv2_interp = cv2.INTER_NEAREST if interp == 'nearest' else cv2.INTER_AREA
-    else:  # 拡大
+    if rgb.shape[1] < width and rgb.shape[0] < height:  # 拡大
         cv2_interp = {
             'nearest': cv2.INTER_NEAREST,
             'bilinear': cv2.INTER_LINEAR,
             'bicubic': cv2.INTER_CUBIC,
             'lanczos': cv2.INTER_LANCZOS4,
         }[interp]
+    else:  # 縮小
+        cv2_interp = cv2.INTER_NEAREST if interp == 'nearest' else cv2.INTER_AREA
     rgb = cv2.resize(rgb, (width, height), interpolation=cv2_interp)
     return rgb
 
