@@ -4,13 +4,11 @@ kerasをimportしてしまうとTensorFlowの初期化が始まって重いの�
 importしただけではkerasがimportされないように作っている。
 
 """
-import contextlib
+import concurrent.futures
 import copy
 import csv
 import os
 import pathlib
-import queue
-import threading
 import time
 import warnings
 
@@ -755,81 +753,87 @@ class Generator(object):
 
     def flow(self, X, y=None, weights=None, batch_size=32, shuffle=False, data_augmentation=False, random_state=None):
         """`fit_generator`などに渡すgenerator。kargsはそのままprepareに渡される。"""
-        random_state = sklearn.utils.check_random_state(random_state)
-        length = len(X[0]) if isinstance(X, list) else len(X)
-        if y is not None:
-            assert length == (len(y[0]) if isinstance(y, list) else len(y))
-
         cpu_count = os.cpu_count()
-        max_queue_size = max(batch_size * 4, cpu_count * 2)  # 適当に余裕をもったサイズにしておく
-        worker_count = min(batch_size * 4, cpu_count * 2)
-        input_queue = queue.Queue(maxsize=max_queue_size)
-        result_queue = queue.Queue(maxsize=max_queue_size)
-        workers = [threading.Thread(target=self._worker,
-                                    args=(wid, input_queue, result_queue, data_augmentation),
-                                    daemon=True)
-                   for wid in range(worker_count)]
-        for worker in workers:
-            worker.start()
+        worker_count = min(batch_size * 4, cpu_count * 2)  # 適当に余裕をもったサイズにしておく
+        with concurrent.futures.ThreadPoolExecutor(worker_count) as pool:
+            yield from self._flow(pool, X, y, weights, batch_size, shuffle, data_augmentation, random_state)
+
+    def _flow(self, pool, X, y, weights, batch_size, shuffle, data_augmentation, random_state):
+        _MAX_QUEUE_BATCHES = 4  # ため込むバッチ数
+
+        random_state = sklearn.utils.check_random_state(random_state)
+        data_count = len(X[0]) if isinstance(X, list) else len(X)
+        if y is not None:
+            assert data_count == (len(y[0]) if isinstance(y, list) else len(y))
+
+        future_queue = []
+        gen = self._flow_batch(data_count, batch_size, shuffle, random_state)
         try:
-            gen = self._flow_index(length, shuffle, random_state)
-            result_buffer = []
-            next_seq = 0
-            seq_in = 0
-
             while True:
-                # キューサイズの限界までinput_queueにデータを入れる
-                queue_size = input_queue.qsize() + result_queue.qsize()
-                while queue_size < max_queue_size:
-                    ix, seed, x_, y_, w_ = self._pick_next(gen, X, y, weights)
-                    input_queue.put((seq_in, ix, seed, x_, y_, w_))
-                    queue_size += 1
-                    seq_in += 1
+                # 最大キューサイズまで仕事をsubmitする
+                while len(future_queue) < _MAX_QUEUE_BATCHES:
+                    indices, seeds = next(gen)
+                    batch = [pool.submit(self._work, ix, seed, X, y, weights, data_augmentation)
+                             for ix, seed in zip(indices, seeds)]
+                    future_queue.append(batch)
 
-                # バッチサイズ分の結果を取り出す
-                remain_size = length - next_seq % length
-                cur_batch_size = batch_size if shuffle or batch_size <= remain_size else remain_size
-                while True:
-                    if len(result_buffer) >= cur_batch_size:
-                        if shuffle:
-                            break
-                        else:
-                            result_buffer.sort(key=lambda x: x[0])
-                            first_seq = result_buffer[0][0]
-                            last_seq = result_buffer[cur_batch_size - 1][0]
-                            if first_seq == next_seq and last_seq == next_seq + cur_batch_size - 1:
-                                break
-                    result_buffer.append(result_queue.get())
-                _, rx, ry, rw = zip(*result_buffer[:cur_batch_size])
-                result_buffer = result_buffer[cur_batch_size:]
-                next_seq += cur_batch_size
-
-                # 結果を返す
+                # 先頭のバッチの処理結果を取り出す
+                batch = [f.result() for f in future_queue[0]]
+                rx, ry, rw = zip(*batch)
                 yield self._get_result(X, y, weights, rx, ry, rw)
+                future_queue = future_queue[1:]
         except GeneratorExit:
             pass
         finally:
-            # 処理中のものをいったんキャンセルして、
-            # Noneを入れて、結果キューを空にして、join
-            with contextlib.suppress(queue.Empty):
-                while True:
-                    input_queue.get_nowait()
-            with contextlib.suppress(queue.Full):
-                while True:
-                    input_queue.put_nowait((None, None, None, None, None, None))
-            with contextlib.suppress(queue.Empty):
-                while True:
-                    result_queue.get_nowait()
-            for worker in workers:
-                worker.join()
+            gen.close()
+
+    def _flow_batch(self, data_count, batch_size, shuffle, random_state):
+        """データのindexとseedをバッチサイズずつ列挙し続けるgenerator。"""
+        if shuffle:
+            # シャッフルありの場合、常にbatch_size分を返す (horovodとかはそれが都合が良い)
+            batch_indices = []
+            seeds = []
+            for ix, seed in self._flow_instance(data_count, shuffle, random_state):
+                batch_indices.append(ix)
+                seeds.append(seed)
+                if len(batch_indices) == batch_size:
+                    yield batch_indices, seeds
+                    batch_indices = []
+                    seeds = []
+        else:
+            # シャッフル無しの場合、1epoch分でぴったり終わるようにする (predict_generatorとか用)
+            steps = self.steps_per_epoch(data_count, batch_size)
+            indices = np.arange(data_count)
+            while True:
+                seeds = random_state.randint(0, 2 ** 31, size=(len(indices),))
+                for batch_indices in np.array_split(indices, steps):
+                    yield batch_indices, seeds[batch_indices]
+
+    def _flow_instance(self, data_count, shuffle, random_state):
+        """データのindexとseedを1件ずつ列挙し続けるgenerator。"""
+        indices = np.arange(data_count)
+        while True:
+            if shuffle:
+                random_state.shuffle(indices)
+            seeds = random_state.randint(0, 2 ** 31, size=(len(indices),))
+            for ix, seed in zip(indices, seeds):
+                yield ix, seed
+
+    def _work(self, ix, seed, X, y, weights, data_augmentation):
+        """1件1件の処理。"""
+        x_, y_, w_ = self._pick_next(ix, X, y, weights)
+        result_x, result_y, result_w = self.generate(ix, seed, x_, y_, w_, data_augmentation)
+        assert result_x is not None
+        assert (result_y is None) == (y_ is None)
+        assert (result_w is None) == (w_ is None)
+        return result_x, result_y, result_w
 
     @staticmethod
-    def _pick_next(gen, X, y, weights):
-        """genから1件取り出す。"""
+    def _pick_next(ix, X, y, weights):
+        """X, y, weightsからix番目の値を1件取り出す。"""
         def _pick(arr, ix):
             return [x[ix] for x in arr] if isinstance(arr, list) else arr[ix]
 
-        ix, seed = next(gen)
         x_ = _pick(X, ix)
         if y is None:
             y_ = None
@@ -839,7 +843,7 @@ class Generator(object):
             w_ = None
         else:
             w_ = weights[ix]
-        return ix, seed, x_, y_, w_
+        return x_, y_, w_
 
     @staticmethod
     def _get_result(X, y, weights, rx, ry, rw):
@@ -854,32 +858,6 @@ class Generator(object):
             return _arr(rx, isinstance(X, list)), _arr(ry, isinstance(y, list))
         else:
             return _arr(rx, isinstance(X, list)), _arr(ry, isinstance(y, list)), np.array(rw)
-
-    @staticmethod
-    def _flow_index(data_count, shuffle, random_state):
-        """データのindexとseedを列挙し続けるgenerator。"""
-        indices = np.arange(data_count)
-        while True:
-            if shuffle:
-                random_state.shuffle(indices)
-            seeds = random_state.randint(0, 2 ** 31, size=(len(indices),))
-            for index, seed in zip(indices, seeds):
-                yield index, seed
-
-    def _worker(self, wid, input_queue, result_queue, data_augmentation):
-        """ワーカースレッド。"""
-        assert wid >= 0
-        while True:
-            seq, ix, seed, x_, y_, w_ = input_queue.get()
-            if seq is None:
-                break
-            result_x, result_y, result_w = self.generate(ix, seed, x_, y_, w_, data_augmentation)
-            assert result_x is not None
-            assert (result_y is None) == (y_ is None)
-            assert (result_w is None) == (w_ is None)
-            result_queue.put((seq, result_x, result_y, result_w))
-        # allow_exit_without_flush
-        # result_queue.cancel_join_thread()
 
     def generate(self, ix, seed, x_, y_, w_, data_augmentation):
         """1件分の処理。
