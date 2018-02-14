@@ -341,7 +341,6 @@ def normal_noise_layer():
     """クラスを作って返す。"""
     import keras
     import keras.backend as K
-    import tensorflow as tf
 
     class NormalNoise(keras.engine.topology.Layer):
         """平均0、分散1のノイズをドロップアウト風に適用する。"""
@@ -874,8 +873,11 @@ class Generator(object):
             seq, ix, seed, x_, y_, w_ = input_queue.get()
             if seq is None:
                 break
-            x_, y_, w_ = self.generate(ix, seed, x_, y_, w_, data_augmentation)
-            result_queue.put((seq, x_, y_, w_))
+            result_x, result_y, result_w = self.generate(ix, seed, x_, y_, w_, data_augmentation)
+            assert result_x is not None
+            assert (result_y is None) == (y_ is None)
+            assert (result_w is None) == (w_ is None)
+            result_queue.put((seq, result_x, result_y, result_w))
         # allow_exit_without_flush
         # result_queue.cancel_join_thread()
 

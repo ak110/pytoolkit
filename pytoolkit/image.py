@@ -493,11 +493,11 @@ class RandomErasing(Augmentor):
                     inter_boxes = np.copy(bboxes[inter[i]])
                     inter_boxes -= np.expand_dims(np.tile(b[:2], 2), axis=0)  # bに合わせて平行移動
                     # random erasing
-                    rgb[b[1]:b[3], b[0]:b[2], :], y, w = self._erase_random(rgb[b[1]:b[3], b[0]:b[2], :], rand, inter_boxes)
+                    rgb[b[1]:b[3], b[0]:b[2], :] = self._erase_random(rgb[b[1]:b[3], b[0]:b[2], :], rand, inter_boxes)
             return rgb, y, w
         else:
             # 画像全体でrandom erasing。
-            return self._erase_random(rgb, rand, bboxes)
+            return self._erase_random(rgb, rand, bboxes), y, w
 
     def _erase_random(self, rgb, rand, bboxes):
         if bboxes is not None:
@@ -538,4 +538,4 @@ class RandomErasing(Augmentor):
             rgb[y:y + h, x:x + w, :] = rand.randint(0, 255, size=(h, w, rgb.shape[2]))
             break
 
-        return rgb, y, w
+        return rgb
