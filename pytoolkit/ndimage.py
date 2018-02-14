@@ -46,7 +46,7 @@ def rotate(rgb: np.ndarray, degrees: float, interp='lanczos') -> np.ndarray:
     return rgb
 
 
-def pad(rgb: np.ndarray, width: int, height: int, padding='same', rand=None) -> np.ndarray:
+def pad(rgb: np.ndarray, width: int, height: int, padding='edge', rand=None) -> np.ndarray:
     """パディング。width/heightはpadding後のサイズ。(左右/上下均等、端数は右と下につける)"""
     assert width >= 0
     assert height >= 0
@@ -59,20 +59,25 @@ def pad(rgb: np.ndarray, width: int, height: int, padding='same', rand=None) -> 
     return rgb
 
 
-def pad_ltrb(rgb: np.ndarray, x1: int, y1: int, x2: int, y2: int, padding='same', rand=None):
+def pad_ltrb(rgb: np.ndarray, x1: int, y1: int, x2: int, y2: int, padding='edge', rand=None):
     """パディング。x1/y1/x2/y2は左/上/右/下のパディング量。"""
-    assert padding in ('same', 'zero', 'reflect', 'wrap', 'rand')
-    if padding == 'same':
-        mode = 'edge'
-    elif padding == 'zero':
+    assert padding in ('edge', 'zero', 'half', 'one', 'reflect', 'wrap', 'rand')
+    kwargs = {}
+    if padding == 'zero':
         mode = 'constant'
+    elif padding == 'half':
+        mode = 'constant'
+        kwargs['constant_values'] = (127.5,)
+    elif padding == 'one':
+        mode = 'constant'
+        kwargs['constant_values'] = (255.0,)
     elif padding == 'rand':
         assert rand is not None
         mode = 'constant'
     else:
         mode = padding
 
-    rgb = np.pad(rgb, ((y1, y2), (x1, x2), (0, 0)), mode=mode)
+    rgb = np.pad(rgb, ((y1, y2), (x1, x2), (0, 0)), mode=mode, **kwargs)
 
     if padding == 'rand':
         if y1:
@@ -115,15 +120,13 @@ def resize(rgb: np.ndarray, width: int, height: int, padding=None, interp='lancz
         return rgb
     # パディングしつつリサイズ (縦横比維持)
     if padding is not None:
-        assert padding in ('same', 'zero')
         resize_rate_w = width / rgb.shape[1]
         resize_rate_h = height / rgb.shape[0]
         resize_rate = min(resize_rate_w, resize_rate_h)
         resized_w = int(rgb.shape[0] * resize_rate)
         resized_h = int(rgb.shape[1] * resize_rate)
-        if rgb.shape[1] != resized_w or rgb.shape[0] != resized_h:
-            rgb = resize(rgb, resized_w, resized_h, padding=None, interp=interp)
-        return pad(rgb, width, height)
+        rgb = resize(rgb, resized_w, resized_h, padding=None, interp=interp)
+        return pad(rgb, width, height, padding=padding)
     # パディングせずリサイズ (縦横比無視)
     if rgb.shape[1] < width and rgb.shape[0] < height:  # 拡大
         cv2_interp = {

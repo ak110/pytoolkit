@@ -270,7 +270,7 @@ class RandomPadding(Augmentor):
 
     def _execute(self, rgb, y, w, rand):
         """処理。"""
-        padding = rand.choice(('same', 'zero', 'reflect', 'wrap', 'rand'))
+        padding = rand.choice(('edge', 'zero', 'one', 'reflect', 'wrap', 'rand'))
         padded_w = int(np.ceil(rgb.shape[1] * (1 + self.padding_rate)))
         padded_h = int(np.ceil(rgb.shape[0] * (1 + self.padding_rate)))
         rgb = ndimage.pad(rgb, padded_w, padded_h, padding, rand)

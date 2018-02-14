@@ -12,8 +12,10 @@ def test_filters():
     rand = np.random.RandomState(1234)
     filters = [
         (0, 'original', lambda rgb: rgb),
-        (0, 'pad_same', lambda rgb: tk.ndimage.pad(rgb, 300, 300)),
+        (0, 'pad_edge', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='edge')),
         (0, 'pad_zero', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='zero')),
+        (0, 'pad_half', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='half')),
+        (0, 'pad_one', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='one')),
         (0, 'pad_refl', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='reflect')),
         (0, 'pad_wrap', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='wrap')),
         (0, 'pad_rand', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='rand', rand=np.random)),
@@ -22,7 +24,7 @@ def test_filters():
         (0, 'crop', lambda rgb: tk.ndimage.crop(rgb, 30, 30, 200, 200)),
         (0, 'flip_lr', tk.ndimage.flip_lr),
         (0, 'flip_tb', tk.ndimage.flip_tb),
-        (0, 'resize', lambda rgb: tk.ndimage.resize(rgb, 128, 64, padding='same')),
+        (0, 'resize', lambda rgb: tk.ndimage.resize(rgb, 128, 64, padding='edge')),
         (0, 'resize', lambda rgb: tk.ndimage.resize(rgb, 128, 64, padding=None)),
         (1, 'gaussian_noise', lambda rgb: tk.ndimage.gaussian_noise(rgb, rand, 5)),
         (1, 'blur', lambda rgb: tk.ndimage.blur(rgb, 0.5)),
