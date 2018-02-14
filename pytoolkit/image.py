@@ -95,7 +95,7 @@ class ImageDataGenerator(dl.Generator):
     ]))
     gen.add(tk.image.RandomErasing(probability=0.5))
     gen.add(tk.image.ProcessInput(tk.image.preprocess_input_abs1))
-    gen.add(tk.image.ProcessOutput(tk.ml.to_categorical(num_classes)))
+    gen.add(tk.image.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
     ```
 
     # 例
@@ -239,12 +239,18 @@ class ProcessOutput(Operator):
 
     def __init__(self, func, batch_axis=False):
         self.func = func
+        self.batch_axis = batch_axis
 
     def execute(self, rgb, y, w, rand, data_augmentation):
         """処理。"""
         assert rand is not None  # noqa
         assert data_augmentation in (True, False)  # noqa
-        y = self.func(y)
+        if self.batch_axis:
+            y = np.expand_dims(y, axis=0)
+            y = self.func(y)
+            y = np.squeeze(y, axis=0)
+        else:
+            y = self.func(y)
         return rgb, y, w
 
 
