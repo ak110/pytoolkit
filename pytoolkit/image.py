@@ -98,11 +98,11 @@ class ImageDataGenerator(dl.Generator):
     gen.add(tk.image.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
     ```
 
-    # 例
+    # Padding+Cropの例
 
-    padding_rate=0.25、crop_rate=0.25、aspect_rate=3/4で32px四方の画像を処理すると、
-    32*1.25=40なので上下左右に4pxずつpaddingした後に、
-    40*0.75*3/4=22.5なので22pxを切り抜く処理になる。(最悪18pxしか残らない)
+    padding_rate=0.25、crop_rate=0.2で32px四方の画像を処理すると、
+    上下左右に4pxずつpaddingした後に、32pxを切り抜く処理になる。
+    256px四方だと、32pxで256px。
 
     """
 
@@ -293,7 +293,7 @@ class RandomRotate(Augmentor):
 class RandomCrop(Augmentor):
     """切り抜き。"""
 
-    def __init__(self, probability=1, crop_rate=0.5, aspect_prob=0.5, aspect_rations=(3 / 4, 4 / 3)):
+    def __init__(self, probability=1, crop_rate=0.4, aspect_prob=0.5, aspect_rations=(3 / 4, 4 / 3)):
         self.crop_rate = crop_rate
         self.aspect_prob = aspect_prob
         self.aspect_rations = aspect_rations
@@ -301,13 +301,9 @@ class RandomCrop(Augmentor):
 
     def _execute(self, rgb, y, w, rand):
         cr = rand.uniform(1 - self.crop_rate, 1)
-        ar = rand.choice(self.aspect_rations) if rand.rand() <= self.aspect_prob else 1
-        if ar <= 1:
-            cropped_w = int(np.floor(rgb.shape[1] * cr * ar))
-            cropped_h = int(np.floor(rgb.shape[0] * cr))
-        else:
-            cropped_w = int(np.floor(rgb.shape[1] * cr))
-            cropped_h = int(np.floor(rgb.shape[0] * cr / ar))
+        ar = np.sqrt(rand.choice(self.aspect_rations)) if rand.rand() <= self.aspect_prob else 1
+        cropped_w = min(int(np.floor(rgb.shape[1] * cr * ar)), rgb.shape[1])
+        cropped_h = min(int(np.floor(rgb.shape[0] * cr / ar)), rgb.shape[0])
         crop_x = rand.randint(0, rgb.shape[1] - cropped_w + 1)
         crop_y = rand.randint(0, rgb.shape[0] - cropped_h + 1)
         rgb = ndimage.crop(rgb, crop_x, crop_y, cropped_w, cropped_h)
