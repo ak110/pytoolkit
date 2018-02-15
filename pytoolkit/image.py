@@ -190,8 +190,7 @@ class Resize(Operator):
     def execute(self, rgb, y, w, rand, data_augmentation):
         """処理。"""
         assert rand is not None  # noqa
-        interp = rand.choice(('nearest', 'bilinear', 'bicubic', 'lanczos')) if data_augmentation else 'lanczos'
-        rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=self.padding, interp=interp)
+        rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=self.padding)
         return rgb, y, w
 
 
@@ -270,7 +269,7 @@ class RandomPadding(Augmentor):
 
     def _execute(self, rgb, y, w, rand):
         """処理。"""
-        padding = rand.choice(('edge', 'zero', 'one', 'reflect', 'wrap', 'rand'))
+        padding = rand.choice(('zero', 'one', 'rand'))
         padded_w = int(np.ceil(rgb.shape[1] * (1 + self.padding_rate)))
         padded_h = int(np.ceil(rgb.shape[0] * (1 + self.padding_rate)))
         rgb = ndimage.pad(rgb, padded_w, padded_h, padding, rand)
@@ -285,8 +284,7 @@ class RandomRotate(Augmentor):
         super().__init__(probability=probability)
 
     def _execute(self, rgb, y, w, rand):
-        interp = rand.choice(('nearest', 'bilinear', 'bicubic', 'lanczos'))
-        rgb = ndimage.rotate(rgb, rand.uniform(-self.degrees, self.degrees), interp=interp)
+        rgb = ndimage.rotate(rgb, rand.uniform(-self.degrees, self.degrees))
         return rgb, y, w
 
 
