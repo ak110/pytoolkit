@@ -667,10 +667,16 @@ def tsv_log_callback(filename, append=False):
             logs = logs or {}
             logs['lr'] = K.get_value(self.model.optimizer.lr)
             elapsed_time = time.time() - self.epoch_start_time
-            metrics = ['{:.4f}'.format(logs.get(k)) for k in self.params['metrics']]
+            metrics = [self._format_metric(logs, k) for k in self.params['metrics']]
             self.log_writer.writerow([epoch + 1, '{:.1e}'.format(logs['lr'])] + metrics +
                                      [str(int(np.ceil(elapsed_time)))])
             self.log_file.flush()
+
+        def _format_metric(self, logs, k):
+            value = logs.get(k)
+            if value is None:
+                return '<none>'
+            return '{:.4f}'.format(value)
 
         def on_train_end(self, logs=None):
             self.log_file.close()
