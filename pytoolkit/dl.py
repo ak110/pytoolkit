@@ -765,7 +765,7 @@ class Generator(object):
             yield from self._flow(pool, X, y, weights, batch_size, shuffle, data_augmentation, random_state)
 
     def _flow(self, pool, X, y, weights, batch_size, shuffle, data_augmentation, random_state):
-        _MAX_QUEUE_BATCHES = 4  # ため込むバッチ数
+        _MAX_QUEUE_BATCHES = 2  # ため込むバッチ数
 
         random_state = sklearn.utils.check_random_state(random_state)
         data_count = len(X[0]) if isinstance(X, list) else len(X)
