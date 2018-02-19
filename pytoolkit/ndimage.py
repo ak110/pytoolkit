@@ -17,7 +17,10 @@ def load(path: typing.Union[str, pathlib.Path], grayscale=False) -> np.ndarray:
     """
     flags = cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR
     bgr = cv2.imread(str(path), flags)
-    rgb = bgr[:, :, ::-1]
+    if grayscale:
+        rgb = np.expand_dims(bgr, axis=-1)
+    else:
+        rgb = bgr[:, :, ::-1]
     return rgb.astype(np.float32)
 
 
