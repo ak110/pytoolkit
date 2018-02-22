@@ -25,6 +25,7 @@ def _main():
     import pytoolkit as tk
 
     gen = tk.image.ImageDataGenerator()
+    gen.add(tk.image.Resize(_IMAGE_SIZE))
     gen.add(tk.image.RandomPadding(probability=1))
     gen.add(tk.image.RandomRotate(probability=0.5))
     gen.add(tk.image.RandomCrop(probability=1))
@@ -50,6 +51,7 @@ def _main():
     X = np.array([str(data_dir / '9ab919332a1dceff9a252b43c0fb34a0_m.jpg')] * 16)
     g = gen.flow(X, batch_size=_BATCH_SIZE, data_augmentation=True, random_state=123)
     # 適当にループして速度を見る
+    X_batch = []
     with tqdm(total=_BATCH_SIZE * _ITER, unit='f', ascii=True, ncols=100) as pbar:
         for it, X_batch in enumerate(g):
             pbar.update(len(X_batch))
