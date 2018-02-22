@@ -4,7 +4,6 @@ kerasをimportしてしまうとTensorFlowの初期化が始まって重いの�
 importしただけではkerasがimportされないように作っている。
 
 """
-import concurrent.futures
 import copy
 import csv
 import os
@@ -14,7 +13,6 @@ import warnings
 
 import numpy as np
 import pandas as pd
-import sklearn.utils
 
 from . import log, utils
 
@@ -752,130 +750,6 @@ def count_network_depth(model):
         elif hasattr(layer, 'layers'):
             count += count_network_depth(layer)
     return count
-
-
-class Generator(object):
-    """`fit_generator`などに渡すgeneratorを作るためのベースクラス。"""
-
-    def flow(self, X, y=None, weights=None, batch_size=32, shuffle=False, data_augmentation=False, random_state=None):
-        """`fit_generator`などに渡すgenerator。kargsはそのままprepareに渡される。"""
-        cpu_count = os.cpu_count()
-        worker_count = min(batch_size * 4, cpu_count * 2)  # 適当に余裕をもったサイズにしておく
-        with concurrent.futures.ThreadPoolExecutor(worker_count) as pool:
-            yield from self._flow(pool, X, y, weights, batch_size, shuffle, data_augmentation, random_state)
-
-    def _flow(self, pool, X, y, weights, batch_size, shuffle, data_augmentation, random_state):
-        _MAX_QUEUE_BATCHES = 2  # ため込むバッチ数
-
-        random_state = sklearn.utils.check_random_state(random_state)
-        data_count = len(X[0]) if isinstance(X, list) else len(X)
-        if y is not None:
-            assert data_count == (len(y[0]) if isinstance(y, list) else len(y))
-
-        future_queue = []
-        gen = self._flow_batch(data_count, batch_size, shuffle, random_state)
-        try:
-            while True:
-                # 最大キューサイズまで仕事をsubmitする
-                while len(future_queue) < _MAX_QUEUE_BATCHES:
-                    indices, seeds = next(gen)
-                    batch = [pool.submit(self._work, ix, seed, X, y, weights, data_augmentation)
-                             for ix, seed in zip(indices, seeds)]
-                    future_queue.append(batch)
-
-                # 先頭のバッチの処理結果を取り出す
-                batch = [f.result() for f in future_queue[0]]
-                rx, ry, rw = zip(*batch)
-                yield self._get_result(X, y, weights, rx, ry, rw)
-                future_queue = future_queue[1:]
-        except GeneratorExit:
-            pass
-        finally:
-            gen.close()
-
-    def _flow_batch(self, data_count, batch_size, shuffle, random_state):
-        """データのindexとseedをバッチサイズずつ列挙し続けるgenerator。"""
-        if shuffle:
-            # シャッフルありの場合、常にbatch_size分を返す (horovodとかはそれが都合が良い)
-            batch_indices = []
-            seeds = []
-            for ix, seed in self._flow_instance(data_count, shuffle, random_state):
-                batch_indices.append(ix)
-                seeds.append(seed)
-                if len(batch_indices) == batch_size:
-                    yield batch_indices, seeds
-                    batch_indices = []
-                    seeds = []
-        else:
-            # シャッフル無しの場合、1epoch分でぴったり終わるようにする (predict_generatorとか用)
-            steps = self.steps_per_epoch(data_count, batch_size)
-            indices = np.arange(data_count)
-            while True:
-                seeds = random_state.randint(0, 2 ** 31, size=(len(indices),))
-                for batch_indices in np.array_split(indices, steps):
-                    yield batch_indices, seeds[batch_indices]
-
-    def _flow_instance(self, data_count, shuffle, random_state):
-        """データのindexとseedを1件ずつ列挙し続けるgenerator。"""
-        indices = np.arange(data_count)
-        while True:
-            if shuffle:
-                random_state.shuffle(indices)
-            seeds = random_state.randint(0, 2 ** 31, size=(len(indices),))
-            for ix, seed in zip(indices, seeds):
-                yield ix, seed
-
-    def _work(self, ix, seed, X, y, weights, data_augmentation):
-        """1件1件の処理。"""
-        x_, y_, w_ = self._pick_next(ix, X, y, weights)
-        result_x, result_y, result_w = self.generate(ix, seed, x_, y_, w_, data_augmentation)
-        assert result_x is not None
-        assert (result_y is None) == (y_ is None)
-        assert (result_w is None) == (w_ is None)
-        return result_x, result_y, result_w
-
-    @staticmethod
-    def _pick_next(ix, X, y, weights):
-        """X, y, weightsからix番目の値を1件取り出す。"""
-        def _pick(arr, ix):
-            if arr is None:
-                return None
-            return [x[ix] for x in arr] if isinstance(arr, list) else arr[ix]
-
-        x_ = _pick(X, ix)
-        y_ = _pick(y, ix)
-        w_ = _pick(weights, ix)
-        return x_, y_, w_
-
-    @staticmethod
-    def _get_result(X, y, weights, rx, ry, rw):
-        """Kerasに渡すデータを返す。"""
-        def _arr(arr, islist):
-            return [np.array(a) for a in arr] if islist else np.array(arr)
-
-        if y is None:
-            assert weights is None
-            return _arr(rx, isinstance(X, list))
-        elif weights is None:
-            return _arr(rx, isinstance(X, list)), _arr(ry, isinstance(y, list))
-        else:
-            return _arr(rx, isinstance(X, list)), _arr(ry, isinstance(y, list)), np.array(rw)
-
-    def generate(self, ix, seed, x_, y_, w_, data_augmentation):
-        """1件分の処理。
-
-        画像の読み込みとかDataAugmentationとか。
-        y_やw_は使わない場合もそのまま返せばOK。(使う場合はNoneに注意。)
-        """
-        assert ix is not None
-        assert seed is not None
-        assert data_augmentation in (True, False)
-        return x_, y_, w_
-
-    @staticmethod
-    def steps_per_epoch(data_count, batch_size):
-        """1epochが何ステップかを算出して返す"""
-        return (data_count + batch_size - 1) // batch_size
 
 
 def categorical_crossentropy(y_true, y_pred, alpha=None):

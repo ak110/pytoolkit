@@ -6,7 +6,7 @@ import warnings
 
 import numpy as np
 
-from . import dl, ml, ndimage
+from . import generator, ml, ndimage
 
 
 class Operator(metaclass=abc.ABCMeta):
@@ -18,7 +18,7 @@ class Operator(metaclass=abc.ABCMeta):
         assert False
 
 
-class ImageDataGenerator(dl.Generator):
+class ImageDataGenerator(generator.Generator):
     """画像データのgenerator。
 
     Xは画像のファイルパスの配列またはndarray。

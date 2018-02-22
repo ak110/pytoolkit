@@ -5,7 +5,7 @@ import pytoolkit as tk
 
 
 def test_generator():
-    gen = tk.dl.Generator()
+    gen = tk.generator.Generator()
 
     assert gen.steps_per_epoch(3, 2) == 2
 

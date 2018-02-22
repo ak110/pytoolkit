@@ -2,6 +2,7 @@
 
 from .utils import *
 from . import dl
+from . import generator
 from . import image
 from . import io
 from . import log
