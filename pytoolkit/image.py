@@ -103,9 +103,8 @@ class ImageDataGenerator(dl.Generator):
     """
 
     def __init__(self, grayscale=False):
-        self.grayscale = grayscale
-        self.operators = []
         super().__init__()
+        self.operators = [LoadImage(grayscale)]
 
     def add(self, operator: Operator):
         """Operatorの追加。"""
@@ -117,25 +116,12 @@ class ImageDataGenerator(dl.Generator):
         y_ = copy.deepcopy(y_)
         w_ = copy.deepcopy(w_)
 
-        # 画像の読み込み
-        rgb, y_, w_ = self._load_image(x_, y_, w_)
-
-        # パイプライン処理
         for op in self.operators:
-            rgb, y_, w_ = op.execute(rgb, y_, w_, rand, data_augmentation=data_augmentation)
-            assert rgb.dtype == np.float32, 'dtype error: {}'.format(op.__class__)
+            x_, y_, w_ = op.execute(x_, y_, w_, rand, data_augmentation=data_augmentation)
+            assert x_.dtype == np.float32, 'dtype error: {}'.format(op.__class__)
 
-        return super().generate(ix, seed, rgb, y_, w_, data_augmentation)
+        return super().generate(ix, seed, x_, y_, w_, data_augmentation)
 
-    def _load_image(self, x, y, w):
-        """画像の読み込み"""
-        if isinstance(x, np.ndarray):
-            rgb = np.copy(x).astype(np.float32)
-            assert rgb.shape[-1] == (1 if self.grayscale else 3)
-        else:
-            assert isinstance(x, (str, pathlib.Path))
-            rgb = ndimage.load(x, self.grayscale)
-        return rgb, y, w
 
 
 def preprocess_input_mean(x: np.ndarray):
@@ -168,6 +154,37 @@ def unpreprocess_input_abs1(x: np.ndarray):
     x += 1
     x *= 127.5
     return x
+
+
+class LoadImage(Operator):
+    """画像のリサイズ。
+
+    # 引数
+
+    - grayscale: グレースケールで読み込むならTrue、RGBならFalse
+    """
+
+    def __init__(self, grayscale):
+        self.grayscale = grayscale
+
+    def execute(self, rgb, y, w, rand, data_augmentation):
+        """処理。"""
+        assert rand is not None  # noqa
+        assert data_augmentation in (True, False)  # noqa
+        if isinstance(rgb, list):
+            # 配列なら中身1つ1つを処理 (複数画像用)
+            for _, i in enumerate(rgb):
+                rgb[i] = self.execute(rgb[i], y, w)
+        elif isinstance(rgb, np.ndarray):
+            # ndarrayならそのまま画像扱い
+            rgb = np.copy(rgb).astype(np.float32)
+            assert len(rgb.shape) == 3
+            assert rgb.shape[-1] == (1 if self.grayscale else 3)
+        else:
+            # ファイルパスなら読み込み
+            assert isinstance(rgb, (str, pathlib.Path))
+            rgb = ndimage.load(rgb, self.grayscale)
+        return rgb, y, w
 
 
 class Resize(Operator):
