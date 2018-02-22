@@ -838,17 +838,13 @@ class Generator(object):
     def _pick_next(ix, X, y, weights):
         """X, y, weightsからix番目の値を1件取り出す。"""
         def _pick(arr, ix):
+            if arr is None:
+                return None
             return [x[ix] for x in arr] if isinstance(arr, list) else arr[ix]
 
         x_ = _pick(X, ix)
-        if y is None:
-            y_ = None
-        else:
-            y_ = _pick(y, ix)
-        if weights is None:
-            w_ = None
-        else:
-            w_ = weights[ix]
+        y_ = _pick(y, ix)
+        w_ = _pick(weights, ix)
         return x_, y_, w_
 
     @staticmethod

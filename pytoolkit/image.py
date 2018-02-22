@@ -32,6 +32,7 @@ class ImageDataGenerator(dl.Generator):
     # 使用例
     ```
     gen = tk.image.ImageDataGenerator()
+    gen.add(tk.image.Resize((300, 300)))
     gen.add(tk.image.RandomPadding(probability=1))
     gen.add(tk.image.RandomRotate(probability=0.5))
     gen.add(tk.image.RandomCrop(probability=1))
