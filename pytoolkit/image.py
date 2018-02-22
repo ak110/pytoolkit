@@ -25,9 +25,7 @@ class ImageDataGenerator(generator.Generator):
     ndarrayの場合は、(BGRではなく)RGB形式で、samples×rows×cols×channels。
 
     # 引数
-    - image_size: 出力する画像のサイズのタプル(rows, cols)
     - grayscale: グレースケールで読み込むならTrue、RGBならFalse
-    - preprocess_input: 前処理を行う関数。Noneなら`keras.application.inception_v3.preprocess_input`風処理。(画素値を-1～+1に線形変換)
 
     # 使用例
     ```
@@ -51,12 +49,6 @@ class ImageDataGenerator(generator.Generator):
     gen.add(tk.image.ProcessInput(tk.image.preprocess_input_abs1))
     gen.add(tk.image.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
     ```
-
-    # Padding+Cropの例
-
-    padding_rate=0.25、crop_rate=0.2で32px四方の画像を処理すると、
-    上下左右に4pxずつpaddingした後に、32pxを切り抜く処理になる。
-    256px四方だと、32pxで256px。
 
     """
 
@@ -262,7 +254,13 @@ class RandomRotate(Operator):
 
 
 class RandomCrop(Operator):
-    """切り抜き。"""
+    """切り抜き。
+
+    # Padding+Cropの例
+    padding_rate=0.25、crop_rate=0.2で32px四方の画像を処理すると、
+    上下左右に4pxずつパディングした後に、32px四方を切り抜く処理になる。
+    256px四方だと、32pxパディングで256px四方を切り抜く。
+    """
 
     def __init__(self, probability=1, crop_rate=0.4, aspect_prob=0.5, aspect_rations=(3 / 4, 4 / 3)):
         assert 0 < probability <= 1
@@ -342,7 +340,7 @@ class RandomFlipLRTB(Operator):
 class RandomBlur(Operator):
     """ぼかし。"""
 
-    def __init__(self, probability=1, radius=0.75, partial=False):
+    def __init__(self, probability=1, radius=0.75):
         assert 0 < probability <= 1
         self.probability = probability
         self.radius = radius
@@ -356,7 +354,7 @@ class RandomBlur(Operator):
 class RandomUnsharpMask(Operator):
     """シャープ化。"""
 
-    def __init__(self, probability=1, sigma=0.5, min_alpha=1, max_alpha=2, partial=False):
+    def __init__(self, probability=1, sigma=0.5, min_alpha=1, max_alpha=2):
         assert 0 < probability <= 1
         self.probability = probability
         self.sigma = sigma
@@ -372,7 +370,7 @@ class RandomUnsharpMask(Operator):
 class RandomMedian(Operator):
     """メディアンフィルタ。"""
 
-    def __init__(self, probability=1, sizes=(3,), partial=False):
+    def __init__(self, probability=1, sizes=(3,)):
         assert 0 < probability <= 1
         self.probability = probability
         self.sizes = sizes
@@ -386,7 +384,7 @@ class RandomMedian(Operator):
 class GaussianNoise(Operator):
     """ガウシアンノイズ。"""
 
-    def __init__(self, probability=1, scale=5, partial=False):
+    def __init__(self, probability=1, scale=5):
         assert 0 < probability <= 1
         self.probability = probability
         self.scale = scale

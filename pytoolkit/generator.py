@@ -82,6 +82,7 @@ class Generator(object):
         画像の読み込みとかDataAugmentationとか。
         y_やw_は使わない場合もそのまま返せばOK。(使う場合はNoneに注意。)
         """
+        assert isinstance(self, Generator)  # noqa
         assert ix is not None
         assert seed is not None
         assert data_augmentation in (True, False)

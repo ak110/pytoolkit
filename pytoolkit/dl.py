@@ -164,64 +164,6 @@ class Builder(object):
         return params
 
 
-def conv2d(filters, kernel_size, activation, name, use_bn=True, use_batch_renorm=False, preact=False, **kargs):
-    """Conv2D+BN+Activationの簡単なヘルパー。"""
-    import keras
-    if use_bn:
-        def _conv2d(x):
-            if not preact:
-                x = keras.layers.Conv2D(filters, kernel_size, use_bias=False, name=name, **kargs)(x)
-            if use_batch_renorm:
-                import keras_contrib
-                x = keras_contrib.layers.BatchRenormalization(name=name + '_brn')(x)
-            else:
-                x = keras.layers.BatchNormalization(name=name + '_bn')(x)
-            if activation is not None:
-                x = keras.layers.Activation(activation, name=name + '_act')(x)
-            if preact:
-                x = keras.layers.Conv2D(filters, kernel_size, use_bias=False, name=name, **kargs)(x)
-            return x
-        return _conv2d
-    else:
-        if preact:
-            def _conv2d(x):
-                if activation is not None:
-                    x = keras.layers.Activation(activation, name=name + '_act')(x)
-                x = keras.layers.Conv2D(filters, kernel_size, name=name, **kargs)(x)
-                return x
-            return _conv2d
-        else:
-            return keras.layers.Conv2D(filters, kernel_size, activation=activation, name=name, **kargs)
-
-
-def sepconv2d(filters, kernel_size, activation, name, use_bn=True, use_batch_renorm=False, preact=False, **kargs):
-    """SeparableConv2D+BN+Activationの簡単なヘルパー。"""
-    import keras
-    if use_bn:
-        def _conv2d(x):
-            if not preact:
-                x = keras.layers.SeparableConv2D(filters, kernel_size, use_bias=False, name=name, **kargs)(x)
-            if use_batch_renorm:
-                import keras_contrib
-                x = keras_contrib.layers.BatchRenormalization(name=name + '_brn')(x)
-            else:
-                x = keras.layers.BatchNormalization(name=name + '_bn')(x)
-            x = keras.layers.Activation(activation, name=name + '_act')(x)
-            if preact:
-                x = keras.layers.SeparableConv2D(filters, kernel_size, use_bias=False, name=name, **kargs)(x)
-            return x
-        return _conv2d
-    else:
-        if preact:
-            def _conv2d(x):
-                x = keras.layers.Activation(activation, name=name + '_act')(x)
-                x = keras.layers.SeparableConv2D(filters, kernel_size, name=name, **kargs)(x)
-                return x
-            return _conv2d
-        else:
-            return keras.layers.SeparableConv2D(filters, kernel_size, activation=activation, name=name, **kargs)
-
-
 def get_custom_objects():
     """独自オブジェクトのdictを返す。"""
     return {
@@ -665,16 +607,17 @@ def tsv_log_callback(filename, append=False):
             logs = logs or {}
             logs['lr'] = K.get_value(self.model.optimizer.lr)
             elapsed_time = time.time() - self.epoch_start_time
-            metrics = [self._format_metric(logs, k) for k in self.params['metrics']]
+
+            def _format_metric(logs, k):
+                value = logs.get(k)
+                if value is None:
+                    return '<none>'
+                return '{:.4f}'.format(value)
+
+            metrics = [_format_metric(logs, k) for k in self.params['metrics']]
             self.log_writer.writerow([epoch + 1, '{:.1e}'.format(logs['lr'])] + metrics +
                                      [str(int(np.ceil(elapsed_time)))])
             self.log_file.flush()
-
-        def _format_metric(self, logs, k):
-            value = logs.get(k)
-            if value is None:
-                return '<none>'
-            return '{:.4f}'.format(value)
 
         def on_train_end(self, logs=None):
             self.log_file.close()

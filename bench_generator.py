@@ -33,12 +33,9 @@ def _main():
     gen.add(tk.image.RandomFlipLR(probability=0.5))
     gen.add(tk.image.RandomAugmentors([
         tk.image.RandomBlur(probability=0.25),
-        tk.image.RandomBlur(probability=0.25, partial=True),
         tk.image.RandomUnsharpMask(probability=0.25),
-        tk.image.RandomUnsharpMask(probability=0.25, partial=True),
         tk.image.RandomMedian(probability=0.25),
         tk.image.GaussianNoise(probability=0.25),
-        tk.image.GaussianNoise(probability=0.25, partial=True),
         tk.image.RandomSaturation(probability=0.5),
         tk.image.RandomBrightness(probability=0.5),
         tk.image.RandomContrast(probability=0.5),
