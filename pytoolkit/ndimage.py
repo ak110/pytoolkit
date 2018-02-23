@@ -10,28 +10,38 @@ import numpy as np
 import scipy.stats
 
 
-def load(path: typing.Union[str, pathlib.Path], grayscale=False) -> np.ndarray:
+def load(path_or_array: typing.Union[np.ndarray, str, pathlib.Path], grayscale=False) -> np.ndarray:
     """画像の読み込み。
 
     やや余計なお世話だけど今後のためにfloat32に変換して返す。
     """
-    flags = cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR
-    bgr = cv2.imread(str(path), flags)
-    if grayscale:
-        rgb = np.expand_dims(bgr, axis=-1)
+    if isinstance(path_or_array, np.ndarray):
+        # ndarrayならそのまま画像扱い
+        img = np.copy(path_or_array)  # 念のためコピー
+        assert len(img.shape) == 3
+        assert img.shape[-1] == (1 if grayscale else 3)
     else:
-        rgb = bgr[:, :, ::-1]
-    return rgb.astype(np.float32)
+        # ファイルパスなら読み込み
+        flags = cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR
+        img = cv2.imread(str(path_or_array), flags)
+        if grayscale:
+            img = np.expand_dims(img, axis=-1)
+        else:
+            img = img[:, :, ::-1]
+    return img.astype(np.float32)
 
 
-def save(path: typing.Union[str, pathlib.Path], rgb: np.ndarray) -> None:
+def save(path: typing.Union[str, pathlib.Path], img: np.ndarray) -> None:
     """画像の保存。
 
     やや余計なお世話だけど0～255にクリッピング(飽和)してから保存。
     """
-    rgb = np.clip(rgb, 0, 255).astype(np.uint8)
-    bgr = rgb[:, :, ::-1]
-    cv2.imwrite(str(path), bgr)
+    img = np.clip(img, 0, 255).astype(np.uint8)
+    if img.shape[-1] == 1:
+        img = np.squeeze(img, axis=-1)
+    else:
+        img = img[:, :, ::-1]
+    cv2.imwrite(str(path), img)
 
 
 def rotate(rgb: np.ndarray, degrees: float, interp='lanczos') -> np.ndarray:

@@ -24,7 +24,7 @@ def _main():
     sys.path.insert(0, str(base_dir.parent))
     import pytoolkit as tk
 
-    gen = tk.image.ImageDataGenerator()
+    gen = tk.image.ImageDataGenerator(profile=True)
     gen.add(tk.image.Resize(_IMAGE_SIZE))
     gen.add(tk.image.RandomPadding(probability=1))
     gen.add(tk.image.RandomRotate(probability=0.5))
@@ -57,6 +57,9 @@ def _main():
     # 最後のバッチを保存
     for ix, x in enumerate(X_batch):
         tk.ndimage.save(save_dir / '{}.png'.format(ix), x)
+
+    # プロファイル結果
+    gen.summary_profile()
 
 
 if __name__ == '__main__':

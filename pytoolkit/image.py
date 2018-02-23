@@ -1,21 +1,10 @@
 """画像処理関連"""
-import abc
-import copy
 import pathlib
 import warnings
 
 import numpy as np
 
 from . import generator, ml, ndimage
-
-
-class Operator(metaclass=abc.ABCMeta):
-    """ImageDataGeneratorで行う操作の基底クラス。"""
-
-    @abc.abstractmethod
-    def execute(self, rgb, y, w, rand, data_augmentation):
-        """処理。"""
-        assert False
 
 
 class ImageDataGenerator(generator.Generator):
@@ -52,25 +41,9 @@ class ImageDataGenerator(generator.Generator):
 
     """
 
-    def __init__(self, grayscale=False):
-        super().__init__()
-        self.operators = [LoadImage(grayscale)]
-
-    def add(self, operator: Operator):
-        """Operatorの追加。"""
-        self.operators.append(operator)
-
-    def generate(self, ix, seed, x_, y_, w_, data_augmentation):
-        """画像の読み込みとDataAugmentation。(単数)"""
-        rand = np.random.RandomState(seed)
-        y_ = copy.deepcopy(y_)
-        w_ = copy.deepcopy(w_)
-
-        for op in self.operators:
-            x_, y_, w_ = op.execute(x_, y_, w_, rand, data_augmentation=data_augmentation)
-            assert x_.dtype == np.float32, 'dtype error: {}'.format(op.__class__)
-
-        return super().generate(ix, seed, x_, y_, w_, data_augmentation)
+    def __init__(self, grayscale=False, profile=False):
+        super().__init__(profile=profile)
+        self.add(LoadImage(grayscale))
 
 
 def preprocess_input_mean(x: np.ndarray):
@@ -105,7 +78,7 @@ def unpreprocess_input_abs1(x: np.ndarray):
     return x
 
 
-class LoadImage(Operator):
+class LoadImage(generator.Operator):
     """画像のリサイズ。
 
     # 引数
@@ -116,15 +89,10 @@ class LoadImage(Operator):
     def __init__(self, grayscale):
         self.grayscale = grayscale
 
-    def execute(self, rgb, y, w, rand, data_augmentation):
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
         """処理。"""
         assert rand is not None  # noqa
-        assert data_augmentation in (True, False)  # noqa
-        if isinstance(rgb, list):
-            # 配列なら中身1つ1つを処理 (複数画像用)
-            for _, i in enumerate(rgb):
-                rgb[i] = self.execute(rgb[i], y, w)
-        elif isinstance(rgb, np.ndarray):
+        if isinstance(rgb, np.ndarray):
             # ndarrayならそのまま画像扱い
             rgb = np.copy(rgb).astype(np.float32)
             assert len(rgb.shape) == 3
@@ -136,7 +104,7 @@ class LoadImage(Operator):
         return rgb, y, w
 
 
-class Resize(Operator):
+class Resize(generator.Operator):
     """画像のリサイズ。
 
     # 引数
@@ -149,14 +117,14 @@ class Resize(Operator):
         self.padding = padding
         assert len(self.image_size) == 2
 
-    def execute(self, rgb, y, w, rand, data_augmentation):
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
         """処理。"""
         assert rand is not None  # noqa
         rgb = ndimage.resize(rgb, self.image_size[1], self.image_size[0], padding=self.padding)
         return rgb, y, w
 
 
-class ProcessInput(Operator):
+class ProcessInput(generator.Operator):
     """画像に対する任意の処理。
 
     # 引数
@@ -184,10 +152,9 @@ class ProcessInput(Operator):
         self.func = func
         self.batch_axis = batch_axis
 
-    def execute(self, rgb, y, w, rand, data_augmentation):
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
         """処理。"""
         assert rand is not None  # noqa
-        assert data_augmentation in (True, False)  # noqa
         if self.batch_axis:
             rgb = np.expand_dims(rgb, axis=0)
             rgb = self.func(rgb)
@@ -197,17 +164,16 @@ class ProcessInput(Operator):
         return rgb, y, w
 
 
-class ProcessOutput(Operator):
+class ProcessOutput(generator.Operator):
     """ラベルに対する任意の処理。"""
 
     def __init__(self, func, batch_axis=False):
         self.func = func
         self.batch_axis = batch_axis
 
-    def execute(self, rgb, y, w, rand, data_augmentation):
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
         """処理。"""
         assert rand is not None  # noqa
-        assert data_augmentation in (True, False)  # noqa
         if y is not None:
             if self.batch_axis:
                 y = np.expand_dims(y, axis=0)
@@ -218,7 +184,7 @@ class ProcessOutput(Operator):
         return rgb, y, w
 
 
-class RandomPadding(Operator):
+class RandomPadding(generator.Operator):
     """パディング。
 
     この後のRandomCropを前提に、パディングするサイズは固定。
@@ -230,8 +196,8 @@ class RandomPadding(Operator):
         self.probability = probability
         self.padding_rate = padding_rate
 
-    def execute(self, rgb, y, w, rand, data_augmentation):
-        if data_augmentation and (self.probability >= 1 or rand.rand() <= self.probability):
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
             padding = rand.choice(('edge', 'zero', 'one', 'rand'))
             padded_w = int(np.ceil(rgb.shape[1] * (1 + self.padding_rate)))
             padded_h = int(np.ceil(rgb.shape[0] * (1 + self.padding_rate)))
@@ -239,7 +205,7 @@ class RandomPadding(Operator):
         return rgb, y, w
 
 
-class RandomRotate(Operator):
+class RandomRotate(generator.Operator):
     """回転。"""
 
     def __init__(self, probability=1, degrees=15):
@@ -247,13 +213,13 @@ class RandomRotate(Operator):
         self.probability = probability
         self.degrees = degrees
 
-    def execute(self, rgb, y, w, rand, data_augmentation):
-        if data_augmentation and (self.probability >= 1 or rand.rand() <= self.probability):
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
             rgb = ndimage.rotate(rgb, rand.uniform(-self.degrees, self.degrees))
         return rgb, y, w
 
 
-class RandomCrop(Operator):
+class RandomCrop(generator.Operator):
     """切り抜き。
 
     # Padding+Cropの例
@@ -269,8 +235,8 @@ class RandomCrop(Operator):
         self.aspect_prob = aspect_prob
         self.aspect_rations = aspect_rations
 
-    def execute(self, rgb, y, w, rand, data_augmentation):
-        if data_augmentation and (self.probability >= 1 or rand.rand() <= self.probability):
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
             cr = rand.uniform(1 - self.crop_rate, 1)
             ar = np.sqrt(rand.choice(self.aspect_rations)) if rand.rand() <= self.aspect_prob else 1
             cropped_w = min(int(np.floor(rgb.shape[1] * cr * ar)), rgb.shape[1])
@@ -281,7 +247,7 @@ class RandomCrop(Operator):
         return rgb, y, w
 
 
-class RandomAugmentors(Operator):
+class RandomAugmentors(generator.Operator):
     """順番と適用確率をランダムにDataAugmentationを行う。
 
     # 引数
@@ -295,12 +261,12 @@ class RandomAugmentors(Operator):
         self.augmentors = augmentors
         self.clip_rgb = clip_rgb
 
-    def execute(self, rgb, y, w, rand, data_augmentation):
-        if data_augmentation and (self.probability >= 1 or rand.rand() <= self.probability):
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
             augmentors = self.augmentors[:]
             rand.shuffle(augmentors)
             for a in augmentors:
-                rgb, y, w = a.execute(rgb, y, w, rand, data_augmentation)
+                rgb, y, w = a.execute(rgb, y, w, rand, ctx)
                 assert rgb.dtype == np.float32, 'dtype error: {}'.format(a.__class__)
             # 色が範囲外になっていたら補正(飽和)
             if self.clip_rgb:
@@ -308,28 +274,28 @@ class RandomAugmentors(Operator):
         return rgb, y, w
 
 
-class RandomFlipLR(Operator):
+class RandomFlipLR(generator.Operator):
     """左右反転。"""
 
     def __init__(self, probability=1):
         assert 0 < probability <= 1
         self.probability = probability
 
-    def execute(self, rgb, y, w, rand, data_augmentation):
-        if data_augmentation and (self.probability >= 1 or rand.rand() <= self.probability):
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
             rgb = ndimage.flip_lr(rgb)
         return rgb, y, w
 
 
-class RandomFlipLRTB(Operator):
+class RandomFlipLRTB(generator.Operator):
     """左右反転 or 上下反転。"""
 
     def __init__(self, probability=1):
         assert 0 < probability <= 1
         self.probability = probability
 
-    def execute(self, rgb, y, w, rand, data_augmentation):
-        if data_augmentation and (self.probability >= 1 or rand.rand() <= self.probability):
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
             if rand.rand() < 0.5:
                 rgb = ndimage.flip_lr(rgb)
             else:
@@ -337,7 +303,7 @@ class RandomFlipLRTB(Operator):
         return rgb, y, w
 
 
-class RandomBlur(Operator):
+class RandomBlur(generator.Operator):
     """ぼかし。"""
 
     def __init__(self, probability=1, radius=0.75):
@@ -345,13 +311,13 @@ class RandomBlur(Operator):
         self.probability = probability
         self.radius = radius
 
-    def execute(self, rgb, y, w, rand, data_augmentation):
-        if data_augmentation and (self.probability >= 1 or rand.rand() <= self.probability):
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
             rgb = ndimage.blur(rgb, self.radius * rand.rand())
         return rgb, y, w
 
 
-class RandomUnsharpMask(Operator):
+class RandomUnsharpMask(generator.Operator):
     """シャープ化。"""
 
     def __init__(self, probability=1, sigma=0.5, min_alpha=1, max_alpha=2):
@@ -361,13 +327,13 @@ class RandomUnsharpMask(Operator):
         self.min_alpha = min_alpha
         self.max_alpha = max_alpha
 
-    def execute(self, rgb, y, w, rand, data_augmentation):
-        if data_augmentation and (self.probability >= 1 or rand.rand() <= self.probability):
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
             rgb = ndimage.unsharp_mask(rgb, self.sigma, rand.uniform(self.min_alpha, self.max_alpha))
         return rgb, y, w
 
 
-class RandomMedian(Operator):
+class RandomMedian(generator.Operator):
     """メディアンフィルタ。"""
 
     def __init__(self, probability=1, sizes=(3,)):
@@ -375,13 +341,13 @@ class RandomMedian(Operator):
         self.probability = probability
         self.sizes = sizes
 
-    def execute(self, rgb, y, w, rand, data_augmentation):
-        if data_augmentation and (self.probability >= 1 or rand.rand() <= self.probability):
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
             rgb = ndimage.median(rgb, rand.choice(self.sizes))
         return rgb, y, w
 
 
-class GaussianNoise(Operator):
+class GaussianNoise(generator.Operator):
     """ガウシアンノイズ。"""
 
     def __init__(self, probability=1, scale=5):
@@ -389,13 +355,13 @@ class GaussianNoise(Operator):
         self.probability = probability
         self.scale = scale
 
-    def execute(self, rgb, y, w, rand, data_augmentation):
-        if data_augmentation and (self.probability >= 1 or rand.rand() <= self.probability):
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
             rgb = ndimage.gaussian_noise(rgb, rand, self.scale)
         return rgb, y, w
 
 
-class RandomBrightness(Operator):
+class RandomBrightness(generator.Operator):
     """明度の変更。"""
 
     def __init__(self, probability=1, shift=32):
@@ -403,13 +369,13 @@ class RandomBrightness(Operator):
         self.probability = probability
         self.shift = shift
 
-    def execute(self, rgb, y, w, rand, data_augmentation):
-        if data_augmentation and (self.probability >= 1 or rand.rand() <= self.probability):
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
             rgb = ndimage.brightness(rgb, rand.uniform(-self.shift, self.shift))
         return rgb, y, w
 
 
-class RandomContrast(Operator):
+class RandomContrast(generator.Operator):
     """コントラストの変更。"""
 
     def __init__(self, probability=1, var=0.25):
@@ -417,13 +383,13 @@ class RandomContrast(Operator):
         self.probability = probability
         self.var = var
 
-    def execute(self, rgb, y, w, rand, data_augmentation):
-        if data_augmentation and (self.probability >= 1 or rand.rand() <= self.probability):
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
             rgb = ndimage.contrast(rgb, rand.uniform(1 - self.var, 1 + self.var))
         return rgb, y, w
 
 
-class RandomSaturation(Operator):
+class RandomSaturation(generator.Operator):
     """彩度の変更。"""
 
     def __init__(self, probability=1, var=0.5):
@@ -431,13 +397,13 @@ class RandomSaturation(Operator):
         self.probability = probability
         self.var = var
 
-    def execute(self, rgb, y, w, rand, data_augmentation):
-        if data_augmentation and (self.probability >= 1 or rand.rand() <= self.probability):
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
             rgb = ndimage.saturation(rgb, rand.uniform(1 - self.var, 1 + self.var))
         return rgb, y, w
 
 
-class RandomHue(Operator):
+class RandomHue(generator.Operator):
     """色相の変更。"""
 
     def __init__(self, probability=1, var=1 / 16, shift=8):
@@ -446,15 +412,15 @@ class RandomHue(Operator):
         self.var = var
         self.shift = shift
 
-    def execute(self, rgb, y, w, rand, data_augmentation):
-        if data_augmentation and (self.probability >= 1 or rand.rand() <= self.probability):
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
             alpha = rand.uniform(1 - self.var, 1 + self.var, (3,))
             beta = rand.uniform(- self.shift, + self.shift, (3,))
             rgb = ndimage.hue_lite(rgb, alpha, beta)
         return rgb, y, w
 
 
-class RandomErasing(Operator):
+class RandomErasing(generator.Operator):
     """Random Erasing。
 
     https://arxiv.org/abs/1708.04896
@@ -478,8 +444,8 @@ class RandomErasing(Operator):
         self.object_aware_prob = object_aware_prob
         self.max_tries = max_tries
 
-    def execute(self, rgb, y, w, rand, data_augmentation):
-        if data_augmentation and (self.probability >= 1 or rand.rand() <= self.probability):
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
             bboxes = np.round(y.bboxes * np.array(rgb.shape)[[1, 0, 1, 0]]) if isinstance(y, ml.ObjectsAnnotation) else None
             if self.object_aware:
                 assert bboxes is not None

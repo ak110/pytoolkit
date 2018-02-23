@@ -4,11 +4,17 @@ import numpy as np
 
 import pytoolkit as tk
 
+_BASE_DIR = pathlib.Path(__file__).resolve().parent
+
+
+def test_saveload_grayscale(tmpdir):
+    rgb = tk.ndimage.load(_BASE_DIR / 'data' / 'Lenna.png', grayscale=True)
+    tk.ndimage.save(str(tmpdir.join('output.png')), rgb)
+
 
 def test_filters():
     """画像の変換のテスト。目視したいので結果を`../___check/ndimage/`に保存しちゃう。"""
-    base_dir = pathlib.Path(__file__).resolve().parent
-    save_dir = base_dir.parent.joinpath('___check', 'ndimage')
+    save_dir = _BASE_DIR.parent / '___check' / 'ndimage'
     rand = np.random.RandomState(1234)
     filters = [
         (0, 'original', lambda rgb: rgb),
@@ -41,7 +47,7 @@ def test_filters():
         (1, 'hue_lite_r', lambda rgb: tk.ndimage.hue_lite(rgb, np.array([1.05, 0.95, 0.95]), np.array([+8, -8, -8]))),
     ]
 
-    rgb = tk.ndimage.load(base_dir.joinpath('data', 'Lenna.png'))  # 256x256の某有名画像
+    rgb = tk.ndimage.load(_BASE_DIR / 'data' / 'Lenna.png')  # 256x256の某有名画像
     save_dir.mkdir(parents=True, exist_ok=True)
     for cp in save_dir.iterdir():
         cp.unlink()
