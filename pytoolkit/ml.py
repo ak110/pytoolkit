@@ -160,8 +160,8 @@ class _ToCategorical(object):
         self.nb_classes = nb_classes
 
     def __call__(self, y):
-        y = np.ravel(y)
-        cat = np.zeros((len(y), self.nb_classes))
+        assert len(y.shape) == 1
+        cat = np.zeros((len(y), self.nb_classes), dtype=np.float32)
         cat[np.arange(len(y)), y] = 1
         return cat
 

@@ -26,6 +26,8 @@ def _main():
 
     gen = tk.image.ImageDataGenerator(profile=True)
     gen.add(tk.image.Resize(_IMAGE_SIZE))
+    gen.add(tk.image.ProcessOutput(tk.ml.to_categorical(10), batch_axis=True))
+    gen.add(tk.image.Mixup(probability=1))
     gen.add(tk.image.RandomPadding(probability=1))
     gen.add(tk.image.RandomRotate(probability=0.5))
     gen.add(tk.image.RandomCrop(probability=1))
@@ -43,14 +45,14 @@ def _main():
     ]))
     gen.add(tk.image.RandomErasing(probability=0.5))
     gen.add(tk.image.ProcessInput(lambda x: x))
-    gen.add(tk.image.ProcessOutput(lambda y: y))
 
     X = np.array([str(data_dir / '9ab919332a1dceff9a252b43c0fb34a0_m.jpg')] * 16)
-    g = gen.flow(X, batch_size=_BATCH_SIZE, data_augmentation=True, random_state=123)
+    y = np.zeros((len(X),), dtype=int)
+    g = gen.flow(X, y, batch_size=_BATCH_SIZE, data_augmentation=True, random_state=123)
     # 適当にループして速度を見る
     X_batch = []
     with tqdm(total=_BATCH_SIZE * _ITER, unit='f', ascii=True, ncols=100) as pbar:
-        for it, X_batch in enumerate(g):
+        for it, (X_batch, _) in enumerate(g):
             pbar.update(len(X_batch))
             if it + 1 >= _ITER:
                 break

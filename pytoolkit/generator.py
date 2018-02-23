@@ -162,14 +162,12 @@ def _flow_instance(data_count, shuffle, random_state):
 
 def _pick_next(ix, X, y, weights):
     """X, y, weightsからix番目の値を取り出す。"""
+    def _pick(arr, ix):
+        if arr is None:
+            return None
+        return [x[ix] for x in arr] if isinstance(arr, list) else arr[ix]
+
     return _pick(X, ix), _pick(y, ix), _pick(weights, ix)
-
-
-def _pick(arr, ix):
-    """配列からix番目の値を取り出す。"""
-    if arr is None:
-        return None
-    return [x[ix] for x in arr] if isinstance(arr, list) else arr[ix]
 
 
 def _get_result(X, y, weights, rx, ry, rw):

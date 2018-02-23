@@ -20,6 +20,8 @@ class ImageDataGenerator(generator.Generator):
     ```
     gen = tk.image.ImageDataGenerator()
     gen.add(tk.image.Resize((300, 300)))
+    gen.add(tk.image.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
+    gen.add(tk.image.Mixup(probability=1))
     gen.add(tk.image.RandomPadding(probability=1))
     gen.add(tk.image.RandomRotate(probability=0.5))
     gen.add(tk.image.RandomCrop(probability=1))
@@ -36,7 +38,6 @@ class ImageDataGenerator(generator.Generator):
     ]))
     gen.add(tk.image.RandomErasing(probability=0.5))
     gen.add(tk.image.ProcessInput(tk.image.preprocess_input_abs1))
-    gen.add(tk.image.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
     ```
 
     """
@@ -509,3 +510,33 @@ class RandomErasing(generator.Operator):
             break
 
         return rgb
+
+
+class Mixup(generator.Operator):
+    """`mixup`
+
+    yはone-hot化済みの前提
+
+    - mixup: Beyond Empirical Risk Minimization
+      https://arxiv.org/abs/1710.09412
+
+    """
+
+    def __init__(self, probability=1, alpha=0.2, beta=0.2):
+        assert 0 < probability <= 1
+        self.probability = probability
+        self.alpha = alpha
+        self.beta = beta
+
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
+            assert y is not None and len(y.shape) == 1
+            # 混ぜる先を選ぶ
+            ti = rand.randint(0, ctx.data_count)
+            rgb2 = ndimage.resize(ndimage.load(ctx.X[ti]), rgb.shape[1], rgb.shape[0])
+            y2 = ctx.y[ti]
+            # 混ぜる
+            m = rand.beta(self.alpha, self.beta)
+            rgb = rgb * m + rgb2 * (1 - m)
+            y = y * m + y2 * (1 - m)
+        return rgb, y, w
