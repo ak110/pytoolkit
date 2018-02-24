@@ -52,7 +52,8 @@ def _main():
     # 適当にループして速度を見る
     X_batch = []
     with tqdm(total=_BATCH_SIZE * _ITER, unit='f', ascii=True, ncols=100) as pbar:
-        for it, (X_batch, _) in enumerate(g):
+        for it, (X_batch, y_batch) in enumerate(g):
+            assert len(y_batch.shape) == 2
             pbar.update(len(X_batch))
             if it + 1 >= _ITER:
                 break
