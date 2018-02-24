@@ -156,8 +156,7 @@ def _flow_instance(data_count, shuffle, random_state):
         if shuffle:
             random_state.shuffle(indices)
         seeds = random_state.randint(0, 2 ** 31, size=(len(indices),))
-        for ix, seed in zip(indices, seeds):
-            yield ix, seed
+        yield from zip(indices, seeds)
 
 
 def _pick_next(ix, X, y, weights):
@@ -165,7 +164,9 @@ def _pick_next(ix, X, y, weights):
     def _pick(arr, ix):
         if arr is None:
             return None
-        return [x[ix] for x in arr] if isinstance(arr, list) else arr[ix]
+        if isinstance(arr, list):
+            return [x[ix] for x in arr]
+        return arr[ix]
 
     return _pick(X, ix), _pick(y, ix), _pick(weights, ix)
 
@@ -173,7 +174,9 @@ def _pick_next(ix, X, y, weights):
 def _get_result(X, y, weights, rx, ry, rw):
     """Kerasに渡すデータを返す。"""
     def _arr(arr, islist):
-        return [np.array(a) for a in arr] if islist else np.array(arr)
+        if islist:
+            return [np.array(a) for a in arr]
+        return np.array(arr)
 
     if y is None:
         assert weights is None

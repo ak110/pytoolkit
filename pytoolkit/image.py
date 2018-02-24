@@ -19,9 +19,9 @@ class ImageDataGenerator(generator.Generator):
     # 使用例
     ```
     gen = tk.image.ImageDataGenerator()
-    gen.add(tk.image.Resize((300, 300)))
     gen.add(tk.image.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
-    gen.add(tk.image.Mixup(probability=1))
+    gen.add(tk.image.Resize((300, 300)))
+    gen.add(tk.image.Mixup(probability=1, num_classes=num_classes))
     gen.add(tk.image.RandomPadding(probability=1))
     gen.add(tk.image.RandomRotate(probability=0.5))
     gen.add(tk.image.RandomCrop(probability=1))
@@ -522,21 +522,30 @@ class Mixup(generator.Operator):
 
     """
 
-    def __init__(self, probability=1, alpha=0.2, beta=0.2):
+    def __init__(self, probability=1, num_classes=None, alpha=0.2, beta=0.2):
         assert 0 < probability <= 1
         self.probability = probability
+        self.num_classes = num_classes
         self.alpha = alpha
         self.beta = beta
 
     def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
         if ctx.do_augmentation(rand, self.probability):
+            assert len(rgb.shape) == 3
             assert y is not None and len(y.shape) == 1
             # 混ぜる先を選ぶ
             ti = rand.randint(0, ctx.data_count)
             rgb2 = ndimage.resize(ndimage.load(ctx.X[ti]), rgb.shape[1], rgb.shape[0])
             y2 = ctx.y[ti]
+            if self.num_classes is not None:
+                t = np.zeros((self.num_classes,), dtype=y.dtype)
+                t[y2] = 1
+                y2 = t
+            assert rgb.shape == rgb2.shape
+            assert y.shape == y2.shape
             # 混ぜる
             m = rand.beta(self.alpha, self.beta)
+            assert 0 <= m <= 1
             rgb = rgb * m + rgb2 * (1 - m)
             y = y * m + y2 * (1 - m)
         return rgb, y, w
