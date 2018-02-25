@@ -652,7 +652,7 @@ def logger_callback(name='__main__'):
     return _Logger(name=name)
 
 
-def freeze_bn_callback(freeze_epoch: typing.Union[int, float]):
+def freeze_bn_callback(freeze_epoch_rate: float, logger_name=None):
     """指定epoch目でBNを全部freezeする。
 
     SENetの論文の最後の方にしれっと書いてあったので真似てみた。
@@ -661,12 +661,13 @@ def freeze_bn_callback(freeze_epoch: typing.Union[int, float]):
     https://arxiv.org/abs/1709.01507
 
     ## 引数
-    - freeze_epoch: 発動するepoch数を指定。floatで割合か、intでepoch。
+    - freeze_epoch_rate: 発動するepoch数の割合を指定。
+    - logger_name: ログ出力先
 
     ## 使用例
 
     ```
-    callbacks.append(tk.dl.freeze_bn_callback(freeze_epoch=0.95))
+    callbacks.append(tk.dl.freeze_bn_callback(0.95))
     ```
 
     """
@@ -674,23 +675,19 @@ def freeze_bn_callback(freeze_epoch: typing.Union[int, float]):
 
     class _FreezeBNCallback(keras.callbacks.Callback):
 
-        def __init__(self, freeze_epoch):
-            self.freeze_epoch = freeze_epoch
-            self.current_freeze_epoch = 0
+        def __init__(self, freeze_epoch_rate, logger_name=None):
+            self.freeze_epoch_rate = freeze_epoch_rate
+            self.logger_name = logger_name or __name__
+            self.freeze_epoch = 0
             self.freezed_layers = []
             super().__init__()
 
         def on_train_begin(self, logs=None):
-            if isinstance(self.freeze_epoch, float):
-                assert 0 < self.freeze_epoch <= 1
-                self.current_freeze_epoch = int(self.params['epochs'] * self.freeze_epoch)
-            else:
-                assert isinstance(self.freeze_epoch, int)
-                assert 0 < self.freeze_epoch <= self.params['epochs']
-                self.current_freeze_epoch = self.freeze_epoch
+            assert 0 < self.freeze_epoch_rate <= 1
+            self.freeze_epoch = int(self.params['epochs'] * self.freeze_epoch_rate)
 
         def on_epoch_begin(self, epoch, logs=None):
-            if self.current_freeze_epoch == epoch + 1:
+            if self.freeze_epoch == epoch + 1:
                 for layer in self.model.layers:
                     if isinstance(layer, keras.layers.BatchNormalization):
                         if layer.trainable:
@@ -698,7 +695,7 @@ def freeze_bn_callback(freeze_epoch: typing.Union[int, float]):
                             self.freezed_layers.append(layer)
                 if len(self.freezed_layers) > 0:
                     self._recompile()
-                logger = log.get(__name__)
+                logger = log.get(self.logger_name)
                 logger.info('FreezeBNCallback: freezed layers = {}'.format(len(self.freezed_layers)))
 
         def on_train_end(self, logs=None):
@@ -710,7 +707,7 @@ def freeze_bn_callback(freeze_epoch: typing.Union[int, float]):
             self.freezed_layers = []
             if unfreezed > 0:
                 self._recompile()
-            logger = log.get(__name__)
+            logger = log.get(self.logger_name)
             logger.info('FreezeBNCallback: unfreezed layers = {}'.format(unfreezed))
 
         def _recompile(self):
@@ -719,10 +716,10 @@ def freeze_bn_callback(freeze_epoch: typing.Union[int, float]):
                 loss=self.model.loss,
                 metrics=self.model.metrics,
                 loss_weights=self.model.loss_weights,
-                sample_weight_mod=self.model.sample_weight_mod,
+                sample_weight_mode=self.model.sample_weight_mode,
                 weighted_metrics=self.model.weighted_metrics)
 
-    return _FreezeBNCallback(freeze_epoch=freeze_epoch)
+    return _FreezeBNCallback(freeze_epoch_rate=freeze_epoch_rate, logger_name=logger_name)
 
 
 @log.trace()

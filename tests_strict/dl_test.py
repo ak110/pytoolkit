@@ -43,7 +43,9 @@ def test_xor(tmpdir):
 
     with tk.dl.session():
         inp = x = keras.layers.Input(shape=(2,))
-        x = keras.layers.Dense(16, activation='relu')(x)
+        x = keras.layers.Dense(16, use_bias=False)(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Activation(activation='relu')(x)
         x = keras.layers.Dense(1, activation='sigmoid')(x)
         model = keras.models.Model(inputs=inp, outputs=x)
         model.compile('nadam', 'binary_crossentropy', ['acc'])
@@ -57,7 +59,7 @@ def test_xor(tmpdir):
                 tk.dl.learning_curve_plot_callback(str(tmpdir.join('history.png'))),
                 tk.dl.tsv_log_callback(str(tmpdir.join('history.tsv'))),
                 tk.dl.logger_callback('test_xor'),
-                tk.dl.freeze_bn_callback(freeze_epoch=6),
+                tk.dl.freeze_bn_callback(0.5, logger_name='test_xor'),
             ])
         pred = model.predict(X)
         y_pred = (pred > 0.5).astype(np.int32).reshape(y.shape)
