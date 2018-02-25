@@ -18,7 +18,7 @@ from . import log, utils
 
 
 def device(cpu=False, gpu=False):
-    """`tf.device('/cpu:0')` などの簡単なラッパー。"""
+    """TensorFlowのデバイス指定の簡単なラッパー。"""
     assert cpu != gpu
     import tensorflow as tf
     if cpu:
@@ -73,10 +73,10 @@ class Builder(object):
         self.bn_defaults = {}
         self.act_defaults = {'activation': 'elu'}
 
-    def set_default_l2(self, l=1e-5):
+    def set_default_l2(self, l2_weight=1e-5):
         """全layerの既定値にL2を設定。"""
         from keras.regularizers import l2
-        reg = l2(l)
+        reg = l2(l2_weight)
         self.conv_defaults['kernel_regularizer'] = reg
         self.conv_defaults['bias_regularizer'] = reg
         self.dense_defaults['kernel_regularizer'] = reg

@@ -12,7 +12,7 @@ import time
 
 
 def get(name=None):
-    """"ロガーを取得して返す。"""
+    """ロガーを取得して返す。"""
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
     return logger
@@ -31,7 +31,7 @@ def file_handler(output_path, append=False, rotate=False,
                  max_bytes=1048576, backup_count=10, encoding='utf-8',
                  level=logging.DEBUG,
                  fmt='[%(levelname)-5s] %(message)s <%(name)s:%(filename)s:%(lineno)d>'):
-    """RotatingFileHandler / FileHandlerを作成して返す。levelは文字列で'INFO'とかも指定可。(Python>=3.2)"""
+    """RotatingFileHandler/FileHandlerを作成して返す。levelは文字列で'INFO'とかも指定可。(Python>=3.2)"""
     if rotate:
         handler = logging.handlers.RotatingFileHandler(
             str(output_path), 'a', max_bytes, backup_count, encoding=encoding)
