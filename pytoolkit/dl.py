@@ -9,7 +9,6 @@ import csv
 import os
 import pathlib
 import time
-import typing
 import warnings
 
 import numpy as np
@@ -509,12 +508,33 @@ def session(config=None, gpu_options=None):
     return _Scope(config=config, gpu_options=gpu_options)
 
 
-def learning_rate_callback(lr=0.1, epochs=300):
+def learning_rate_callback(reduce_epoch_rates=(0.5, 0.75), factor=0.1, logger_name=None):
     """よくある150epoch目と225epoch目に学習率を1/10するコールバックを作って返す。"""
-    assert epochs % 4 == 0
     import keras
-    lr_list = [lr] * (epochs // 2) + [lr / 10] * (epochs // 4) + [lr / 100] * (epochs // 4)
-    return keras.callbacks.LearningRateScheduler(lambda ep: lr_list[ep])
+    import keras.backend as K
+
+    class _LearningRate(keras.callbacks.Callback):
+
+        def __init__(self, reduce_epoch_rates, factor, logger_name):
+            self.reduce_epoch_rates = reduce_epoch_rates
+            self.factor = factor
+            self.logger_name = logger_name
+            self.reduce_epochs = None
+            super().__init__()
+
+        def on_train_begin(self, logs=None):
+            epochs = self.params['epochs']
+            self.reduce_epochs = [min(max(int(epochs * r), 1), epochs) for r in self.reduce_epoch_rates]
+
+        def on_epoch_begin(self, epoch, logs=None):
+            if epoch + 1 in self.reduce_epochs:
+                lr1 = K.get_value(self.model.optimizer.lr)
+                lr2 = lr1 * self.factor
+                K.set_value(self.model.optimizer.lr, lr2)
+                logger = log.get(self.logger_name or __name__)
+                logger.info('Reduce learning rate: {:.1e} -> {:.1e}'.format(epoch + 1, lr1, lr2))
+
+    return _LearningRate(reduce_epoch_rates=reduce_epoch_rates, factor=factor, logger_name=logger_name)
 
 
 def learning_curve_plot_callback(filename, metric='loss'):
@@ -675,9 +695,9 @@ def freeze_bn_callback(freeze_epoch_rate: float, logger_name=None):
 
     class _FreezeBNCallback(keras.callbacks.Callback):
 
-        def __init__(self, freeze_epoch_rate, logger_name=None):
+        def __init__(self, freeze_epoch_rate, logger_name):
             self.freeze_epoch_rate = freeze_epoch_rate
-            self.logger_name = logger_name or __name__
+            self.logger_name = logger_name
             self.freeze_epoch = 0
             self.freezed_layers = []
             super().__init__()
@@ -695,7 +715,7 @@ def freeze_bn_callback(freeze_epoch_rate: float, logger_name=None):
                             self.freezed_layers.append(layer)
                 if len(self.freezed_layers) > 0:
                     self._recompile()
-                logger = log.get(self.logger_name)
+                logger = log.get(self.logger_name or __name__)
                 logger.info('FreezeBNCallback: freezed layers = {}'.format(len(self.freezed_layers)))
 
         def on_train_end(self, logs=None):
@@ -707,7 +727,7 @@ def freeze_bn_callback(freeze_epoch_rate: float, logger_name=None):
             self.freezed_layers = []
             if unfreezed > 0:
                 self._recompile()
-            logger = log.get(self.logger_name)
+            logger = log.get(self.logger_name or __name__)
             logger.info('FreezeBNCallback: unfreezed layers = {}'.format(unfreezed))
 
         def _recompile(self):

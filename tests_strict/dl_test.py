@@ -48,14 +48,14 @@ def test_xor(tmpdir):
         x = keras.layers.Activation(activation='relu')(x)
         x = keras.layers.Dense(1, activation='sigmoid')(x)
         model = keras.models.Model(inputs=inp, outputs=x)
-        model.compile('nadam', 'binary_crossentropy', ['acc'])
+        model.compile('adam', 'binary_crossentropy', ['acc'])
         model.fit(
             X.repeat(4096, axis=0),
             y.repeat(4096, axis=0),
             epochs=8,
             verbose=2,
             callbacks=[
-                tk.dl.learning_rate_callback(1e-3, epochs=8),
+                tk.dl.learning_rate_callback(logger_name='test_xor'),
                 tk.dl.learning_curve_plot_callback(str(tmpdir.join('history.png'))),
                 tk.dl.tsv_log_callback(str(tmpdir.join('history.tsv'))),
                 tk.dl.logger_callback('test_xor'),
