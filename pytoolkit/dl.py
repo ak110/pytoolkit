@@ -532,7 +532,7 @@ def learning_rate_callback(reduce_epoch_rates=(0.5, 0.75), factor=0.1, logger_na
                 lr2 = lr1 * self.factor
                 K.set_value(self.model.optimizer.lr, lr2)
                 logger = log.get(self.logger_name or __name__)
-                logger.info('Reduce learning rate: {:.1e} -> {:.1e}'.format(epoch + 1, lr1, lr2))
+                logger.info('Learning rate: {:.1e} -> {:.1e}'.format(lr1, lr2))
 
     return _LearningRate(reduce_epoch_rates=reduce_epoch_rates, factor=factor, logger_name=logger_name)
 
@@ -716,7 +716,7 @@ def freeze_bn_callback(freeze_epoch_rate: float, logger_name=None):
                 if len(self.freezed_layers) > 0:
                     self._recompile()
                 logger = log.get(self.logger_name or __name__)
-                logger.info('FreezeBNCallback: freezed layers = {}'.format(len(self.freezed_layers)))
+                logger.info('Freeze BN: freezed layers = {}'.format(len(self.freezed_layers)))
 
         def on_train_end(self, logs=None):
             unfreezed = 0
@@ -728,7 +728,7 @@ def freeze_bn_callback(freeze_epoch_rate: float, logger_name=None):
             if unfreezed > 0:
                 self._recompile()
             logger = log.get(self.logger_name or __name__)
-            logger.info('FreezeBNCallback: unfreezed layers = {}'.format(unfreezed))
+            logger.info('Freeze BN: unfreezed layers = {}'.format(unfreezed))
 
         def _recompile(self):
             self.model.compile(
