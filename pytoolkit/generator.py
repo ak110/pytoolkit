@@ -61,7 +61,7 @@ class Generator(object):
             yield from self._flow(pool, ctx)
 
     def _flow(self, pool, ctx: GeneratorContext):
-        _MAX_QUEUE_BATCHES = 4  # ため込むバッチ数
+        _MAX_QUEUE_BATCHES = 2  # ため込むバッチ数
 
         future_queue = []
         gen = self._flow_batch(ctx.data_count, ctx.batch_size, ctx.shuffle, ctx.random_state)
