@@ -7,6 +7,18 @@ import pytest
 import pytoolkit as tk
 
 
+def test_init(tmpdir):
+    log_path = str(tmpdir.join('test.log'))
+    tk.log.init(log_path, stream_fmt=None, file_fmt=None)
+    logger = tk.log.get(None)
+    logger.debug('あいうえお')
+    with open(log_path, encoding='utf-8') as f:
+        assert f.read() == 'あいうえお\n'
+
+    tk.log.close(logger)
+    os.remove(log_path)
+
+
 def test_logger(tmpdir):
     log_path = str(tmpdir.join('test.log'))
     stderr = io.StringIO()

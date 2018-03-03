@@ -5,17 +5,6 @@ import pytest
 import pytoolkit as tk
 
 
-def test_create_tee_logger(tmpdir):
-    log_path = str(tmpdir.join('test.log'))
-    logger = tk.create_tee_logger(log_path, name='test', fmt=None)
-    logger.debug('あいうえお')
-    with open(log_path, encoding='utf-8') as f:
-        assert f.read() == 'あいうえお\n'
-
-    tk.log.close(logger)
-    os.remove(log_path)
-
-
 def test_memorized(tmpdir):
     cache_path = str(tmpdir.join('cache.pkl'))
     assert tk.memorized(cache_path, lambda: 1) == 1  # fnの結果

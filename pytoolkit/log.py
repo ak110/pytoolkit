@@ -11,6 +11,16 @@ import logging.handlers
 import time
 
 
+def init(output_path, append=False, rotate=False, max_bytes=1048576, backup_count=10,
+         stream_fmt='[%(levelname)-5s] %(message)s',
+         file_fmt='[%(levelname)-5s] %(message)s <%(name)s:%(filename)s:%(lineno)d>'):
+    """ルートロガーの初期化。"""
+    logger = get(None)
+    logger.addHandler(stream_handler(fmt=stream_fmt))
+    if output_path is not None:
+        logger.addHandler(file_handler(output_path, append, rotate, max_bytes, backup_count, fmt=file_fmt))
+
+
 def get(name=None):
     """ロガーを取得して返す。"""
     logger = logging.getLogger(name)
