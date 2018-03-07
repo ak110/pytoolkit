@@ -96,12 +96,12 @@ class LoadImage(generator.Operator):
         if isinstance(rgb, np.ndarray):
             # ndarrayならそのまま画像扱い
             rgb = np.copy(rgb).astype(np.float32)
-            assert len(rgb.shape) == 3
-            assert rgb.shape[-1] == (1 if self.grayscale else 3)
         else:
             # ファイルパスなら読み込み
             assert isinstance(rgb, (str, pathlib.Path))
             rgb = ndimage.load(rgb, self.grayscale)
+        assert len(rgb.shape) == 3
+        assert rgb.shape[-1] == (1 if self.grayscale else 3)
         return rgb, y, w
 
 

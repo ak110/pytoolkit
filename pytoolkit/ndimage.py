@@ -56,6 +56,8 @@ def rotate(rgb: np.ndarray, degrees: float, interp='lanczos') -> np.ndarray:
     center = (size[0] // 2, size[1] // 2)
     rotation_matrix = cv2.getRotationMatrix2D(center=center, angle=degrees, scale=1.0)
     rgb = cv2.warpAffine(rgb, rotation_matrix, size, flags=cv2_interp)
+    if len(rgb.shape) == 2:
+        rgb = np.expand_dims(rgb, axis=-1)
     return rgb
 
 
@@ -151,6 +153,8 @@ def resize(rgb: np.ndarray, width: int, height: int, padding=None, interp='lancz
     else:  # 縮小
         cv2_interp = cv2.INTER_NEAREST if interp == 'nearest' else cv2.INTER_AREA
     rgb = cv2.resize(rgb, (width, height), interpolation=cv2_interp)
+    if len(rgb.shape) == 2:
+        rgb = np.expand_dims(rgb, axis=-1)
     return rgb
 
 
@@ -162,6 +166,8 @@ def gaussian_noise(rgb: np.ndarray, rand: np.random.RandomState, scale: float) -
 def blur(rgb: np.ndarray, sigma: float) -> np.ndarray:
     """ぼかし。sigmaは0～1程度がよい？"""
     rgb = cv2.GaussianBlur(rgb, (5, 5), sigma)
+    if len(rgb.shape) == 2:
+        rgb = np.expand_dims(rgb, axis=-1)
     return rgb
 
 
@@ -174,6 +180,8 @@ def unsharp_mask(rgb: np.ndarray, sigma: float, alpha=2.0) -> np.ndarray:
 def median(rgb: np.ndarray, size: int) -> np.ndarray:
     """メディアンフィルタ。sizeは3程度がよい？"""
     rgb = cv2.medianBlur(rgb, size)
+    if len(rgb.shape) == 2:
+        rgb = np.expand_dims(rgb, axis=-1)
     return rgb
 
 
