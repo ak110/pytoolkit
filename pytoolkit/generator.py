@@ -1,12 +1,12 @@
 """データを読み込むgenerator。"""
 import abc
-import concurrent.futures
 import copy
 import os
 import time
 
 import numpy as np
 import sklearn.utils
+import sklearn.externals.joblib as joblib
 
 
 class GeneratorContext(object):
@@ -55,33 +55,13 @@ class Generator(object):
     def flow(self, X, y=None, weights=None, batch_size=32, shuffle=False, data_augmentation=False, random_state=None):
         """`fit_generator`などに渡すgenerator。kargsはそのままprepareに渡される。"""
         cpu_count = os.cpu_count()
-        worker_count = min(batch_size * 4, cpu_count * 2)  # 適当に余裕をもったサイズにしておく
+        worker_count = min(batch_size, cpu_count * 3)
         ctx = GeneratorContext(X, y, weights, batch_size, shuffle, data_augmentation, random_state)
-        with concurrent.futures.ThreadPoolExecutor(worker_count) as pool:
-            yield from self._flow(pool, ctx)
-
-    def _flow(self, pool, ctx: GeneratorContext):
-        _MAX_QUEUE_BATCHES = 2  # ため込むバッチ数
-
-        future_queue = []
-        gen = self._flow_batch(ctx.data_count, ctx.batch_size, ctx.shuffle, ctx.random_state)
-        try:
-            while True:
-                # 最大キューサイズまで仕事をsubmitする
-                while len(future_queue) < _MAX_QUEUE_BATCHES:
-                    indices, seeds = next(gen)
-                    batch = [pool.submit(self._work, ix, seed, ctx) for ix, seed in zip(indices, seeds)]
-                    future_queue.append(batch)
-
-                # 先頭のバッチの処理結果を取り出す
-                batch = [f.result() for f in future_queue[0]]
-                rx, ry, rw = zip(*batch)
+        with joblib.Parallel(n_jobs=worker_count, backend='threading') as parallel:
+            for indices, seeds in self._flow_batch(ctx.data_count, ctx.batch_size, ctx.shuffle, ctx.random_state):
+                batch = [joblib.delayed(self._work, check_pickle=False)(ix, seed, ctx) for ix, seed in zip(indices, seeds)]
+                rx, ry, rw = zip(*parallel(batch))
                 yield _get_result(ctx.X, ctx.y, ctx.weights, rx, ry, rw)
-                future_queue = future_queue[1:]
-        except GeneratorExit:
-            pass
-        finally:
-            gen.close()
 
     def _flow_batch(self, data_count, batch_size, shuffle, random_state):
         """データのindexとseedをバッチサイズずつ列挙し続けるgenerator。"""
