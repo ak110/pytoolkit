@@ -549,3 +549,28 @@ class Mixup(generator.Operator):
             rgb = rgb * m + rgb2 * (1 - m)
             y = y * m + y2 * (1 - m)
         return rgb, y, w
+
+
+class CustomOperator(generator.Operator):
+    """カスタム処理用。"""
+
+    def __init__(self, process):
+        self.process = process
+
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        rgb, y, w = self.process(rgb, y, w, rand, ctx)
+        return rgb, y, w
+
+
+class CustomAugmentation(generator.Operator):
+    """カスタム処理用。"""
+
+    def __init__(self, process, probability=1):
+        assert 0 < probability <= 1
+        self.process = process
+        self.probability = probability
+
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
+            rgb, y, w = self.process(rgb, y, w, rand, ctx)
+        return rgb, y, w
