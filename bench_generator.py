@@ -27,7 +27,7 @@ def _main():
     gen = tk.image.ImageDataGenerator(profile=True)
     gen.add(tk.image.Resize(_IMAGE_SIZE))
     gen.add(tk.image.ProcessOutput(tk.ml.to_categorical(10), batch_axis=True))
-    gen.add(tk.image.Mixup(probability=1))
+    gen.add(tk.image.Mixup(probability=1, num_classes=10))
     gen.add(tk.image.RandomPadding(probability=1))
     gen.add(tk.image.RandomRotate(probability=0.5))
     gen.add(tk.image.RandomCrop(probability=1))
