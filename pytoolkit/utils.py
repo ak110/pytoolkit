@@ -1,7 +1,10 @@
 """各種ユーティリティ"""
+import functools
+import io
 import multiprocessing as mp
 import os
 import subprocess
+import sys
 
 import numpy as np
 import sklearn.externals.joblib
@@ -71,3 +74,24 @@ def _init_gpu_pool(mpq, initializer, initargs):
         if initargs is None:
             initargs = []
         initializer(*initargs)
+
+
+def capture_output():
+    """stdoutとstderrをキャプチャして戻り値として返すデコレーター"""
+    def _decorator(func):
+        @functools.wraps(func)
+        def _decorated_func(*args, **kwargs):
+            stdout = sys.stdout
+            stderr = sys.stderr
+            buf = io.StringIO()  # kerasも黙らせる。。
+            sys.stdout = buf
+            sys.stderr = buf
+            try:
+                result = func(*args, **kwargs)
+                assert result is None
+                return buf.getvalue()
+            finally:
+                sys.stderr = stderr
+                sys.stdout = stdout
+        return _decorated_func
+    return _decorator
