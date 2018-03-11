@@ -1,6 +1,5 @@
 """各種ユーティリティ"""
 import functools
-import io
 import multiprocessing as mp
 import os
 import subprocess
@@ -78,6 +77,8 @@ def _init_gpu_pool(mpq, initializer, initargs):
 
 def capture_output():
     """stdoutとstderrをキャプチャして戻り値として返すデコレーター"""
+    import io
+
     def _decorator(func):
         @functools.wraps(func)
         def _decorated_func(*args, **kwargs):
