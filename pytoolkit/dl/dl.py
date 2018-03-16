@@ -1,9 +1,4 @@
-"""DeepLearning(主にKeras)関連。
-
-kerasをimportしてしまうとTensorFlowの初期化が始まって重いので、
-importしただけではkerasがimportされないように作っている。
-
-"""
+"""DeepLearning(主にKeras)関連。"""
 import copy
 import csv
 import os
