@@ -1,7 +1,7 @@
 """Kerasのmetrics関連。"""
 
 
-def tp(y_true, y_pred):
+def tpr(y_true, y_pred):
     """True positive rate。(真陽性率、再現率、Recall)
 
     バッチごとのtrue/falseの数が一定でない限り正しく算出されないため要注意。
@@ -12,7 +12,7 @@ def tp(y_true, y_pred):
     return K.sum(pred * mask) / K.sum(mask)
 
 
-def fp(y_true, y_pred):
+def fpr(y_true, y_pred):
     """False positive rate。(偽陽性率)
 
     バッチごとのtrue/falseの数が一定でない限り正しく算出されないため要注意。
@@ -24,4 +24,4 @@ def fp(y_true, y_pred):
 
 
 # 再現率(recall)
-recall = tp
+recall = tpr
