@@ -551,6 +551,45 @@ class Mixup(generator.Operator):
         return rgb, y, w
 
 
+class SamplewiseStandardize(generator.Operator):
+    """標準化。0～255に適当に収める。"""
+
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        rgb = ndimage.standardize(rgb)
+        return rgb, y, w
+
+
+class ToGrayScale(generator.Operator):
+    """グレースケール化。チャンネル数はとりあえず維持。"""
+
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        assert len(rgb.shape) == 3
+        start_shape = rgb.shape
+        rgb = ndimage.to_grayscale(rgb)
+        rgb = np.tile(np.expand_dims(rgb, axis=-1), (1, 1, start_shape[-1]))
+        assert rgb.shape == start_shape
+        return rgb, y, w
+
+
+class RandomBinarize(generator.Operator):
+    """ランダム2値化(白黒化)。"""
+
+    def __init__(self, threshold_min=128 - 32, threshold_max=128 + 32):
+        assert 0 < threshold_min < 255
+        assert 0 < threshold_max < 255
+        assert threshold_min < threshold_max
+        self.threshold_min = threshold_min
+        self.threshold_max = threshold_max
+
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.data_augmentation:
+            threshold = rand.uniform(self.threshold_min, self.threshold_max)
+            rgb = ndimage.binarize(rgb, threshold)
+        else:
+            rgb = ndimage.binarize(rgb, (self.threshold_min + self.threshold_max) / 2)
+        return rgb, y, w
+
+
 class CustomOperator(generator.Operator):
     """カスタム処理用。"""
 

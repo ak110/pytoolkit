@@ -88,19 +88,28 @@ class Generator(object):
     def _work(self, ix, seed, ctx: GeneratorContext):
         """1件1件の処理。"""
         x_, y_, w_ = _pick_next(ix, ctx.X, ctx.y, ctx.weights)
-        result_x, result_y, result_w = self.generate(seed, x_, y_, w_, ctx)
+        rand = np.random.RandomState(seed)
+        result_x, result_y, result_w = self._transform(x_, y_, w_, rand, ctx)
         assert result_x is not None
         assert (result_y is None) == (y_ is None)
         assert (result_w is None) == (w_ is None)
         return result_x, result_y, result_w
 
-    def generate(self, seed, x_, y_, w_, ctx: GeneratorContext):
+    def transform(self, x_, y_=None, w_=None, rand=None, data_augmentation=None):
+        """1件分の処理を外から使うとき用のインターフェース。"""
+        ctx = GeneratorContext(
+            X=None, y=None, weights=None, batch_size=None, shuffle=None,
+            data_augmentation=data_augmentation, random_state=None)
+        if rand is None:
+            rand = ctx.random_state
+        return self._transform(x_, y_, w_, rand, ctx)
+
+    def _transform(self, x_, y_, w_, rand, ctx: GeneratorContext):
         """1件分の処理。
 
         画像の読み込みとかDataAugmentationとか。
         y_やw_は使わない場合もそのまま返せばOK。(使う場合はNoneに注意。)
         """
-        rand = np.random.RandomState(seed)
         x_ = copy.deepcopy(x_)  # 念のため
         y_ = copy.deepcopy(y_)  # 念のため
         w_ = copy.deepcopy(w_)  # 念のため

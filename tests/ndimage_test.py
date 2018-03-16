@@ -45,6 +45,9 @@ def test_filters():
         (1, 'hue_lite_b', lambda rgb: tk.ndimage.hue_lite(rgb, np.array([0.95, 0.95, 1.05]), np.array([-8, -8, +8]))),
         (1, 'hue_lite_g', lambda rgb: tk.ndimage.hue_lite(rgb, np.array([0.95, 1.05, 0.95]), np.array([-8, +8, -8]))),
         (1, 'hue_lite_r', lambda rgb: tk.ndimage.hue_lite(rgb, np.array([1.05, 0.95, 0.95]), np.array([+8, -8, -8]))),
+        (1, 'standardize', tk.ndimage.standardize),
+        (1, 'binarize_1', lambda rgb: tk.ndimage.binarize(rgb, 128 - 32)),
+        (1, 'binarize_2', lambda rgb: tk.ndimage.binarize(rgb, 128 + 32)),
     ]
 
     rgb = tk.ndimage.load(_BASE_DIR / 'data' / 'Lenna.png')  # 256x256の某有名画像

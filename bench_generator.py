@@ -44,6 +44,9 @@ def _main():
         tk.image.RandomHue(probability=0.5),
     ]))
     gen.add(tk.image.RandomErasing(probability=0.5))
+    gen.add(tk.image.SamplewiseStandardize())
+    gen.add(tk.image.ToGrayScale())
+    gen.add(tk.image.RandomBinarize())
     gen.add(tk.image.ProcessInput(lambda x: x))
 
     X = np.array([str(data_dir / '9ab919332a1dceff9a252b43c0fb34a0_m.jpg')] * 16)

@@ -201,7 +201,7 @@ def saturation(rgb: np.ndarray, alpha: float) -> np.ndarray:
     """彩度の変更。alphaの例：`np.random.uniform(0.5, 1.5)`"""
     gs = to_grayscale(rgb)
     rgb *= alpha
-    rgb += (1 - alpha) * gs[:, :, np.newaxis]
+    rgb += (1 - alpha) * np.expand_dims(gs, axis=-1)
     return rgb
 
 
@@ -218,3 +218,16 @@ def hue_lite(rgb: np.ndarray, alpha: np.ndarray, beta: np.ndarray) -> np.ndarray
 def to_grayscale(rgb: np.ndarray) -> np.ndarray:
     """グレースケール化。"""
     return rgb.dot([0.299, 0.587, 0.114])
+
+
+def standardize(rgb: np.ndarray) -> np.ndarray:
+    """標準化。0～255に適当に収める。"""
+    rgb = (rgb - np.mean(rgb)) / (np.std(rgb) + 1e-5)
+    rgb = rgb * 64 + 127
+    return rgb
+
+
+def binarize(rgb: np.ndarray, threshold) -> np.ndarray:
+    """二値化(白黒化)。"""
+    assert 0 < threshold < 255
+    return (rgb >= threshold).astype(np.float32) * 255

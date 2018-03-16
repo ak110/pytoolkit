@@ -153,6 +153,21 @@ class ObjectsAnnotation(object):
         return annotation
 
 
+def listup_classification(dirpath, class_names=None):
+    """画像分類でよくある、クラス名ディレクトリの列挙。クラス名の配列, X, yを返す。"""
+    dirpath = pathlib.Path(dirpath)
+    # クラス名
+    if class_names is None:
+        class_names = list(sorted([p.name for p in class_names.iterdir() if p.is_dir()]))
+    # 各クラスのデータ
+    X, y = [], []
+    for class_id, class_name in enumerate(class_names):
+        t = [p for p in class_name.iterdir() if p.is_file()]
+        X.extend(t)
+        y.extend([class_id] * len(t))
+    return class_names, np.array(X), np.array(y)
+
+
 class _ToCategorical(object):
     """クラスラベルのone-hot encoding化を行うクラス。"""
 
