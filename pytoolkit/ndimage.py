@@ -224,7 +224,7 @@ def standardize(rgb: np.ndarray) -> np.ndarray:
     """標準化。0～255に適当に収める。"""
     rgb = (rgb - np.mean(rgb)) / (np.std(rgb) + 1e-5)
     rgb = rgb * 64 + 127
-    return rgb
+    return rgb.astype(np.float32)
 
 
 def binarize(rgb: np.ndarray, threshold) -> np.ndarray:

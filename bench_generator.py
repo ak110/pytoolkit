@@ -28,6 +28,9 @@ def _main():
     gen.add(tk.image.Resize(_IMAGE_SIZE))
     gen.add(tk.image.ProcessOutput(tk.ml.to_categorical(10), batch_axis=True))
     gen.add(tk.image.Mixup(probability=1, num_classes=10))
+    gen.add(tk.image.ToGrayScale())
+    gen.add(tk.image.SamplewiseStandardize())
+    gen.add(tk.image.RandomBinarize())
     gen.add(tk.image.RandomPadding(probability=1))
     gen.add(tk.image.RandomRotate(probability=0.5))
     gen.add(tk.image.RandomCrop(probability=1))
@@ -44,9 +47,6 @@ def _main():
         tk.image.RandomHue(probability=0.5),
     ]))
     gen.add(tk.image.RandomErasing(probability=0.5))
-    gen.add(tk.image.SamplewiseStandardize())
-    gen.add(tk.image.ToGrayScale())
-    gen.add(tk.image.RandomBinarize())
     gen.add(tk.image.ProcessInput(lambda x: x))
 
     X = np.array([str(data_dir / '9ab919332a1dceff9a252b43c0fb34a0_m.jpg')] * 16)
