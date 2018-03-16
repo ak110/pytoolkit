@@ -708,15 +708,20 @@ def freeze_bn_callback(freeze_epoch_rate: float, logger_name=None):
 
         def on_epoch_begin(self, epoch, logs=None):
             if self.freeze_epoch == epoch + 1:
-                for layer in self.model.layers:
-                    if isinstance(layer, keras.layers.BatchNormalization):
-                        if layer.trainable:
-                            layer.trainable = False
-                            self.freezed_layers.append(layer)
+                self._freeze_layers(self.model)
                 if len(self.freezed_layers) > 0:
                     self._recompile()
                 logger = log.get(self.logger_name or __name__)
                 logger.info('Freeze BN: freezed layers = {}'.format(len(self.freezed_layers)))
+
+        def _freeze_layers(self, container):
+            for layer in container.layers:
+                if isinstance(layer, keras.layers.BatchNormalization):
+                    if layer.trainable:
+                        layer.trainable = False
+                        self.freezed_layers.append(layer)
+                elif hasattr(layer, 'layers'):
+                    self._freeze_layers(layer)
 
         def on_train_end(self, logs=None):
             unfreezed = 0
