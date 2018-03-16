@@ -158,13 +158,14 @@ def listup_classification(dirpath, class_names=None):
     dirpath = pathlib.Path(dirpath)
     # クラス名
     if class_names is None:
-        class_names = list(sorted([p.name for p in class_names.iterdir() if p.is_dir()]))
+        class_names = list(sorted([p.name for p in dirpath.iterdir() if p.is_dir()]))
     # 各クラスのデータ
     X, y = [], []
     for class_id, class_name in enumerate(class_names):
-        t = [p for p in class_name.iterdir() if p.is_file()]
+        t = [p for p in (dirpath / class_name).iterdir() if p.is_file()]
         X.extend(t)
         y.extend([class_id] * len(t))
+    assert len(X) == len(y)
     return class_names, np.array(X), np.array(y)
 
 

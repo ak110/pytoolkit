@@ -98,7 +98,7 @@ class Generator(object):
     def transform(self, x_, y_=None, w_=None, rand=None, data_augmentation=None):
         """1件分の処理を外から使うとき用のインターフェース。"""
         ctx = GeneratorContext(
-            X=None, y=None, weights=None, batch_size=None, shuffle=None,
+            X=np.empty((0,)), y=None, weights=None, batch_size=None, shuffle=None,
             data_augmentation=data_augmentation, random_state=None)
         if rand is None:
             rand = ctx.random_state
