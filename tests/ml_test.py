@@ -8,7 +8,7 @@ import pytoolkit as tk
 
 def test_load_voc_file():
     base_dir = pathlib.Path(__file__).resolve().parent
-    xml_path = base_dir.joinpath('data', 'VOC2007_000001.xml')
+    xml_path = base_dir / 'data' / 'VOC2007_000001.xml'
     class_name_to_id = {class_name: i for i, class_name in enumerate(tk.ml.VOC_CLASS_NAMES)}
     ann = tk.ml.ObjectsAnnotation.load_voc_file(xml_path, class_name_to_id, without_difficult=False)
     assert ann.folder == 'VOCdevkit/VOC2007/JPEGImages'

@@ -268,7 +268,7 @@ class RandomAugmentors(generator.Operator):
             rand.shuffle(augmentors)
             for a in augmentors:
                 rgb, y, w = a.execute(rgb, y, w, rand, ctx)
-                assert rgb.dtype == np.float32, 'dtype error: {}'.format(a.__class__)
+                assert rgb.dtype == np.float32, f'dtype error: {a.__class__}'
             # 色が範囲外になっていたら補正(飽和)
             if self.clip_rgb:
                 rgb = np.clip(rgb, 0, 255)
@@ -456,7 +456,7 @@ class RandomErasing(generator.Operator):
                 # 各box内でrandom erasing。
                 for i, b in enumerate(bboxes):
                     if (b[2:] - b[:2] <= 1).any():
-                        warnings.warn('bboxサイズが不正: {}, {}'.format(y.filename, b))
+                        warnings.warn(f'bboxサイズが不正: {y.filename}, {b}')
                         continue  # 安全装置：サイズが無いboxはskip
                     if rand.rand() <= self.object_aware_prob:
                         b = np.copy(b).astype(int)

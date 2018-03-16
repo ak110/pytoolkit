@@ -46,7 +46,7 @@ def test_image_data_generator_save():
         g = gen.flow(X, batch_size=1, data_augmentation=True, random_state=123)
         for i, X_batch in enumerate(g):
             assert X_batch.shape == (1, 64, 64, 3)
-            tk.ndimage.save(save_dir / '{}.png'.format(i), X_batch[0])
+            tk.ndimage.save(save_dir / f'{i}.png', X_batch[0])
             if i >= 31:
                 break
 

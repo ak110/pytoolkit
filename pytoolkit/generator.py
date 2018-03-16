@@ -135,7 +135,7 @@ class Generator(object):
         assert self.profile
         total = sum(self.profile_data.values())
         for key, val in self.profile_data.items():
-            print_fn('{:32s}: {:6.2f}%'.format(key, val * 100 / total))
+            print_fn(f'{key:32s}: {val * 100 / total:6.2f}%')
 
 
 def _flow_instance(data_count, shuffle, random_state):

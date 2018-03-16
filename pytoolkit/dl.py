@@ -457,7 +457,7 @@ def nsgd():
 
                 self.updates.append(K.update(p, new_p))
 
-            assert len(lr_multipliers) == 0, 'Invalid lr_multipliers: {}'.format(lr_multipliers)
+            assert len(lr_multipliers) == 0, f'Invalid lr_multipliers: {lr_multipliers}'
             return self.updates
 
         def get_config(self):
@@ -532,7 +532,7 @@ def learning_rate_callback(reduce_epoch_rates=(0.5, 0.75), factor=0.1, logger_na
                 lr2 = lr1 * self.factor
                 K.set_value(self.model.optimizer.lr, lr2)
                 logger = log.get(self.logger_name or __name__)
-                logger.info('Learning rate: {:.1e} -> {:.1e}'.format(lr1, lr2))
+                logger.info(f'Learning rate: {lr1:.1e} -> {lr2:.1e}')
 
     return _LearningRate(reduce_epoch_rates=reduce_epoch_rates, factor=factor, logger_name=logger_name)
 
@@ -572,8 +572,8 @@ def learning_curve_plot_callback(filename, metric='loss'):
         def _plot(self, logs):
             met = logs.get(self.metric)
             if met is None:
-                warnings.warn('LearningCurvePlotter requires {} available!'.format(self.metric), RuntimeWarning)
-            val_met = logs.get('val_{}'.format(self.metric))
+                warnings.warn(f'LearningCurvePlotter requires {self.metric} available!', RuntimeWarning)
+            val_met = logs.get(f'val_{self.metric}')
 
             self.met_list.append(met)
             self.val_met_list.append(val_met)
@@ -582,7 +582,7 @@ def learning_curve_plot_callback(filename, metric='loss'):
                 df = pd.DataFrame()
                 df[self.metric] = self.met_list
                 if val_met is not None:
-                    df['val_{}'.format(self.metric)] = self.val_met_list
+                    df[f'val_{self.metric}'] = self.val_met_list
 
                 df.plot()
 
@@ -633,7 +633,7 @@ def tsv_log_callback(filename, append=False):
                 value = logs.get(k)
                 if value is None:
                     return '<none>'
-                return '{:.4f}'.format(value)
+                return f'{value:.4f}'
 
             metrics = [_format_metric(logs, k) for k in self.params['metrics']]
             self.log_writer.writerow([epoch + 1, '{:.1e}'.format(logs['lr'])] + metrics +
@@ -665,7 +665,7 @@ def logger_callback(name='__main__'):
         def on_epoch_end(self, epoch, logs=None):
             lr = K.get_value(self.model.optimizer.lr)
             elapsed_time = time.time() - self.epoch_start_time
-            metrics = " ".join(['{}={:.4f}'.format(k, logs.get(k)) for k in self.params['metrics']])
+            metrics = " ".join([f'{k}={logs.get(k):.4f}' for k in self.params['metrics']])
             self.logger.debug('Epoch %3d: lr=%.1e %s time=%d',
                               epoch + 1, lr, metrics, int(np.ceil(elapsed_time)))
 
@@ -712,7 +712,7 @@ def freeze_bn_callback(freeze_epoch_rate: float, logger_name=None):
                 if len(self.freezed_layers) > 0:
                     self._recompile()
                 logger = log.get(self.logger_name or __name__)
-                logger.info('Freeze BN: freezed layers = {}'.format(len(self.freezed_layers)))
+                logger.info(f'Freeze BN: freezed layers = {len(self.freezed_layers)}')
 
         def _freeze_layers(self, container):
             for layer in container.layers:
@@ -733,7 +733,7 @@ def freeze_bn_callback(freeze_epoch_rate: float, logger_name=None):
             if unfreezed > 0:
                 self._recompile()
             logger = log.get(self.logger_name or __name__)
-            logger.info('Freeze BN: unfreezed layers = {}'.format(unfreezed))
+            logger.info(f'Freeze BN: unfreezed layers = {unfreezed}')
 
         def _recompile(self):
             self.model.compile(

@@ -56,8 +56,13 @@ def test_filters():
         cp.unlink()
     for i, (partial, name, filter_func) in enumerate(filters):
         x = np.copy(rgb)
+        t = filter_func(x[64:-64, 64:-64, :] if partial else x)
+
+        assert t.dtype == np.float32
+        assert len(t.shape) == 3
+
         if partial:
-            x[64:-64, 64:-64, :] = filter_func(x[64:-64, 64:-64, :])
+            x[64:-64, 64:-64, :] = t
         else:
-            x = filter_func(x)
-        tk.ndimage.save(save_dir.joinpath('{:02d}_{}.png'.format(i, name)), x)
+            x = t
+        tk.ndimage.save(save_dir / f'{i:02d}_{name}.png', x)

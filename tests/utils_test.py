@@ -37,6 +37,6 @@ def _test_create_gpu_pool_func(arg):
     tmpdir, a = arg
     assert a in range(3)
     pid = os.environ['GPU_POOL_PID']
-    print('a={} tid={}'.format(a, pid))
-    with open(os.path.join(tmpdir, '{}.log'.format(a)), 'w') as f:
-        f.write('{}'.format(a))
+    print(f'a={a} pid={pid}')
+    with open(os.path.join(tmpdir, f'{a}.log'), 'w') as f:
+        f.write(f'{a}')

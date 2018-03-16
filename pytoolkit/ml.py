@@ -101,8 +101,8 @@ class ObjectsAnnotation(object):
         - set_name: 'trainval'とか'test'とか
 
         """
-        names = io.read_all_lines(data_dir / 'VOCdevkit/VOC{}/ImageSets/Main/{}.txt'.format(year, set_name))
-        y = cls.load_voc_files(data_dir / 'VOCdevkit/VOC{}/Annotations'.format(year),
+        names = io.read_all_lines(data_dir / f'VOCdevkit/VOC{year}/ImageSets/Main/{set_name}.txt')
+        y = cls.load_voc_files(data_dir / f'VOCdevkit/VOC{year}/Annotations',
                                names, class_name_to_id, without_difficult)
         return np.array(y)
 
@@ -114,7 +114,7 @@ class ObjectsAnnotation(object):
         戻り値はObjectsAnnotationの配列。
         """
         d = pathlib.Path(annotations_dir)
-        return [cls.load_voc_file(d.joinpath(name + '.xml'), class_name_to_id, without_difficult)
+        return [cls.load_voc_file(d / (name + '.xml'), class_name_to_id, without_difficult)
                 for name in names]
 
     @staticmethod
@@ -143,7 +143,7 @@ class ObjectsAnnotation(object):
             bboxes.append([xmin, ymin, xmax, ymax])
             difficults.append(difficult)
         annotation = ObjectsAnnotation(
-            folder='VOCdevkit/{}/JPEGImages'.format(folder),
+            folder=f'VOCdevkit/{folder}/JPEGImages',
             filename=filename,
             width=width,
             height=height,
@@ -448,8 +448,8 @@ class WeakModel(object):
         train, _ = self.split(fold, X, y, groups)
         estimator.fit(X[train], y[train], **fit_params)
         pred = estimator.predict_proba(X)
-        sklearn.externals.joblib.dump(pred, str(self.model_dir.joinpath('predict.fold{}.train.pkl'.format(fold))))
-        sklearn.externals.joblib.dump(estimator, str(self.model_dir.joinpath('model.fold{}.pkl'.format(fold))))
+        sklearn.externals.joblib.dump(pred, str(self.model_dir / f'predict.fold{fold}.train.pkl'))
+        sklearn.externals.joblib.dump(estimator, str(self.model_dir / f'model.fold{fold}.pkl'))
 
     def oopf(self, X, y, groups=None):
         """out-of-folds predictionを作って返す。
@@ -457,16 +457,16 @@ class WeakModel(object):
         Xはデータの順序が変わってないかのチェック用。
         """
         self._init_data()
-        oopf = sklearn.externals.joblib.load(str(self.model_dir.joinpath('predict.fold{}.train.pkl'.format(0))))
+        oopf = sklearn.externals.joblib.load(str(self.model_dir / f'predict.fold{0}.train.pkl'))
         for fold in range(1, self.cv):
-            pred = sklearn.externals.joblib.load(str(self.model_dir.joinpath('predict.fold{}.train.pkl'.format(fold))))
+            pred = sklearn.externals.joblib.load(str(self.model_dir / f'predict.fold{fold}.train.pkl'))
             _, test = self.split(fold, X, y, groups)
             oopf[test] = pred[test]
         return oopf
 
     def _init_data(self):
         """self.data_の初期化。今のところ(?)split_seedのみ。"""
-        model_json_file = self.model_dir.joinpath('model.json')
+        model_json_file = self.model_dir / 'model.json'
         if model_json_file.is_file():
             # あれば読み込み
             with model_json_file.open() as f:
@@ -488,7 +488,7 @@ def plot_cm(cm, to_file='confusion_matrix.png', classes=None, normalize=True, ti
     import matplotlib.pyplot as plt
 
     if classes is None:
-        classes = ['class {}'.format(i) for i in range(len(cm))]
+        classes = [f'class {i}' for i in range(len(cm))]
 
     if normalize:
         cm = np.array(cm, dtype=np.float32)
@@ -592,7 +592,7 @@ def plot_objects(base_image, save_path, classes, confs, locs, class_names):
     elif isinstance(base_image, np.ndarray):
         img = base_image
     else:
-        raise ValueError('type error: type(base_image)={}'.format(type(base_image)))
+        raise ValueError(f'type error: type(base_image)={type(base_image)}')
     plt.imshow(img / 255.)
     gca = plt.gca()
     for classid, conf, loc in zip(classes, confs, locs):
@@ -604,7 +604,7 @@ def plot_objects(base_image, save_path, classes, confs, locs, class_names):
         if conf is None:
             txt = label
         else:
-            txt = '{:0.2f}, {}'.format(conf, label)
+            txt = f'{conf:0.2f}, {label}'
         color = colors[classid]
         gca.add_patch(plt.Rectangle(
             (xmin, ymin), xmax - xmin + 1, ymax - ymin + 1,

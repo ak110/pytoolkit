@@ -62,7 +62,7 @@ def _main():
                 break
     # 最後のバッチを保存
     for ix, x in enumerate(X_batch):
-        tk.ndimage.save(save_dir / '{}.png'.format(ix), x)
+        tk.ndimage.save(save_dir / f'{ix}.png', x)
 
     # プロファイル結果
     gen.summary_profile()
