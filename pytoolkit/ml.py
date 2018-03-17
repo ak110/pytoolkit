@@ -156,9 +156,16 @@ class ObjectsAnnotation(object):
 def listup_classification(dirpath, class_names=None):
     """画像分類でよくある、クラス名ディレクトリの列挙。クラス名の配列, X, yを返す。"""
     dirpath = pathlib.Path(dirpath)
+
     # クラス名
     if class_names is None:
-        class_names = list(sorted([p.name for p in dirpath.iterdir() if p.is_dir()]))
+        def _empty(it):
+            for _ in it:
+                return False
+            return True
+
+        class_names = list(sorted([p.name for p in dirpath.iterdir() if p.is_dir() and not _empty(p.iterdir())]))
+
     # 各クラスのデータ
     X, y = [], []
     for class_id, class_name in enumerate(class_names):
