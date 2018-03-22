@@ -7,7 +7,6 @@ import time
 import warnings
 
 import numpy as np
-import pandas as pd
 
 from .. import log, utils
 
@@ -574,6 +573,7 @@ def learning_curve_plot_callback(filename, metric='loss'):
             self.val_met_list.append(val_met)
 
             if len(self.met_list) > 1:
+                import pandas as pd
                 df = pd.DataFrame()
                 df[self.metric] = self.met_list
                 if val_met is not None:
@@ -756,6 +756,7 @@ def plot_model_params(model, to_file='model.params.png', skip_bn=True):
             continue
         rows.append([layer.name, pc])
 
+    import pandas as pd
     df = pd.DataFrame(data=rows, columns=['name', 'params'])
     df.plot(x='name', y='params', kind='barh', figsize=(16, 4 * (len(rows) // 32 + 1)))
 
