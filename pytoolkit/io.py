@@ -40,7 +40,7 @@ def do_retry(func, count=10, sleep_seconds=1.0):
     while True:
         try:
             return func()
-        except:
+        except BaseException:
             if retry >= count:
                 raise
             retry += 1

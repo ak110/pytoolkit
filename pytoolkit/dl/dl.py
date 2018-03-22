@@ -560,7 +560,7 @@ def learning_curve_plot_callback(filename, metric='loss'):
         def on_epoch_end(self, epoch, logs=None):
             try:
                 self._plot(logs)
-            except:  # noqa
+            except BaseException:
                 import traceback
                 warnings.warn(traceback.format_exc(), RuntimeWarning)
 

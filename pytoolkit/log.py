@@ -12,13 +12,16 @@ import time
 
 
 def init(output_path, append=False, rotate=False, max_bytes=1048576, backup_count=10,
+         stream_level=logging.INFO,
          stream_fmt='[%(levelname)-5s] %(message)s',
+         file_level=logging.DEBUG,
          file_fmt='[%(levelname)-5s] %(message)s <%(name)s:%(filename)s:%(lineno)d>'):
     """ルートロガーの初期化。"""
     logger = get(None)
-    logger.addHandler(stream_handler(fmt=stream_fmt))
+    logger.addHandler(stream_handler(level=stream_level, fmt=stream_fmt))
     if output_path is not None:
-        logger.addHandler(file_handler(output_path, append, rotate, max_bytes, backup_count, fmt=file_fmt))
+        logger.addHandler(file_handler(output_path, append, rotate, max_bytes, backup_count,
+                                       level=file_level, fmt=file_fmt))
 
 
 def get(name=None):
