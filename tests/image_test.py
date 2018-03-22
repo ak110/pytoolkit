@@ -1,7 +1,7 @@
 import pathlib
 
 import numpy as np
-import sklearn.externals.joblib
+import sklearn.externals.joblib as joblib
 
 import pytoolkit as tk
 
@@ -37,7 +37,7 @@ def test_image_data_generator_save():
     gen = _gen()
 
     X_list = [
-        np.array([sklearn.externals.joblib.load(str(data_dir / 'cifar.pkl'))]),
+        np.array([joblib.load(str(data_dir / 'cifar.pkl'))]),
         np.array([str(data_dir / 'Lenna.png')]),
     ]
     for X, dir_name in zip(X_list, ['image1', 'image2']):

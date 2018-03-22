@@ -6,7 +6,7 @@ import subprocess
 import sys
 
 import numpy as np
-import sklearn.externals.joblib
+import sklearn.externals.joblib as joblib
 
 
 def memorized(cache_path, func):
@@ -15,11 +15,11 @@ def memorized(cache_path, func):
     funcは呼び出すたびに毎回同じ結果が返るものという仮定のもとに単純にキャッシュするだけ。
     """
     if os.path.isfile(cache_path):
-        return sklearn.externals.joblib.load(cache_path)
+        return joblib.load(cache_path)
 
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
     result = func()
-    sklearn.externals.joblib.dump(result, cache_path)
+    joblib.dump(result, cache_path)
     return result
 
 

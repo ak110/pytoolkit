@@ -10,6 +10,7 @@ import numpy as np
 import scipy.misc
 import sklearn.base
 import sklearn.cluster
+import sklearn.externals.joblib as joblib
 import sklearn.model_selection
 import sklearn.utils
 
@@ -455,8 +456,8 @@ class WeakModel(object):
         train, _ = self.split(fold, X, y, groups)
         estimator.fit(X[train], y[train], **fit_params)
         pred = estimator.predict_proba(X)
-        sklearn.externals.joblib.dump(pred, str(self.model_dir / f'predict.fold{fold}.train.pkl'))
-        sklearn.externals.joblib.dump(estimator, str(self.model_dir / f'model.fold{fold}.pkl'))
+        joblib.dump(pred, str(self.model_dir / f'predict.fold{fold}.train.pkl'))
+        joblib.dump(estimator, str(self.model_dir / f'model.fold{fold}.pkl'))
 
     def oopf(self, X, y, groups=None):
         """out-of-folds predictionを作って返す。
@@ -464,9 +465,9 @@ class WeakModel(object):
         Xはデータの順序が変わってないかのチェック用。
         """
         self._init_data()
-        oopf = sklearn.externals.joblib.load(str(self.model_dir / f'predict.fold{0}.train.pkl'))
+        oopf = joblib.load(str(self.model_dir / f'predict.fold{0}.train.pkl'))
         for fold in range(1, self.cv):
-            pred = sklearn.externals.joblib.load(str(self.model_dir / f'predict.fold{fold}.train.pkl'))
+            pred = joblib.load(str(self.model_dir / f'predict.fold{fold}.train.pkl'))
             _, test = self.split(fold, X, y, groups)
             oopf[test] = pred[test]
         return oopf
