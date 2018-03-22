@@ -5,8 +5,8 @@ import os
 import time
 
 import numpy as np
-import sklearn.utils
 import sklearn.externals.joblib as joblib
+import sklearn.utils
 
 
 class GeneratorContext(object):
