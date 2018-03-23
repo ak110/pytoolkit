@@ -18,17 +18,16 @@ def init(output_path, append=False, rotate=False, max_bytes=1048576, backup_coun
          file_fmt='[%(levelname)-5s] %(message)s <%(name)s:%(filename)s:%(lineno)d>'):
     """ルートロガーの初期化。"""
     logger = get(None)
+    logger.setLevel(logging.DEBUG)
     logger.addHandler(stream_handler(level=stream_level, fmt=stream_fmt))
     if output_path is not None:
         logger.addHandler(file_handler(output_path, append, rotate, max_bytes, backup_count,
                                        level=file_level, fmt=file_fmt))
 
 
-def get(name=None):
+def get(name):
     """ロガーを取得して返す。"""
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
-    return logger
+    return logging.getLogger(name)
 
 
 def stream_handler(stream=None, level=logging.INFO, fmt='[%(levelname)-5s] %(message)s'):
