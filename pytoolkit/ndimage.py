@@ -24,6 +24,10 @@ def load(path_or_array: typing.Union[np.ndarray, str, pathlib.Path], grayscale=F
         # ファイルパスなら読み込み
         flags = cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR
         img = cv2.imread(str(path_or_array), flags)
+        if img is None and (pathlib.Path(path_or_array).suffix or '').lower() == '.gif':
+            gif = cv2.VideoCapture(str(path_or_array))
+            assert gif is not None, f'load error: {path_or_array}'
+            _, img = gif.read()
         if grayscale:
             img = np.expand_dims(img, axis=-1)
         else:
