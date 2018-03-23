@@ -8,3 +8,4 @@ importしただけではkerasがimportされないように作っている。
 
 from .dl import *
 from . import metrics
+from . import layers

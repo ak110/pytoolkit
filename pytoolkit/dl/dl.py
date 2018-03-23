@@ -8,6 +8,7 @@ import warnings
 
 import numpy as np
 
+from . import layers
 from .. import log, utils
 
 
@@ -61,11 +62,12 @@ def create_data_parallel_model(model, batch_size, gpu_count=None):
 class Builder(object):
     """Kerasでネットワークを作るときのヘルパークラス。"""
 
-    def __init__(self):
+    def __init__(self, use_gn=False):
         self.conv_defaults = {'padding': 'same'}
         self.dense_defaults = {}
         self.bn_defaults = {}
         self.act_defaults = {'activation': 'elu'}
+        self.use_gn = use_gn
 
     def set_default_l2(self, l2_weight=1e-5):
         """全layerの既定値にL2を設定。"""
@@ -138,6 +140,8 @@ class Builder(object):
 
     def bn(self, **kwargs):
         """BatchNormalization。"""
+        if self.use_gn:
+            return layers.group_normalization()(**self._params(self.bn_defaults, kwargs))
         import keras.layers
         return keras.layers.BatchNormalization(**self._params(self.bn_defaults, kwargs))
 
@@ -161,11 +165,12 @@ class Builder(object):
 def get_custom_objects():
     """独自オブジェクトのdictを返す。"""
     return {
-        'Destandarization': destandarization_layer(),
-        'StocasticAdd': stocastic_add_layer(),
-        'NormalNoise': normal_noise_layer(),
-        'L2Normalization': l2normalization_layer(),
-        'WeightedMean': weighted_mean_layer(),
+        'GroupNormalization': layers.group_normalization(),
+        'Destandarization': layers.destandarization(),
+        'StocasticAdd': layers.stocastic_add(),
+        'NormalNoise': layers.normal_noise(),
+        'L2Normalization': layers.l2normalization(),
+        'WeightedMean': layers.weighted_mean(),
         'NSGD': nsgd(),
     }
 
