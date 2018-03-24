@@ -62,17 +62,19 @@ def create_data_parallel_model(model, batch_size, gpu_count=None):
 class Builder(object):
     """Kerasでネットワークを作るときのヘルパークラス。"""
 
-    def __init__(self, use_gn=False):
-        self.conv_defaults = {'padding': 'same'}
-        self.dense_defaults = {}
+    def __init__(self, use_gn=False, default_l2=1e-5):
+        self.conv_defaults = {'kernel_initializer': 'he_uniform', 'padding': 'same'}
+        self.dense_defaults = {'kernel_initializer': 'he_uniform'}
         self.bn_defaults = {}
         self.act_defaults = {'activation': 'elu'}
         self.use_gn = use_gn
+        if default_l2:
+            self.set_default_l2(default_l2)
 
-    def set_default_l2(self, l2_weight=1e-5):
+    def set_default_l2(self, default_l2=1e-5):
         """全layerの既定値にL2を設定。"""
         from keras.regularizers import l2
-        reg = l2(l2_weight)
+        reg = l2(default_l2)
         self.conv_defaults['kernel_regularizer'] = reg
         self.conv_defaults['bias_regularizer'] = reg
         self.dense_defaults['kernel_regularizer'] = reg
@@ -160,6 +162,12 @@ class Builder(object):
         params = copy.copy(defaults)
         params.update(kwargs)
         return params
+
+    @staticmethod
+    def shape(x):
+        """`K.int_shapeを実行するだけのヘルパー (これだけのためにbackendをimportするのが面倒なので)`"""
+        import keras.backend as K
+        return K.int_shape(x)
 
 
 def get_custom_objects():
