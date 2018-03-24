@@ -2,9 +2,7 @@
 """ImageDataGeneratorのチェック用コード。"""
 import pathlib
 
-import better_exceptions
 import numpy as np
-from tqdm import tqdm
 
 _BATCH_SIZE = 16
 _ITER = 32
@@ -12,9 +10,6 @@ _IMAGE_SIZE = (256, 256)
 
 
 def _main():
-    better_exceptions.MAX_LENGTH = 128
-    np.random.seed(1234)
-
     base_dir = pathlib.Path(__file__).resolve().parent
     data_dir = base_dir / 'tests' / 'data'
     save_dir = base_dir / '___check' / 'bench'
@@ -23,6 +18,7 @@ def _main():
     import sys
     sys.path.insert(0, str(base_dir.parent))
     import pytoolkit as tk
+    tk.better_exceptions()
 
     gen = tk.image.ImageDataGenerator(profile=True)
     gen.add(tk.image.Resize(_IMAGE_SIZE))
@@ -49,12 +45,12 @@ def _main():
     gen.add(tk.image.RandomErasing(probability=0.5))
     gen.add(tk.image.ProcessInput(lambda x: x))
 
-    X = np.array([str(data_dir / '9ab919332a1dceff9a252b43c0fb34a0_m.jpg')] * 16)
+    X = np.array([data_dir / '9ab919332a1dceff9a252b43c0fb34a0_m.jpg'] * 16)
     y = np.zeros((len(X),), dtype=int)
     g = gen.flow(X, y, batch_size=_BATCH_SIZE, data_augmentation=True, random_state=123)
     # 適当にループして速度を見る
     X_batch = []
-    with tqdm(total=_BATCH_SIZE * _ITER, unit='f', ascii=True, ncols=100) as pbar:
+    with tk.tqdm(total=_BATCH_SIZE * _ITER, unit='f') as pbar:
         for it, (X_batch, y_batch) in enumerate(g):
             assert len(y_batch.shape) == 2
             pbar.update(len(X_batch))

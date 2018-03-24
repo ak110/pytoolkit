@@ -8,6 +8,14 @@ import sys
 import numpy as np
 import sklearn.externals.joblib as joblib
 
+from . import log
+
+
+def noqa(*args):
+    """pylintなどの誤検知対策用の空の関数。"""
+    assert args is None or args is not None  # noqa
+    assert args is None or args is not None  # noqa
+
 
 def memorized(cache_path, func):
     """結果をcache_pathにキャッシュする処理
@@ -96,3 +104,18 @@ def capture_output():
                 sys.stdout = stdout
         return _decorated_func
     return _decorator
+
+
+def better_exceptions():
+    """`better_exceptions`するだけ。"""
+    try:
+        import better_exceptions as be  # pip install better_exceptions
+        be.MAX_LENGTH = 128
+    except BaseException:
+        log.get(__name__).warning('better_exceptions is not installed?', exc_info=True)
+
+
+def tqdm(iterable=None, desc=None, total=None, leave=True, **kwargs):
+    """`tqdm`の簡単なラッパー。"""
+    from tqdm import tqdm as t
+    return t(iterable, desc, total, leave, ascii=True, ncols=100, **kwargs)

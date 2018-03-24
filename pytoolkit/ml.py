@@ -293,7 +293,7 @@ def compute_ap(precision, recall, use_voc2007_metric=False):
         mrec = np.concatenate(([0.], recall, [1.]))
         mpre = np.concatenate(([0.], precision, [0.]))
 
-        mpre = np.maximum.accumulate(mpre[::-1])[::-1]
+        mpre = np.maximum.accumulate(mpre[::-1])[::-1]  # pylint: disable=no-member
 
         i = np.where(mrec[1:] != mrec[:-1])[0]
 
