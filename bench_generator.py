@@ -32,16 +32,7 @@ def _main():
     gen.add(tk.image.RandomCrop(probability=1))
     gen.add(tk.image.Resize(_IMAGE_SIZE))
     gen.add(tk.image.RandomFlipLR(probability=0.5))
-    gen.add(tk.image.RandomAugmentors([
-        tk.image.RandomBlur(probability=0.25),
-        tk.image.RandomUnsharpMask(probability=0.25),
-        tk.image.RandomMedian(probability=0.25),
-        tk.image.GaussianNoise(probability=0.25),
-        tk.image.RandomSaturation(probability=0.5),
-        tk.image.RandomBrightness(probability=0.5),
-        tk.image.RandomContrast(probability=0.5),
-        tk.image.RandomHue(probability=0.5),
-    ]))
+    gen.add(tk.image.RandomColorAugmentors(probability=0.5))
     gen.add(tk.image.RandomErasing(probability=0.5))
     gen.add(tk.image.ProcessInput(lambda x: x))
 

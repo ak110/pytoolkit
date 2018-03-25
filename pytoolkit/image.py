@@ -27,15 +27,7 @@ class ImageDataGenerator(generator.Generator):
     gen.add(tk.image.RandomCrop(probability=1))
     gen.add(tk.image.Resize((300, 300)))
     gen.add(tk.image.RandomFlipLR(probability=0.5))
-    gen.add(tk.image.RandomAugmentors([
-        tk.image.RandomBlur(probability=0.5),
-        tk.image.RandomUnsharpMask(probability=0.5),
-        tk.image.GaussianNoise(probability=0.5),
-        tk.image.RandomSaturation(probability=0.5),
-        tk.image.RandomBrightness(probability=0.5),
-        tk.image.RandomContrast(probability=0.5),
-        tk.image.RandomHue(probability=0.5),
-    ]))
+    gen.add(tk.image.RandomColorAugmentors(probability=0.5))
     gen.add(tk.image.RandomErasing(probability=0.5))
     gen.add(tk.image.ProcessInput(tk.image.preprocess_input_abs1))
     ```
@@ -273,6 +265,22 @@ class RandomAugmentors(generator.Operator):
             if self.clip_rgb:
                 rgb = np.clip(rgb, 0, 255)
         return rgb, y, w
+
+
+class RandomColorAugmentors(RandomAugmentors):
+    """色関連のDataAugmentationをいくつかまとめたもの。"""
+
+    def __init__(self, probability=1):
+        argumentors = [
+            RandomBlur(probability=probability),
+            RandomUnsharpMask(probability=probability),
+            GaussianNoise(probability=probability),
+            RandomSaturation(probability=probability),
+            RandomBrightness(probability=probability),
+            RandomContrast(probability=probability),
+            RandomHue(probability=probability),
+        ]
+        super().__init__(argumentors, probability=1, clip_rgb=True)
 
 
 class RandomFlipLR(generator.Operator):
