@@ -1,6 +1,121 @@
-"""Kerasのカスタムレイヤー。"""
+"""Kerasのカスタムレイヤーなど。"""
+import copy
 
 import numpy as np
+
+
+class Builder(object):
+    """Kerasでネットワークを作るときのヘルパークラス。"""
+
+    def __init__(self, use_gn=False, default_l2=1e-5):
+        self.conv_defaults = {'kernel_initializer': 'he_uniform', 'padding': 'same'}
+        self.dense_defaults = {'kernel_initializer': 'he_uniform'}
+        self.bn_defaults = {}
+        self.gn_defaults = {}
+        self.act_defaults = {'activation': 'elu'}
+        self.use_gn = use_gn
+        if default_l2:
+            self.set_default_l2(default_l2)
+
+    def set_default_l2(self, default_l2=1e-5):
+        """全layerの既定値にL2を設定。"""
+        from keras.regularizers import l2
+        reg = l2(default_l2)
+        self.conv_defaults['kernel_regularizer'] = reg
+        self.conv_defaults['bias_regularizer'] = reg
+        self.dense_defaults['kernel_regularizer'] = reg
+        self.dense_defaults['bias_regularizer'] = reg
+        self.bn_defaults['gamma_regularizer'] = reg
+        self.bn_defaults['beta_regularizer'] = reg
+        self.gn_defaults['gamma_regularizer'] = reg
+        self.gn_defaults['beta_regularizer'] = reg
+
+    def conv1d(self, filters, kernel_size, name, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
+        """Conv1D+BN+Act。"""
+        import keras.layers
+        return self._conv(keras.layers.Conv1D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+
+    def conv2d(self, filters, kernel_size, name, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
+        """Conv2D+BN+Act。"""
+        import keras.layers
+        return self._conv(keras.layers.Conv2D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+
+    def conv3d(self, filters, kernel_size, name, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
+        """Conv3D+BN+Act。"""
+        import keras.layers
+        return self._conv(keras.layers.Conv3D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+
+    def conv2dtr(self, filters, kernel_size, name, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
+        """Conv2DTranspose+BN+Act。"""
+        import keras.layers
+        return self._conv(keras.layers.Conv2DTranspose, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+
+    def _conv(self, conv, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs):
+        """ConvND+BN+Act。"""
+        kwargs = copy.copy(kwargs)
+        bn_kwargs = copy.copy(bn_kwargs) if bn_kwargs is not None else {}
+        act_kwargs = copy.copy(act_kwargs) if act_kwargs is not None else {}
+        if use_bn:
+            kwargs['use_bias'] = False
+        if 'activation' in kwargs:
+            if use_bn:
+                assert 'activation' not in act_kwargs
+                act_kwargs['activation'] = kwargs.pop('activation')
+            else:
+                use_act = False
+
+        if not use_bn:
+            assert len(bn_kwargs) == 0
+        if not use_act:
+            assert len(act_kwargs) == 0
+        if not kwargs.get('use_bias', True):
+            assert 'bias_initializer' not in kwargs
+            assert 'bias_regularizer' not in kwargs
+            assert 'bias_constraint' not in kwargs
+
+        conv = conv(filters, kernel_size, name=name, **self._params(self.conv_defaults, kwargs))
+        bn = self.bn(name=name + '_bn', **bn_kwargs) if use_bn else None
+        act = self.act(name=name + '_act', **act_kwargs) if use_act else None
+
+        if not use_bn and not use_act:
+            return conv
+
+        def _pseudo_layer(x):
+            x = conv(x)
+            x = bn(x) if use_bn else x
+            x = act(x) if use_act else x
+            return x
+
+        return _pseudo_layer
+
+    def bn(self, **kwargs):
+        """BatchNormalization。"""
+        if self.use_gn:
+            return group_normalization()(**self._params(self.gn_defaults, kwargs))
+        import keras.layers
+        return keras.layers.BatchNormalization(**self._params(self.bn_defaults, kwargs))
+
+    def act(self, **kwargs):
+        """Activation。"""
+        import keras.layers
+        return keras.layers.Activation(**self._params(self.act_defaults, kwargs))
+
+    def dense(self, units, **kwargs):
+        """Dense。"""
+        import keras.layers
+        return keras.layers.Dense(units, **self._params(self.dense_defaults, kwargs))
+
+    @staticmethod
+    def _params(defaults, kwargs):
+        params = copy.copy(defaults)
+        params.update(kwargs)
+        return params
+
+    @staticmethod
+    def shape(x):
+        """`K.int_shapeを実行するだけのヘルパー (これだけのためにbackendをimportするのが面倒なので)`"""
+        import keras.backend as K
+        return K.int_shape(x)
 
 
 def group_normalization():

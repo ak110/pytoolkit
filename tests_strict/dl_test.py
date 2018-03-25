@@ -55,11 +55,11 @@ def test_xor(tmpdir):
             epochs=8,
             verbose=2,
             callbacks=[
-                tk.dl.learning_rate_callback(logger_name='test_xor'),
-                tk.dl.learning_curve_plot_callback(str(tmpdir.join('history.png'))),
-                tk.dl.tsv_log_callback(str(tmpdir.join('history.tsv'))),
-                tk.dl.logger_callback('test_xor'),
-                tk.dl.freeze_bn_callback(0.5, logger_name='test_xor'),
+                tk.dl.callbacks.learning_rate(logger_name='test_xor'),
+                tk.dl.callbacks.learning_curve_plot(str(tmpdir.join('history.png'))),
+                tk.dl.callbacks.tsv_logger(str(tmpdir.join('history.tsv'))),
+                tk.dl.callbacks.logger('test_xor'),
+                tk.dl.callbacks.freeze_bn(0.5, logger_name='test_xor'),
             ])
         pred = model.predict(X)
         y_pred = (pred > 0.5).astype(np.int32).reshape(y.shape)
@@ -82,8 +82,8 @@ def test_params(tmpdir):
     model.add(keras.layers.Dense(32, input_shape=(16,)))
     model.add(keras.layers.Dense(32))
     model.add(keras.layers.BatchNormalization())
-    tk.dl.plot_model_params(model, filepath)
+    tk.dl.models.plot_model_params(model, filepath)
 
     assert pathlib.Path(filepath).is_file()  # とりあえず存在チェックだけ
 
-    assert tk.dl.count_trainable_params(model) == (16 * 32 + 32) + (32 * 32 + 32) + 32 * 2
+    assert tk.dl.models.count_trainable_params(model) == (16 * 32 + 32) + (32 * 32 + 32) + 32 * 2
