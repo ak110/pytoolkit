@@ -58,7 +58,7 @@ def test_xor(tmpdir):
                 tk.dl.callbacks.learning_rate(logger_name='test_xor'),
                 tk.dl.callbacks.learning_curve_plot(str(tmpdir.join('history.png'))),
                 tk.dl.callbacks.tsv_logger(str(tmpdir.join('history.tsv'))),
-                tk.dl.callbacks.logger('test_xor'),
+                tk.dl.callbacks.epoch_logger('test_xor'),
                 tk.dl.callbacks.freeze_bn(0.5, logger_name='test_xor'),
             ])
         pred = model.predict(X)

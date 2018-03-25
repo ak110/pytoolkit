@@ -1,7 +1,99 @@
 """Kerasのモデル関連。"""
 import warnings
 
-from .. import log, utils
+from .. import generator, log, utils
+
+
+class Model(object):
+    """`keras.models.Model` + `tk.dl.generators.Generator`の薄いラッパー。"""
+
+    def __init__(self, model, gen: generator.Generator, use_horovod: bool = False):
+        self.model = model  # type: keras.models.Model
+        self.gen = gen
+        self.use_horovod = use_horovod
+
+    def load_weights(self, filepath, where_fn=None):
+        """重みの読み込み。
+
+        model.load_weights()は重みの形が違うと読み込めないが、
+        警告を出しつつ読むようにしたもの。
+        """
+        load_weights(self.model, filepath, where_fn)
+
+    @log.trace()
+    def compile(self, optimizer, loss, metrics=None,
+                sample_weight_mode=None, weighted_metrics=None, target_tensors=None,
+                device_dense='', device_sparse=''):
+        """コンパイル。"""
+        if self.use_horovod:
+            import horovod.keras as hvd
+            optimizer = hvd.DistributedOptimizer(
+                optimizer, device_dense=device_dense, device_sparse=device_sparse)
+        self.model.compile(optimizer, loss, metrics=metrics,
+                           sample_weight_mode=sample_weight_mode,
+                           weighted_metrics=weighted_metrics,
+                           target_tensors=target_tensors)
+
+    def summary(self):
+        """サマリ表示。"""
+        print_fn = log.get(__name__).info if self.printable else lambda: None
+        self.model.summary(print_fn=print_fn)
+
+    def horovod_callbacks(self):
+        """"Horovodのコールバック3つをまとめて返すだけのやつ。"""
+        assert self.use_horovod
+        import horovod.keras as hvd
+        return [
+            hvd.callbacks.BroadcastGlobalVariablesCallback(0),
+            hvd.callbacks.MetricAverageCallback(),
+            hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1),
+        ]
+
+    def fit(self, X_train, y_train,
+            batch_size=32, epochs=1, verbose=1, callbacks=None,
+            validation_data: tuple = None,
+            class_weight=None, initial_epoch=0):
+        """学習。"""
+        has_val = validation_data is not None
+        X_val, y_val = validation_data if has_val else (None, None)
+        gen1 = self.gen.flow(X_train, y_train, batch_size=batch_size, data_augmentation=True, shuffle=True)
+        gen2 = self.gen.flow(X_val, y_val, batch_size=batch_size, shuffle=self.use_horovod) if has_val else None
+        steps1 = self.gen.steps_per_epoch(len(X_train), batch_size)
+        steps2 = self.gen.steps_per_epoch(len(X_val), batch_size) if has_val else None
+
+        if self.use_horovod:
+            import horovod.keras as hvd
+            steps1 //= hvd.size()
+            steps2 //= hvd.size()  # horovodのサンプルでは * 3 だけど早く進んで欲しいので省略
+
+        hist = self.model.fit_generator(
+            gen1, steps1, epochs=epochs,
+            verbose=verbose if self.printable else 0,
+            callbacks=callbacks,
+            validation_data=gen2,
+            validation_steps=steps2,
+            class_weight=class_weight,
+            initial_epoch=initial_epoch)
+        return hist
+
+    def predict(self, X, batch_size=32, data_augmentation=False):
+        """予測。"""
+        gen = self.gen.flow(X, batch_size=batch_size, data_augmentation=data_augmentation)
+        steps = self.gen.steps_per_epoch(len(X), batch_size=batch_size)
+        return self.model.predict_generator(gen, steps)
+
+    def evaluate(self, X, y, batch_size=32, data_augmentation=False):
+        """評価。"""
+        gen = self.gen.flow(X, y, batch_size=batch_size, data_augmentation=data_augmentation)
+        steps = self.gen.steps_per_epoch(len(X), batch_size=batch_size)
+        return self.model.evaluate_generator(gen, steps)
+
+    def printable(self):
+        """Horovodを使ってるなら`hvd.rank() == 0`の場合、そうでないなら常にTrue。"""
+        if self.use_horovod:
+            import horovod.keras as hvd
+            return hvd.rank() == 0
+        return True
 
 
 @log.trace()
