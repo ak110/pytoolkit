@@ -38,6 +38,7 @@ class Model(object):
         """サマリ表示。"""
         print_fn = log.get(__name__).info if self.printable else lambda: None
         self.model.summary(print_fn=print_fn)
+        print_fn(f'network depth: {count_network_depth(self.model)}')
 
     def horovod_callbacks(self):
         """"Horovodのコールバック3つをまとめて返すだけのやつ。"""
@@ -87,6 +88,10 @@ class Model(object):
         gen = self.gen.flow(X, y, batch_size=batch_size, data_augmentation=data_augmentation)
         steps = self.gen.steps_per_epoch(len(X), batch_size=batch_size)
         return self.model.evaluate_generator(gen, steps)
+
+    def save(self, filepath, overwrite=True, include_optimizer=True):
+        """pathlib対応なsave。"""
+        self.model.save(str(filepath), overwrite=overwrite, include_optimizer=include_optimizer)
 
     def printable(self):
         """Horovodを使ってるなら`hvd.rank() == 0`の場合、そうでないなら常にTrue。"""
