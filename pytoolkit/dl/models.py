@@ -41,7 +41,7 @@ class Model(object):
         print_fn(f'network depth: {count_network_depth(self.model)}')
 
     def horovod_callbacks(self):
-        """"Horovodのコールバック3つをまとめて返すだけのやつ。"""
+        """Horovodのコールバック3つをまとめて返すだけのやつ。"""
         assert self.use_horovod
         import horovod.keras as hvd
         return [
@@ -53,11 +53,12 @@ class Model(object):
     def fit(self, X_train, y_train,
             batch_size=32, epochs=1, verbose=1, callbacks=None,
             validation_data: tuple = None,
-            class_weight=None, initial_epoch=0):
+            class_weight=None, initial_epoch=0,
+            balanced=False):
         """学習。"""
         has_val = validation_data is not None
         X_val, y_val = validation_data if has_val else (None, None)
-        gen1 = self.gen.flow(X_train, y_train, batch_size=batch_size, data_augmentation=True, shuffle=True)
+        gen1 = self.gen.flow(X_train, y_train, batch_size=batch_size, data_augmentation=True, shuffle=True, balanced=balanced)
         gen2 = self.gen.flow(X_val, y_val, batch_size=batch_size, shuffle=self.use_horovod) if has_val else None
         steps1 = self.gen.steps_per_epoch(len(X_train), batch_size)
         steps2 = self.gen.steps_per_epoch(len(X_val), batch_size) if has_val else None
@@ -185,7 +186,10 @@ def count_network_depth(model):
 
 @log.trace()
 def load_model(filepath, compile=True):  # pylint: disable=W0622
-    """Kerasの`keras.models.load_model()` + `tk.dl.get_custom_objects()`"""
+    """モデルの読み込み。
+
+    `keras.models.load_model()` + `tk.dl.get_custom_objects()`
+    """
     from . import dl
     import keras
     return keras.models.load_model(filepath, custom_objects=dl.get_custom_objects(), compile=compile)

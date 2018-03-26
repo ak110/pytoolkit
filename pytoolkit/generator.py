@@ -12,7 +12,7 @@ import sklearn.utils
 class GeneratorContext(object):
     """Generatorの中で使う情報をまとめて持ち歩くためのクラス。"""
 
-    def __init__(self, X, y, weights, batch_size, shuffle, data_augmentation, random_state):
+    def __init__(self, X, y, weights, batch_size, shuffle, data_augmentation, random_state, balanced):
         self.X = X
         self.y = y
         self.weights = weights
@@ -20,11 +20,14 @@ class GeneratorContext(object):
         self.shuffle = shuffle
         self.data_augmentation = data_augmentation
         self.random_state = sklearn.utils.check_random_state(random_state)
+        self.balanced = balanced
         self.data_count = len(X[0]) if isinstance(X, list) else len(X)
         if y is not None:
             assert (len(y[0]) if isinstance(y, list) else len(y)) == self.data_count
         if weights is not None:
             assert len(weights) == self.data_count
+        if balanced:
+            assert shuffle, 'balancedはshuffle=Trueのときのみ有効'
 
     def do_augmentation(self, rand, probability=1):
         """DataAugmentationを確率的にやるときの判定。"""
@@ -52,36 +55,55 @@ class Generator(object):
         """Operatorの追加。"""
         self.operators.append(operator)
 
-    def flow(self, X, y=None, weights=None, batch_size=32, shuffle=False, data_augmentation=False, random_state=None):
-        """`fit_generator`などに渡すgenerator。kargsはそのままprepareに渡される。"""
+    def flow(self, X, y=None, weights=None, batch_size=32, shuffle=False, data_augmentation=False, random_state=None, balanced=False):
+        """`fit_generator`などに渡すgenerator。
+
+        # 引数
+        - balanced: クラス間のバランスが均等になるようにサンプリングする。(shuffle=Trueな場合のみ有効。yはクラスのindexかそれをone-hot化したものなどである必要あり)
+
+        """
         cpu_count = os.cpu_count()
         worker_count = min(batch_size, cpu_count * 3)
-        ctx = GeneratorContext(X, y, weights, batch_size, shuffle, data_augmentation, random_state)
+        ctx = GeneratorContext(X, y, weights, batch_size, shuffle, data_augmentation, random_state, balanced)
         with joblib.Parallel(n_jobs=worker_count, backend='threading') as parallel:
-            for indices, seeds in self._flow_batch(ctx.data_count, ctx.batch_size, ctx.shuffle, ctx.random_state):
+            for indices, seeds in self._flow_batch(ctx):
                 batch = [joblib.delayed(self._work, check_pickle=False)(ix, seed, ctx) for ix, seed in zip(indices, seeds)]
                 rx, ry, rw = zip(*parallel(batch))
                 yield _get_result(ctx.X, ctx.y, ctx.weights, rx, ry, rw)
 
-    def _flow_batch(self, data_count, batch_size, shuffle, random_state):
+    def _flow_batch(self, ctx):
         """データのindexとseedをバッチサイズずつ列挙し続けるgenerator。"""
-        if shuffle:
+        if ctx.balanced:
+            # クラス間のバランスが均等になるようにサンプリング
+            assert ctx.shuffle
+            assert isinstance(ctx.y, np.ndarray)
+            assert len(ctx.y.shape) in (1, 2)
+            classes = ctx.y if len(ctx.y.shape) == 1 else ctx.y.argmax(axis=-1)
+            unique_classes = np.unique(classes)
+            assert len(unique_classes) < len(classes)
+            indices = np.arange(ctx.data_count)
+            while True:
+                y_batch = ctx.random_state.choice(classes, ctx.batch_size)
+                batch_indices = [ctx.random_state.choice(indices[classes == y]) for y in y_batch]
+                seeds = ctx.random_state.randint(0, 2 ** 31, size=(len(batch_indices),))
+                yield batch_indices, seeds
+        elif ctx.shuffle:
             # シャッフルありの場合、常にbatch_size分を返す (horovodとかはそれが都合が良い)
             batch_indices = []
             seeds = []
-            for ix, seed in _flow_instance(data_count, shuffle, random_state):
+            for ix, seed in _flow_instance(ctx.data_count, ctx.shuffle, ctx.random_state):
                 batch_indices.append(ix)
                 seeds.append(seed)
-                if len(batch_indices) == batch_size:
+                if len(batch_indices) == ctx.batch_size:
                     yield batch_indices, seeds
                     batch_indices = []
                     seeds = []
         else:
             # シャッフル無しの場合、1epoch分でぴったり終わるようにする (predict_generatorとか用)
-            steps = self.steps_per_epoch(data_count, batch_size)
-            indices = np.arange(data_count)
+            steps = self.steps_per_epoch(ctx.data_count, ctx.batch_size)
+            indices = np.arange(ctx.data_count)
             while True:
-                seeds = random_state.randint(0, 2 ** 31, size=(len(indices),))
+                seeds = ctx.random_state.randint(0, 2 ** 31, size=(len(indices),))
                 for batch_indices in np.array_split(indices, steps):
                     yield batch_indices, seeds[batch_indices]
 
@@ -99,7 +121,7 @@ class Generator(object):
         """1件分の処理を外から使うとき用のインターフェース。"""
         ctx = GeneratorContext(
             X=np.empty((0,)), y=None, weights=None, batch_size=None, shuffle=None,
-            data_augmentation=data_augmentation, random_state=None)
+            data_augmentation=data_augmentation, random_state=None, balanced=False)
         if rand is None:
             rand = ctx.random_state
         return self._transform(x_, y_, w_, rand, ctx)
