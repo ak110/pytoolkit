@@ -36,7 +36,7 @@ class Model(object):
 
     def summary(self):
         """サマリ表示。"""
-        print_fn = log.get(__name__).info if self.printable else lambda: None
+        print_fn = log.get(__name__).info if self.printable else lambda _: None
         self.model.summary(print_fn=print_fn)
         print_fn(f'network depth: {count_network_depth(self.model)}')
 
@@ -94,6 +94,7 @@ class Model(object):
         """pathlib対応なsave。"""
         self.model.save(str(filepath), overwrite=overwrite, include_optimizer=include_optimizer)
 
+    @property
     def printable(self):
         """Horovodを使ってるなら`hvd.rank() == 0`の場合、そうでないなら常にTrue。"""
         if self.use_horovod:
