@@ -32,7 +32,7 @@ def format_histgram(a, bins=10, range=None, weights=None, ncols=72, name=None) -
     return lines
 
 
-def format_values(values: typing.Union[list, np.ndarray]):
+def format_values(values: typing.Union[list, np.ndarray], padding_sign=True):
     """`values`をいい感じに固定長の文字列にして返す。"""
     values = np.asarray(values)
     assert len(values.shape) == 1
@@ -42,10 +42,10 @@ def format_values(values: typing.Union[list, np.ndarray]):
 
     if (abs_values < 0.1).all() or (abs_values >= 10).any():
         # 指数表示
-        fmt = f'{9 if has_minus else 8}.2e'
+        fmt = f'{9 if has_minus and padding_sign else 8}.2e'
     else:
         # 少数表示
-        fmt = f'{6 if has_minus else 5}.3f'
+        fmt = f'{6 if has_minus and padding_sign else 5}.3f'
 
     formatted = [format(x, fmt) for x in values]
     return formatted

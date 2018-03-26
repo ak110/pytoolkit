@@ -135,7 +135,7 @@ def tsv_logger(filename, append=False):
                 return f'{value:.4f}'
 
             metrics = [_format_metric(logs, k) for k in self.params['metrics']]
-            self.log_writer.writerow([epoch + 1, '{:.1e}'.format(logs['lr'])] + metrics +
+            self.log_writer.writerow([epoch + 1, format(logs['lr'], '.1e')] + metrics +
                                      [str(int(np.ceil(elapsed_time)))])
             self.log_file.flush()
 
