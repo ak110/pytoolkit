@@ -73,20 +73,13 @@ class Builder(object):
             assert 'bias_regularizer' not in kwargs
             assert 'bias_constraint' not in kwargs
 
-        conv = conv(filters, kernel_size, name=name, **self._params(self.conv_defaults, kwargs))
-        bn = self.bn(name=name + '_bn', **bn_kwargs) if use_bn else None
-        act = self.act(name=name + '_act', **act_kwargs) if use_act else None
-
-        if not use_bn and not use_act:
-            return conv
-
-        def _pseudo_layer(x):
-            x = conv(x)
-            x = bn(x) if use_bn else x
-            x = act(x) if use_act else x
-            return x
-
-        return _pseudo_layer
+        layers = []
+        layers.append(conv(filters, kernel_size, name=name, **self._params(self.conv_defaults, kwargs)))
+        if use_bn:
+            layers.append(self.bn(name=name + '_bn', **bn_kwargs))
+        if use_act:
+            layers.append(self.act(name=name + '_act', **act_kwargs))
+        return Sequence(layers)
 
     def bn(self, **kwargs):
         """BatchNormalization。"""
@@ -116,6 +109,35 @@ class Builder(object):
         """`K.int_shapeを実行するだけのヘルパー (これだけのためにbackendをimportするのが面倒なので)`"""
         import keras.backend as K
         return K.int_shape(x)
+
+
+class Sequence(object):
+    """複数のレイヤーの塊。kerasのlayer風にcall出来るもの。(プロパティなどは必要に応じて実装予定。。)
+
+    # 引数
+    - layers: Kerasのレイヤーの配列。
+    - merge_function: callableまたは文字列で、入力とlayers適用後のをマージする関数を指定する。Noneなら何もしなくて'add'ならResidual blockになる。
+
+    """
+
+    def __init__(self, layers, merge_function=None):
+        self.layers = layers
+        self.merge_function = merge_function
+
+    def __call__(self, x):
+        x_in = x
+        for layer in self.layers:
+            x = layer(x)
+        if self.merge_function is not None:
+            import keras
+            merge_fn = self.merge_function if callable(self.merge_function) else keras.layers.__dict__[self.merge_function]
+            x = merge_fn([x_in, x])
+        return x
+
+    @property
+    def trainable_weights(self):
+        """訓練対象の重みTensorを返す。"""
+        return sum([layer.trainable_weights for layer in self.layers], [])
 
 
 def group_normalization():
