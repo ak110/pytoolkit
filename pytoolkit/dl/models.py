@@ -21,14 +21,31 @@ class Model(object):
         load_weights(self.model, filepath, where_fn)
 
     @log.trace()
-    def compile(self, optimizer, loss, metrics=None,
+    def compile(self, optimizer=None, loss=None, metrics=None,
                 sample_weight_mode=None, weighted_metrics=None, target_tensors=None,
-                device_dense='', device_sparse=''):
-        """コンパイル。"""
+                device_dense='', device_sparse='',
+                lr=None):
+        """コンパイル。
+
+        lrを指定するとSGD+Nesterov momentumでoptimizerを作る。
+        このlrはhorovodを考慮してない値。
+
+        """
+        import keras
+        assert (optimizer is None) != (lr is None)  # どちらか必須
+        assert loss is not None  # 必須 (optimizerを省略できるようにNoneにしているだけ)
+
+        if lr is not None:
+            if self.use_horovod:
+                import horovod.keras as hvd
+                lr *= hvd.rank()
+            optimizer = keras.optimizers.SGD(lr=lr, momentum=0.9, nesterov=True)
+
         if self.use_horovod:
             import horovod.keras as hvd
             optimizer = hvd.DistributedOptimizer(
                 optimizer, device_dense=device_dense, device_sparse=device_sparse)
+
         self.model.compile(optimizer, loss, metrics=metrics,
                            sample_weight_mode=sample_weight_mode,
                            weighted_metrics=weighted_metrics,

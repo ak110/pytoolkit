@@ -6,7 +6,7 @@ import warnings
 
 import numpy as np
 
-from .. import log
+from .. import draw, log
 
 
 def learning_rate(reduce_epoch_rates=(0.5, 0.75), factor=0.1, logger_name=None):
@@ -83,7 +83,7 @@ def learning_curve_plot(filename, metric='loss'):
                 if val_met is not None:
                     df[f'val_{self.metric}'] = self.val_met_list
 
-                df.plot()
+                ax = df.plot()
 
                 import matplotlib.pyplot as plt
                 self.filename.parent.mkdir(parents=True, exist_ok=True)
