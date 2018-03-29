@@ -1,7 +1,7 @@
 """Kerasのモデル関連。"""
 import warnings
 
-from .. import generator, log, utils
+from .. import draw, generator, log, utils
 
 
 class Model(object):
@@ -173,12 +173,12 @@ def plot_model_params(model, to_file='model.params.png', skip_bn=True):
 
     import pandas as pd
     df = pd.DataFrame(data=rows, columns=['name', 'params'])
-    df.plot(x='name', y='params', kind='barh', figsize=(16, 4 * (len(rows) // 32 + 1)))
 
-    import matplotlib.pyplot as plt
-    plt.gca().invert_yaxis()
-    plt.savefig(str(to_file))
-    plt.close()
+    with draw.get_lock():
+        ax = df.plot(x='name', y='params', kind='barh', figsize=(16, 4 * (len(rows) // 32 + 1)))
+        ax.invert_yaxis()
+        draw.save(ax, to_file)
+        draw.close(ax)
 
 
 def count_trainable_params(model):

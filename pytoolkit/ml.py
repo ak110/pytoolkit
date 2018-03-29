@@ -632,7 +632,7 @@ def plot_objects(base_image, save_path, classes, confs, locs, class_names):
     else:
         raise ValueError(f'type error: type(base_image)={type(base_image)}')
     plt.imshow(img / 255.)
-    gca = plt.gca()
+    ax = plt.gca()
     for classid, conf, loc in zip(classes, confs, locs):
         xmin = int(round(loc[0] * img.shape[1]))
         ymin = int(round(loc[1] * img.shape[0]))
@@ -644,10 +644,10 @@ def plot_objects(base_image, save_path, classes, confs, locs, class_names):
         else:
             txt = f'{conf:0.2f}, {label}'
         color = colors[classid]
-        gca.add_patch(plt.Rectangle(
+        ax.add_patch(plt.Rectangle(
             (xmin, ymin), xmax - xmin + 1, ymax - ymin + 1,
             fill=False, edgecolor=color, linewidth=2))
-        gca.text(xmin, ymin, txt, bbox={'facecolor': color, 'alpha': 0.5})
+        ax.text(xmin, ymin, txt, bbox={'facecolor': color, 'alpha': 0.5})
 
     save_path = pathlib.Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)

@@ -54,7 +54,7 @@ def learning_curve_plot(filename, metric='loss'):
     class _LearningCurvePlotter(keras.callbacks.Callback):
 
         def __init__(self, filename, metric='loss'):
-            self.filename = pathlib.Path(filename)
+            self.filename = pathlib.Path(filename).resolve()
             self.metric = metric
             self.met_list = []
             self.val_met_list = []
@@ -83,12 +83,10 @@ def learning_curve_plot(filename, metric='loss'):
                 if val_met is not None:
                     df[f'val_{self.metric}'] = self.val_met_list
 
-                ax = df.plot()
-
-                import matplotlib.pyplot as plt
-                self.filename.parent.mkdir(parents=True, exist_ok=True)
-                plt.savefig(str(self.filename).format(metric=self.metric))
-                plt.close()
+                with draw.get_lock():
+                    ax = df.plot()
+                    draw.save(ax, self.filename.parent / self.filename.name.format(metric=self.metric))
+                    draw.close(ax)
 
     return _LearningCurvePlotter(filename=filename, metric=metric)
 
