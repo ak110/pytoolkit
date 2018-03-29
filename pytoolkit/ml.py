@@ -332,7 +332,7 @@ def compute_ap(precision, recall, use_voc2007_metric=False):
 
 
 def compute_iou(bboxes_a, bboxes_b):
-    """IOU(Intersection over union、Jaccard係数)の算出。
+    """IoU(Intersection over union、Jaccard係数)の算出。
 
     重なり具合を示す係数。(0～1)
     """
@@ -345,6 +345,22 @@ def compute_iou(bboxes_a, bboxes_b):
     area_inter = np.prod(rb - lt, axis=2) * (lt < rb).all(axis=2)
     area_a = np.prod(bboxes_a[:, 2:] - bboxes_a[:, :2], axis=1)
     area_b = np.prod(bboxes_b[:, 2:] - bboxes_b[:, :2], axis=1)
+    area_union = area_a[:, np.newaxis] + area_b - area_inter
+    return area_inter / area_union
+
+
+def compute_size_based_iou(bbox_sizes_a, bbox_sizes_b):
+    """中心が一致している場合のIoU (何か名前無いんだろうか…)を算出する。"""
+    assert bbox_sizes_a.shape[0] > 0
+    assert bbox_sizes_b.shape[0] > 0
+    if bbox_sizes_a.shape[-1] == 4 and bbox_sizes_b.shape[-1] == 4:
+        bbox_sizes_a = bbox_sizes_a[:, 2:] - bbox_sizes_a[:, :2]
+        bbox_sizes_b = bbox_sizes_b[:, 2:] - bbox_sizes_b[:, :2]
+    assert bbox_sizes_a.shape == (len(bbox_sizes_a), 2)
+    assert bbox_sizes_b.shape == (len(bbox_sizes_b), 2)
+    area_inter = np.prod(np.minimum(bbox_sizes_a[:, np.newaxis, :], bbox_sizes_b), axis=-1)
+    area_a = np.prod(bbox_sizes_a, axis=-1)
+    area_b = np.prod(bbox_sizes_b, axis=-1)
     area_union = area_a[:, np.newaxis] + area_b - area_inter
     return area_inter / area_union
 
@@ -383,13 +399,7 @@ def cluster_by_iou(X, n_clusters, **kwargs):
             return _iou_distances(np.expand_dims(X, 0), Y, Y_norm_squared, squared, X_norm_squared)
         assert X.shape == (len(X), 2)
         assert Y.shape == (len(Y), 2)
-        inter_wh = np.minimum(X[:, np.newaxis, :], Y)
-        area_inter = np.prod(inter_wh, axis=-1)
-        area_x = np.prod(X, axis=-1)
-        area_y = np.prod(Y, axis=-1)
-        area_union = area_x[:, np.newaxis] + area_y - area_inter
-        iou = area_inter / area_union
-        dist = 1 - iou
+        dist = 1 - compute_size_based_iou(X, Y)
         return np.square(dist) if squared else dist
 
     from sklearn.cluster import k_means_
