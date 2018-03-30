@@ -61,7 +61,6 @@ class ObjectsAnnotation(object):
         self.bboxes = np.array(bboxes)
         # difficultフラグの配列。(True or False)
         self.difficults = np.array(difficults) if difficults is not None else np.zeros(len(classes))
-        assert (self.classes >= 1).all()
         assert self.width >= 1
         assert self.height >= 1
         assert (self.bboxes >= 0).all()

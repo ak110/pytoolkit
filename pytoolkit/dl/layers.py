@@ -179,7 +179,7 @@ def group_normalization():
 
         def __init__(self,
                      groups=32,
-                     epsilon=1e-3,
+                     epsilon=1e-5,
                      center=True,
                      scale=True,
                      beta_initializer='zeros',
@@ -207,7 +207,6 @@ def group_normalization():
         def build(self, input_shape):
             dim = input_shape[-1]
             shape = (dim,)
-
             if self.scale:
                 self.gamma = self.add_weight(shape=shape,
                                              name='gamma',
@@ -232,7 +231,7 @@ def group_normalization():
             N, H, W, C = shape[0], shape[1], shape[2], shape[3]
             x = K.reshape(x, [N, H, W, self.groups, C // self.groups])
             mean, var = tf.nn.moments(x, [1, 2, 4], keep_dims=True)
-            x = (x - mean) / tf.sqrt(var + self.epsilon)
+            x = (x - mean) / K.sqrt(var + self.epsilon)
             x = K.reshape(x, [N, H, W, C])
             return x * self.gamma + self.beta
 
