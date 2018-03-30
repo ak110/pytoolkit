@@ -162,7 +162,7 @@ def epoch_logger(name='__main__'):
         def on_epoch_end(self, epoch, logs=None):
             lr = K.get_value(self.model.optimizer.lr)
             elapsed_time = time.time() - self.epoch_start_time
-            metrics = ' '.join([f'{k}={logs.get(k):.4f}' for k in self.params['metrics']])
+            metrics = ' '.join([f'{k}={logs.get(k):.4f}' for k in self.params['metrics'] if k in logs])
             self.logger.debug('Epoch %3d: lr=%.1e %s time=%d',
                               epoch + 1, lr, metrics, int(np.ceil(elapsed_time)))
 

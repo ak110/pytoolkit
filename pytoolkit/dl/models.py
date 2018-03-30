@@ -7,9 +7,10 @@ from .. import draw, generator, log, utils
 class Model(object):
     """`keras.models.Model` + `tk.dl.generators.Generator`の薄いラッパー。"""
 
-    def __init__(self, model, gen: generator.Generator, use_horovod: bool = False):
+    def __init__(self, model, gen: generator.Generator, batch_size, use_horovod: bool = False):
         self.model = model  # type: keras.models.Model
         self.gen = gen
+        self.batch_size = batch_size
         self.use_horovod = use_horovod
 
     def load_weights(self, filepath, where_fn=None):
@@ -24,7 +25,7 @@ class Model(object):
     def compile(self, optimizer=None, loss=None, metrics=None,
                 sample_weight_mode=None, weighted_metrics=None, target_tensors=None,
                 device_dense='', device_sparse='',
-                lr=None):
+                sgd_lr=None):
         """コンパイル。
 
         lrを指定するとSGD+Nesterov momentumでoptimizerを作る。
@@ -32,13 +33,15 @@ class Model(object):
 
         """
         import keras
-        assert (optimizer is None) != (lr is None)  # どちらか必須
+        assert (optimizer is None) != (sgd_lr is None)  # どちらか必須
         assert loss is not None  # 必須 (optimizerを省略できるようにNoneにしているだけ)
 
-        if lr is not None:
+        if sgd_lr is not None:
             if self.use_horovod:
                 import horovod.keras as hvd
-                lr *= hvd.rank()
+                sgd_lr *= hvd.size()
+            lr = sgd_lr * self.batch_size
+            log.get(__name__).info(f'lr = {lr:.2e}')
             optimizer = keras.optimizers.SGD(lr=lr, momentum=0.9, nesterov=True)
 
         if self.use_horovod:
@@ -68,22 +71,27 @@ class Model(object):
         ]
 
     def fit(self, X_train, y_train,
-            batch_size=32, epochs=1, verbose=1, callbacks=None,
+            epochs=1, verbose=1, callbacks=None,
             validation_data: tuple = None,
             class_weight=None, initial_epoch=0,
             balanced=False):
         """学習。"""
+        callbacks = callbacks or []
         has_val = validation_data is not None
         X_val, y_val = validation_data if has_val else (None, None)
-        gen1 = self.gen.flow(X_train, y_train, batch_size=batch_size, data_augmentation=True, shuffle=True, balanced=balanced)
-        gen2 = self.gen.flow(X_val, y_val, batch_size=batch_size, shuffle=self.use_horovod) if has_val else None
-        steps1 = self.gen.steps_per_epoch(len(X_train), batch_size)
-        steps2 = self.gen.steps_per_epoch(len(X_val), batch_size) if has_val else None
+        gen1 = self.gen.flow(X_train, y_train, batch_size=self.batch_size, data_augmentation=True, shuffle=True, balanced=balanced)
+        gen2 = self.gen.flow(X_val, y_val, batch_size=self.batch_size, shuffle=self.use_horovod) if has_val else None
+        steps1 = self.gen.steps_per_epoch(len(X_train), self.batch_size)
+        steps2 = self.gen.steps_per_epoch(len(X_val), self.batch_size) if has_val else None
 
         if self.use_horovod:
             import horovod.keras as hvd
             steps1 //= hvd.size()
             steps2 //= hvd.size()  # horovodのサンプルでは * 3 だけど早く進んで欲しいので省略
+
+        # TerminateOnNaNは常に付けちゃう
+        import keras
+        callbacks = callbacks + [keras.callbacks.TerminateOnNaN()]
 
         hist = self.model.fit_generator(
             gen1, steps1, epochs=epochs,
@@ -95,16 +103,16 @@ class Model(object):
             initial_epoch=initial_epoch)
         return hist
 
-    def predict(self, X, batch_size=32, data_augmentation=False):
+    def predict(self, X, data_augmentation=False):
         """予測。"""
-        gen = self.gen.flow(X, batch_size=batch_size, data_augmentation=data_augmentation)
-        steps = self.gen.steps_per_epoch(len(X), batch_size=batch_size)
+        gen = self.gen.flow(X, batch_size=self.batch_size, data_augmentation=data_augmentation)
+        steps = self.gen.steps_per_epoch(len(X), batch_size=self.batch_size)
         return self.model.predict_generator(gen, steps)
 
-    def evaluate(self, X, y, batch_size=32, data_augmentation=False):
+    def evaluate(self, X, y, data_augmentation=False):
         """評価。"""
-        gen = self.gen.flow(X, y, batch_size=batch_size, data_augmentation=data_augmentation)
-        steps = self.gen.steps_per_epoch(len(X), batch_size=batch_size)
+        gen = self.gen.flow(X, y, batch_size=self.batch_size, data_augmentation=data_augmentation)
+        steps = self.gen.steps_per_epoch(len(X), batch_size=self.batch_size)
         return self.model.evaluate_generator(gen, steps)
 
     def save(self, filepath, overwrite=True, include_optimizer=True):

@@ -346,7 +346,9 @@ def compute_iou(bboxes_a, bboxes_b):
     area_a = np.prod(bboxes_a[:, 2:] - bboxes_a[:, :2], axis=1)
     area_b = np.prod(bboxes_b[:, 2:] - bboxes_b[:, :2], axis=1)
     area_union = area_a[:, np.newaxis] + area_b - area_inter
-    return area_inter / area_union
+    iou = area_inter / area_union
+    assert iou.shape == (len(bboxes_a), len(bboxes_b))
+    return iou
 
 
 def compute_size_based_iou(bbox_sizes_a, bbox_sizes_b):
@@ -362,7 +364,9 @@ def compute_size_based_iou(bbox_sizes_a, bbox_sizes_b):
     area_a = np.prod(bbox_sizes_a, axis=-1)
     area_b = np.prod(bbox_sizes_b, axis=-1)
     area_union = area_a[:, np.newaxis] + area_b - area_inter
-    return area_inter / area_union
+    iou = area_inter / area_union
+    assert iou.shape == (len(bbox_sizes_a), len(bbox_sizes_b))
+    return iou
 
 
 def is_intersection(bboxes_a, bboxes_b):
