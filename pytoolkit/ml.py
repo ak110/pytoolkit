@@ -351,7 +351,10 @@ def compute_iou(bboxes_a, bboxes_b):
 
 
 def compute_size_based_iou(bbox_sizes_a, bbox_sizes_b):
-    """中心が一致している場合のIoU (何か名前無いんだろうか…)を算出する。"""
+    """中心が一致している場合のIoUを算出する。
+
+    例えば(10, 15)と(15, 10)で0.5。
+    """
     assert bbox_sizes_a.shape[0] > 0
     assert bbox_sizes_b.shape[0] > 0
     if bbox_sizes_a.shape[-1] == 4 and bbox_sizes_b.shape[-1] == 4:

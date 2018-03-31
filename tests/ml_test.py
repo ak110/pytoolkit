@@ -59,8 +59,16 @@ def test_iou():
     ])
     iou = tk.ml.compute_iou(bboxes_a, bboxes_b)
     assert iou.shape == (2, 1)
-    assert iou[0][0] == pytest.approx(100 * 100 / (200 * 200 * 2 - 100 * 100))
-    assert iou[1][0] == 0
+    assert iou[0, 0] == pytest.approx(100 * 100 / (200 * 200 * 2 - 100 * 100))
+    assert iou[1, 0] == 0
+
+
+def test_size_based_iou():
+    bboxes_a = np.array([[10, 15]])
+    bboxes_b = np.array([[15, 10]])
+    iou = tk.ml.compute_size_based_iou(bboxes_a, bboxes_b)
+    assert iou.shape == (1, 1)
+    assert iou[0, 0] == pytest.approx(0.5)
 
 
 def test_is_in_box():

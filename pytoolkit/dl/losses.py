@@ -23,7 +23,7 @@ def categorical_crossentropy(y_true, y_pred, alpha=None):
 def binary_focal_loss(y_true, y_pred, alpha=0.25, gamma=2.0):
     """2クラス分類用focal loss (https://arxiv.org/pdf/1708.02002v1.pdf)。"""
     import keras.backend as K
-    y_pred = K.maximum(y_pred, K.epsilon())
+    y_pred = K.clip(y_pred, K.epsilon(), 1 - K.epsilon())
     p_t = y_true * y_pred + (1 - y_true) * (1 - y_pred)
     a_t = y_true * alpha + (1 - y_true) * (1 - alpha)
     return -a_t * K.pow(1 - p_t, gamma) * K.log(p_t)
