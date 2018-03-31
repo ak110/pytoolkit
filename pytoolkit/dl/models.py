@@ -165,6 +165,18 @@ def multi_gpu_model(model, batch_size, gpus=None):
     return parallel_model, batch_size * gpus
 
 
+def freeze_to_name(model, freeze_end_layer_name, skip_bn=False):
+    """指定した名前までのレイヤーをfreezeする。skip_bn=TrueならBNはfreezeしない。"""
+    import keras
+    for layer in model.layers:
+        if layer.name == freeze_end_layer_name:
+            break
+        if skip_bn and isinstance(layer, keras.layers.BatchNormalization):
+            pass
+        else:
+            layer.trainable = False
+
+
 @log.trace()
 def plot_model_params(model, to_file='model.params.png', skip_bn=True):
     """パラメータ数を棒グラフ化"""
