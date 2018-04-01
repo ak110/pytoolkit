@@ -18,7 +18,6 @@
 ## 動的な依存ライブラリ
 
 - Pillow
-- better_exceptions
 - h5py
 - horovod
 - keras

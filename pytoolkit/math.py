@@ -1,7 +1,17 @@
-"""主に機械学習関連？"""
+"""主にnumpy関連？"""
 import typing
 
 import numpy as np
+
+
+def between(x, a, b):
+    """`a <= x <= b`を返す。"""
+    return np.logical_and(a <= x, x <= b)
+
+
+def in_range(x, a, b):
+    """`a <= x < b`を返す。"""
+    return np.logical_and(a <= x, x < b)
 
 
 def print_histgram(a, bins=10, range=None, weights=None, ncols=72, name=None, print_fn=print):  # pylint: disable=W0622
@@ -38,14 +48,18 @@ def format_values(values: typing.Union[list, np.ndarray], padding_sign=True):
     assert len(values.shape) == 1
 
     has_minus = (values < 0).any()
+    minus_col = 1 if has_minus and padding_sign else 0
     abs_values = np.abs(values)
 
-    if (abs_values < 0.1).all() or (abs_values >= 10).any():
+    if issubclass(values.dtype.type, np.integer) and abs_values.max() <= 99999999:
+        n = int(np.ceil(np.log10(abs_values.max())))
+        fmt = f'{n + minus_col}d'
+    elif (abs_values < 0.1).all() or (abs_values >= 10).any():
         # 指数表示
-        fmt = f'{9 if has_minus and padding_sign else 8}.2e'
+        fmt = f'{8 + minus_col}.2e'
     else:
         # 少数表示
-        fmt = f'{6 if has_minus and padding_sign else 5}.3f'
+        fmt = f'{5 + minus_col}.3f'
 
     formatted = [format(x, fmt) for x in values]
     return formatted

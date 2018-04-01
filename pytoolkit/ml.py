@@ -396,7 +396,7 @@ def is_in_box(boxes_a, boxes_b):
 def cluster_by_iou(X, n_clusters, **kwargs):
     """`1 - IoU`の値によるクラスタリング。
 
-    YOLO9000のDimension Clustersで使用されているもの。
+    YOLOv2のDimension Clustersで使用されているもの。
     KMeansのモデルのインスタンスを返す。
     """
     def _iou_distances(X, Y=None, Y_norm_squared=None, squared=False, X_norm_squared=None):

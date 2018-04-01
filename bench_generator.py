@@ -18,7 +18,6 @@ def _main():
     import sys
     sys.path.insert(0, str(base_dir.parent))
     import pytoolkit as tk
-    tk.better_exceptions()
 
     gen = tk.image.ImageDataGenerator(profile=True)
     gen.add(tk.image.Resize(_IMAGE_SIZE))

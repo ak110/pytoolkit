@@ -106,15 +106,6 @@ def capture_output():
     return _decorator
 
 
-def better_exceptions():
-    """`better_exceptions`するだけ。"""
-    try:
-        import better_exceptions as be  # pip install better_exceptions
-        be.MAX_LENGTH = 128
-    except BaseException:
-        log.get(__name__).warning('better_exceptions is not installed?', exc_info=True)
-
-
 def tqdm(iterable=None, desc=None, total=None, leave=True, **kwargs):
     """`tqdm`の簡単なラッパー。"""
     from tqdm import tqdm as t
