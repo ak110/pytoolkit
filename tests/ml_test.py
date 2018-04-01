@@ -9,18 +9,26 @@ import pytoolkit as tk
 def test_load_voc_file():
     base_dir = pathlib.Path(__file__).resolve().parent
     xml_path = base_dir / 'data' / 'VOC2007_000001.xml'
-    class_name_to_id = {class_name: i for i, class_name in enumerate(tk.ml.VOC_CLASS_NAMES)}
-    ann = tk.ml.ObjectsAnnotation.load_voc_file(xml_path, class_name_to_id, without_difficult=False)
+    ann = tk.ml.ObjectsAnnotation.load_voc_file(xml_path, tk.ml.VOC_CLASS_NAMES_TO_ID, without_difficult=False)
     assert ann.folder == 'VOCdevkit/VOC2007/JPEGImages'
     assert ann.filename == '000001.jpg'
     assert ann.width == 353
     assert ann.height == 500
     assert len(ann.classes) == 2
-    assert ann.classes[0] == class_name_to_id['dog']
-    assert ann.classes[1] == class_name_to_id['person']
+    assert ann.classes[0] == tk.ml.VOC_CLASS_NAMES_TO_ID['dog']
+    assert ann.classes[1] == tk.ml.VOC_CLASS_NAMES_TO_ID['person']
     assert (ann.difficults == np.array([False, False])).all()
     assert ann.bboxes[0] == pytest.approx(np.array([48, 240, 195, 371]) / [353, 500, 353, 500])
     assert ann.bboxes[1] == pytest.approx(np.array([8, 12, 352, 498]) / [353, 500, 353, 500])
+
+
+def test_plot_objects():
+    base_dir = pathlib.Path(__file__).resolve().parent
+    xml_path = base_dir / 'data' / 'VOC2007_000001.xml'
+    img_path = base_dir / 'data' / 'VOC2007_000001.jpg'
+    ann = tk.ml.ObjectsAnnotation.load_voc_file(xml_path, tk.ml.VOC_CLASS_NAMES_TO_ID, without_difficult=False)
+    save_path = base_dir.parent / '___check' / 'plot_objects.png'
+    tk.ml.plot_objects(img_path, save_path, ann.classes, None, ann.bboxes, tk.ml.VOC_CLASS_NAMES)
 
 
 def test_compute_map():
@@ -113,12 +121,11 @@ def test_non_maximum_suppression():
     assert idx.shape == (0,)
 
 
-def test_plot_cm(tmpdir):
-    filepath = str(tmpdir.join('confusion_matrix.png'))
+def test_plot_cm():
+    filepath = pathlib.Path(__file__).resolve().parent.parent / '___check' / 'plot_cm.png'
     cm = [
         [5, 0, 0],
         [0, 3, 2],
         [0, 2, 3],
     ]
     tk.ml.plot_cm(cm, filepath)
-    assert pathlib.Path(filepath).is_file()  # とりあえずファイルの存在チェックだけ。。

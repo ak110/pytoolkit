@@ -81,6 +81,12 @@ class Builder(object):
             layers.append(self.act(name=name + '_act', **act_kwargs))
         return Sequence(layers)
 
+    def bn_act(self, name=None):
+        """BN+Act。"""
+        bn_name = None if name is None else name + '_bn'
+        act_name = None if name is None else name + '_act'
+        return Sequence([self.bn(name=bn_name), self.act(name=act_name)])
+
     def bn(self, **kwargs):
         """BatchNormalization。"""
         if self.use_gn:

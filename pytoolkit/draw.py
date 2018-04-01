@@ -27,6 +27,18 @@ def get_lock() -> threading.Lock:
     return _lock
 
 
+def create_figure(figsize=None, dpi=None, facecolor=None, edgecolor=None,
+                  linewidth=0.0, frameon=None, subplotpars=None, tight_layout=None, **kwargs):
+    """Figureを作って返す。"""
+    import matplotlib
+    from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+    fig = matplotlib.figure.Figure(figsize=figsize, dpi=dpi, facecolor=facecolor, edgecolor=edgecolor,
+                                   linewidth=linewidth, frameon=frameon,
+                                   subplotpars=subplotpars, tight_layout=tight_layout, **kwargs)
+    FigureCanvas(fig)
+    return fig
+
+
 def set_axis_tick_to_int(axis):
     """軸のラベルを整数のみにする。
 

@@ -7,14 +7,13 @@ import pathlib
 import xml.etree.ElementTree
 
 import numpy as np
-import scipy.misc
 import sklearn.base
 import sklearn.cluster
 import sklearn.externals.joblib as joblib
 import sklearn.model_selection
 import sklearn.utils
 
-from . import io
+from . import draw
 
 # VOC2007のクラス名のリスト (20クラス)
 VOC_CLASS_NAMES = [
@@ -39,6 +38,8 @@ VOC_CLASS_NAMES = [
     'train',
     'tvmonitor',
 ]
+# 0～19のIDへの変換
+VOC_CLASS_NAMES_TO_ID = {class_name: i for i, class_name in enumerate(VOC_CLASS_NAMES)}
 
 
 class ObjectsAnnotation(object):
@@ -101,6 +102,7 @@ class ObjectsAnnotation(object):
         - set_name: 'trainval'とか'test'とか
 
         """
+        from . import io
         names = io.read_all_lines(data_dir / f'VOCdevkit/VOC{year}/ImageSets/Main/{set_name}.txt')
         y = cls.load_voc_files(data_dir / f'VOCdevkit/VOC{year}/Annotations',
                                names, class_name_to_id, without_difficult)
@@ -539,8 +541,6 @@ def plot_cm(cm, to_file='confusion_matrix.png', classes=None, normalize=True, ti
 
     参考: http://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html
     """
-    import matplotlib.pyplot as plt
-
     if classes is None:
         classes = [f'class {i}' for i in range(len(cm))]
 
@@ -551,32 +551,33 @@ def plot_cm(cm, to_file='confusion_matrix.png', classes=None, normalize=True, ti
         cm = np.array(cm)
 
     size = (len(cm) + 1) // 2
-    fig = plt.figure(figsize=(size + 4, size + 2), dpi=96)
-    plt.clf()
-
+    fig = draw.create_figure(figsize=(size + 4, size + 2), dpi=96)
     ax = fig.add_subplot(111)
     ax.set_aspect(1)
     res = ax.imshow(cm, cmap='Blues', interpolation='nearest')
     fig.colorbar(res)
 
     tick_marks = np.arange(len(classes))
-    plt.xticks(tick_marks, classes, rotation=45)
-    plt.yticks(tick_marks, classes)
+    ax.set_xticks(tick_marks)
+    ax.set_yticks(tick_marks)
+    ax.set_xticklabels(classes, rotation=45)
+    ax.set_yticklabels(classes)
 
     fmt = '.2f' if normalize else 'd'
     thresh = cm.max() / 2.
     for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
-        plt.text(j, i, format(cm[i, j], fmt),
-                 horizontalalignment='center',
-                 color='white' if cm[i, j] > thresh else 'black')
+        ax.text(j, i, format(cm[i, j], fmt),
+                horizontalalignment='center',
+                color='white' if cm[i, j] > thresh else 'black')
 
-    plt.tight_layout()
-    plt.ylabel('True label')
-    plt.xlabel('Predicted label')
-    plt.title(title)
+    ax.set_ylabel('True label')
+    ax.set_xlabel('Predicted label')
+    ax.set_title(title)
 
-    plt.savefig(str(to_file), bbox_inches='tight')
-    plt.close()
+    to_file = pathlib.Path(to_file)
+    to_file.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(str(to_file), bbox_inches='tight')
+    fig.clf()
 
 
 def load_voc_annotations(annotations_dir, class_name_to_id):
@@ -629,7 +630,9 @@ def plot_objects(base_image, save_path, classes, confs, locs, class_names):
     - class_names: クラスID→クラス名のリスト  (None可)
 
     """
-    import matplotlib.pyplot as plt
+    import io
+    import matplotlib
+    import matplotlib.cm
 
     if confs is None:
         confs = [None] * len(classes)
@@ -639,16 +642,22 @@ def plot_objects(base_image, save_path, classes, confs, locs, class_names):
         assert 0 <= np.min(classes) < len(class_names)
         assert 0 <= np.max(classes) < len(class_names)
 
-    colors = plt.cm.hsv(np.linspace(0, 1, len(class_names))).tolist()
+    colors = matplotlib.cm.hsv(np.linspace(0, 1, len(class_names))).tolist()
 
-    if isinstance(base_image, (str, pathlib.Path)):
-        img = scipy.misc.imread(str(base_image), mode='RGB')
-    elif isinstance(base_image, np.ndarray):
+    if isinstance(base_image, np.ndarray):
         img = base_image
+    elif isinstance(base_image, (str, pathlib.Path, io.IOBase)):
+        import PIL.Image
+        with PIL.Image.open(base_image) as pil:
+            if pil.mode != 'RGB':
+                pil = pil.convert('RGB')
+            img = np.asarray(pil).astype(np.float32)
     else:
         raise ValueError(f'type error: type(base_image)={type(base_image)}')
-    plt.imshow(img / 255.)
-    ax = plt.gca()
+
+    fig = draw.create_figure(dpi=96)
+    ax = fig.add_subplot(111)
+    ax.imshow(img / 255.)
     for classid, conf, loc in zip(classes, confs, locs):
         xmin = int(round(loc[0] * img.shape[1]))
         ymin = int(round(loc[1] * img.shape[0]))
@@ -660,12 +669,12 @@ def plot_objects(base_image, save_path, classes, confs, locs, class_names):
         else:
             txt = f'{conf:0.2f}, {label}'
         color = colors[classid]
-        ax.add_patch(plt.Rectangle(
+        ax.add_patch(matplotlib.patches.Rectangle(
             (xmin, ymin), xmax - xmin + 1, ymax - ymin + 1,
             fill=False, edgecolor=color, linewidth=2))
         ax.text(xmin, ymin, txt, bbox={'facecolor': color, 'alpha': 0.5})
 
     save_path = pathlib.Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(str(save_path))
-    plt.close()
+    fig.savefig(str(save_path))
+    fig.clf()

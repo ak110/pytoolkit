@@ -2,6 +2,7 @@
 
 float32でRGBで0～255として扱う。
 """
+import io
 import pathlib
 import typing
 
@@ -10,7 +11,7 @@ import numpy as np
 import scipy.stats
 
 
-def load(path_or_array: typing.Union[np.ndarray, str, pathlib.Path], grayscale=False) -> np.ndarray:
+def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], grayscale=False) -> np.ndarray:
     """画像の読み込み。
 
     やや余計なお世話だけど今後のためにfloat32に変換して返す。
@@ -20,8 +21,16 @@ def load(path_or_array: typing.Union[np.ndarray, str, pathlib.Path], grayscale=F
         img = np.copy(path_or_array)  # 念のためコピー
         assert len(img.shape) == 3
         assert img.shape[-1] == (1 if grayscale else 3)
+    elif isinstance(path_or_array, io.IOBase):
+        # file-like objectならPillowで読み込み (OpenCVは未対応なので)
+        import PIL.Image
+        with PIL.Image.open(path_or_array) as pil:
+            target_mode = 'L' if grayscale else 'RGB'
+            if pil.mode != target_mode:
+                pil = pil.convert(target_mode)
+            img = np.asarray(pil)
     else:
-        # ファイルパスなら読み込み
+        # ファイルパスならOpenCVで読み込み (Pillowより早いので)
         flags = cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR
         img = cv2.imread(str(path_or_array), flags)
         if img is None and (pathlib.Path(path_or_array).suffix or '').lower() == '.gif':
