@@ -88,4 +88,3 @@ def close(ax):
     # …これで正しいかは不明…
     import matplotlib.pyplot as plt
     plt.close(ax.get_figure())
-    plt.close()
