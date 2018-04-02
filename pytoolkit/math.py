@@ -26,8 +26,8 @@ def format_histgram(a, bins=10, range=None, weights=None, ncols=72, name=None) -
     hist = np.asarray(hist)
     edges_text = format_values(bin_edges)
 
-    std_hist = hist / hist.sum()
-    norm_hist = hist / hist.max()
+    std_hist = hist / (hist.sum() + 1e-7)
+    norm_hist = hist / (hist.max() + 1e-7)
     has_100 = (std_hist >= 0.995).any()
     max_bar_size = ncols - (len(edges_text[0]) + 2 + len(edges_text[0]) + 2 + (5 if has_100 else 4) + 4)
 
