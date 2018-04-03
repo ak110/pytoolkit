@@ -1,6 +1,7 @@
 """Kerasのモデル関連。"""
 import warnings
 
+from . import optimizers
 from .. import draw, generator, log, utils
 
 
@@ -25,7 +26,7 @@ class Model(object):
     def compile(self, optimizer=None, loss=None, metrics=None,
                 sample_weight_mode=None, weighted_metrics=None, target_tensors=None,
                 device_dense='', device_sparse='',
-                sgd_lr=None):
+                sgd_lr=None, lr_multipliers=None):
         """コンパイル。
 
         lrを指定するとSGD+Nesterov momentumでoptimizerを作る。
@@ -35,6 +36,8 @@ class Model(object):
         import keras
         assert (optimizer is None) != (sgd_lr is None)  # どちらか必須
         assert loss is not None  # 必須 (optimizerを省略できるようにNoneにしているだけ)
+        if lr_multipliers is not None:
+            assert sgd_lr is not None
 
         if sgd_lr is not None:
             if self.use_horovod:
@@ -42,7 +45,10 @@ class Model(object):
                 sgd_lr *= hvd.size()
             lr = sgd_lr * self.batch_size
             log.get(__name__).info(f'lr = {lr:.2e}')
-            optimizer = keras.optimizers.SGD(lr=lr, momentum=0.9, nesterov=True)
+            if lr_multipliers is None:
+                optimizer = keras.optimizers.SGD(lr=lr, momentum=0.9, nesterov=True)
+            else:
+                optimizer = optimizers.nsgd()(lr=lr, lr_multipliers=lr_multipliers)
 
         if self.use_horovod:
             import horovod.keras as hvd

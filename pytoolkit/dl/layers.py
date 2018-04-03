@@ -141,6 +141,16 @@ class Sequence(object):
         return x
 
     @property
+    def name(self):
+        """先頭のレイヤーのnameを返しちゃう。"""
+        return self.layers[0].name
+
+    @property
+    def names(self):
+        """全レイヤーのnameを配列で返す。"""
+        return [layer.name for layer in self.layers]
+
+    @property
     def trainable_weights(self):
         """訓練対象の重みTensorを返す。"""
         return sum([layer.trainable_weights for layer in self.layers], [])
