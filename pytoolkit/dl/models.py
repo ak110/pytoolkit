@@ -221,7 +221,7 @@ def count_network_depth(model):
     """
     count = 0
     for layer in model.layers:
-        if hasattr(layer, 'kernel'):
+        if hasattr(layer, 'kernel') or hasattr(layer, 'depthwise_kernel'):
             count += 1
         elif hasattr(layer, 'layers'):
             count += count_network_depth(layer)

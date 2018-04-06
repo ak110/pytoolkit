@@ -50,8 +50,14 @@ class Builder(object):
         import keras.layers
         return self._conv(keras.layers.Conv2DTranspose, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
+    def dwconv2d(self, filters, kernel_size, name, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
+        """DepthwiseConv2D+BN+Act。"""
+        import keras.layers
+        return self._conv(keras.layers.DepthwiseConv2D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+
     def _conv(self, conv, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs):
         """ConvND+BN+Act。"""
+        import keras.layers
         kwargs = copy.copy(kwargs)
         bn_kwargs = copy.copy(bn_kwargs) if bn_kwargs is not None else {}
         act_kwargs = copy.copy(act_kwargs) if act_kwargs is not None else {}
@@ -73,8 +79,15 @@ class Builder(object):
             assert 'bias_regularizer' not in kwargs
             assert 'bias_constraint' not in kwargs
 
+        args = [filters, kernel_size]
+        kwargs = self._params(self.conv_defaults, kwargs)
+        kwargs['name'] = name
+        if conv == keras.layers.DepthwiseConv2D:
+            kwargs = {k.replace('kernel_', 'depthwise_'): v for k, v in kwargs.items()}
+            args = args[1:]
+
         layers = []
-        layers.append(conv(filters, kernel_size, name=name, **self._params(self.conv_defaults, kwargs)))
+        layers.append(conv(*args, **kwargs))
         if use_bn:
             layers.append(self.bn(name=name + '_bn', **bn_kwargs))
         if use_act:
