@@ -6,11 +6,13 @@ import numpy as np
 
 def between(x, a, b):
     """`a <= x <= b`を返す。"""
+    assert np.all(a <= b)
     return np.logical_and(a <= x, x <= b)
 
 
 def in_range(x, a, b):
     """`a <= x < b`を返す。"""
+    assert np.all(a < b)
     return np.logical_and(a <= x, x < b)
 
 

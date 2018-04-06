@@ -332,6 +332,23 @@ def compute_ap(precision, recall, use_voc2007_metric=False):
     return ap
 
 
+def bboxes_center(bboxes):
+    """Bounding boxの中心を返す。"""
+    assert bboxes.shape[-1] == 4
+    return (bboxes[..., 2:] + bboxes[..., :2]) / 2
+
+
+def bboxes_size(bboxes):
+    """Bounding boxのサイズを返す。"""
+    assert bboxes.shape[-1] == 4
+    return bboxes[..., 2:] - bboxes[..., :2]
+
+
+def bboxes_area(bboxes):
+    """Bounding boxの面積を返す。"""
+    return bboxes_size(bboxes).prod(axis=-1)
+
+
 def compute_iou(bboxes_a, bboxes_b):
     """IoU(Intersection over union、Jaccard係数)の算出。
 
