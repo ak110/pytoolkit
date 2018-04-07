@@ -61,12 +61,12 @@ class Model(object):
 
     def summary(self):
         """サマリ表示。"""
-        print_fn = log.get(__name__).info if self.printable else lambda _: None
+        print_fn = log.get(__name__).info if self.is_master else lambda _: None
         self.model.summary(print_fn=print_fn)
         print_fn(f'network depth: {count_network_depth(self.model)}')
 
     def horovod_callbacks(self):
-        """Horovodのコールバック3つをまとめて返すだけのやつ。"""
+        """Horovodのコールバック3つをまとめて返すだけ。"""
         assert self.use_horovod
         import horovod.keras as hvd
         return [
@@ -100,7 +100,7 @@ class Model(object):
 
         hist = self.model.fit_generator(
             gen1, steps1, epochs=epochs,
-            verbose=verbose if self.printable else 0,
+            verbose=verbose if self.is_master else 0,
             callbacks=callbacks,
             validation_data=gen2,
             validation_steps=steps2,
@@ -121,11 +121,12 @@ class Model(object):
         return self.model.evaluate_generator(gen, steps)
 
     def save(self, filepath, overwrite=True, include_optimizer=True):
-        """pathlib対応なsave。"""
-        self.model.save(str(filepath), overwrite=overwrite, include_optimizer=include_optimizer)
+        """pathlib対応&is_masterな時のみなsave。"""
+        if self.is_master:
+            self.model.save(str(filepath), overwrite=overwrite, include_optimizer=include_optimizer)
 
     @property
-    def printable(self):
+    def is_master(self):
         """Horovodを使ってるなら`hvd.rank() == 0`の場合、そうでないなら常にTrue。"""
         if self.use_horovod:
             import horovod.keras as hvd
