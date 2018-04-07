@@ -11,4 +11,5 @@ from . import log
 from . import math
 from . import ml
 from . import ndimage
+from . import thread
 from . import web

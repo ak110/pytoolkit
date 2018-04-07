@@ -1,5 +1,4 @@
 """Kerasのモデル関連。"""
-import warnings
 
 from . import optimizers
 from .. import draw, generator, log, utils
@@ -254,6 +253,7 @@ def load_weights(model, filepath, where_fn=None):
     import h5py
     import keras
     import keras.backend as K
+    logger = log.get(__name__)
     with h5py.File(str(filepath), mode='r') as f:
         if 'layer_names' not in f.attrs and 'model_weights' in f:
             f = f['model_weights']
@@ -270,7 +270,7 @@ def load_weights(model, filepath, where_fn=None):
             try:
                 layer = model.get_layer(name=name)
             except ValueError as e:
-                warnings.warn(str(e))
+                logger.warning(str(e))
                 continue
 
             g = f[name]
@@ -284,16 +284,12 @@ def load_weights(model, filepath, where_fn=None):
                 original_keras_version,
                 original_backend)
             if len(weight_values) != len(symbolic_weights):
-                warnings.warn('Layer #' + str(k) + ' (named "' + layer.name + '") expects ' +
-                              str(len(symbolic_weights)) + ' weight(s), but the saved weights' +
-                              ' have ' + str(len(weight_values)) + ' element(s).')
+                logger.warning(f'Layer  # {k} (named "{layer.name}") expects {len(symbolic_weights)} weight(s), but the saved weights have {len(weight_values)} element(s).')
                 continue
             is_match_shapes = True
             for s, w in zip(symbolic_weights, weight_values):
                 if s.shape != w.shape:
-                    warnings.warn('Layer #' + str(k) + ' (named "' + layer.name + '") expects ' +
-                                  str(s.shape) + ' weight(s), but the saved weights' +
-                                  ' have ' + str(w.shape) + ' element(s).')
+                    logger.warning(f'Layer #{k} (named "{layer.name}") expects {s.shape} weight(s), but the saved weights have {w.shape} element(s).')
                     is_match_shapes = False
                     continue
             if is_match_shapes:

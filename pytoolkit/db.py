@@ -15,3 +15,11 @@ def register_ping():
                 cursor.execute('SELECT 1')
             except BaseException:
                 raise sqlalchemy.exc.DisconnectionError()
+
+
+def safe_close(session):
+    """例外を無視するclose。"""
+    try:
+        session.close()
+    except BaseException:
+        pass

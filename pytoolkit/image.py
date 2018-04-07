@@ -293,6 +293,8 @@ class RandomFlipLR(generator.Operator):
     def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
         if ctx.do_augmentation(rand, self.probability):
             rgb = ndimage.flip_lr(rgb)
+            if y is not None and isinstance(y, ml.ObjectsAnnotation):
+                y.bboxes[:, [0, 2]] = 1 - y.bboxes[:, [2, 0]]
         return rgb, y, w
 
 
@@ -307,8 +309,12 @@ class RandomFlipLRTB(generator.Operator):
         if ctx.do_augmentation(rand, self.probability):
             if rand.rand() < 0.5:
                 rgb = ndimage.flip_lr(rgb)
+                if y is not None and isinstance(y, ml.ObjectsAnnotation):
+                    y.bboxes[:, [0, 2]] = 1 - y.bboxes[:, [2, 0]]
             else:
                 rgb = ndimage.flip_tb(rgb)
+                if y is not None and isinstance(y, ml.ObjectsAnnotation):
+                    y.bboxes[:, [1, 3]] = 1 - y.bboxes[:, [3, 1]]
         return rgb, y, w
 
 

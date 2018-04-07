@@ -94,6 +94,16 @@ def test_is_in_box():
     assert (is_in == [[False, True, True, False]]).all()
 
 
+def test_top_k_accuracy():
+    y_true = np.array([1, 1, 1])
+    proba_pred = np.array([
+        [0.2, 0.1, 0.3],
+        [0.1, 0.2, 0.3],
+        [0.1, 0.3, 0.2],
+    ])
+    assert tk.ml.top_k_accuracy(y_true, proba_pred, k=2) == pytest.approx(2 / 3)
+
+
 def test_non_maximum_suppression():
     boxes = np.array([
         [200, 0, 200, 200],  # empty

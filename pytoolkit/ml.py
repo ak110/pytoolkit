@@ -332,6 +332,14 @@ def compute_ap(precision, recall, use_voc2007_metric=False):
     return ap
 
 
+def top_k_accuracy(y_true, proba_pred, k=5):
+    """Top-K accuracy。"""
+    assert len(y_true.shape) == 1
+    assert len(proba_pred.shape) == 2
+    best_k = np.argsort(proba_pred, axis=1)[:, -k:]
+    return np.mean([y in best_k[i, :] for i, y in enumerate(y_true)])
+
+
 def bboxes_center(bboxes):
     """Bounding boxの中心を返す。"""
     assert bboxes.shape[-1] == 4
@@ -595,44 +603,6 @@ def plot_cm(cm, to_file='confusion_matrix.png', classes=None, normalize=True, ti
     to_file.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(str(to_file), bbox_inches='tight')
     fig.clf()
-
-
-def load_voc_annotations(annotations_dir, class_name_to_id):
-    """VOC2007などのアノテーションデータの読み込み。
-
-    結果は「画像ファイル名拡張子なし」とObjectsAnnotationのdict。
-    """
-    data = {}
-    for f in pathlib.Path(annotations_dir).iterdir():
-        root = xml.etree.ElementTree.parse(str(f)).getroot()
-        folder = root.find('folder').text
-        filename = root.find('filename').text
-        size_tree = root.find('size')
-        width = float(size_tree.find('width').text)
-        height = float(size_tree.find('height').text)
-        classes = []
-        bboxes = []
-        difficults = []
-        for object_tree in root.findall('object'):
-            class_id = class_name_to_id[object_tree.find('name').text]
-            bndbox = object_tree.find('bndbox')
-            xmin = float(bndbox.find('xmin').text) / width
-            ymin = float(bndbox.find('ymin').text) / height
-            xmax = float(bndbox.find('xmax').text) / width
-            ymax = float(bndbox.find('ymax').text) / height
-            difficult = object_tree.find('difficult').text == '1'
-            classes.append(class_id)
-            bboxes.append([xmin, ymin, xmax, ymax])
-            difficults.append(difficult)
-        data[f.stem] = ObjectsAnnotation(
-            folder=folder,
-            filename=filename,
-            width=width,
-            height=height,
-            classes=np.array(classes),
-            bboxes=np.array(bboxes),
-            difficults=np.array(difficults))
-    return data
 
 
 def plot_objects(base_image, save_path, classes, confs, locs, class_names):

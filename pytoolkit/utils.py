@@ -8,8 +8,6 @@ import sys
 import numpy as np
 import sklearn.externals.joblib as joblib
 
-from . import log
-
 
 def noqa(*args):
     """pylintなどの誤検知対策用の空の関数。"""
