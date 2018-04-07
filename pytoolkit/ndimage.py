@@ -102,21 +102,11 @@ def pad_ltrb(rgb: np.ndarray, x1: int, y1: int, x2: int, y2: int, padding='edge'
     elif padding == 'rand':
         assert rand is not None
         mode = 'constant'
+        kwargs['constant_values'] = rand.randint(0, 255)
     else:
         mode = padding
 
     rgb = np.pad(rgb, ((y1, y2), (x1, x2), (0, 0)), mode=mode, **kwargs)
-
-    if padding == 'rand':
-        if y1:
-            rgb[:+y1, :, :] = rand.randint(0, 255, size=(y1, rgb.shape[1], rgb.shape[2]))
-        if y2:
-            rgb[-y2:, :, :] = rand.randint(0, 255, size=(y2, rgb.shape[1], rgb.shape[2]))
-        if x1:
-            rgb[:, :+x1, :] = rand.randint(0, 255, size=(rgb.shape[0], x1, rgb.shape[2]))
-        if x2:
-            rgb[:, -x2:, :] = rand.randint(0, 255, size=(rgb.shape[0], x2, rgb.shape[2]))
-
     return rgb
 
 

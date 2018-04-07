@@ -520,7 +520,7 @@ class RandomErasing(generator.Operator):
                 if (area_inter >= area_bb * 0.25).any():
                     continue
 
-            rgb[y:y + h, x:x + w, :] = rand.randint(0, 255, size=(h, w, rgb.shape[2]))
+            rgb[y:y + h, x:x + w, :] = rand.randint(0, 255, size=3)[np.newaxis, np.newaxis, :]
             break
 
         return rgb
