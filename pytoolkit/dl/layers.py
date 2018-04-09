@@ -129,6 +129,26 @@ class Builder(object):
         import keras.backend as K
         return K.int_shape(x)
 
+    @staticmethod
+    def se_block(filters, ratio=16, name=None):
+        """Squeeze-and-Excitation block
+
+        https://arxiv.org/abs/1709.01507
+        """
+        import keras
+        reg = keras.regularizers.l2(1e-4)
+        layers = [
+            keras.layers.GlobalAveragePooling2D(name=f'{name}_p' if name else None),
+            keras.layers.Dense(filters // ratio, activation='relu',
+                               kernel_initializer='he_uniform', kernel_regularizer=reg,
+                               name=f'{name}_sq' if name else None),
+            keras.layers.Dense(filters, activation='sigmoid',
+                               kernel_initializer='he_uniform', kernel_regularizer=reg,
+                               name=f'{name}_ex' if name else None),
+            keras.layers.Reshape((1, 1, filters), name=f'{name}_r' if name else None),
+        ]
+        return Sequence(layers, 'multiply', f'{name}_s' if name else None)
+
 
 class Sequence(object):
     """複数のレイヤーの塊。kerasのlayer風にcall出来るもの。(プロパティなどは必要に応じて実装予定。。)
@@ -136,12 +156,14 @@ class Sequence(object):
     # 引数
     - layers: Kerasのレイヤーの配列。
     - merge_function: callableまたは文字列で、入力とlayers適用後のをマージする関数を指定する。Noneなら何もしなくて'add'ならResidual blockになる。
+    - merge_name: merge_functionのname
 
     """
 
-    def __init__(self, layers, merge_function=None):
+    def __init__(self, layers, merge_function=None, merge_name=None):
         self.layers = layers
         self.merge_function = merge_function
+        self.merge_name = merge_name
 
     def __call__(self, x):
         x_in = x
@@ -150,7 +172,7 @@ class Sequence(object):
         if self.merge_function is not None:
             import keras
             merge_fn = self.merge_function if callable(self.merge_function) else keras.layers.__dict__[self.merge_function]
-            x = merge_fn([x_in, x])
+            x = merge_fn([x_in, x], name=self.merge_name)
         return x
 
     @property
