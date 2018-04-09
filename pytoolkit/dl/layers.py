@@ -139,10 +139,10 @@ class Builder(object):
         reg = keras.regularizers.l2(1e-4)
         layers = [
             keras.layers.GlobalAveragePooling2D(name=f'{name}_p' if name else None),
-            keras.layers.Dense(filters // ratio, activation='relu',
+            keras.layers.Dense(filters // ratio, activation='relu', use_bias=False,
                                kernel_initializer='he_uniform', kernel_regularizer=reg,
                                name=f'{name}_sq' if name else None),
-            keras.layers.Dense(filters, activation='sigmoid',
+            keras.layers.Dense(filters, activation='sigmoid', use_bias=False,
                                kernel_initializer='he_uniform', kernel_regularizer=reg,
                                name=f'{name}_ex' if name else None),
             keras.layers.Reshape((1, 1, filters), name=f'{name}_r' if name else None),
