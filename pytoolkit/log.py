@@ -8,6 +8,7 @@ import contextlib
 import functools
 import logging
 import logging.handlers
+import pathlib
 import time
 
 
@@ -44,6 +45,8 @@ def file_handler(output_path, append=False, rotate=False,
                  level=logging.DEBUG,
                  fmt='[%(levelname)-5s] %(message)s <%(name)s:%(filename)s:%(lineno)d>'):
     """RotatingFileHandler/FileHandlerを作成して返す。levelは文字列で'INFO'とかも指定可。(Python>=3.2)"""
+    output_path = pathlib.Path(output_path)
+    output_path.resolve().parent.mkdir(parents=True, exist_ok=True)
     if rotate:
         handler = logging.handlers.RotatingFileHandler(
             str(output_path), 'a', max_bytes, backup_count, encoding=encoding)
