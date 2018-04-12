@@ -8,7 +8,7 @@ class Builder(object):
     """Kerasでネットワークを作るときのヘルパークラス。"""
 
     def __init__(self, use_gn=False, default_l2=1e-5):
-        self.conv_defaults = {'kernel_initializer': 'he_uniform', 'padding': 'same'}
+        self.conv_defaults = {'kernel_initializer': 'he_uniform', 'padding': 'same', 'use_bias': False}
         self.dense_defaults = {'kernel_initializer': 'he_uniform'}
         self.bn_defaults = {}
         self.gn_defaults = {}
@@ -61,8 +61,11 @@ class Builder(object):
         kwargs = copy.copy(kwargs)
         bn_kwargs = copy.copy(bn_kwargs) if bn_kwargs is not None else {}
         act_kwargs = copy.copy(act_kwargs) if act_kwargs is not None else {}
-        if use_bn:
-            kwargs['use_bias'] = False
+        if not use_bn:
+            assert len(bn_kwargs) == 0
+        if not use_act:
+            assert len(act_kwargs) == 0
+
         if 'activation' in kwargs:
             if use_bn:
                 assert 'activation' not in act_kwargs
@@ -70,21 +73,16 @@ class Builder(object):
             else:
                 use_act = False
 
-        if not use_bn:
-            assert len(bn_kwargs) == 0
-        if not use_act:
-            assert len(act_kwargs) == 0
-        if not kwargs.get('use_bias', True):
-            assert 'bias_initializer' not in kwargs
-            assert 'bias_regularizer' not in kwargs
-            assert 'bias_constraint' not in kwargs
-
         args = [filters, kernel_size]
         kwargs = self._params(self.conv_defaults, kwargs)
         kwargs['name'] = name
         if conv == keras.layers.DepthwiseConv2D:
             kwargs = {k.replace('kernel_', 'depthwise_'): v for k, v in kwargs.items()}
             args = args[1:]
+
+        if not kwargs['use_bias']:
+            assert 'bias_initializer' not in kwargs
+            assert 'bias_constraint' not in kwargs
 
         layers = []
         layers.append(conv(*args, **kwargs))
