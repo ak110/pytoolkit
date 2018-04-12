@@ -86,13 +86,13 @@ class Builder(object):
 
         layers = []
         if kwargs['padding'] in ('reflect', 'symmetric'):
-            layers.append(pad2d()(mode=kwargs['padding']))  # とりあえず3x3 convのみ対応
+            layers.append(pad2d()(mode=kwargs['padding'], name=f'{name}_pad'))  # とりあえず3x3 convのみ対応
             kwargs['padding'] = 'valid'
         layers.append(conv(*args, **kwargs))
         if use_bn:
-            layers.append(self.bn(name=name + '_bn', **bn_kwargs))
+            layers.append(self.bn(name=f'{name}_bn', **bn_kwargs))
         if use_act:
-            layers.append(self.act(name=name + '_act', **act_kwargs))
+            layers.append(self.act(name=f'{name}_act', **act_kwargs))
         return Sequence(layers)
 
     def bn_act(self, name=None):
@@ -251,11 +251,15 @@ def pad2d():
             self.constant_values = constant_values
 
         def call(self, inputs, **kwargs):
-            padding = K.constant(((0, 0),) + self.padding + ((0, 0),))
-            return tf.pad(inputs, padding, self.mode, self.constant_values)
+            padding = K.constant(((0, 0),) + self.padding + ((0, 0),), dtype='int32')
+            return tf.pad(inputs, padding, mode=self.mode, constant_values=self.constant_values, name=self.name)
 
         def compute_output_shape(self, input_shape):
-            return input_shape[0] + sum(self.padding[0]), input_shape[1] + sum(self.padding[1]), input_shape[2]
+            assert len(input_shape) == 4
+            input_shape = list(input_shape)
+            input_shape[1] += sum(self.padding[0])
+            input_shape[2] += sum(self.padding[1])
+            return tuple(input_shape)
 
         def get_config(self):
             config = {
