@@ -5,15 +5,18 @@ import os
 def get_custom_objects():
     """独自オブジェクトのdictを返す。"""
     from . import layers, optimizers
-    return {
-        'GroupNormalization': layers.group_normalization(),
-        'Destandarization': layers.destandarization(),
-        'StocasticAdd': layers.stocastic_add(),
-        'NormalNoise': layers.normal_noise(),
-        'L2Normalization': layers.l2normalization(),
-        'WeightedMean': layers.weighted_mean(),
-        'NSGD': optimizers.nsgd(),
-    }
+    classes = [
+        layers.channel_argmax(),
+        layers.channel_max(),
+        layers.group_normalization(),
+        layers.destandarization(),
+        layers.stocastic_add(),
+        layers.normal_noise(),
+        layers.l2normalization(),
+        layers.weighted_mean(),
+        optimizers.nsgd(),
+    ]
+    return {c.__name__: c for c in classes}
 
 
 def session(config=None, gpu_options=None, use_horovod=False):

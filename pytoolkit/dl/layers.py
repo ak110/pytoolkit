@@ -85,6 +85,9 @@ class Builder(object):
             assert 'bias_constraint' not in kwargs
 
         layers = []
+        if kwargs['padding'] in ('reflect', 'symmetric'):
+            layers.append(pad2d()(mode=kwargs['padding']))  # とりあえず3x3 convのみ対応
+            kwargs['padding'] = 'valid'
         layers.append(conv(*args, **kwargs))
         if use_bn:
             layers.append(self.bn(name=name + '_bn', **bn_kwargs))
@@ -187,6 +190,83 @@ class Sequence(object):
     def trainable_weights(self):
         """訓練対象の重みTensorを返す。"""
         return sum([layer.trainable_weights for layer in self.layers], [])
+
+
+def channel_argmax():
+    """チャンネルをargmaxするレイヤー。"""
+    import keras
+    import keras.backend as K
+
+    class ChannelArgMax(keras.engine.topology.Layer):
+        """チャンネルをargmaxするレイヤー。"""
+
+        def call(self, inputs, **kwargs):
+            return K.argmax(inputs, axis=-1)
+
+        def compute_output_shape(self, input_shape):
+            return input_shape[:-1]
+
+    return ChannelArgMax
+
+
+def channel_max():
+    """チャンネルをmaxするレイヤー。"""
+    import keras
+    import keras.backend as K
+
+    class ChannelMax(keras.engine.topology.Layer):
+        """チャンネルをmaxするレイヤー。"""
+
+        def call(self, inputs, **kwargs):
+            return K.max(inputs, axis=-1)
+
+        def compute_output_shape(self, input_shape):
+            return input_shape[:-1]
+
+    return ChannelMax
+
+
+def pad2d():
+    """`tf.pad`するレイヤー。"""
+    import keras
+    import keras.backend as K
+    import tensorflow as tf
+
+    class Pad2D(keras.engine.topology.Layer):
+        """`tf.pad`するレイヤー。"""
+
+        def __init__(self, padding=(1, 1), mode='constant', constant_values=0, **kwargs):
+            super().__init__(**kwargs)
+
+            assert isinstance(padding, tuple) and len(padding) == 2
+            assert mode in ('constant', 'reflect', 'symmetric')
+
+            if isinstance(padding, int):
+                padding = ((padding, padding), (padding, padding))
+            elif isinstance(padding[0], int):
+                padding = ((padding[0], padding[0]), (padding[1], padding[1]))
+
+            self.padding = padding
+            self.mode = mode
+            self.constant_values = constant_values
+
+        def call(self, inputs, **kwargs):
+            padding = K.constant(((0, 0),) + self.padding + ((0, 0),))
+            return tf.pad(inputs, padding, self.mode, self.constant_values)
+
+        def compute_output_shape(self, input_shape):
+            return input_shape[0] + sum(self.padding[0]), input_shape[1] + sum(self.padding[1]), input_shape[2]
+
+        def get_config(self):
+            config = {
+                'padding': self.padding,
+                'mode': self.mode,
+                'constant_values': self.constant_values,
+            }
+            base_config = super().get_config()
+            return dict(list(base_config.items()) + list(config.items()))
+
+    return Pad2D
 
 
 def group_normalization():
@@ -325,12 +405,12 @@ def destandarization():
         """
 
         def __init__(self, mean=0, std=0.3, **kwargs):
+            super().__init__(**kwargs)
             self.supports_masking = True
             self.mean = K.cast_to_floatx(mean)
             self.std = K.cast_to_floatx(std)
             if self.std <= K.epsilon():
                 self.std = 1.  # 怪しい安全装置
-            super().__init__(**kwargs)
 
         def call(self, inputs, **kwargs):
             return inputs * self.std + self.mean
@@ -488,12 +568,12 @@ def weighted_mean():
                      kernel_regularizer=None,
                      kernel_constraint='non_neg',
                      **kwargs):
+            super().__init__(**kwargs)
             self.supports_masking = True
             self.kernel = None
             self.kernel_initializer = keras.initializers.get(kernel_initializer)
             self.kernel_regularizer = keras.regularizers.get(kernel_regularizer)
             self.kernel_constraint = keras.constraints.get(kernel_constraint)
-            super().__init__(**kwargs)
 
         def build(self, input_shape):
             self.kernel = self.add_weight(shape=(len(input_shape),),
