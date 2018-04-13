@@ -19,11 +19,12 @@ def register_ping():
                 raise sqlalchemy.exc.DisconnectionError()
 
 
-def wait_for_connection(url):
+def wait_for_connection(url, timeout=10):
     """DBに接続可能になるまで待機する。"""
     import sqlalchemy
     logger = logging.getLogger(__name__)
     failed = False
+    start_time = time.time()
     while True:
         try:
             engine = sqlalchemy.create_engine(url)
@@ -43,6 +44,8 @@ def wait_for_connection(url):
             if not failed:
                 failed = True
                 logger.info(f'DB接続待機中 . . . (URL: {url})')
+            if time.time() - start_time >= timeout:
+                raise
             time.sleep(1)
 
 
