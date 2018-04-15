@@ -12,11 +12,13 @@ def register_ping():
     @sqlalchemy.event.listens_for(sqlalchemy.pool.Pool, 'checkout')
     def _ping_connection(dbapi_connection, connection_record, connection_proxy):
         utils.noqa(connection_record, connection_proxy)
-        with dbapi_connection.cursor() as cursor:
-            try:
-                cursor.execute('SELECT 1')
-            except BaseException:
-                raise sqlalchemy.exc.DisconnectionError()
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute('SELECT 1')
+        except BaseException:
+            raise sqlalchemy.exc.DisconnectionError()
+        finally:
+            cursor.close()
 
 
 def wait_for_connection(url, timeout=10):
@@ -55,3 +57,25 @@ def safe_close(session):
         session.close()
     except BaseException:
         pass
+
+
+def long_text_type():
+    """LONGTEXTな型を返す。"""
+    import sqlalchemy.dialects.mysql
+    import sqlalchemy.dialects.sqlite
+    import sqlalchemy.sql.sqltypes
+    t = sqlalchemy.sql.sqltypes.Text()
+    t = t.with_variant(sqlalchemy.dialects.mysql.LONGTEXT(), 'mysql')
+    t = t.with_variant(sqlalchemy.dialects.sqlite.TEXT(), 'sqlite')
+    return t
+
+
+def big_int_type():
+    """BIGINTな型を返す。"""
+    import sqlalchemy.dialects.mysql
+    import sqlalchemy.dialects.sqlite
+    import sqlalchemy.sql.sqltypes
+    t = sqlalchemy.sql.sqltypes.Integer()
+    t = t.with_variant(sqlalchemy.dialects.mysql.BIGINT(), 'mysql')
+    t = t.with_variant(sqlalchemy.dialects.sqlite.INTEGER(), 'sqlite')
+    return t
