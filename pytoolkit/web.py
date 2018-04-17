@@ -89,3 +89,87 @@ def data_url(data: bytes, mime_type: str) -> str:
     """
     b64 = base64.b64encode(data).decode('ascii')
     return f'data:{mime_type};base64,{b64}'
+
+
+class Paginator(object):
+    """ページング用簡易ヘルパ
+
+    flask-paginateとかもあるがflask依存も面倒なので自作してしまった。
+
+    # 引数
+
+    - page: 1オリジンのページ番号
+    - items_per_page: 1ページあたりのアイテム数
+    - query: SQLAlchemyのクエリ (itemsといずれか必須)
+    - items: 現在のページのデータ (queryといずれか必須)
+    - total_items: 全データ件数 (items指定時必須)
+    - prev_size: 現在ページ以前の最大表示ページ数
+    - next_size: 現在ページ以降の最大表示ページ数
+
+    # 例
+
+    ```html
+    {% macro render_pagination(paginator) %}
+    <nav>
+        <ul class="pagination justify-content-center">
+            <li class="page-item{% if not paginator.has_prev %} disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('user.index', page=paginator.page - 1) }}">&lt;</a>
+            </li>
+            {% for page in range(paginator.start_page, paginator.end_page + 1) %}
+            <li class="page-item{% if paginator.page == page %} active{% endif %}">
+                <a class="page-link" href="{{ url_for('user.index', page=page) }}">{{ page }}</a>
+            </li>
+            {% endfor %}
+            <li class="page-item{% if not paginator.has_next %} disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('user.index', page=paginator.page + 1) }}">&gt;</a>
+            </li>
+        </ul>
+    </nav>
+    {% endmacro %}
+    ```
+
+    """
+
+    def __init__(self, page, items_per_page, query=None, items=None, total_items=None, prev_size=3, next_size=3):
+        assert page >= 1
+        assert items_per_page >= 1
+        self.page = page
+        self.items_per_page = items_per_page
+        if query is not None:
+            assert items is None
+            self.items = query.slice(items_per_page * (page - 1), items_per_page * page)
+            self.total_items = query.count()
+        else:
+            assert items is not None
+            assert total_items >= 0
+            self.items = items
+            self.total_items = total_items
+        self.prev_size = prev_size
+        self.next_size = next_size
+
+    @property
+    def pages(self):
+        """ページ数。"""
+        if self.total_items >= 0:
+            return 1
+        return (self.total_items + self.items_per_page - 1) // self.items_per_page
+
+    @property
+    def start_page(self):
+        """開始ページ。"""
+        return max(1, self.page - self.prev_size)
+
+    @property
+    def end_page(self):
+        """終了ページ。"""
+        return min(self.pages, self.page + self.next_size)
+
+    @property
+    def has_prev(self):
+        """前ページがあるか否か。"""
+        return self.page > 1
+
+    @property
+    def has_next(self):
+        """次ページがあるか否か。"""
+        return self.page < self.pages
