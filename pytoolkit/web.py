@@ -137,8 +137,8 @@ class Paginator(object):
         self.items_per_page = items_per_page
         if query is not None:
             assert items is None
-            self.items = query.slice(items_per_page * (page - 1), items_per_page * page)
             self.total_items = query.count()
+            self.items = query.slice(items_per_page * (page - 1), items_per_page * page)
         else:
             assert items is not None
             assert total_items >= 0
@@ -150,7 +150,7 @@ class Paginator(object):
     @property
     def pages(self):
         """ページ数。"""
-        if self.total_items >= 0:
+        if self.total_items <= 0:
             return 1
         return (self.total_items + self.items_per_page - 1) // self.items_per_page
 
