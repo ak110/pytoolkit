@@ -59,6 +59,7 @@ def session(config=None, gpu_options=None, use_horovod=False):
                 for k, v in self.gpu_options.items():
                     setattr(config.gpu_options, k, v)
                 K.set_session(tf.Session(config=config))
+            return self
 
         def __exit__(self, *exc_info):
             if K.backend() == 'tensorflow':
