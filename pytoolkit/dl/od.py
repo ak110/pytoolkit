@@ -355,94 +355,6 @@ class ObjectDetector(object):
 
         return pb_indices, pb_assigned_gt[pb_indices], pb_valids
 
-    def predict(self, model, X, batch_size, verbose=1, conf_threshold=0.1):
-        """予測。"""
-        pred_classes_list = []
-        pred_confs_list = []
-        pred_locs_list = []
-        gen = self.create_generator()
-        steps = gen.steps_per_epoch(len(X), batch_size)
-        with utils.tqdm(total=len(X), unit='f', desc='predict', disable=verbose == 0) as pbar, joblib.Parallel(batch_size, backend='threading') as parallel:
-            for i, X_batch in enumerate(gen.flow(X, batch_size=batch_size)):
-                # 予測
-                pcl, pcf, pl = model.predict(X_batch)
-                # NMSなど
-                pcl, pcf, pl = self.select_predictions(pcl, pcf, pl, conf_threshold=conf_threshold, parallel=parallel)
-                pred_classes_list.extend(pcl)
-                pred_confs_list.extend(pcf)
-                pred_locs_list.extend(pl)
-                # 次へ
-                pbar.update(len(X_batch))
-                if i + 1 >= steps:
-                    break
-        return pred_classes_list, pred_confs_list, pred_locs_list
-
-    def select_predictions(self, classes_list, confs_list, locs_list, top_k=200, nms_threshold=0.45, conf_threshold=0.1, parallel=None):
-        """予測結果のうちスコアが高いものを取り出す。
-
-        入出力は以下の3つの値。画像ごとにconfidenceの降順。
-        - 画像数×BOX数×class_id
-        - 画像数×BOX数×confidence
-        - 画像数×BOX数×(xmin, ymin, xmax, ymax)
-
-        BOX数は、入力はprior box数。出力は検出数(可変)
-        """
-        num_images = len(classes_list)
-        assert classes_list.shape == (num_images, len(self.pb_locs),)
-        assert confs_list.shape == (num_images, len(self.pb_locs),)
-        assert locs_list.shape == (num_images, len(self.pb_locs), 4)
-        # 画像毎にループ
-        if parallel:
-            jobs = [joblib.delayed(self._select, check_pickle=False)(pc, pf, pl, top_k, nms_threshold, conf_threshold)
-                    for pc, pf, pl in zip(classes_list, confs_list, locs_list)]
-            result_classes, result_confs, result_locs = zip(*parallel(jobs))
-        else:
-            results = [self._select(pc, pf, pl, top_k, nms_threshold, conf_threshold)
-                       for pc, pf, pl in zip(classes_list, confs_list, locs_list)]
-            result_classes, result_confs, result_locs = zip(*results)
-        assert len(result_classes) == num_images
-        assert len(result_confs) == num_images
-        assert len(result_locs) == num_images
-        return result_classes, result_confs, result_locs
-
-    def _select(self, pred_classes, pred_confs, pred_locs, top_k, nms_threshold, conf_threshold):
-        # 適当に上位のみ見る
-        conf_mask1 = pred_confs > conf_threshold
-        if not conf_mask1.any():
-            max_ix = conf_mask1.argmax()
-            return pred_classes[max_ix:max_ix + 1], pred_confs[max_ix:max_ix + 1], pred_locs[max_ix:max_ix + 1]
-        conf_mask2 = pred_confs[conf_mask1].argsort()[::-1][:top_k * 4]
-        pred_classes = pred_classes[conf_mask1][conf_mask2]
-        pred_confs = pred_confs[conf_mask1][conf_mask2]
-        pred_locs = pred_locs[conf_mask1, :][conf_mask2, :]
-        # クラスごとに処理
-        img_classes = []
-        img_confs = []
-        img_locs = []
-        for target_class in range(self.nb_classes):
-            targets = pred_classes == target_class
-            if targets.any():
-                # 重複を除くtop_k個を採用
-                target_confs = pred_confs[targets]
-                target_locs = pred_locs[targets, :]
-                idx = ml.non_maximum_suppression(target_locs, target_confs, top_k, nms_threshold)
-                # 結果
-                img_classes.append(np.repeat(target_class, len(idx)))
-                img_confs.append(target_confs[idx])
-                img_locs.append(target_locs[idx])
-        img_classes = np.concatenate(img_classes)
-        img_confs = np.concatenate(img_confs)
-        img_locs = np.concatenate(img_locs)
-        # 最終結果 (confidence降順に並べつつもう一度top_k)
-        sorted_indices = img_confs.argsort()[::-1][:top_k]
-        img_confs = img_confs[sorted_indices]
-        img_classes = img_classes[sorted_indices]
-        img_locs = img_locs[sorted_indices]
-        assert img_classes.shape == (len(sorted_indices),)
-        assert img_confs.shape == (len(sorted_indices),)
-        assert img_locs.shape == (len(sorted_indices), 4)
-        return img_classes, img_confs, img_locs
-
     def loss(self, y_true, y_pred):
         """損失関数。"""
         import keras.backend as K
@@ -529,7 +441,7 @@ class ObjectDetector(object):
 
         """
         assert mode in ('pretrain', 'train', 'predict')
-        assert weights in (None, 'imagenet', 'voc')
+        assert weights in (None, 'imagenet', 'voc') or isinstance(weights, pathlib.Path)
         import keras
         builder = layers.Builder()
         input_size = _PRETRAIN_SIZE if mode == 'pretrain' else self.image_size
@@ -547,11 +459,6 @@ class ObjectDetector(object):
         logger.info('network depth: %d', models.count_network_depth(model))
         logger.info('trainable params: %d', models.count_trainable_params(model))
 
-        if mode == 'predict':
-            # マルチGPU化
-            logger.info('gpu count = %d', utils.get_gpu_count())
-            model, batch_size = models.multi_gpu_model(model, batch_size)
-
         gen = self.create_pretrain_generator() if mode == 'pretrain' else self.create_generator()
         model = models.Model(model, gen, batch_size)
 
@@ -563,14 +470,16 @@ class ObjectDetector(object):
             logger.info(f'warm start: {weights.name}')
 
         if mode == 'pretrain':
-            # 通常の分類
+            # 事前学習：通常の分類としてコンパイル
             model.compile(sgd_lr=0.5 / 256, loss='categorical_crossentropy', metrics=['acc'])
         elif mode == 'train':
-            # Object detection
+            # Object detectionとしてコンパイル
             sgd_lr = 0.5 / 256 / 3  # lossが複雑なので微調整
             model.compile(sgd_lr=sgd_lr, lr_multipliers=lr_multipliers, loss=self.loss, metrics=self.metrics)
         else:
-            pass  # コンパイル不要
+            assert mode == 'predict'
+            # 予測：コンパイル不要。マルチGPU化。
+            model.set_multi_gpu_model()
         return model
 
     @log.trace()
@@ -678,7 +587,7 @@ class ObjectDetector(object):
         else:
             # ラベル側とshapeを合わせるためのダミー
             dummy_shape = (len(self.pb_locs), 1)
-            dummy = keras.layers.Lambda(K.zeros_like, dummy_shape)(objs)  # objsとちょうどshapeが同じなのでzeros_like。
+            dummy = keras.layers.Lambda(K.zeros_like, dummy_shape, name='dummy')(objs)  # objsとちょうどshapeが同じなのでzeros_like。
             # いったんくっつける (損失関数の中で分割して使う)
             outputs = keras.layers.concatenate([dummy, objs, clfs, locs], axis=-1, name='outputs')
             model = keras.models.Model(inputs=inputs, outputs=outputs)
@@ -774,11 +683,12 @@ class ObjectDetector(object):
             conf = K.sqrt(objs * confs)
             return conf * np.expand_dims(self.pb_mask, axis=0)
 
-        classes = layers.channel_argmax()()(clfs)
-        confs = layers.channel_max()()(clfs)
-        objconfs = keras.layers.Lambda(_conf, K.int_shape(clfs)[1:-1])([objs, confs])
-        locs = keras.layers.Lambda(self.decode_locs)(locs)
-        return keras.models.Model(inputs=inputs, outputs=[classes, objconfs, locs])
+        classes = layers.channel_argmax()(name='classes')(clfs)
+        confs = layers.channel_max()(name='confs')(clfs)
+        objconfs = keras.layers.Lambda(_conf, K.int_shape(clfs)[1:-1], name='objconfs')([objs, confs])
+        locs = keras.layers.Lambda(self.decode_locs, name='locs')(locs)
+        nms = layers.nms()(self.nb_classes, len(self.pb_locs), name='nms')([classes, objconfs, locs])
+        return keras.models.Model(inputs=inputs, outputs=nms)
 
     def create_pretrain_generator(self):
         """ImageDataGeneratorを作って返す。"""
@@ -881,3 +791,24 @@ class ObjectDetector(object):
             assert (rgb.shape[:2] == cropped_wh[::-1]).all()
             break
         return rgb
+
+    def predict(self, model, X, conf_threshold=0.1, verbose=1):
+        """予測。"""
+        pred_classes_list, pred_confs_list, pred_locs_list = [], [], []
+        steps = model.gen.steps_per_epoch(len(X), model.batch_size)
+        with utils.tqdm(total=len(X), unit='f', desc='predict', disable=verbose == 0) as pbar:
+            for i, X_batch in enumerate(model.gen.flow(X, batch_size=model.batch_size)):
+                for pred in model.model.predict_on_batch(X_batch):
+                    pred_classes = pred[:, 0].astype(np.int32)
+                    pred_confs = pred[:, 1]
+                    pred_locs = pred[:, 2:]
+                    mask = pred_confs >= conf_threshold
+                    pred_classes_list.append(pred_classes[mask])
+                    pred_confs_list.append(pred_confs[mask])
+                    pred_locs_list.append(pred_locs[mask, :])
+                # 次へ
+                pbar.update(len(X_batch))
+                if i + 1 >= steps:
+                    assert i + 1 == steps
+                    break
+        return pred_classes_list, pred_confs_list, pred_locs_list

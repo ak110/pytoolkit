@@ -608,3 +608,87 @@ def weighted_mean():
             return dict(list(base_config.items()) + list(config.items()))
 
     return WeightedMean
+
+
+def nms():
+    """Non maximum suppressionを行うレイヤー。
+
+    入力は、classes, confs, locs。
+    出力は、画像数×top_k×6
+    6はclass(1) + conf(1) + loc(4)。
+    """
+    import keras
+    import keras.backend as K
+    import tensorflow as tf
+
+    class NMS(keras.engine.topology.Layer):
+        """Non maximum suppressionを行うレイヤー。"""
+
+        def __init__(self, num_classes, prior_boxes, top_k=200, nms_threshold=0.45, **kwargs):
+            super().__init__(**kwargs)
+            self.num_classes = num_classes
+            self.prior_boxes = prior_boxes
+            self.top_k = top_k
+            self.nms_threshold = nms_threshold
+
+        def call(self, inputs, **kwargs):
+            classes, confs, locs = inputs
+            classes = K.reshape(K.cast(classes, K.floatx()), (-1, self.prior_boxes, 1))
+            confs = K.reshape(confs, (-1, self.prior_boxes, 1))
+            inputs = K.concatenate([classes, confs, locs], axis=-1)
+            return K.map_fn(self._process_image, inputs)
+
+        def compute_output_shape(self, input_shape):
+            assert input_shape and len(input_shape) >= 2
+            return (input_shape[0][0], self.top_k, 1 + 1 + 4)
+
+        def get_config(self):
+            config = {
+                'num_classes': self.num_classes,
+                'prior_boxes': self.prior_boxes,
+                'top_k': self.top_k,
+                'nms_threshold': self.nms_threshold,
+            }
+            base_config = super().get_config()
+            return dict(list(base_config.items()) + list(config.items()))
+
+        def _process_image(self, image):
+            classes = K.cast(image[:, 0], 'int32')
+            confs = image[:, 1]
+            locs = image[:, 2:]
+
+            img_classes = []
+            img_confs = []
+            img_locs = []
+            for class_id in range(self.num_classes):
+                mask = K.equal(classes, class_id)
+                target_classes = tf.boolean_mask(classes, mask, axis=0)  # 無駄だが、tileの使い方が分からないのでとりあえず。。
+                target_confs = tf.boolean_mask(confs, mask, axis=0)
+                target_locs = tf.boolean_mask(locs, mask, axis=0)
+
+                top_k = K.minimum(self.top_k, K.shape(target_confs)[0])
+
+                target_confs, sorted_indnces = tf.nn.top_k(target_confs, k=top_k)
+                target_locs = K.gather(target_locs, sorted_indnces)
+
+                nms_indices = tf.image.non_max_suppression(target_locs, target_confs, top_k, self.nms_threshold)
+
+                img_classes.append(target_classes[:top_k])
+                img_confs.append(K.gather(target_confs, nms_indices))
+                img_locs.append(K.gather(target_locs, nms_indices))
+
+            img_classes = K.concatenate(img_classes, axis=0)
+            img_confs = K.concatenate(img_confs, axis=0)
+            img_locs = K.concatenate(img_locs, axis=0)
+
+            img_confs, sorted_indices = tf.nn.top_k(img_confs, k=self.top_k)
+            img_classes = K.gather(img_classes, sorted_indices)
+            img_locs = K.gather(img_locs, sorted_indices)
+
+            img_classes = K.reshape(img_classes, (self.top_k, 1))
+            img_confs = K.reshape(img_confs, (self.top_k, 1))
+
+            img_classes = K.cast(img_classes, K.floatx())
+            return K.concatenate([img_classes, img_confs, img_locs], axis=-1)
+
+    return NMS

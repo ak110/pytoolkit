@@ -20,6 +20,9 @@ class Model(object):
         """
         load_weights(self.model, filepath, where_fn)
 
+    def set_multi_gpu_model(self):
+        self.model, self.batch_size = multi_gpu_model(self.model, self.batch_size)
+
     @log.trace()
     def compile(self, optimizer=None, loss=None, metrics=None,
                 sample_weight_mode=None, weighted_metrics=None, target_tensors=None,
@@ -133,6 +136,7 @@ def multi_gpu_model(model, batch_size, gpus=None):
     """
     if gpus is None:
         gpus = utils.get_gpu_count()
+        log.get(__name__).info(f'gpu count = {gpus}')
     if gpus <= 1:
         return model, batch_size
 
