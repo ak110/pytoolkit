@@ -234,3 +234,11 @@ def binarize(rgb: np.ndarray, threshold) -> np.ndarray:
     """二値化(白黒化)。"""
     assert 0 < threshold < 255
     return (rgb >= threshold).astype(np.float32) * 255
+
+
+def rot90(rgb: np.ndarray, k) -> np.ndarray:
+    """90度回転。"""
+    assert 0 <= k <= 3
+    if k == 0:
+        return rgb
+    return np.rot90(rgb, k=k, axes=(0, 1))

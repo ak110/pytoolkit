@@ -604,6 +604,30 @@ class RandomBinarize(generator.Operator):
         return rgb, y, w
 
 
+class RotationsLearning(generator.Operator):
+    """画像を0,90,180,270度回転させた画像を与え、その回転を推定する学習。
+
+    Unsupervised Representation Learning by Predicting Image Rotations
+    https://arxiv.org/abs/1803.07728
+
+    # 使い方
+
+    - `y` は `np.zeros((len(X),))` とする。
+    - 4クラス分類として学習する。
+
+    ```
+    gen.add(tk.image.RotationsLearning())
+    ```
+
+    """
+
+    def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
+        assert y == 0
+        y = rand.randint(0, 4)
+        rgb = ndimage.rot90(rgb, y)
+        return rgb, y, w
+
+
 class CustomOperator(generator.Operator):
     """カスタム処理用。"""
 

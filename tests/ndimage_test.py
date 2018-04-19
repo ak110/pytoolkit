@@ -48,6 +48,9 @@ def test_filters():
         (1, 'standardize', tk.ndimage.standardize),
         (1, 'binarize_1', lambda rgb: tk.ndimage.binarize(rgb, 128 - 32)),
         (1, 'binarize_2', lambda rgb: tk.ndimage.binarize(rgb, 128 + 32)),
+        (0, 'rot90', lambda rgb: tk.ndimage.rot90(rgb, 1)),
+        (0, 'rot180', lambda rgb: tk.ndimage.rot90(rgb, 2)),
+        (0, 'rot270', lambda rgb: tk.ndimage.rot90(rgb, 3)),
     ]
 
     rgb = tk.ndimage.load(_BASE_DIR / 'data' / 'Lenna.png')  # 256x256の某有名画像
