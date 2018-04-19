@@ -25,4 +25,4 @@ def is_master():
     """Horovod未使用 or hvd.rank() == 0ならTrue。"""
     if not initialized():
         return True
-    get().init()
+    return get().rank() == 0
