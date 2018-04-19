@@ -1,17 +1,16 @@
 """Kerasのモデル関連。"""
 
-from . import optimizers
+from . import hvd, optimizers
 from .. import draw, generator, log, utils
 
 
 class Model(object):
     """`keras.models.Model` + `tk.dl.generators.Generator`の薄いラッパー。"""
 
-    def __init__(self, model, gen: generator.Generator, batch_size, use_horovod: bool = False):
+    def __init__(self, model, gen: generator.Generator, batch_size):
         self.model = model  # type: keras.models.Model
         self.gen = gen
         self.batch_size = batch_size
-        self.use_horovod = use_horovod
 
     def load_weights(self, filepath, where_fn=None):
         """重みの読み込み。
@@ -39,9 +38,8 @@ class Model(object):
             assert sgd_lr is not None
 
         if sgd_lr is not None:
-            if self.use_horovod:
-                import horovod.keras as hvd
-                sgd_lr *= hvd.size()
+            if hvd.initialized():
+                sgd_lr *= hvd.get().size()
             lr = sgd_lr * self.batch_size
             log.get(__name__).info(f'lr = {lr:.2e}')
             if lr_multipliers is None:
@@ -49,9 +47,8 @@ class Model(object):
             else:
                 optimizer = optimizers.nsgd()(lr=lr, lr_multipliers=lr_multipliers)
 
-        if self.use_horovod:
-            import horovod.keras as hvd
-            optimizer = hvd.DistributedOptimizer(
+        if hvd.initialized():
+            optimizer = hvd.get().DistributedOptimizer(
                 optimizer, device_dense=device_dense, device_sparse=device_sparse)
 
         self.model.compile(optimizer, loss, metrics=metrics,
@@ -61,18 +58,17 @@ class Model(object):
 
     def summary(self):
         """サマリ表示。"""
-        print_fn = log.get(__name__).info if self.is_master else lambda _: None
+        print_fn = log.get(__name__).info if hvd.is_master() else lambda _: None
         self.model.summary(print_fn=print_fn)
         print_fn(f'network depth: {count_network_depth(self.model)}')
 
     def horovod_callbacks(self):
         """Horovodのコールバック3つをまとめて返すだけ。"""
-        assert self.use_horovod
-        import horovod.keras as hvd
+        assert hvd.initialized()
         return [
-            hvd.callbacks.BroadcastGlobalVariablesCallback(0),
-            hvd.callbacks.MetricAverageCallback(),
-            hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1),
+            hvd.get().callbacks.BroadcastGlobalVariablesCallback(0),
+            hvd.get().callbacks.MetricAverageCallback(),
+            hvd.get().callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1),
         ]
 
     def fit(self, X_train, y_train,
@@ -85,14 +81,14 @@ class Model(object):
         has_val = validation_data is not None
         X_val, y_val = validation_data if has_val else (None, None)
         gen1 = self.gen.flow(X_train, y_train, batch_size=self.batch_size, data_augmentation=True, shuffle=True, balanced=balanced)
-        gen2 = self.gen.flow(X_val, y_val, batch_size=self.batch_size, shuffle=self.use_horovod) if has_val else None
+        gen2 = self.gen.flow(X_val, y_val, batch_size=self.batch_size, shuffle=hvd.initialized()) if has_val else None
         steps1 = self.gen.steps_per_epoch(len(X_train), self.batch_size)
         steps2 = self.gen.steps_per_epoch(len(X_val), self.batch_size) if has_val else None
 
-        if self.use_horovod:
-            import horovod.keras as hvd
-            steps1 //= hvd.size()
-            steps2 //= hvd.size()  # horovodのサンプルでは * 3 だけど早く進んで欲しいので省略
+        if hvd.initialized():
+            hvd_size = hvd.get().size()
+            steps1 //= hvd_size
+            steps2 //= hvd_size  # Horovodのサンプルでは * 3 だけど早く進んで欲しいので省略
 
         # TerminateOnNaNは常に付けちゃう
         import keras
@@ -100,7 +96,7 @@ class Model(object):
 
         hist = self.model.fit_generator(
             gen1, steps1, epochs=epochs,
-            verbose=verbose if self.is_master else 0,
+            verbose=verbose if hvd.is_master() else 0,
             callbacks=callbacks,
             validation_data=gen2,
             validation_steps=steps2,
@@ -121,17 +117,9 @@ class Model(object):
         return self.model.evaluate_generator(gen, steps)
 
     def save(self, filepath, overwrite=True, include_optimizer=True):
-        """pathlib対応&is_masterな時のみなsave。"""
-        if self.is_master:
+        """pathlib対応＆hvd.is_master()な時のみなsave。"""
+        if hvd.is_master():
             self.model.save(str(filepath), overwrite=overwrite, include_optimizer=include_optimizer)
-
-    @property
-    def is_master(self):
-        """Horovodを使ってるなら`hvd.rank() == 0`の場合、そうでないなら常にTrue。"""
-        if self.use_horovod:
-            import horovod.keras as hvd
-            return hvd.rank() == 0
-        return True
 
 
 @log.trace()

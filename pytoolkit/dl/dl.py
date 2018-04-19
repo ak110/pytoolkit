@@ -1,6 +1,8 @@
 """DeepLearning(主にKeras)関連。"""
 import os
 
+from . import hvd
+
 
 def get_custom_objects():
     """独自オブジェクトのdictを返す。"""
@@ -46,9 +48,8 @@ def session(config=None, gpu_options=None, use_horovod=False):
 
         def __enter__(self):
             if use_horovod:
-                import horovod.keras as hvd
                 hvd.init()
-                self.gpu_options['visible_device_list'] = str(hvd.local_rank())
+                self.gpu_options['visible_device_list'] = str(hvd.get().local_rank())
             if K.backend() == 'tensorflow':
                 self.config['allow_soft_placement'] = True
                 self.gpu_options['allow_growth'] = True
