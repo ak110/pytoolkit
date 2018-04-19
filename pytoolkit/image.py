@@ -614,17 +614,16 @@ class RotationsLearning(generator.Operator):
 
     - `y` は `np.zeros((len(X),))` とする。
     - 4クラス分類として学習する。
-
-    ```
-    gen.add(tk.image.RotationsLearning())
-    ```
+    - 一番最後に `gen.add(tk.image.RotationsLearning())`
 
     """
 
     def execute(self, rgb, y, w, rand, ctx: generator.GeneratorContext):
         assert y == 0
-        y = rand.randint(0, 4)
-        rgb = ndimage.rot90(rgb, y)
+        k = rand.randint(0, 4)
+        rgb = ndimage.rot90(rgb, k)
+        y = np.zeros((4,))
+        y[k] = 1
         return rgb, y, w
 
 
