@@ -535,9 +535,9 @@ class ObjectDetector(object):
         while True:
             down_index += 1
             map_size = builder.shape(x)[1] // 2
-            x = builder.dwconv2d(256, 2, strides=2, name=f'down{down_index}_ds')(x)
+            x = builder.conv2d(256, 2, strides=2, name=f'down{down_index}_ds')(x)
             x = builder.conv2d(256, 3, name=f'down{down_index}_conv1')(x)
-            x = builder.dwconv2d(256, 3, name=f'down{down_index}_conv2')(x)
+            x = builder.dwconv2d(3, name=f'down{down_index}_conv2')(x)
             assert builder.shape(x)[1] == map_size
             ref_list.append(x)
             if map_size <= 4 or map_size % 2 != 0:  # 充分小さくなるか奇数になったら終了
@@ -567,12 +567,12 @@ class ObjectDetector(object):
             up_size = map_size // in_map_size
             x = keras.layers.Dropout(0.25)(x)
             x = builder.conv2dtr(256, up_size, strides=up_size, padding='valid', name=f'up{up_index}_us')(x)
-            x = builder.dwconv2d(256, 3, use_act=False, bn_kwargs={'center': False}, name=f'up{up_index}_up')(x)
+            x = builder.dwconv2d(3, use_act=False, bn_kwargs={'center': False}, name=f'up{up_index}_up')(x)
             t = builder.conv2d(256, 1, use_act=False, bn_kwargs={'center': False}, name=f'up{up_index}_lt')(ref[f'down{map_size}'])
             x = keras.layers.add([x, t], name=f'up{up_index}_mix')
             x = builder.bn_act(name=f'up{up_index}_mix')(x)
             x = builder.conv2d(256, 3, name=f'up{up_index}_conv1')(x)
-            x = builder.dwconv2d(256, 3, name=f'up{up_index}_conv2')(x)
+            x = builder.dwconv2d(3, name=f'up{up_index}_conv2')(x)
             ref[f'out{map_size}'] = x
 
             if self.map_sizes[0] <= map_size:
@@ -607,11 +607,10 @@ class ObjectDetector(object):
         shared_layers['pm_conv2_2'] = builder.conv2d(256, 3, use_act=False, name='pm_conv2_2')
         shared_layers['pm_conv3_1'] = builder.conv2d(256, 3, use_act=True, name='pm_conv3_1')
         shared_layers['pm_conv3_2'] = builder.conv2d(256, 3, use_act=False, name='pm_conv3_2')
-        shared_layers['pm_bn'] = builder.bn(name='pm_bn')
-        shared_layers['pm_act'] = builder.act(name='pm_act')
+        shared_layers['pm_bn_act'] = builder.bn_act(name='pm')
         for pat_ix in range(len(self.pb_size_patterns)):
             shared_layers[f'pm-{pat_ix}_obj'] = builder.conv2d(
-                1, (1, 1),
+                1, 1,
                 kernel_initializer='zeros',
                 bias_initializer=losses.od_bias_initializer(1),
                 bias_regularizer=None,
@@ -620,14 +619,14 @@ class ObjectDetector(object):
                 use_bn=False,
                 name=f'pm-{pat_ix}_obj')
             shared_layers[f'pm-{pat_ix}_clf'] = builder.conv2d(
-                self.nb_classes, (1, 1),
+                self.nb_classes, 1,
                 kernel_initializer='zeros',
                 activation='sigmoid',  # softmaxより速そう (cf. YOLOv3)
                 use_bias=True,
                 use_bn=False,
                 name=f'pm-{pat_ix}_clf')
             shared_layers[f'pm-{pat_ix}_loc'] = builder.conv2d(
-                4, (1, 1),
+                4, 1,
                 kernel_initializer='zeros',
                 use_bias=False,
                 use_bn=False,
@@ -652,8 +651,7 @@ class ObjectDetector(object):
             x = shared_layers[f'pm_conv2_1'](x)
             x = shared_layers[f'pm_conv2_2'](x)
             x = keras.layers.add([t, x], name=f'pm{map_size}_mix2')
-            x = shared_layers[f'pm_bn'](x)
-            x = shared_layers[f'pm_act'](x)
+            x = shared_layers[f'pm_bn_act'](x)
             for pat_ix in range(len(self.pb_size_patterns)):
                 obj = shared_layers[f'pm-{pat_ix}_obj'](x)
                 clf = shared_layers[f'pm-{pat_ix}_clf'](x)
