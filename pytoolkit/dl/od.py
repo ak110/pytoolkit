@@ -15,7 +15,6 @@ from .. import generator, image, log, math, ml, ndimage, utils
 
 _VAR_LOC = 0.2  # SSD風(?)適当スケーリング
 _VAR_SIZE = 0.2  # SSD風適当スケーリング
-_PRETRAIN_SIZE = (299, 299)
 
 
 class ObjectDetector(object):
@@ -445,8 +444,7 @@ class ObjectDetector(object):
         assert weights in (None, 'imagenet', 'voc') or isinstance(weights, pathlib.Path)
         import keras
         builder = layers.Builder()
-        input_size = _PRETRAIN_SIZE if mode == 'pretrain' else self.image_size
-        x = inputs = keras.layers.Input(input_size + (3,))
+        x = inputs = keras.layers.Input(self.image_size + (3,))
         x, ref, lr_multipliers = self._create_basenet(builder, x, weights == 'imagenet')
         if mode == 'pretrain':
             assert len(lr_multipliers) == 0
@@ -692,7 +690,7 @@ class ObjectDetector(object):
     def create_pretrain_generator(self):
         """ImageDataGeneratorを作って返す。"""
         gen = image.ImageDataGenerator()
-        gen.add(image.Resize(_PRETRAIN_SIZE))
+        gen.add(image.Resize(self.image_size))
         gen.add(image.RandomFlipLR(probability=0.5))
         gen.add(image.RandomErasing(probability=0.5))
         gen.add(image.RotationsLearning())
