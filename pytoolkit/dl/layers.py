@@ -616,6 +616,8 @@ def nms():
     入力は、classes, confs, locs。
     出力は、画像数×top_k×6
     6はclass(1) + conf(1) + loc(4)。
+
+    出力がtop_k個未満ならzero padding。(confidenceが0になるのでそこそこ無害のはず)
     """
     import keras
     import keras.backend as K
@@ -661,34 +663,43 @@ def nms():
             img_confs = []
             img_locs = []
             for class_id in range(self.num_classes):
+                # 対象のクラスのみ抜き出す
                 mask = K.equal(classes, class_id)
                 target_classes = tf.boolean_mask(classes, mask, axis=0)  # 無駄だが、tileの使い方が分からないのでとりあえず。。
                 target_confs = tf.boolean_mask(confs, mask, axis=0)
                 target_locs = tf.boolean_mask(locs, mask, axis=0)
 
+                # スコア上位top_k個を抜き出す
                 top_k = K.minimum(self.top_k, K.shape(target_confs)[0])
-
                 target_confs, sorted_indnces = tf.nn.top_k(target_confs, k=top_k)
                 target_locs = K.gather(target_locs, sorted_indnces)
 
+                # NMS
                 nms_indices = tf.image.non_max_suppression(target_locs, target_confs, top_k, self.nms_threshold)
-
-                img_classes.append(target_classes[:top_k])
+                img_classes.append(K.gather(target_classes, nms_indices))
                 img_confs.append(K.gather(target_confs, nms_indices))
                 img_locs.append(K.gather(target_locs, nms_indices))
 
+            # 全クラス分くっつける
             img_classes = K.concatenate(img_classes, axis=0)
             img_confs = K.concatenate(img_confs, axis=0)
             img_locs = K.concatenate(img_locs, axis=0)
 
-            img_confs, sorted_indices = tf.nn.top_k(img_confs, k=self.top_k)
+            # スコア上位top_k個を抜き出す
+            top_k = K.minimum(self.top_k, K.shape(img_confs)[0])
+            img_confs, sorted_indices = tf.nn.top_k(img_confs, k=top_k)
             img_classes = K.gather(img_classes, sorted_indices)
             img_locs = K.gather(img_locs, sorted_indices)
 
-            img_classes = K.reshape(img_classes, (self.top_k, 1))
-            img_confs = K.reshape(img_confs, (self.top_k, 1))
-
+            # shapeとdtypeを合わせてconcat
+            output_size = K.shape(sorted_indices)[0]
+            img_classes = K.reshape(img_classes, (output_size, 1))
+            img_confs = K.reshape(img_confs, (output_size, 1))
             img_classes = K.cast(img_classes, K.floatx())
-            return K.concatenate([img_classes, img_confs, img_locs], axis=-1)
+            output = K.concatenate([img_classes, img_confs, img_locs], axis=-1)
+
+            # top_k個に満たなければzero padding。
+            output = tf.pad(output, [[0, self.top_k - output_size], [0, 0]])
+            return output
 
     return NMS

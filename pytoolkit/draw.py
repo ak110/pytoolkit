@@ -55,7 +55,7 @@ def set_axis_tick_to_int(axis):
 
 
 def save_to_bytes(ax, dpi=None, facecolor='w', edgecolor='w',
-                  orientation='portrait', papertype=None, format='png',  # pylint: disable=W0622
+                  orientation='portrait', papertype=None, format=None,  # pylint: disable=W0622
                   transparent=False, bbox_inches=None, pad_inches=0.1,
                   frameon=None, **kwargs) -> bytes:
     """bytesに保存。"""
@@ -68,13 +68,19 @@ def save_to_bytes(ax, dpi=None, facecolor='w', edgecolor='w',
 
 
 def save(ax, file, dpi=None, facecolor='w', edgecolor='w',
-         orientation='portrait', papertype=None, format='png',  # pylint: disable=W0622
+         orientation='portrait', papertype=None, format=None,  # pylint: disable=W0622
          transparent=False, bbox_inches=None, pad_inches=0.1,
          frameon=None, **kwargs):
     """保存。"""
     # ディレクトリ作成
     if isinstance(file, (str, pathlib.Path)):
-        pathlib.Path(file).resolve().parent.mkdir(parents=True, exist_ok=True)
+        file = pathlib.Path(file)
+        file.resolve().parent.mkdir(parents=True, exist_ok=True)
+        if format is None:
+            format = file.suffix[1:]
+    else:
+        if format is None:
+            format = 'png'
     # 保存
     ax.get_figure().savefig(
         file, dpi=dpi, facecolor=facecolor, edgecolor=edgecolor,
