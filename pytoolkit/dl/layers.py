@@ -86,13 +86,13 @@ class Builder(object):
 
         layers = []
         if kwargs['padding'] in ('reflect', 'symmetric'):
-            layers.append(pad2d()(mode=kwargs['padding'], name=f'{name}_pad'))  # とりあえず3x3 convのみ対応
+            layers.append(pad2d()(mode=kwargs['padding'], name=f'{name}_pad' if name is not None else None))  # とりあえず3x3 convのみ対応
             kwargs['padding'] = 'valid'
         layers.append(conv(*args, **kwargs))
         if use_bn:
-            layers.append(self.bn(name=f'{name}_bn', **bn_kwargs))
+            layers.append(self.bn(name=f'{name}_bn' if name is not None else None, **bn_kwargs))
         if use_act:
-            layers.append(self.act(name=f'{name}_act', **act_kwargs))
+            layers.append(self.act(name=f'{name}_act' if name is not None else None, **act_kwargs))
         return Sequence(layers)
 
     def bn_act(self, name=None):
