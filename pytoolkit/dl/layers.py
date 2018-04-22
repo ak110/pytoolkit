@@ -30,27 +30,27 @@ class Builder(object):
         self.gn_defaults['gamma_regularizer'] = reg
         self.gn_defaults['beta_regularizer'] = reg
 
-    def conv1d(self, filters, kernel_size, name, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
+    def conv1d(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """Conv1D+BN+Act。"""
         import keras.layers
         return self._conv(keras.layers.Conv1D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
-    def conv2d(self, filters, kernel_size, name, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
+    def conv2d(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """Conv2D+BN+Act。"""
         import keras.layers
         return self._conv(keras.layers.Conv2D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
-    def conv3d(self, filters, kernel_size, name, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
+    def conv3d(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """Conv3D+BN+Act。"""
         import keras.layers
         return self._conv(keras.layers.Conv3D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
-    def conv2dtr(self, filters, kernel_size, name, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
+    def conv2dtr(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """Conv2DTranspose+BN+Act。"""
         import keras.layers
         return self._conv(keras.layers.Conv2DTranspose, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
-    def dwconv2d(self, kernel_size, name, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
+    def dwconv2d(self, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """DepthwiseConv2D+BN+Act。"""
         import keras.layers
         return self._conv(keras.layers.DepthwiseConv2D, None, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)

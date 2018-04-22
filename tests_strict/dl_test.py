@@ -42,11 +42,11 @@ def test_xor(tmpdir):
     y = np.array([0, 1, 1, 0])
 
     with tk.dl.session():
+        builder = tk.dl.layers.Builder()
         inp = x = keras.layers.Input(shape=(2,))
-        x = keras.layers.Dense(16, use_bias=False)(x)
-        x = keras.layers.BatchNormalization()(x)
-        x = keras.layers.Activation(activation='relu')(x)
-        x = keras.layers.Dense(1, activation='sigmoid')(x)
+        x = builder.dense(16, use_bias=False)(x)
+        x = builder.bn_act()(x)
+        x = builder.dense(1, activation='sigmoid')(x)
         model = keras.models.Model(inputs=inp, outputs=x)
         model.compile('adam', 'binary_crossentropy', ['acc'])
         model.fit(
