@@ -3,6 +3,11 @@ import pathlib
 import time
 
 
+def open_devnull(mode='r', buffering=-1, encoding=None, errors=None, newline=None):
+    import os
+    return pathlib.Path(os.devnull).open(mode, buffering, encoding, errors, newline)
+
+
 def delete_file(file_path):
     """ファイル削除"""
     file_path = pathlib.Path(file_path)

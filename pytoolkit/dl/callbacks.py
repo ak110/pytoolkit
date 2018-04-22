@@ -6,7 +6,8 @@ import warnings
 
 import numpy as np
 
-from .. import draw, log
+from . import hvd
+from .. import draw, io, log
 
 
 def learning_rate(reduce_epoch_rates=(0.5, 0.75), factor=0.1, logger_name=None):
@@ -92,7 +93,7 @@ def learning_curve_plot(filename, metric='loss'):
 
 
 def tsv_logger(filename, append=False):
-    """ログを保存するコールバック。
+    """ログを保存するコールバック。Horovod使用時はrank() == 0のみ有効。
 
     # 引数
     - filename: 保存先ファイル名。「{metric}」はmetricの値に置換される。str or pathlib.Path
@@ -102,19 +103,25 @@ def tsv_logger(filename, append=False):
     import keras
     import keras.backend as K
 
+    enabled = hvd.is_master()
+
     class _TSVLogger(keras.callbacks.Callback):
 
-        def __init__(self, filename, append):
+        def __init__(self, filename, append, enabled):
             self.filename = pathlib.Path(filename)
             self.append = append
+            self.enabled = enabled
             self.log_file = None
             self.log_writer = None
             self.epoch_start_time = None
             super().__init__()
 
         def on_train_begin(self, logs=None):
-            self.filename.parent.mkdir(parents=True, exist_ok=True)
-            self.log_file = self.filename.open('a' if self.append else 'w', buffering=65536)
+            if self.enabled:
+                self.filename.parent.mkdir(parents=True, exist_ok=True)
+                self.log_file = self.filename.open('a' if self.append else 'w', buffering=65536)
+            else:
+                self.log_file = io.open_devnull('w', buffering=65536)
             self.log_writer = csv.writer(self.log_file, delimiter='\t', lineterminator='\n')
             self.log_writer.writerow(['epoch', 'lr'] + self.params['metrics'] + ['time'])
 
@@ -140,19 +147,22 @@ def tsv_logger(filename, append=False):
         def on_train_end(self, logs=None):
             self.log_file.close()
 
-    return _TSVLogger(filename=filename, append=append)
+    return _TSVLogger(filename=filename, append=append, enabled=enabled)
 
 
-def epoch_logger(name='__main__'):
-    """`logging.getLogger(name)`にDEBUGログを色々出力するcallback"""
+def epoch_logger(name=None):
+    """`logging.getLogger(name)`にDEBUGログを色々出力するcallback。Horovod使用時はrank() == 0のみ有効。"""
     import keras
     import keras.backend as K
 
-    class _Logger(keras.callbacks.Callback):
+    enabled = hvd.is_master()
 
-        def __init__(self, name):
+    class _EpochLogger(keras.callbacks.Callback):
+
+        def __init__(self, name, enabled):
             self.name = name
-            self.logger = log.get(name)
+            self.enabled = enabled
+            self.logger = log.get(name or __name__)
             self.epoch_start_time = None
             super().__init__()
 
@@ -163,10 +173,11 @@ def epoch_logger(name='__main__'):
             lr = K.get_value(self.model.optimizer.lr)
             elapsed_time = time.time() - self.epoch_start_time
             metrics = ' '.join([f'{k}={logs.get(k):.4f}' for k in self.params['metrics'] if k in logs])
-            self.logger.debug('Epoch %3d: lr=%.1e %s time=%d',
-                              epoch + 1, lr, metrics, int(np.ceil(elapsed_time)))
+            if enabled:
+                self.logger.debug('Epoch %3d: lr=%.1e %s time=%d',
+                                  epoch + 1, lr, metrics, int(np.ceil(elapsed_time)))
 
-    return _Logger(name=name)
+    return _EpochLogger(name=name, enabled=enabled)
 
 
 def freeze_bn(freeze_epoch_rate: float, logger_name=None):

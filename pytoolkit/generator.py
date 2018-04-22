@@ -38,9 +38,9 @@ class Operator(metaclass=abc.ABCMeta):
     """ImageDataGeneratorで行う操作の基底クラス。"""
 
     @abc.abstractmethod
-    def execute(self, rgb, y, w, rand, ctx: GeneratorContext):
+    def execute(self, x, y, w, rand, ctx: GeneratorContext):
         """処理。"""
-        assert False
+        return x, y, w
 
 
 class Generator(object):
