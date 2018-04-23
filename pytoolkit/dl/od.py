@@ -431,7 +431,7 @@ class ObjectDetector(object):
             return image.preprocess_input_abs1
 
     @log.trace()
-    def create_model(self, mode, batch_size, weights='voc'):
+    def create_model(self, mode, batch_size, weights='voc', multi_gpu_predict=True):
         """学習とか予測とか用に`tk.dl.models.Model`を作成して返す。
 
         # 引数
@@ -478,7 +478,8 @@ class ObjectDetector(object):
         else:
             assert mode == 'predict'
             # 予測：コンパイル不要。マルチGPU化。
-            model.set_multi_gpu_model()
+            if multi_gpu_predict:
+                model.set_multi_gpu_model()
         return model
 
     @log.trace()
