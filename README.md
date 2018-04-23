@@ -11,7 +11,6 @@
 ## importするために最低限必要なライブラリ
 
 - numpy
-- opencv-python
 - scikit-learn
 - scipy
 
@@ -22,6 +21,7 @@
 - horovod
 - keras
 - matplotlib
+- opencv-python
 - pandas
 - sqlalchemy
 - tensorflow-gpu

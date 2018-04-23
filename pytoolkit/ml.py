@@ -651,11 +651,8 @@ def plot_objects(base_image, save_path, classes, confs, locs, class_names):
         xmax = int(round(loc[2] * img.shape[1]))
         ymax = int(round(loc[3] * img.shape[0]))
         label = class_names[classid] if class_names is not None else str(classid)
-        if conf is None:
-            txt = label
-        else:
-            txt = f'{conf:0.2f}, {label}'
         color = colors[classid]
+        txt = label if conf is None else f'{conf:0.2f}, {label}'
         ax.add_patch(matplotlib.patches.Rectangle(
             (xmin, ymin), xmax - xmin + 1, ymax - ymin + 1,
             fill=False, edgecolor=color, linewidth=2))

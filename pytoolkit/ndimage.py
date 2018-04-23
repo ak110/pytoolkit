@@ -6,7 +6,6 @@ import io
 import pathlib
 import typing
 
-import cv2
 import numpy as np
 import scipy.stats
 
@@ -16,6 +15,7 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
 
     やや余計なお世話だけど今後のためにfloat32に変換して返す。
     """
+    import cv2
     if isinstance(path_or_array, np.ndarray):
         # ndarrayならそのまま画像扱い
         img = np.copy(path_or_array)  # 念のためコピー
@@ -49,6 +49,7 @@ def save(path: typing.Union[str, pathlib.Path], img: np.ndarray) -> None:
 
     やや余計なお世話だけど0～255にクリッピング(飽和)してから保存。
     """
+    import cv2
     img = np.clip(img, 0, 255).astype(np.uint8)
     if img.shape[-1] == 1:
         img = np.squeeze(img, axis=-1)
@@ -59,6 +60,7 @@ def save(path: typing.Union[str, pathlib.Path], img: np.ndarray) -> None:
 
 def rotate(rgb: np.ndarray, degrees: float, interp='lanczos') -> np.ndarray:
     """回転。"""
+    import cv2
     cv2_interp = {
         'nearest': cv2.INTER_NEAREST,
         'bilinear': cv2.INTER_LINEAR,
@@ -133,6 +135,7 @@ def flip_tb(rgb: np.ndarray) -> np.ndarray:
 
 def resize(rgb: np.ndarray, width: int, height: int, padding=None, interp='lanczos') -> np.ndarray:
     """リサイズ。"""
+    import cv2
     assert interp in ('nearest', 'bilinear', 'bicubic', 'lanczos')
     if rgb.shape[1] == width and rgb.shape[0] == height:
         return rgb
@@ -168,6 +171,7 @@ def gaussian_noise(rgb: np.ndarray, rand: np.random.RandomState, scale: float) -
 
 def blur(rgb: np.ndarray, sigma: float) -> np.ndarray:
     """ぼかし。sigmaは0～1程度がよい？"""
+    import cv2
     rgb = cv2.GaussianBlur(rgb, (5, 5), sigma)
     if len(rgb.shape) == 2:
         rgb = np.expand_dims(rgb, axis=-1)
@@ -182,6 +186,7 @@ def unsharp_mask(rgb: np.ndarray, sigma: float, alpha=2.0) -> np.ndarray:
 
 def median(rgb: np.ndarray, size: int) -> np.ndarray:
     """メディアンフィルタ。sizeは3程度がよい？"""
+    import cv2
     rgb = cv2.medianBlur(rgb, size)
     if len(rgb.shape) == 2:
         rgb = np.expand_dims(rgb, axis=-1)

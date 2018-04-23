@@ -535,9 +535,8 @@ class ObjectDetector(object):
         while True:
             down_index += 1
             map_size = builder.shape(x)[1] // 2
-            x = builder.dwconv2d(2, strides=2, name=f'down{down_index}_ds')(x)
-            x = builder.conv2d(256, 3, name=f'down{down_index}_conv1')(x)
-            x = builder.dwconv2d(3, name=f'down{down_index}_conv2')(x)
+            x = builder.conv2d(256, 2, strides=2, name=f'down{down_index}_ds')(x)
+            x = builder.conv2d(256, 3, name=f'down{down_index}_conv')(x)
             assert builder.shape(x)[1] == map_size
             ref_list.append(x)
             if map_size <= 4 or map_size % 2 != 0:  # 充分小さくなるか奇数になったら終了
@@ -566,12 +565,12 @@ class ObjectDetector(object):
             assert map_size % in_map_size == 0, f'map size error: {in_map_size} -> {map_size}'
             up_size = map_size // in_map_size
             x = keras.layers.Dropout(0.25)(x)
-            x = builder.conv2dtr(256, up_size, strides=up_size, padding='valid', bn_kwargs={'center': False}, name=f'up{up_index}_us')(x)
-            t = builder.conv2d(256, 1, use_act=False, bn_kwargs={'center': False}, name=f'up{up_index}_lt')(ref[f'down{map_size}'])
+            x = builder.conv2dtr(64, up_size, strides=up_size, padding='valid', name=f'up{up_index}_us')(x)
+            x = builder.conv2d(256, 1, use_act=False, name=f'up{up_index}_ex')(x)
+            t = builder.conv2d(256, 1, use_act=False, name=f'up{up_index}_lt')(ref[f'down{map_size}'])
             x = keras.layers.add([x, t], name=f'up{up_index}_mix')
             x = builder.bn_act(name=f'up{up_index}_mix')(x)
-            x = builder.conv2d(256, 3, name=f'up{up_index}_conv1')(x)
-            x = builder.dwconv2d(3, name=f'up{up_index}_conv2')(x)
+            x = builder.conv2d(256, 3, name=f'up{up_index}_conv')(x)
             ref[f'out{map_size}'] = x
 
             if self.map_sizes[0] <= map_size:
