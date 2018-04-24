@@ -68,7 +68,8 @@ class Model(object):
 
     def horovod_callbacks(self):
         """Horovodのコールバック3つをまとめて返すだけ。"""
-        assert hvd.initialized()
+        if not hvd.initialized():
+            return []
         return [
             hvd.get().callbacks.BroadcastGlobalVariablesCallback(0),
             hvd.get().callbacks.MetricAverageCallback(),
