@@ -7,7 +7,7 @@ import typing
 
 import numpy as np
 
-from . import callbacks, hvd, losses, models, od_gen, od_net, od_pb
+from . import hvd, losses, models, od_gen, od_net, od_pb
 from .. import jsonex, log, ml, utils
 
 # バージョン
@@ -149,6 +149,9 @@ class ObjectDetector(object):
             # 予測：コンパイル不要。マルチGPU化。
             if multi_gpu_predict:
                 self.model.set_multi_gpu_model()
+            # 1回予測して計算グラフを構築
+            gpus = utils.get_gpu_count()
+            self.model.model.predict_on_batch(np.zeros((gpus,) + self.input_size + (3,), np.float32))
 
     def loss(self, y_true, y_pred):
         """損失関数。"""

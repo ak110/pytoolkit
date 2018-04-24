@@ -155,9 +155,6 @@ def _create_pm(pb, num_classes, builder, ref, lr_multipliers):
     """Prediction module."""
     import keras
 
-    # 分類の初期値は控えめにしておく
-    clf_bias = keras.initializers.constant(scipy.special.logit(1 / num_classes))
-
     old_gn, builder.use_gn = builder.use_gn, True
 
     shared_layers = {}
@@ -180,8 +177,7 @@ def _create_pm(pb, num_classes, builder, ref, lr_multipliers):
         shared_layers[f'pm-{pat_ix}_clf'] = builder.conv2d(
             num_classes, 1,
             kernel_initializer='zeros',
-            bias_initializer=clf_bias,
-            activation='sigmoid',  # softmaxより速そう (cf. YOLOv3)
+            activation='softmax',
             use_bias=True,
             use_bn=False,
             name=f'pm-{pat_ix}_clf')
