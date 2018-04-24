@@ -2,7 +2,6 @@
 
 https://github.com/ak110/object_detector
 """
-import concurrent.futures
 import pathlib
 
 import numpy as np
@@ -787,26 +786,25 @@ class ObjectDetector(object):
 
     def predict(self, model, X, conf_threshold=0.1, verbose=1):
         """予測。"""
-        def _filter_pred(pred):
-            pred_classes = pred[:, 0].astype(np.int32)
-            pred_confs = pred[:, 1]
-            pred_locs = pred[:, 2:]
-            mask = pred_confs >= conf_threshold
-            return pred_classes[mask], pred_confs[mask], pred_locs[mask, :]
-
-        result_list = []
+        pred_classes_list, pred_confs_list, pred_locs_list = [], [], []
         steps = model.gen.steps_per_epoch(len(X), model.batch_size)
         with utils.tqdm(total=len(X), unit='f', desc='predict', disable=verbose == 0) as pbar:
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                for i, X_batch in enumerate(model.gen.flow(X, batch_size=model.batch_size)):
-                    pred_list = model.model.predict_on_batch(X_batch)
-                    result_list.append(executor.map(_filter_pred, pred_list))
-                    # 次へ
-                    pbar.update(len(X_batch))
-                    if i + 1 >= steps:
-                        assert i + 1 == steps
-                        break
-            all_results = sum([list(r) for r in result_list], [])
-            pred_classes_list, pred_confs_list, pred_locs_list = zip(*all_results)
+            for i, X_batch in enumerate(model.gen.flow(X, batch_size=model.batch_size)):
+                # 予測
+                pred_list = model.model.predict_on_batch(X_batch)
+                # 整形：キャストしたりマスクしたり
+                for pred in pred_list:
+                    pred_classes = pred[:, 0].astype(np.int32)
+                    pred_confs = pred[:, 1]
+                    pred_locs = pred[:, 2:]
+                    mask = pred_confs >= conf_threshold
+                    pred_classes_list.append(pred_classes[mask])
+                    pred_confs_list.append(pred_confs[mask])
+                    pred_locs_list.append(pred_locs[mask, :])
+                # 次へ
+                pbar.update(len(X_batch))
+                if i + 1 >= steps:
+                    assert i + 1 == steps
+                    break
 
         return pred_classes_list, pred_confs_list, pred_locs_list
