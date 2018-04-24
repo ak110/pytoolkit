@@ -81,19 +81,19 @@ class ObjectsAnnotation(object):
         return np.array([data_dir / y_.folder / y_.filename for y_ in y])
 
     @classmethod
-    def load_voc_0712_trainval(cls, data_dir, class_name_to_id, without_difficult=False):
+    def load_voc_0712_trainval(cls, data_dir, class_name_to_id=None, without_difficult=False):
         """PASCAL VOCデータセットの、よくある07+12 trainvalの読み込み。"""
         y1 = cls.load_voc(data_dir, 2007, 'trainval', class_name_to_id, without_difficult=without_difficult)
         y2 = cls.load_voc(data_dir, 2012, 'trainval', class_name_to_id, without_difficult=without_difficult)
         return np.concatenate([y1, y2])
 
     @classmethod
-    def load_voc_07_test(cls, data_dir, class_name_to_id):
+    def load_voc_07_test(cls, data_dir, class_name_to_id=None):
         """PASCAL VOCデータセットの、よくある07 testの読み込み。"""
         return cls.load_voc(data_dir, 2007, 'test', class_name_to_id)
 
     @classmethod
-    def load_voc(cls, data_dir, year, set_name, class_name_to_id, without_difficult=False):
+    def load_voc(cls, data_dir, year, set_name, class_name_to_id=None, without_difficult=False):
         """PASCAL VOCデータセットの読み込み。
 
         # 引数
@@ -109,7 +109,7 @@ class ObjectsAnnotation(object):
         return np.array(y)
 
     @classmethod
-    def load_voc_files(cls, annotations_dir, names, class_name_to_id, without_difficult=False):
+    def load_voc_files(cls, annotations_dir, names, class_name_to_id=None, without_difficult=False):
         """VOC2007などのアノテーションデータの読み込み。
 
         namesは「画像ファイル名拡張子なし」のリスト。
@@ -122,6 +122,7 @@ class ObjectsAnnotation(object):
     @staticmethod
     def load_voc_file(f, class_name_to_id, without_difficult):
         """VOC2007などのアノテーションデータの読み込み。"""
+        class_name_to_id = class_name_to_id or VOC_CLASS_NAMES_TO_ID
         root = xml.etree.ElementTree.parse(str(f)).getroot()
         folder = root.find('folder').text
         filename = root.find('filename').text

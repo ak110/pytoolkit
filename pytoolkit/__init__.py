@@ -7,6 +7,7 @@ from . import draw
 from . import generator
 from . import image
 from . import io
+from . import jsonex
 from . import log
 from . import math
 from . import ml

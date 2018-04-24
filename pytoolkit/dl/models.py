@@ -8,7 +8,8 @@ class Model(object):
     """`keras.models.Model` + `tk.dl.generators.Generator`の薄いラッパー。"""
 
     def __init__(self, model, gen: generator.Generator, batch_size):
-        self.model = model  # type: keras.models.Model
+        import keras
+        self.model: keras.models.Model = model
         self.gen = gen
         self.batch_size = batch_size
 
@@ -74,6 +75,7 @@ class Model(object):
             hvd.get().callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1),
         ]
 
+    @log.trace()
     def fit(self, X_train, y_train,
             epochs=1, verbose=1, callbacks=None,
             validation_data: tuple = None,
@@ -92,6 +94,11 @@ class Model(object):
             hvd_size = hvd.get().size()
             steps1 //= hvd_size
             steps2 //= hvd_size  # Horovodのサンプルでは * 3 だけど早く進んで欲しいので省略
+            # 安全装置
+            if steps1 == 0:
+                steps1 = 1
+            if steps2 == 0:
+                steps2 = 1
 
         # TerminateOnNaNは常に付けちゃう
         import keras
@@ -107,22 +114,37 @@ class Model(object):
             initial_epoch=initial_epoch)
         return hist
 
+    @log.trace()
     def predict(self, X, data_augmentation=False):
         """予測。"""
         gen = self.gen.flow(X, batch_size=self.batch_size, data_augmentation=data_augmentation)
         steps = self.gen.steps_per_epoch(len(X), batch_size=self.batch_size)
         return self.model.predict_generator(gen, steps)
 
+    @log.trace()
     def evaluate(self, X, y, data_augmentation=False):
         """評価。"""
         gen = self.gen.flow(X, y, batch_size=self.batch_size, data_augmentation=data_augmentation)
         steps = self.gen.steps_per_epoch(len(X), batch_size=self.batch_size)
         return self.model.evaluate_generator(gen, steps)
 
+    @log.trace()
     def save(self, filepath, overwrite=True, include_optimizer=True):
         """pathlib対応＆hvd.is_master()な時のみなsave。"""
         if hvd.is_master():
             self.model.save(str(filepath), overwrite=overwrite, include_optimizer=include_optimizer)
+
+    @log.trace()
+    def plot(self, to_file='model.png', show_shapes=False, show_layer_names=True, rankdir='TB'):
+        """pathlib対応＆hvd.is_master()な時のみ＆エラー握り潰しな`keras.utils.plot_model`。"""
+        if hvd.is_master():
+            import keras
+            try:
+                keras.utils.plot_model(self.model, to_file=str(to_file),
+                                       show_shapes=show_shapes, show_layer_names=show_layer_names,
+                                       rankdir=rankdir)
+            except BaseException:
+                log.get(__name__).warning('keras.utils.plot_model失敗', exc_info=True)
 
 
 @log.trace()
