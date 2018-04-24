@@ -4,7 +4,7 @@ import numpy as np
 import scipy.special
 
 from . import layers, losses, models
-from .. import image, log, utils
+from .. import image, log
 
 
 def get_preprocess_input(base_network):
