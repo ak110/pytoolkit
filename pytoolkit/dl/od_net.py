@@ -177,7 +177,8 @@ def _create_pm(pb, num_classes, builder, ref, lr_multipliers):
         shared_layers[f'pm-{pat_ix}_clf'] = builder.conv2d(
             num_classes, 1,
             kernel_initializer='zeros',
-            bias_initializer=keras.initializers.constant(-2),  # 控えめにしておく
+            bias_initializer=keras.initializers.constant(-3),  # 控えめにしておく
+            bias_regularizer=None,
             activation='sigmoid',  # cf. YOLOv3
             use_bias=True,
             use_bn=False,
