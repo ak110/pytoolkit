@@ -626,12 +626,13 @@ def nms():
     class NMS(keras.engine.topology.Layer):
         """Non maximum suppressionを行うレイヤー。"""
 
-        def __init__(self, num_classes, prior_boxes, top_k=200, nms_threshold=0.45, **kwargs):
+        def __init__(self, num_classes, prior_boxes, top_k=200, nms_threshold=0.45, nms_all_threshold=0.95, **kwargs):
             super().__init__(**kwargs)
             self.num_classes = num_classes
             self.prior_boxes = prior_boxes
             self.top_k = top_k
             self.nms_threshold = nms_threshold
+            self.nms_all_threshold = nms_all_threshold
 
         def call(self, inputs, **kwargs):
             classes, confs, locs = inputs
@@ -650,6 +651,7 @@ def nms():
                 'prior_boxes': self.prior_boxes,
                 'top_k': self.top_k,
                 'nms_threshold': self.nms_threshold,
+                'nms_all_threshold': self.nms_all_threshold,
             }
             base_config = super().get_config()
             return dict(list(base_config.items()) + list(config.items()))
@@ -685,14 +687,15 @@ def nms():
             img_confs = K.concatenate(img_confs, axis=0)
             img_locs = K.concatenate(img_locs, axis=0)
 
-            # スコア上位top_k個を抜き出す
+            # 全クラスで再度NMS (閾値高め)
             top_k = K.minimum(self.top_k, K.shape(img_confs)[0])
-            img_confs, sorted_indices = tf.nn.top_k(img_confs, k=top_k)
-            img_classes = K.gather(img_classes, sorted_indices)
-            img_locs = K.gather(img_locs, sorted_indices)
+            nms_indices = tf.image.non_max_suppression(img_locs, img_confs, top_k, self.nms_all_threshold)
+            img_classes = K.gather(img_classes, nms_indices)
+            img_confs = K.gather(img_confs, nms_indices)
+            img_locs = K.gather(img_locs, nms_indices)
 
             # shapeとdtypeを合わせてconcat
-            output_size = K.shape(sorted_indices)[0]
+            output_size = K.shape(nms_indices)[0]
             img_classes = K.reshape(img_classes, (output_size, 1))
             img_confs = K.reshape(img_confs, (output_size, 1))
             img_classes = K.cast(img_classes, K.floatx())
