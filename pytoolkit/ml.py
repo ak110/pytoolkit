@@ -630,7 +630,7 @@ def plot_objects(base_image, save_path, classes, confs, locs, class_names):
         assert 0 <= np.min(classes) < len(class_names)
         assert 0 <= np.max(classes) < len(class_names)
 
-    colors = matplotlib.cm.hsv(np.linspace(0, 1, len(class_names))).tolist()
+    colors = matplotlib.cm.hsv(np.linspace(0, 1, len(class_names) + 1)).tolist()
 
     if isinstance(base_image, np.ndarray):
         img = base_image
