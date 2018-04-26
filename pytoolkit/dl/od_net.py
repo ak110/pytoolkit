@@ -234,10 +234,8 @@ def _create_predict_network(pb, num_classes, inputs, objs, clfs, locs):
     def _conf(x):
         objs = x[0][:, :, 0]
         confs = x[1]
-        # objectnessとconfidenceの調和平均をconfidenceということにしてみる
-        # conf = 2 / (1 / objs + 1 / confs)
-        # → どうも相乗平均の方がmAP高いっぽい？
-        conf = K.sqrt(objs * confs)
+        # objectnessとconfidenceの重み付き平均をconfidenceということにしてみる
+        conf = objs * 0.75 + confs * 0.25
         return conf * np.expand_dims(pb.pb_mask, axis=0)
 
     classes = layers.channel_argmax()(name='classes')(clfs)

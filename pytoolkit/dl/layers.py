@@ -626,7 +626,7 @@ def nms():
     class NMS(keras.engine.topology.Layer):
         """Non maximum suppressionを行うレイヤー。"""
 
-        def __init__(self, num_classes, prior_boxes, top_k=200, nms_threshold=0.45, nms_all_threshold=0.9, **kwargs):
+        def __init__(self, num_classes, prior_boxes, top_k=200, nms_threshold=0.45, nms_all_threshold=0.7, **kwargs):
             super().__init__(**kwargs)
             self.num_classes = num_classes
             self.prior_boxes = prior_boxes
