@@ -130,8 +130,16 @@ class Builder(object):
         import keras.backend as K
         return K.int_shape(x)
 
-    @staticmethod
-    def se_block(filters, ratio=16, name=None):
+    def res_block(self, filters, name=None):
+        """普通のResidual Block。((3, 3) × 2)"""
+        import keras
+        layers = [
+            self.conv2d(filters, name=f'{name}_conv1' if name else None),
+            self.conv2d(filters, use_act=False, name=f'{name}_conv2' if name else None),
+        ]
+        return Sequence(layers, keras.layers.Add(name=f'{name}_add' if name else None))
+
+    def se_block(self, filters, ratio=16, name=None):
         """Squeeze-and-Excitation block
 
         https://arxiv.org/abs/1709.01507
@@ -140,15 +148,13 @@ class Builder(object):
         reg = keras.regularizers.l2(1e-4)
         layers = [
             keras.layers.GlobalAveragePooling2D(name=f'{name}_p' if name else None),
-            keras.layers.Dense(filters // ratio, activation='relu', use_bias=False,
-                               kernel_initializer='he_uniform', kernel_regularizer=reg,
-                               name=f'{name}_sq' if name else None),
-            keras.layers.Dense(filters, activation='sigmoid', use_bias=False,
-                               kernel_initializer='he_uniform', kernel_regularizer=reg,
-                               name=f'{name}_ex' if name else None),
+            self.dense(filters // ratio, activation='relu', kernel_regularizer=reg,
+                       name=f'{name}_sq' if name else None),
+            self.dense(filters, activation='sigmoid', kernel_regularizer=reg,
+                       name=f'{name}_ex' if name else None),
             keras.layers.Reshape((1, 1, filters), name=f'{name}_r' if name else None),
         ]
-        return Sequence(layers, 'multiply', f'{name}_s' if name else None)
+        return Sequence(layers, keras.layers.Multiply(name=f'{name}_s' if name else None))
 
 
 class Sequence(object):
@@ -156,24 +162,20 @@ class Sequence(object):
 
     # 引数
     - layers: Kerasのレイヤーの配列。
-    - merge_function: callableまたは文字列で、入力とlayers適用後のをマージする関数を指定する。Noneなら何もしなくて'add'ならResidual blockになる。
-    - merge_name: merge_functionのname
+    - merge_layer: 入力とlayers適用後のをマージする時に使用するレイヤーを指定する。Noneなら何もしない。
 
     """
 
-    def __init__(self, layers, merge_function=None, merge_name=None):
+    def __init__(self, layers, merge_layer=None):
         self.layers = layers
-        self.merge_function = merge_function
-        self.merge_name = merge_name
+        self.merge_layer = merge_layer
 
     def __call__(self, x):
         x_in = x
         for layer in self.layers:
             x = layer(x)
-        if self.merge_function is not None:
-            import keras
-            merge_fn = self.merge_function if callable(self.merge_function) else keras.layers.__dict__[self.merge_function]
-            x = merge_fn([x_in, x], name=self.merge_name)
+        if self.merge_layer is not None:
+            x = self.merge_layer([x_in, x])
         return x
 
     @property

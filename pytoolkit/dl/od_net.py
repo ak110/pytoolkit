@@ -158,11 +158,9 @@ def _create_pm(pb, num_classes, builder, ref, lr_multipliers):
     old_gn, builder.use_gn = builder.use_gn, True
 
     shared_layers = {}
-    shared_layers['pm_conv1'] = builder.conv2d(256, 3, use_act=False, name='pm_conv1')
-    shared_layers['pm_conv2_1'] = builder.conv2d(256, 3, use_act=True, name='pm_conv2_1')
-    shared_layers['pm_conv2_2'] = builder.conv2d(256, 3, use_act=False, name='pm_conv2_2')
-    shared_layers['pm_conv3_1'] = builder.conv2d(256, 3, use_act=True, name='pm_conv3_1')
-    shared_layers['pm_conv3_2'] = builder.conv2d(256, 3, use_act=False, name='pm_conv3_2')
+    shared_layers['pm_layer1'] = builder.conv2d(256, 3, use_act=False, name='pm_conv')
+    shared_layers['pm_layer2'] = builder.res_block(256, name='pm_res1')
+    shared_layers['pm_layer3'] = builder.res_block(256, name='pm_res2')
     shared_layers['pm_bn_act'] = builder.bn_act(name='pm')
     for pat_ix in range(len(pb.pb_size_patterns)):
         shared_layers[f'pm-{pat_ix}_obj'] = builder.conv2d(
@@ -198,15 +196,9 @@ def _create_pm(pb, num_classes, builder, ref, lr_multipliers):
     for map_size in pb.map_sizes:
         assert f'out{map_size}' in ref, f'map_size error: {ref}'
         x = ref[f'out{map_size}']
-        x = shared_layers[f'pm_conv1'](x)
-        t = x
-        x = shared_layers[f'pm_conv2_1'](x)
-        x = shared_layers[f'pm_conv2_2'](x)
-        x = keras.layers.add([t, x], name=f'pm{map_size}_mix1')
-        t = x
-        x = shared_layers[f'pm_conv3_1'](x)
-        x = shared_layers[f'pm_conv3_2'](x)
-        x = keras.layers.add([t, x], name=f'pm{map_size}_mix2')
+        x = shared_layers[f'pm_layer1'](x)
+        x = shared_layers[f'pm_layer2'](x)
+        x = shared_layers[f'pm_layer3'](x)
         x = shared_layers[f'pm_bn_act'](x)
         for pat_ix in range(len(pb.pb_size_patterns)):
             obj = shared_layers[f'pm-{pat_ix}_obj'](x)
