@@ -177,9 +177,7 @@ def _create_pm(pb, num_classes, builder, ref, lr_multipliers):
         shared_layers[f'pm-{pat_ix}_clf'] = builder.conv2d(
             num_classes, 1,
             kernel_initializer='zeros',
-            bias_initializer=keras.initializers.constant(-3),  # 控えめにしておく
-            bias_regularizer=None,
-            activation='sigmoid',  # cf. YOLOv3
+            activation='softmax',
             use_bias=True,
             use_bn=False,
             name=f'pm-{pat_ix}_clf')
@@ -206,8 +204,8 @@ def _create_pm(pb, num_classes, builder, ref, lr_multipliers):
         x = shared_layers[f'pm_conv2_2'](x)
         x = keras.layers.add([t, x], name=f'pm{map_size}_mix1')
         t = x
-        x = shared_layers[f'pm_conv2_1'](x)
-        x = shared_layers[f'pm_conv2_2'](x)
+        x = shared_layers[f'pm_conv3_1'](x)
+        x = shared_layers[f'pm_conv3_2'](x)
         x = keras.layers.add([t, x], name=f'pm{map_size}_mix2')
         x = shared_layers[f'pm_bn_act'](x)
         for pat_ix in range(len(pb.pb_size_patterns)):

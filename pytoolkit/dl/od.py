@@ -185,7 +185,7 @@ class ObjectDetector(object):
         return [self.loss_obj, self.loss_clf, self.loss_loc, acc_bg, acc_obj]
 
     def loss_obj(self, y_true, y_pred):
-        """ObjectnessのFocal loss。"""
+        """Objectness scoreのloss。(Focal loss)"""
         import keras.backend as K
         import tensorflow as tf
         gt_mask = y_true[:, :, 0]
@@ -200,18 +200,17 @@ class ObjectDetector(object):
 
     @staticmethod
     def loss_clf(y_true, y_pred):
-        """クラス分類のloss。多クラスだけどbinary_crossentropy。(cf. YOLOv3)"""
+        """クラス分類のloss。(cross entropy)"""
         import keras.backend as K
         gt_obj = y_true[:, :, 1]
         gt_classes, pred_classes = y_true[:, :, 2:-4], y_pred[:, :, 2:-4]
-        loss = K.binary_crossentropy(gt_classes, pred_classes)
-        loss = K.sum(loss, axis=-1)  # sum(classes)
+        loss = K.categorical_crossentropy(gt_classes, pred_classes)
         loss = K.sum(gt_obj * loss, axis=-1) / K.sum(gt_obj, axis=-1)  # mean (box)
         return loss
 
     @staticmethod
     def loss_loc(y_true, y_pred):
-        """位置のloss。"""
+        """位置のloss。(l2 smooth loss)"""
         import keras.backend as K
         gt_obj = y_true[:, :, 1]
         gt_locs, pred_locs = y_true[:, :, -4:], y_pred[:, :, -4:]
