@@ -77,10 +77,18 @@ class ObjectDetector(object):
         assert self.model is not None
         self.model.save(path)
 
-    def load_weights(self, path: typing.Union[str, pathlib.Path], batch_size):
+    def load_weights(self, path: typing.Union[str, pathlib.Path], batch_size, use_multi_gpu=True):
         """重みの読み込み。(予測用)"""
         assert self.model is None
         self._create_model(mode='predict', weights=path, batch_size=batch_size)
+        # 予マルチGPU化。
+        if use_multi_gpu:
+            gpus = utils.get_gpu_count()
+            self.model.set_multi_gpu_model(gpus)
+        else:
+            gpus = 1
+        # 1回予測して計算グラフを構築
+        self.model.model.predict_on_batch(np.zeros((gpus,) + self.input_size + (3,), np.float32))
 
     def predict(self, X, conf_threshold=0.1, verbose=1):
         """予測。"""
@@ -108,7 +116,7 @@ class ObjectDetector(object):
         return pred_classes_list, pred_confs_list, pred_locs_list
 
     @log.trace()
-    def _create_model(self, mode, weights, batch_size, multi_gpu_predict=True):
+    def _create_model(self, mode, weights, batch_size):
         """学習とか予測とか用に`tk.dl.models.Model`を作成して返す。
 
         # 引数
@@ -146,12 +154,6 @@ class ObjectDetector(object):
             self.model.compile(sgd_lr=sgd_lr, lr_multipliers=lr_multipliers, loss=self.loss, metrics=self.metrics)
         else:
             assert mode == 'predict'
-            # 予測：コンパイル不要。マルチGPU化。
-            if multi_gpu_predict:
-                self.model.set_multi_gpu_model()
-            # 1回予測して計算グラフを構築
-            gpus = utils.get_gpu_count()
-            self.model.model.predict_on_batch(np.zeros((gpus,) + self.input_size + (3,), np.float32))
 
     def loss(self, y_true, y_pred):
         """損失関数。"""

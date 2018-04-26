@@ -21,8 +21,9 @@ class Model(object):
         """
         load_weights(self.model, filepath, where_fn)
 
-    def set_multi_gpu_model(self):
-        self.model, self.batch_size = multi_gpu_model(self.model, self.batch_size)
+    def set_multi_gpu_model(self, gpus=None):
+        """マルチGPU化。"""
+        self.model, self.batch_size = multi_gpu_model(self.model, self.batch_size, gpus)
 
     @log.trace()
     def compile(self, optimizer=None, loss=None, metrics=None,
