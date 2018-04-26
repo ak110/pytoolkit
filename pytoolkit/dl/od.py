@@ -77,10 +77,10 @@ class ObjectDetector(object):
         assert self.model is not None
         self.model.save(path)
 
-    def load_weights(self, path: typing.Union[str, pathlib.Path], batch_size, use_multi_gpu=True):
+    def load_weights(self, path: typing.Union[str, pathlib.Path], batch_size, strict_nms=True, use_multi_gpu=True):
         """重みの読み込み。(予測用)"""
         assert self.model is None
-        self._create_model(mode='predict', weights=path, batch_size=batch_size)
+        self._create_model(mode='predict', weights=path, batch_size=batch_size, strict_nms=strict_nms)
         # 予マルチGPU化。
         if use_multi_gpu:
             gpus = utils.get_gpu_count()
@@ -116,7 +116,7 @@ class ObjectDetector(object):
         return pred_classes_list, pred_confs_list, pred_locs_list
 
     @log.trace()
-    def _create_model(self, mode, weights, batch_size):
+    def _create_model(self, mode, weights, batch_size, strict_nms=None):
         """学習とか予測とか用に`tk.dl.models.Model`を作成して返す。
 
         # 引数
@@ -126,13 +126,16 @@ class ObjectDetector(object):
         """
         logger = log.get(__name__)
 
-        network, lr_multipliers = od_net.create_network(self.base_network, self.input_size, self.pb, self.num_classes, mode)
+        network, lr_multipliers = od_net.create_network(
+            base_network=self.base_network, input_size=self.input_size,
+            pb=self.pb, num_classes=self.num_classes,
+            mode=mode, strict_nms=strict_nms)
         pi = od_net.get_preprocess_input(self.base_network)
         if mode == 'pretrain':
             gen = od_gen.create_pretrain_generator(self.input_size, pi)
         else:
-            gen = od_gen.create_generator(self.input_size, pi,
-                                          lambda y_gt: self.pb.encode_truth(y_gt, self.num_classes))
+            gen = od_gen.create_generator(
+                self.input_size, pi, lambda y_gt: self.pb.encode_truth(y_gt, self.num_classes))
         self.model = models.Model(network, gen, batch_size)
         if mode in ('pretrain', 'train'):
             self.model.summary()
@@ -141,7 +144,10 @@ class ObjectDetector(object):
             pass  # TODO: githubに学習済みモデル置いてkeras.applicationsみたいなダウンロード機能作る。
         elif isinstance(weights, pathlib.Path):
             self.model.load_weights(weights)
-            logger.info(f'warm start: {weights.name}')
+            if mode == 'predict':
+                logger.info(f'{weights.name} loaded.')
+            else:
+                logger.info(f'warm start: {weights.name}')
         else:
             logger.info(f'cold start.')
 

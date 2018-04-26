@@ -618,7 +618,6 @@ def plot_objects(base_image, save_path, classes, confs, locs, class_names):
     - class_names: クラスID→クラス名のリスト  (None可)
 
     """
-    import io
     import matplotlib
     import matplotlib.cm
 

@@ -4,7 +4,6 @@ import numpy as np
 import sklearn.cluster
 import sklearn.metrics
 
-from . import losses
 from .. import log, math, ml, utils
 
 _VAR_LOC = 0.2  # SSD風(?)適当スケーリング
@@ -74,25 +73,8 @@ class PriorBoxes(object):
         assert (bboxes_sizes >= 0).all()  # 不正なデータは含まれない想定 (手抜き)
         assert (bboxes_sizes < 1).all()  # 不正なデータは含まれない想定 (手抜き)
 
-        # bboxのサイズごとにどこかのfeature mapに割り当てたことにして相対サイズをリストアップ
-        tile_sizes = 1 / self.map_sizes
-        min_area_pattern = 0.5  # タイルの半分を下限としてみる
-        max_area_pattern = 1 / tile_sizes.max()  # 一番荒いmapが画像全体になるくらいのスケールを上限としてみる
-        bboxes_size_patterns = []
-        for tile_size in tile_sizes:
-            size_pattern = bboxes_sizes / tile_size
-            area_pattern = np.sqrt(size_pattern.prod(axis=-1))  # 縦幅・横幅の相乗平均のリスト
-            mask = math.between(area_pattern, min_area_pattern, max_area_pattern)
-            bboxes_size_patterns.append(size_pattern[mask])
-        bboxes_size_patterns = np.concatenate(bboxes_size_patterns)
-        assert len(bboxes_size_patterns.shape) == 2
-        assert bboxes_size_patterns.shape[1] == 2
-
-        # リストアップしたものをクラスタリング。(YOLOv2のDimension Clustersのようなもの)。
-        cluster = sklearn.cluster.KMeans(n_clusters=pb_size_pattern_count, n_jobs=-1, random_state=123)
-        pb_size_patterns = cluster.fit(bboxes_size_patterns).cluster_centers_
-        assert pb_size_patterns.shape == (pb_size_pattern_count, 2)
-        self.pb_size_patterns = pb_size_patterns[pb_size_patterns.prod(axis=-1).argsort(), :].astype(np.float32)  # 面積昇順
+        # Prior boxのサイズのパターンを作成
+        self.pb_size_patterns = _create_pb_pattern(self.map_sizes, bboxes_sizes, pb_size_pattern_count)
 
         # prior boxのサイズなどを算出
         self.pb_grid = []
@@ -118,7 +100,7 @@ class PriorBoxes(object):
             grid[:, :2] -= tile_size / 2
             grid[:, 2:] += tile_size / 2 + (1 / np.array(input_size))
             # パターンごとにループ
-            for pb_pat in pb_size_patterns:
+            for pb_pat in self.pb_size_patterns:
                 # prior boxのサイズの基準
                 pb_size = tile_size * pb_pat
                 # prior boxのサイズ
@@ -341,69 +323,28 @@ class PriorBoxes(object):
 
         return pb_indices, pb_assigned_gt[pb_indices], pb_valids
 
-    def loss(self, y_true, y_pred):
-        """損失関数。"""
-        import keras.backend as K
-        loss_obj = self.loss_obj(y_true, y_pred)
-        loss_clf = self.loss_clf(y_true, y_pred)
-        loss_loc = self.loss_loc(y_true, y_pred)
-        loss = loss_obj + loss_clf + loss_loc
-        assert len(K.int_shape(loss)) == 1  # (None,)
-        return loss
 
-    @property
-    def metrics(self):
-        """各種metricをまとめて返す。"""
-        import keras.backend as K
+def _create_pb_pattern(map_sizes, bboxes_sizes, pb_size_pattern_count):
+    """Prior boxのサイズのパターンを作成。"""
+    tile_sizes = 1 / map_sizes
+    # bboxのサイズごとにどこかのfeature mapに割り当てたことにして相対サイズをリストアップ
+    min_area_pattern = 0.5  # タイルの半分を下限としてみる
+    max_area_pattern = 1 / tile_sizes.max()  # 一番荒いmapが画像全体になるくらいのスケールを上限としてみる
+    bboxes_size_patterns = []
+    for tile_size in tile_sizes:
+        size_pattern = bboxes_sizes / tile_size
+        area_pattern = np.sqrt(size_pattern.prod(axis=-1))  # 縦幅・横幅の相乗平均のリスト
+        mask = math.between(area_pattern, min_area_pattern, max_area_pattern)
+        bboxes_size_patterns.append(size_pattern[mask])
+    bboxes_size_patterns = np.concatenate(bboxes_size_patterns)
+    assert len(bboxes_size_patterns.shape) == 2
+    assert bboxes_size_patterns.shape[1] == 2
 
-        def acc_bg(y_true, y_pred):
-            """背景の再現率。"""
-            gt_mask = y_true[:, :, 0]
-            gt_obj, pred_obj = y_true[:, :, 1], y_pred[:, :, 1]
-            gt_bg = (1 - gt_obj) * gt_mask   # 背景
-            acc = K.cast(K.equal(K.greater(gt_obj, 0.5), K.greater(pred_obj, 0.5)), K.floatx())
-            return K.sum(acc * gt_bg, axis=-1) / K.sum(gt_bg, axis=-1)
+    # リストアップしたものをクラスタリング。(YOLOv2のDimension Clustersのようなもの)。
+    cluster = sklearn.cluster.KMeans(n_clusters=pb_size_pattern_count, n_jobs=-1, random_state=123)
+    pb_size_patterns = cluster.fit(bboxes_size_patterns).cluster_centers_
+    assert pb_size_patterns.shape == (pb_size_pattern_count, 2)
 
-        def acc_obj(y_true, y_pred):
-            """物体の再現率。"""
-            gt_obj, pred_obj = y_true[:, :, 1], y_pred[:, :, 1]
-            acc = K.cast(K.equal(K.greater(gt_obj, 0.5), K.greater(pred_obj, 0.5)), K.floatx())
-            return K.sum(acc * gt_obj, axis=-1) / K.sum(gt_obj, axis=-1)
-
-        return [self.loss_obj, self.loss_clf, self.loss_loc, acc_bg, acc_obj]
-
-    def loss_obj(self, y_true, y_pred):
-        """ObjectnessのFocal loss。"""
-        import keras.backend as K
-        import tensorflow as tf
-        gt_mask = y_true[:, :, 0]
-        gt_obj, pred_obj = y_true[:, :, 1], y_pred[:, :, 1]
-        gt_obj_count = K.sum(gt_obj, axis=-1)  # 各batch毎のobj数。
-        with tf.control_dependencies([tf.assert_positive(gt_obj_count)]):  # obj_countが1以上であることの確認
-            gt_obj_count = tf.identity(gt_obj_count)
-        pb_mask = np.expand_dims(self.pb_mask, axis=0)
-        loss = losses.binary_focal_loss(gt_obj, pred_obj)
-        loss = K.sum(loss * gt_mask * pb_mask, axis=-1) / gt_obj_count  # normalized by the number of anchors assigned to a ground-truth box
-        return loss
-
-    @staticmethod
-    def loss_clf(y_true, y_pred):
-        """クラス分類のloss。多クラスだけどbinary_crossentropy。(cf. YOLOv3)"""
-        import keras.backend as K
-        gt_obj = y_true[:, :, 1]
-        gt_classes, pred_classes = y_true[:, :, 2:-4], y_pred[:, :, 2:-4]
-        loss = K.binary_crossentropy(gt_classes, pred_classes)
-        loss = K.sum(loss, axis=-1)  # sum(classes)
-        loss = K.sum(gt_obj * loss, axis=-1) / K.sum(gt_obj, axis=-1)  # mean (box)
-        return loss
-
-    @staticmethod
-    def loss_loc(y_true, y_pred):
-        """位置のloss。"""
-        import keras.backend as K
-        gt_obj = y_true[:, :, 1]
-        gt_locs, pred_locs = y_true[:, :, -4:], y_pred[:, :, -4:]
-        loss = losses.l1_smooth_loss(gt_locs, pred_locs)
-        loss = K.sum(loss, axis=-1)  # loss(x1) + loss(y1) + loss(x2) + loss(y2)
-        loss = K.sum(gt_obj * loss, axis=-1) / K.sum(gt_obj, axis=-1)  # mean (box)
-        return loss
+    # 面積昇順でソート
+    pb_size_patterns = pb_size_patterns[pb_size_patterns.prod(axis=-1).argsort(), :].astype(np.float32)
+    return pb_size_patterns

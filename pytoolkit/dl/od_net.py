@@ -1,7 +1,6 @@
 """お手製Object detectionのネットワーク部分。"""
 
 import numpy as np
-import scipy.special
 
 from . import layers, losses, models
 from .. import image, log
@@ -17,12 +16,12 @@ def get_preprocess_input(base_network):
 
 
 @log.trace()
-def create_network(base_network, image_size, pb, num_classes, mode):
+def create_network(base_network, input_size, pb, num_classes, mode, strict_nms=None):
     """学習とか予測とか用のネットワークを作って返す。"""
     assert mode in ('pretrain', 'train', 'predict')
     import keras
     builder = layers.Builder()
-    x = inputs = keras.layers.Input(image_size + (3,))
+    x = inputs = keras.layers.Input(input_size + (3,))
     x, ref, lr_multipliers = _create_basenet(base_network, builder, x, load_weights=mode != 'predict')
     if mode == 'pretrain':
         assert len(lr_multipliers) == 0
@@ -30,7 +29,8 @@ def create_network(base_network, image_size, pb, num_classes, mode):
         x = builder.dense(4, activation='softmax', name='predictions')(x)
         model = keras.models.Model(inputs=inputs, outputs=x)
     else:
-        model = _create_detector(pb, num_classes, builder, inputs, x, ref, lr_multipliers, for_predict=mode == 'predict')
+        for_predict = mode == 'predict'
+        model = _create_detector(pb, num_classes, builder, inputs, x, ref, lr_multipliers, for_predict, strict_nms)
 
     logger = log.get(__name__)
     logger.info('network depth: %d', models.count_network_depth(model))
@@ -103,7 +103,7 @@ def _create_basenet(base_network, builder, x, load_weights):
 
 
 @log.trace()
-def _create_detector(pb, num_classes, builder, inputs, x, ref, lr_multipliers, for_predict):
+def _create_detector(pb, num_classes, builder, inputs, x, ref, lr_multipliers, for_predict, strict_nms):
     """ネットワークのcenter以降の部分を作る。"""
     import keras
     import keras.backend as K
@@ -138,8 +138,9 @@ def _create_detector(pb, num_classes, builder, inputs, x, ref, lr_multipliers, f
     objs, clfs, locs = _create_pm(pb, num_classes, builder, ref, lr_multipliers)
 
     if for_predict:
-        model = _create_predict_network(pb, num_classes, inputs, objs, clfs, locs)
+        model = _create_predict_network(pb, num_classes, inputs, objs, clfs, locs, strict_nms)
     else:
+        assert strict_nms is None
         # ラベル側とshapeを合わせるためのダミー
         dummy_shape = (len(pb.pb_locs), 1)
         dummy = keras.layers.Lambda(K.zeros_like, dummy_shape, name='dummy')(objs)  # objsとちょうどshapeが同じなのでzeros_like。
@@ -216,10 +217,11 @@ def _create_pm(pb, num_classes, builder, ref, lr_multipliers):
     return objs, clfs, locs
 
 
-def _create_predict_network(pb, num_classes, inputs, objs, clfs, locs):
+def _create_predict_network(pb, num_classes, inputs, objs, clfs, locs, strict_nms):
     """予測用ネットワークの作成"""
     import keras
     import keras.backend as K
+    nms_all_threshold = 0.5 if strict_nms else None
 
     def _conf(x):
         objs = x[0][:, :, 0]
@@ -232,5 +234,5 @@ def _create_predict_network(pb, num_classes, inputs, objs, clfs, locs):
     confs = layers.channel_max()(name='confs')(clfs)
     objconfs = keras.layers.Lambda(_conf, K.int_shape(clfs)[1:-1], name='objconfs')([objs, confs])
     locs = keras.layers.Lambda(pb.decode_locs, name='locs')(locs)
-    nms = layers.nms()(num_classes, len(pb.pb_locs), name='nms')([classes, objconfs, locs])
+    nms = layers.nms()(num_classes, len(pb.pb_locs), nms_all_threshold=nms_all_threshold, name='nms')([classes, objconfs, locs])
     return keras.models.Model(inputs=inputs, outputs=nms)

@@ -67,7 +67,8 @@ class Model(object):
         self.model.summary(print_fn=print_fn)
         print_fn(f'network depth: {count_network_depth(self.model)}')
 
-    def horovod_callbacks(self):
+    @staticmethod
+    def horovod_callbacks():
         """Horovodのコールバック3つをまとめて返すだけ。"""
         if not hvd.initialized():
             return []

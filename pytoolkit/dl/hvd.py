@@ -31,7 +31,7 @@ def is_master():
 def barrier():
     """全員が揃うまで待つ。"""
     if not initialized():
-        return True
+        return
     get().allreduce([], name='Barrier')
 
 

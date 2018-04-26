@@ -620,6 +620,9 @@ def nms():
     6はclass(1) + conf(1) + loc(4)。
 
     出力がtop_k個未満ならzero padding。(confidenceが0になるのでそこそこ無害のはず)
+
+    nms_all_thresholdを指定すると別クラス間でもNMSをする。
+    Noneにするとしない。(mAP算出など用)
     """
     import keras
     import keras.backend as K
@@ -628,7 +631,7 @@ def nms():
     class NMS(keras.engine.topology.Layer):
         """Non maximum suppressionを行うレイヤー。"""
 
-        def __init__(self, num_classes, prior_boxes, top_k=200, nms_threshold=0.45, nms_all_threshold=0.7, **kwargs):
+        def __init__(self, num_classes, prior_boxes, top_k=200, nms_threshold=0.45, nms_all_threshold=None, **kwargs):
             super().__init__(**kwargs)
             self.num_classes = num_classes
             self.prior_boxes = prior_boxes
@@ -673,7 +676,8 @@ def nms():
                 target_confs = tf.boolean_mask(confs, mask, axis=0)
                 target_locs = tf.boolean_mask(locs, mask, axis=0)
                 # スコア上位top_k * 2個でNMS
-                top_k = K.minimum(self.top_k * 2, K.shape(target_confs)[0])
+                top_k = self.top_k * 2 if self.nms_all_threshold else self.top_k  # 全体でもNMSするなら余裕を持たせる必要がある
+                top_k = K.minimum(top_k, K.shape(target_confs)[0])
                 nms_indices = tf.image.non_max_suppression(target_locs, target_confs, top_k, self.nms_threshold)
                 img_classes.append(K.gather(target_classes, nms_indices))
                 img_confs.append(K.gather(target_confs, nms_indices))
@@ -683,12 +687,17 @@ def nms():
             img_classes = K.concatenate(img_classes, axis=0)
             img_confs = K.concatenate(img_confs, axis=0)
             img_locs = K.concatenate(img_locs, axis=0)
-            # 全クラスでtop_k個で再度NMS (閾値高め)
+            # 全クラスで再度NMS or top_k
             top_k = K.minimum(self.top_k, K.shape(img_confs)[0])
-            nms_indices = tf.image.non_max_suppression(img_locs, img_confs, top_k, self.nms_all_threshold)
-            img_classes = K.gather(img_classes, nms_indices)
-            img_confs = K.gather(img_confs, nms_indices)
-            img_locs = K.gather(img_locs, nms_indices)
+            if self.nms_all_threshold:
+                nms_indices = tf.image.non_max_suppression(img_locs, img_confs, top_k, self.nms_all_threshold)
+                img_classes = K.gather(img_classes, nms_indices)
+                img_confs = K.gather(img_confs, nms_indices)
+                img_locs = K.gather(img_locs, nms_indices)
+            else:
+                img_confs, top_k_indices = tf.nn.top_k(img_confs, top_k)
+                img_classes = K.gather(img_classes, top_k_indices)
+                img_locs = K.gather(img_locs, top_k_indices)
             # shapeとdtypeを合わせてconcat
             output_size = K.shape(nms_indices)[0]
             img_classes = K.reshape(img_classes, (output_size, 1))
