@@ -699,7 +699,7 @@ def nms():
                 img_classes = K.gather(img_classes, top_k_indices)
                 img_locs = K.gather(img_locs, top_k_indices)
             # shapeとdtypeを合わせてconcat
-            output_size = K.shape(nms_indices)[0]
+            output_size = K.shape(img_classes)[0]
             img_classes = K.reshape(img_classes, (output_size, 1))
             img_confs = K.reshape(img_confs, (output_size, 1))
             img_classes = K.cast(img_classes, K.floatx())
