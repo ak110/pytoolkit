@@ -13,7 +13,7 @@ import sklearn.externals.joblib as joblib
 import sklearn.model_selection
 import sklearn.utils
 
-from . import draw
+from . import draw, ndimage
 
 # VOC2007のクラス名のリスト (20クラス)
 VOC_CLASS_NAMES = [
@@ -632,16 +632,7 @@ def plot_objects(base_image, save_path, classes, confs, locs, class_names):
 
     colors = matplotlib.cm.hsv(np.linspace(0, 1, len(class_names) + 1)).tolist()
 
-    if isinstance(base_image, np.ndarray):
-        img = base_image
-    elif isinstance(base_image, (str, pathlib.Path, io.IOBase)):
-        import PIL.Image
-        with PIL.Image.open(base_image) as pil:
-            if pil.mode != 'RGB':
-                pil = pil.convert('RGB')
-            img = np.asarray(pil).astype(np.float32)
-    else:
-        raise ValueError(f'type error: type(base_image)={type(base_image)}')
+    img = ndimage.load(base_image, grayscale=False)
 
     fig = draw.create_figure(dpi=96)
     ax = fig.add_subplot(111)
