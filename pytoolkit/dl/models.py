@@ -284,15 +284,17 @@ def load_weights(model, filepath, where_fn=None):
             if where_fn is not None and not where_fn(name):
                 continue
 
+            g = f[name]
+            weight_names = [n.decode('utf8') for n in g.attrs['weight_names']]
+            if len(weight_names) == 0:
+                continue
+            weight_values = [g[weight_name] for weight_name in weight_names]
+
             try:
                 layer = model.get_layer(name=name)
             except ValueError as e:
                 logger.warning(str(e))
                 continue
-
-            g = f[name]
-            weight_names = [n.decode('utf8') for n in g.attrs['weight_names']]
-            weight_values = [g[weight_name] for weight_name in weight_names]
 
             symbolic_weights = layer.weights
             weight_values = keras.engine.topology.preprocess_weights_for_loading(
