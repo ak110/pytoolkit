@@ -284,7 +284,7 @@ class RandomColorAugmentors(RandomAugmentors):
 
 
 class RandomFlipLR(generator.Operator):
-    """左右反転。"""
+    """左右反転。(`tk.ml.ObjectsAnnotation`対応)"""
 
     def __init__(self, probability=1):
         assert 0 < probability <= 1
@@ -298,8 +298,8 @@ class RandomFlipLR(generator.Operator):
         return x, y, w
 
 
-class RandomFlipLRTB(generator.Operator):
-    """左右反転 or 上下反転。"""
+class RandomFlipTB(generator.Operator):
+    """上下反転。(`tk.ml.ObjectsAnnotation`対応)"""
 
     def __init__(self, probability=1):
         assert 0 < probability <= 1
@@ -307,14 +307,40 @@ class RandomFlipLRTB(generator.Operator):
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         if ctx.do_augmentation(rand, self.probability):
-            if rand.rand() < 0.5:
-                x = ndimage.flip_lr(x)
-                if y is not None and isinstance(y, ml.ObjectsAnnotation):
-                    y.bboxes[:, [0, 2]] = 1 - y.bboxes[:, [2, 0]]
-            else:
-                x = ndimage.flip_tb(x)
-                if y is not None and isinstance(y, ml.ObjectsAnnotation):
+            x = ndimage.flip_tb(x)
+            if y is not None and isinstance(y, ml.ObjectsAnnotation):
+                y.bboxes[:, [1, 3]] = 1 - y.bboxes[:, [3, 1]]
+        return x, y, w
+
+
+class RandomRotate90(generator.Operator):
+    """90度/180度/270度回転。(`tk.ml.ObjectsAnnotation`対応)"""
+
+    def __init__(self, probability=1):
+        assert 0 < probability <= 1
+        self.probability = probability
+
+    def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
+            k = rand.randint(0, 4)
+
+            if k == 1:
+                x = np.swapaxes(x, 0, 1)[::-1, :, :]
+            elif k == 2:
+                x = x[::-1, ::-1, :]
+            elif k == 3:
+                x = np.swapaxes(x, 0, 1)[:, ::-1, :]
+
+            if y is not None and isinstance(y, ml.ObjectsAnnotation):
+                if k == 1:
+                    y.bboxes = y.bboxes[:, [1, 0, 3, 2]]
                     y.bboxes[:, [1, 3]] = 1 - y.bboxes[:, [3, 1]]
+                elif k == 2:
+                    y.bboxes = 1 - y.bboxes[:, [2, 3, 0, 1]]
+                elif k == 3:
+                    y.bboxes = y.bboxes[:, [1, 0, 3, 2]]
+                    y.bboxes[:, [0, 2]] = 1 - y.bboxes[:, [2, 0]]
+
         return x, y, w
 
 
