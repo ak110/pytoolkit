@@ -631,11 +631,12 @@ def nms():
     class NMS(keras.engine.topology.Layer):
         """Non maximum suppressionを行うレイヤー。"""
 
-        def __init__(self, num_classes, prior_boxes, top_k=200, nms_threshold=0.45, nms_all_threshold=None, **kwargs):
+        def __init__(self, num_classes, prior_boxes, top_k=200, conf_threshold=0.1, nms_threshold=0.45, nms_all_threshold=None, **kwargs):
             super().__init__(**kwargs)
             self.num_classes = num_classes
             self.prior_boxes = prior_boxes
             self.top_k = top_k
+            self.conf_threshold = conf_threshold
             self.nms_threshold = nms_threshold
             self.nms_all_threshold = nms_all_threshold
 
@@ -655,6 +656,7 @@ def nms():
                 'num_classes': self.num_classes,
                 'prior_boxes': self.prior_boxes,
                 'top_k': self.top_k,
+                'conf_threshold': self.conf_threshold,
                 'nms_threshold': self.nms_threshold,
                 'nms_all_threshold': self.nms_all_threshold,
             }
@@ -671,11 +673,11 @@ def nms():
             img_locs = []
             for class_id in range(self.num_classes):
                 # 対象のクラスのみ抜き出す
-                mask = K.equal(classes, class_id)
+                mask = tf.logical_and(K.equal(classes, class_id), K.greater(confs, self.conf_threshold))
                 target_classes = tf.boolean_mask(classes, mask, axis=0)  # 無駄だが、tileの使い方が分からないのでとりあえず。。
                 target_confs = tf.boolean_mask(confs, mask, axis=0)
                 target_locs = tf.boolean_mask(locs, mask, axis=0)
-                # スコア上位top_k * 2個でNMS
+                # NMS
                 top_k = self.top_k * 2 if self.nms_all_threshold else self.top_k  # 全体でもNMSするなら余裕を持たせる必要がある
                 top_k = K.minimum(top_k, K.shape(target_confs)[0])
                 nms_indices = tf.image.non_max_suppression(target_locs, target_confs, top_k, self.nms_threshold)
@@ -695,7 +697,7 @@ def nms():
                 img_confs = K.gather(img_confs, nms_indices)
                 img_locs = K.gather(img_locs, nms_indices)
             else:
-                img_confs, top_k_indices = tf.nn.top_k(img_confs, top_k)
+                img_confs, top_k_indices = tf.nn.top_k(img_confs, top_k, sorted=True)
                 img_classes = K.gather(img_classes, top_k_indices)
                 img_locs = K.gather(img_locs, top_k_indices)
             # shapeとdtypeを合わせてconcat
