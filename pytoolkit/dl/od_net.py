@@ -47,14 +47,14 @@ def _create_basenet(base_network, builder, x, load_weights):
     if base_network == 'custom':
         x = builder.conv2d(32, 7, strides=2, name='stage0_ds')(x)
         x = keras.layers.MaxPooling2D(name='stage1_ds')(x)
-        x = builder.conv2d(64, 3, name='stage2_conv1')(x)
-        x = builder.conv2d(64, 3, name='stage2_conv2')(x)
+        x = builder.conv2d(64, name='stage2_conv1')(x)
+        x = builder.conv2d(64, name='stage2_conv2')(x)
         x = keras.layers.MaxPooling2D(name='stage2_ds')(x)
-        x = builder.conv2d(128, 3, name='stage3_conv1')(x)
-        x = builder.conv2d(128, 3, name='stage3_conv2')(x)
+        x = builder.conv2d(128, name='stage3_conv1')(x)
+        x = builder.conv2d(128, name='stage3_conv2')(x)
         x = keras.layers.MaxPooling2D(name='stage3_ds')(x)
-        x = builder.conv2d(256, 3, name='stage4_conv1')(x)
-        x = builder.conv2d(256, 3, name='stage4_conv2')(x)
+        x = builder.conv2d(256, name='stage4_conv1')(x)
+        x = builder.conv2d(256, name='stage4_conv2')(x)
         ref_list.append(x)
     elif base_network == 'vgg16':
         basenet = keras.applications.VGG16(include_top=False, input_tensor=x, weights='imagenet' if load_weights else None)
@@ -110,9 +110,8 @@ def _create_detector(pb, num_classes, builder, inputs, x, ref, lr_multipliers, f
     map_size = builder.shape(x)[1]
 
     # center
-    x = builder.conv2d(32, (1, 1), name='center_conv1')(x)
-    x = builder.conv2d(32, (map_size, map_size), padding='valid', name='center_conv2')(x)
-    x = builder.conv2d(32, (1, 1), name='center_conv3')(x)
+    x = builder.conv2d(64, (1, 1), name='center_conv1')(x)
+    x = builder.conv2d(64, (map_size, map_size), padding='valid', name='center_conv2')(x)
 
     # upsampling
     up_index = 0
@@ -126,8 +125,8 @@ def _create_detector(pb, num_classes, builder, inputs, x, ref, lr_multipliers, f
         x = builder.conv2d(256, 1, use_act=False, name=f'up{up_index}_ex')(x)
         t = builder.conv2d(256, 1, use_act=False, name=f'up{up_index}_lt')(ref[f'down{map_size}'])
         x = keras.layers.add([x, t], name=f'up{up_index}_mix')
+        x = builder.res_block(256, name=f'up{up_index}_res')(x)
         x = builder.bn_act(name=f'up{up_index}_mix')(x)
-        x = builder.conv2d(256, 3, name=f'up{up_index}_conv')(x)
         ref[f'out{map_size}'] = x
 
         if pb.map_sizes[0] <= map_size:
@@ -159,7 +158,7 @@ def _create_pm(pb, num_classes, builder, ref, lr_multipliers):
     old_gn, builder.use_gn = builder.use_gn, True
 
     shared_layers = {}
-    shared_layers['pm_layer1'] = builder.conv2d(256, 3, use_act=False, name='pm_conv')
+    shared_layers['pm_layer1'] = builder.conv2d(256, use_act=False, name='pm_conv')
     shared_layers['pm_layer2'] = builder.res_block(256, name='pm_res1')
     shared_layers['pm_layer3'] = builder.res_block(256, name='pm_res2')
     shared_layers['pm_bn_act'] = builder.bn_act(name='pm')

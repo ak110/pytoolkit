@@ -134,7 +134,7 @@ class Builder(object):
         """普通のResidual Block。((3, 3) × 2)"""
         import keras
         layers = [
-            self.conv2d(filters, name=f'{name}_conv1' if name else None),
+            self.conv2d(filters, use_act=True, name=f'{name}_conv1' if name else None),
             self.conv2d(filters, use_act=False, name=f'{name}_conv2' if name else None),
         ]
         return Sequence(layers, keras.layers.Add(name=f'{name}_add' if name else None))
