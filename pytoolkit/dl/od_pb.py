@@ -68,10 +68,8 @@ class PriorBoxes(object):
         logger.info(f'difficults per image: {np.mean([np.sum(y.difficults) for y in y_train]):.1f}')
 
         # bboxのサイズ
-        bboxes = np.concatenate([y.bboxes for y in y_train])
+        bboxes = np.concatenate([y.bboxes_ar_fixed for y in y_train])
         bboxes_sizes = bboxes[:, 2:] - bboxes[:, :2]
-        assert (bboxes_sizes >= 0).all()  # 不正なデータは含まれない想定 (手抜き)
-        assert (bboxes_sizes < 1).all()  # 不正なデータは含まれない想定 (手抜き)
 
         # Prior boxのサイズのパターンを作成
         self.pb_size_patterns = _create_pb_pattern(self.map_sizes, bboxes_sizes, pb_size_pattern_count)

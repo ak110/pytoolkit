@@ -102,7 +102,9 @@ class Resize(generator.Operator):
 
     # 引数
 
-    image_size: (height, width)のタプル
+    - image_size: (height, width)のタプル
+    - padding: アスペクト比を保持するためにパディングするならパディングの種類
+
     """
 
     def __init__(self, image_size, padding=None):

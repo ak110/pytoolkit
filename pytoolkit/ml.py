@@ -155,6 +155,15 @@ class ObjectsAnnotation(object):
             difficults=difficults)
         return annotation
 
+    @property
+    def bboxes_ar_fixed(self):
+        """縦横比を補正したbboxesを返す。(prior box算出など用)"""
+        bboxes = np.copy(self.bboxes)
+        ar = np.sqrt(self.width / self.height)
+        bboxes[:, [0, 2]] /= ar
+        bboxes[:, [1, 3]] *= ar
+        return bboxes
+
 
 def listup_classification(dirpath, class_names=None):
     """画像分類でよくある、クラス名ディレクトリの列挙。クラス名の配列, X, yを返す。"""

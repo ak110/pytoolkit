@@ -52,12 +52,12 @@ class ObjectDetector(object):
     def fit(self, y_train: [ml.ObjectsAnnotation], y_val: [ml.ObjectsAnnotation], batch_size, initial_weights=None, pb_size_pattern_count=8):
         """学習。"""
         assert self.model is None
-        logger = log.get(__name__)
-        logger.info(f'base network:         {self.base_network}')
-        logger.info(f'input size:           {self.input_size}')
-        logger.info(f'number of classes:    {self.num_classes}')
         # 訓練データに合わせたprior boxの作成
         if hvd.is_master():
+            logger = log.get(__name__)
+            logger.info(f'base network:         {self.base_network}')
+            logger.info(f'input size:           {self.input_size}')
+            logger.info(f'number of classes:    {self.num_classes}')
             self.pb.fit(self.input_size, y_train, pb_size_pattern_count)
             pb_dict = self.pb.to_dict()
         else:
