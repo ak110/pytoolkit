@@ -16,7 +16,7 @@ def create_pretrain_generator(image_size, preprocess_input):
     return gen
 
 
-def create_generator(image_size, preprocess_input, encode_truth=None):
+def create_generator(image_size, preprocess_input, encode_truth, flip_h, flip_v, rotate90):
     """ImageDataGeneratorを作って返す。"""
     def _transform(rgb: np.ndarray, y: ml.ObjectsAnnotation, w, rand: np.random.RandomState, ctx: generator.GeneratorContext):
         """変形を伴うAugmentation。"""
@@ -35,7 +35,12 @@ def create_generator(image_size, preprocess_input, encode_truth=None):
     gen = image.ImageDataGenerator()
     gen.add(image.CustomAugmentation(_transform, probability=1))
     gen.add(image.Resize(image_size))
-    gen.add(image.RandomFlipLR(probability=0.5))
+    if flip_h:
+        gen.add(image.RandomFlipLR(probability=0.5))
+    if flip_v:
+        gen.add(image.RandomFlipTB(probability=0.5))
+    if rotate90:
+        gen.add(image.RandomRotate90(probability=1))
     gen.add(image.RandomColorAugmentors(probability=0.5))
     gen.add(image.RandomErasing(probability=0.5))
     gen.add(image.ProcessInput(preprocess_input, batch_axis=True))

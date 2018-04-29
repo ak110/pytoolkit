@@ -7,7 +7,7 @@ import typing
 
 import numpy as np
 
-from . import hvd, models, od_gen, od_net, od_pb
+from . import callbacks as dl_callbacks, hvd, models, od_gen, od_net, od_pb
 from .. import jsonex, log, ml, utils
 
 # バージョン
@@ -48,7 +48,11 @@ class ObjectDetector(object):
         od.pb.from_dict(data['pb'])
         return od
 
-    def fit(self, y_train: [ml.ObjectsAnnotation], y_val: [ml.ObjectsAnnotation], batch_size, initial_weights=None, pb_size_pattern_count=8):
+    def fit(self, X_train: [pathlib.Path], y_train: [ml.ObjectsAnnotation],
+            X_val: [pathlib.Path], y_val: [ml.ObjectsAnnotation],
+            batch_size, epochs, initial_weights=None, pb_size_pattern_count=8,
+            flip_h=True, flip_v=False, rotate90=False,
+            plot_path=None, history_path=None):
         """学習。"""
         assert self.model is None
         # 訓練データに合わせたprior boxの作成
@@ -68,7 +72,20 @@ class ObjectDetector(object):
             self.pb.check_prior_boxes(y_val)
         hvd.barrier()
         # モデルの作成
-        self._create_model(mode='train', weights=initial_weights, batch_size=batch_size)
+        self._create_model(mode='train', weights=initial_weights, batch_size=batch_size,
+                           flip_h=flip_h, flip_v=flip_v, rotate90=rotate90)
+        if plot_path:
+            self.model.plot(plot_path)
+        # 学習
+        callbacks = []
+        callbacks.append(dl_callbacks.learning_rate(reduce_epoch_rates=(0.5, 0.75, 0.875)))
+        callbacks.extend(self.model.horovod_callbacks())
+        if history_path:
+            callbacks.append(dl_callbacks.tsv_logger(history_path))
+        callbacks.append(dl_callbacks.epoch_logger())
+        callbacks.append(dl_callbacks.freeze_bn(0.95))
+        self.model.fit(X_train, y_train, validation_data=(X_val, y_val),
+                       epochs=epochs, callbacks=callbacks)
 
     def save_weights(self, path: typing.Union[str, pathlib.Path]):
         """重みの保存。(学習後用)"""
@@ -78,7 +95,8 @@ class ObjectDetector(object):
     def load_weights(self, path: typing.Union[str, pathlib.Path], batch_size, strict_nms=True, use_multi_gpu=True):
         """重みの読み込み。(予測用)"""
         assert self.model is None
-        self._create_model(mode='predict', weights=path, batch_size=batch_size, strict_nms=strict_nms)
+        self._create_model(mode='predict', weights=path, batch_size=batch_size,
+                           flip_h=False, flip_v=False, rotate90=False, strict_nms=strict_nms)
         # 予マルチGPU化。
         if use_multi_gpu:
             gpus = utils.get_gpu_count()
@@ -114,7 +132,7 @@ class ObjectDetector(object):
         return pred_classes_list, pred_confs_list, pred_locs_list
 
     @log.trace()
-    def _create_model(self, mode, weights, batch_size, strict_nms=None):
+    def _create_model(self, mode, weights, batch_size, flip_h, flip_v, rotate90, strict_nms=None):
         """学習とか予測とか用に`tk.dl.models.Model`を作成して返す。
 
         # 引数
@@ -131,7 +149,8 @@ class ObjectDetector(object):
         if mode == 'pretrain':
             gen = od_gen.create_pretrain_generator(self.input_size, pi)
         else:
-            gen = od_gen.create_generator(self.input_size, pi, self.pb.encode_truth)
+            gen = od_gen.create_generator(self.input_size, pi, self.pb.encode_truth,
+                                          flip_h=flip_h, flip_v=flip_v, rotate90=rotate90)
         self.model = models.Model(network, gen, batch_size)
         if mode in ('pretrain', 'train'):
             self.model.summary()
