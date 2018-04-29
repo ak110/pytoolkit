@@ -106,30 +106,28 @@ class ObjectDetector(object):
         # 1回予測して計算グラフを構築
         self.model.model.predict_on_batch(np.zeros((gpus,) + self.input_size + (3,), np.float32))
 
-    def predict(self, X, conf_threshold=0.1, verbose=1):
+    def predict(self, X, conf_threshold=0.1, verbose=1) -> [ml.ObjectsPrediction]:
         """予測。"""
         assert self.model is not None
-        pred_classes_list, pred_confs_list, pred_locs_list = [], [], []
+        pred = []
         steps = self.model.gen.steps_per_epoch(len(X), self.model.batch_size)
         with utils.tqdm(total=len(X), unit='f', desc='predict', disable=verbose == 0) as pbar:
             for i, X_batch in enumerate(self.model.gen.flow(X, batch_size=self.model.batch_size)):
                 # 予測
                 pred_list = self.model.model.predict_on_batch(X_batch)
                 # 整形：キャストしたりマスクしたり
-                for pred in pred_list:
-                    pred_classes = pred[:, 0].astype(np.int32)
-                    pred_confs = pred[:, 1]
-                    pred_locs = pred[:, 2:]
+                for p in pred_list:
+                    pred_classes = p[:, 0].astype(np.int32)
+                    pred_confs = p[:, 1]
+                    pred_locs = p[:, 2:]
                     mask = pred_confs >= conf_threshold
-                    pred_classes_list.append(pred_classes[mask])
-                    pred_confs_list.append(pred_confs[mask])
-                    pred_locs_list.append(pred_locs[mask, :])
+                    pred.append(ml.ObjectsPrediction(pred_classes[mask], pred_confs[mask], pred_locs[mask, :]))
                 # 次へ
                 pbar.update(len(X_batch))
                 if i + 1 >= steps:
                     assert i + 1 == steps
                     break
-        return pred_classes_list, pred_confs_list, pred_locs_list
+        return pred
 
     @log.trace()
     def _create_model(self, mode, weights, batch_size, flip_h, flip_v, rotate90, strict_nms=None):

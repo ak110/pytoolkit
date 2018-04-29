@@ -13,7 +13,7 @@ import sklearn.externals.joblib as joblib
 import sklearn.model_selection
 import sklearn.utils
 
-from . import draw, ndimage
+from . import draw, log, ndimage
 
 # VOC2007のクラス名のリスト (20クラス)
 VOC_CLASS_NAMES = [
@@ -57,16 +57,24 @@ class ObjectsAnnotation(object):
         # 画像の縦幅(px)
         self.height = height
         # クラスIDの配列
-        self.classes = np.array(classes)
+        self.classes = np.asarray(classes)
         # bounding box(x1, y1, x2, y2)の配列。(0～1)
-        self.bboxes = np.array(bboxes)
+        self.bboxes = np.asarray(bboxes)
         # difficultフラグの配列。(True or False)
-        self.difficults = np.array(difficults) if difficults is not None else np.zeros(len(classes))
+        self.difficults = np.asarray(difficults) if difficults is not None else np.zeros(len(classes))
         assert self.width >= 1
         assert self.height >= 1
         assert (self.bboxes >= 0).all()
         assert (self.bboxes <= 1).all()
         assert (self.bboxes[:, :2] < self.bboxes[:, 2:]).all()
+        assert self.classes.shape == (self.num_objects,)
+        assert self.bboxes.shape == (self.num_objects, 4)
+        assert self.difficults.shape == (self.num_objects,)
+
+    @property
+    def num_objects(self):
+        """物体の数を返す。"""
+        return len(self.classes)
 
     @staticmethod
     def get_path_list(data_dir, y):
@@ -165,6 +173,27 @@ class ObjectsAnnotation(object):
         return bboxes
 
 
+class ObjectsPrediction(object):
+    """物体検出の予測結果を持つクラス。"""
+
+    def __init__(self, classes, confs, bboxes):
+        self.classes = np.asarray(classes)
+        self.confs = np.asarray(confs)
+        self.bboxes = np.asarray(bboxes)
+        assert self.classes.shape == (self.num_objects,)
+        assert self.confs.shape == (self.num_objects,)
+        assert self.bboxes.shape == (self.num_objects, 4)
+
+    @property
+    def num_objects(self):
+        """物体の数を返す。"""
+        return len(self.classes)
+
+    def plot(self, img, class_names):
+        """ワクを描画した画像を作って返す。"""
+        return plot_objects(img, self.classes, self.confs, self.bboxes, class_names)
+
+
 def listup_classification(dirpath, class_names=None):
     """画像分類でよくある、クラス名ディレクトリの列挙。クラス名の配列, X, yを返す。"""
     dirpath = pathlib.Path(dirpath)
@@ -236,9 +265,7 @@ def to_categorical(nb_classes):
     return _ToCategorical(nb_classes)
 
 
-def compute_map(gt_classes_list, gt_bboxes_list, gt_difficults_list,
-                pred_classes_list, pred_confs_list, pred_bboxes_list,
-                iou_threshold=0.5, use_voc2007_metric=False):
+def compute_map(gt, pred, iou_threshold=0.5, use_voc2007_metric=False):
     """`mAP`の算出。
 
     # 引数
@@ -250,11 +277,13 @@ def compute_map(gt_classes_list, gt_bboxes_list, gt_difficults_list,
     - pred_bboxes_list: 予測結果のbounding boxの座標(x1,y1,x2,y2。0～1)。shape=(画像数, bbox数, 4)
 
     """
-    assert len(gt_classes_list) == len(gt_bboxes_list)
-    assert len(gt_classes_list) == len(gt_difficults_list)
-    assert len(gt_classes_list) == len(pred_classes_list)
-    assert len(gt_classes_list) == len(pred_confs_list)
-    assert len(gt_classes_list) == len(pred_bboxes_list)
+    assert len(gt) == len(pred)
+    gt_classes_list = np.array([y.classes for y in gt])
+    gt_bboxes_list = np.array([y.bboxes for y in gt])
+    gt_difficults_list = np.array([y.difficults for y in gt])
+    pred_classes_list = np.array([p.classes for p in pred])
+    pred_confs_list = np.array([p.confs for p in pred])
+    pred_bboxes_list = np.array([p.bboxes for p in pred])
 
     npos_dict = collections.defaultdict(int)
     scores = collections.defaultdict(list)
@@ -340,6 +369,64 @@ def compute_ap(precision, recall, use_voc2007_metric=False):
 
         ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
     return ap
+
+
+def compute_scores(gt, pred, iou_threshold=0.5):
+    """物体検出の正解と予測結果から、適合率、再現率、F値、該当回数を算出して返す。"""
+    assert len(gt) == len(pred)
+    num_classes = len(np.unique(np.concatenate([y.classes for y in gt], axis=0)))
+
+    tp = np.zeros((num_classes,), dtype=int)  # true positive
+    fp = np.zeros((num_classes,), dtype=int)  # false positive
+    tn = np.zeros((num_classes,), dtype=int)  # true negative
+
+    for y_true, y_pred in zip(gt, pred):
+        pred_mask = np.ones((y_pred.num_objects,), dtype=bool)
+        # 各正解が予測結果に含まれるか否か: true positive/negative
+        for gt_class, gt_bbox in zip(y_true.classes, y_true.bboxes):
+            pred_bboxes = y_pred.bboxes[np.logical_and(pred_mask, y_pred.classes == gt_class)]
+            if not pred_bboxes.any():
+                continue
+            iou = compute_iou(np.expand_dims(gt_bbox, axis=0), pred_bboxes)[0, :]
+            pred_ix = iou.argmax()
+            if iou[pred_ix] >= iou_threshold:
+                # 検出成功
+                tp[gt_class] += 1
+                pred_mask[pred_ix] = False
+            else:
+                # 検出失敗
+                tn[gt_class] += 1
+        # 正解に含まれなかった予測結果: false positive
+        for pred_class in y_pred.classes[pred_mask]:
+            fp[pred_class] += 1
+
+    supports = tp + tn
+    precisions = tp.astype(float) / (tp + fp)
+    recalls = tp.astype(float) / supports
+    fscores = 2 / (1 / (precisions + 1e-7) + 1 / (recalls + 1e-7))
+    return precisions, recalls, fscores, supports
+
+
+def print_scores(precisions, recalls, fscores, supports, class_names=None, print_fn=None):
+    """適合率・再現率などをprintする。(classification_report風。)"""
+    assert len(precisions) == len(recalls)
+    assert len(precisions) == len(fscores)
+    assert len(precisions) == len(supports)
+    class_names = class_names or [f'class{i:02d}' for i in range(len(precisions))]
+    print_fn = print_fn or log.get(__name__).info
+
+    print_fn('                   適合率  再現率  F値    件数')
+    # .......'0123456789abcdef:  0.123   0.123   0.123  0123456'
+
+    for cn, prec, rec, f1, sup in zip(class_names, precisions, recalls, fscores, supports):
+        print_fn(f'{cn:16s}:  {prec:.3f}   {rec:.3f}   {f1:.3f}  {sup:7d}')
+
+    cn = 'avg / total'
+    prec = np.average(precisions, weights=supports)
+    rec = np.average(recalls, weights=supports)
+    f1 = 2 / (1 / (prec + 1e-7) + 1 / (rec + 1e-7))
+    sup = np.sum(supports)
+    print_fn(f'{cn:16s}:  {prec:.3f}   {rec:.3f}   {f1:.3f}  {sup:7d}')
 
 
 def top_k_accuracy(y_true, proba_pred, k=5):
@@ -615,50 +702,43 @@ def plot_cm(cm, to_file='confusion_matrix.png', classes=None, normalize=True, ti
     fig.clf()
 
 
-def plot_objects(base_image, save_path, classes, confs, locs, class_names):
+def plot_objects(base_image, classes, confs, bboxes, class_names):
     """画像＋オブジェクト([class_id + confidence + xmin/ymin/xmax/ymax]×n)を画像化する。
 
     # 引数
     - base_image: 元画像ファイルのパスまたはndarray
-    - save_path: 保存先画像ファイルのパス
     - classes: クラスIDのリスト
     - confs: confidenceのリスト (None可)
-    - locs: xmin/ymin/xmax/ymaxのリスト (それぞれ0.0 ～ 1.0)
+    - bboxes: xmin/ymin/xmax/ymaxのリスト (それぞれ0.0 ～ 1.0)
     - class_names: クラスID→クラス名のリスト  (None可)
 
     """
-    import matplotlib
-    import matplotlib.cm
+    import cv2
 
     if confs is None:
         confs = [None] * len(classes)
     assert len(classes) == len(confs)
-    assert len(classes) == len(locs)
+    assert len(classes) == len(bboxes)
     if class_names is not None and any(classes):
         assert 0 <= np.min(classes) < len(class_names)
         assert 0 <= np.max(classes) < len(class_names)
 
-    colors = matplotlib.cm.hsv(np.linspace(0, 1, len(class_names) + 1)).tolist()
-
     img = ndimage.load(base_image, grayscale=False)
+    colors = draw.get_colors(len(class_names) if class_names else 1)
 
-    fig = draw.create_figure(dpi=96)
-    ax = fig.add_subplot(111)
-    ax.imshow(img / 255.)
-    for classid, conf, loc in zip(classes, confs, locs):
-        xmin = int(round(loc[0] * img.shape[1]))
-        ymin = int(round(loc[1] * img.shape[0]))
-        xmax = int(round(loc[2] * img.shape[1]))
-        ymax = int(round(loc[3] * img.shape[0]))
-        label = class_names[classid] if class_names is not None else str(classid)
-        color = colors[classid]
-        txt = label if conf is None else f'{conf:0.2f}, {label}'
-        ax.add_patch(matplotlib.patches.Rectangle(
-            (xmin, ymin), xmax - xmin + 1, ymax - ymin + 1,
-            fill=False, edgecolor=color, linewidth=2))
-        ax.text(xmin, ymin, txt, bbox={'facecolor': color, 'alpha': 0.5})
+    for classid, conf, bbox in zip(classes, confs, bboxes):
+        xmin = int(round(bbox[0] * img.shape[1]))
+        ymin = int(round(bbox[1] * img.shape[0]))
+        xmax = int(round(bbox[2] * img.shape[1]))
+        ymax = int(round(bbox[3] * img.shape[0]))
+        label = class_names[classid] if class_names is not None else f'class{classid:02d}'
+        color = colors[classid % len(colors)][-2::-1]  # RGBA → BGR
+        text = label if conf is None else f'{conf:0.2f}, {label}'
 
-    save_path = pathlib.Path(save_path)
-    save_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(str(save_path))
-    fig.clf()
+        cv2.rectangle(img, (xmin, ymin), (xmax, ymax), color, thickness=2)
+
+        tw = 6 * len(text)
+        cv2.rectangle(img, (xmin - 1, ymin - 10), (xmin + tw + 15, ymin + 5), color, -1)
+        cv2.putText(img, text, (xmin + 5, ymin), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 0), 1)
+
+    return img

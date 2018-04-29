@@ -6,7 +6,6 @@ import subprocess
 import sys
 
 import numpy as np
-import sklearn.externals.joblib as joblib
 
 
 def noqa(*args):
@@ -15,18 +14,17 @@ def noqa(*args):
     assert args is None or args is not None  # noqa
 
 
-def memorized(cache_path, func):
-    """結果をcache_pathにキャッシュする処理
+def memoize(func):
+    """単純なメモ化のデコレーター。"""
+    cache = {}
 
-    funcは呼び出すたびに毎回同じ結果が返るものという仮定のもとに単純にキャッシュするだけ。
-    """
-    if os.path.isfile(cache_path):
-        return joblib.load(cache_path)
+    @functools.wraps(func)
+    def _helper(*args):
+        if args not in cache:
+            cache[args] = func(*args)
+        return cache[args]
 
-    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-    result = func()
-    joblib.dump(result, cache_path)
-    return result
+    return _helper
 
 
 def moving_average(arr, window_size):

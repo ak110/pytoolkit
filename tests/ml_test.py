@@ -27,34 +27,51 @@ def test_plot_objects():
     xml_path = base_dir / 'data' / 'VOC2007_000001.xml'
     img_path = base_dir / 'data' / 'VOC2007_000001.jpg'
     ann = tk.ml.ObjectsAnnotation.load_voc_file(xml_path, tk.ml.VOC_CLASS_NAMES_TO_ID, without_difficult=False)
-    save_path = base_dir.parent / '___check' / 'plot_objects.png'
-    tk.ml.plot_objects(img_path, save_path, ann.classes, None, ann.bboxes, tk.ml.VOC_CLASS_NAMES)
+
+    img = tk.ml.plot_objects(img_path, ann.classes, None, ann.bboxes, None)
+    tk.ndimage.save(base_dir.parent / '___check' / 'plot_objects1.png', img)
+
+    img = tk.ml.plot_objects(img_path, ann.classes, None, ann.bboxes, tk.ml.VOC_CLASS_NAMES)
+    tk.ndimage.save(base_dir.parent / '___check' / 'plot_objects2.png', img)
+
+    img = tk.ml.plot_objects(img_path, ann.classes, np.array([0.5, 0.5]), ann.bboxes, tk.ml.VOC_CLASS_NAMES)
+    tk.ndimage.save(base_dir.parent / '___check' / 'plot_objects3.png', img)
 
 
 def test_compute_map():
-    gt_classes_list = [np.array([1, 2])]
-    gt_bboxes_list = [np.array([
-        [0, 0, 200, 200],
-        [900, 900, 1000, 1000],
-    ])]
-    gt_difficults_list = [np.array([False, False])]
-    pred_class_list1 = [np.array([9, 9, 3, 3, 3, 3])]
-    pred_class_list2 = [np.array([9, 1, 3, 3, 3, 3])]
-    pred_class_list3 = [np.array([2, 9, 3, 3, 3, 3])]
-    pred_class_list4 = [np.array([2, 1, 3, 3, 3, 3])]
-    pred_confs_list = [np.array([1, 1, 1, 1, 1, 1])]
-    pred_bboxes_list = [np.array([
-        [901, 901, 1000, 1000],
-        [1, 1, 199, 199],
-        [333, 333, 334, 334],  # error
-        [333, 333, 334, 334],  # error
-        [333, 333, 334, 334],  # error
-        [333, 333, 334, 334],  # error
-    ])]
-    assert tk.ml.compute_map(gt_classes_list, gt_bboxes_list, gt_difficults_list, pred_class_list1, pred_confs_list, pred_bboxes_list) == 0
-    assert tk.ml.compute_map(gt_classes_list, gt_bboxes_list, gt_difficults_list, pred_class_list2, pred_confs_list, pred_bboxes_list) == 0.5
-    assert tk.ml.compute_map(gt_classes_list, gt_bboxes_list, gt_difficults_list, pred_class_list3, pred_confs_list, pred_bboxes_list) == 0.5
-    assert tk.ml.compute_map(gt_classes_list, gt_bboxes_list, gt_difficults_list, pred_class_list4, pred_confs_list, pred_bboxes_list) == 1
+    gt = [
+        tk.ml.ObjectsAnnotation(
+            '', '', 2000, 2000,
+            np.array([1, 2]),
+            np.array([
+                [0.000, 0.000, 0.200, 0.200],
+                [0.900, 0.900, 1.000, 1.000],
+            ]),
+            np.array([False, False]))
+    ]
+    preds = [
+        tk.ml.ObjectsPrediction(
+            np.array([9, 9, 3, 3, 3, 3]),
+            np.array([1, 1, 1, 1, 1, 1]),
+            np.array([
+                [0.901, 0.901, 1.000, 1.000],
+                [0.001, 0.001, 0.199, 0.199],
+                [0.333, 0.333, 0.334, 0.334],  # error
+                [0.333, 0.333, 0.334, 0.334],  # error
+                [0.333, 0.333, 0.334, 0.334],  # error
+                [0.333, 0.333, 0.334, 0.334],  # error
+            ])),
+    ]
+    assert tk.ml.compute_map(gt, preds) == 0
+
+    preds[0].classes = np.array([9, 1, 3, 3, 3, 3])
+    assert tk.ml.compute_map(gt, preds) == 0.5
+
+    preds[0].classes = np.array([2, 9, 3, 3, 3, 3])
+    assert tk.ml.compute_map(gt, preds) == 0.5
+
+    preds[0].classes = np.array([2, 1, 3, 3, 3, 3])
+    assert tk.ml.compute_map(gt, preds) == 1
 
 
 def test_iou():

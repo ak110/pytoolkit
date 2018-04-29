@@ -55,6 +55,8 @@ def save(path: typing.Union[str, pathlib.Path], img: np.ndarray) -> None:
         img = np.squeeze(img, axis=-1)
     else:
         img = img[:, :, ::-1]
+    path = pathlib.Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     cv2.imwrite(str(path), img)
 
 

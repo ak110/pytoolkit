@@ -15,6 +15,10 @@ import io
 import pathlib
 import threading
 
+import numpy as np
+
+from . import utils
+
 _lock = threading.Lock()
 
 
@@ -37,6 +41,25 @@ def create_figure(figsize=None, dpi=None, facecolor=None, edgecolor=None,
                                    subplotpars=subplotpars, tight_layout=tight_layout, **kwargs)
     FigureCanvas(fig)
     return fig
+
+
+@utils.memoize
+def get_colors(count, cmap='hsv', scale=255):
+    """色を列挙する。
+
+    # 引数
+
+    - count: 色の個数
+    - cmap: matplotlibのカラーマップの名前。
+    - scale: 1なら0～1、255なら0～255で返す。
+
+    # 戻り値
+
+    (count, 4)のndarray。4はRGBA。
+
+    """
+    import matplotlib.cm
+    return matplotlib.cm.get_cmap(name=cmap)(np.linspace(0, 1, count + 1)[:count]) * scale
 
 
 def set_axis_tick_to_int(axis):

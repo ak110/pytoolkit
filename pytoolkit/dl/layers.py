@@ -130,13 +130,14 @@ class Builder(object):
         import keras.backend as K
         return K.int_shape(x)
 
-    def res_block(self, filters, name=None):
+    def res_block(self, filters, dropout=None, name=None):
         """普通のResidual Block。((3, 3) × 2)"""
         import keras
-        layers = [
-            self.conv2d(filters, use_act=True, name=f'{name}_conv1' if name else None),
-            self.conv2d(filters, use_act=False, name=f'{name}_conv2' if name else None),
-        ]
+        layers = []
+        layers.append(self.conv2d(filters, use_act=True, name=f'{name}_conv1' if name else None))
+        if dropout:
+            layers.append(keras.layers.Dropout(dropout, name=f'{name}_drop' if name else None))
+        layers.append(self.conv2d(filters, use_act=False, name=f'{name}_conv2' if name else None))
         return Sequence(layers, keras.layers.Add(name=f'{name}_add' if name else None))
 
     def se_block(self, filters, ratio=16, name=None):

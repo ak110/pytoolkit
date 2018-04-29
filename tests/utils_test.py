@@ -5,12 +5,6 @@ import pytest
 import pytoolkit as tk
 
 
-def test_memorized(tmpdir):
-    cache_path = str(tmpdir.join('cache.pkl'))
-    assert tk.memorized(cache_path, lambda: 1) == 1  # fnの結果
-    assert tk.memorized(cache_path, lambda: 2) == 1  # cacheされた結果
-
-
 def test_moving_average():
     ma = tk.moving_average([1, 2, 3, 4, 5], 3)
     assert ma[0] == pytest.approx((1 + 2 + 3) / 3)
