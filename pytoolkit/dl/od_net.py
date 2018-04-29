@@ -121,12 +121,12 @@ def _create_detector(pb, builder, inputs, x, ref, lr_multipliers, for_predict, s
         in_map_size = builder.shape(x)[1]
         assert map_size % in_map_size == 0, f'map size error: {in_map_size} -> {map_size}'
         up_size = map_size // in_map_size
-        x = keras.layers.Dropout(0.25)(x)
         x = builder.conv2dtr(64, up_size, strides=up_size, padding='valid', name=f'up{up_index}_us')(x)
         x = builder.conv2d(256, 1, use_act=False, name=f'up{up_index}_ex')(x)
         t = builder.conv2d(256, 1, use_act=False, name=f'up{up_index}_lt')(ref[f'down{map_size}'])
         x = keras.layers.add([x, t], name=f'up{up_index}_mix')
         x = builder.bn_act(name=f'up{up_index}_mix')(x)
+        x = keras.layers.Dropout(0.25)(x)
         x = builder.conv2d(256, name=f'up{up_index}_conv1')(x)
         x = builder.dwconv2d(name=f'up{up_index}_conv2')(x)
         ref[f'out{map_size}'] = x
@@ -168,6 +168,7 @@ def _create_pm(pb, builder, ref, lr_multipliers):
         shared_layers[f'pm-{pat_ix}_obj'] = builder.conv2d(
             1, 1,
             kernel_initializer='zeros',
+            kernel_regularizer=keras.regularizers.l2(1e-4),
             bias_initializer=losses.od_bias_initializer(1),
             bias_regularizer=None,
             activation='sigmoid',
@@ -177,6 +178,8 @@ def _create_pm(pb, builder, ref, lr_multipliers):
         shared_layers[f'pm-{pat_ix}_clf'] = builder.conv2d(
             pb.num_classes, 1,
             kernel_initializer='zeros',
+            kernel_regularizer=keras.regularizers.l2(1e-4),
+            bias_regularizer=keras.regularizers.l2(1e-4),
             activation='softmax',
             use_bias=True,
             use_bn=False,
@@ -184,6 +187,8 @@ def _create_pm(pb, builder, ref, lr_multipliers):
         shared_layers[f'pm-{pat_ix}_loc'] = builder.conv2d(
             4, 1,
             kernel_initializer='zeros',
+            kernel_regularizer=keras.regularizers.l2(1e-4),
+            bias_regularizer=keras.regularizers.l2(1e-4),
             use_bias=True,
             use_bn=False,
             use_act=False,
