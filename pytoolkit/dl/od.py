@@ -176,7 +176,7 @@ class ObjectDetector(object):
         """各種metricをまとめて返す。"""
         import keras.backend as K
 
-        def acc_bg(y_true, y_pred):
+        def rec_bg(y_true, y_pred):
             """背景の再現率。"""
             gt_mask = y_true[:, :, 0]
             gt_obj, pred_obj = y_true[:, :, 1], y_pred[:, :, 1]
@@ -184,13 +184,20 @@ class ObjectDetector(object):
             acc = K.cast(K.equal(K.greater(gt_obj, 0.5), K.greater(pred_obj, 0.5)), K.floatx())
             return K.sum(acc * gt_bg, axis=-1) / K.sum(gt_bg, axis=-1)
 
-        def acc_obj(y_true, y_pred):
+        def rec_obj(y_true, y_pred):
             """物体の再現率。"""
             gt_obj, pred_obj = y_true[:, :, 1], y_pred[:, :, 1]
             acc = K.cast(K.equal(K.greater(gt_obj, 0.5), K.greater(pred_obj, 0.5)), K.floatx())
             return K.sum(acc * gt_obj, axis=-1) / K.sum(gt_obj, axis=-1)
 
-        return [self.loss_obj, self.loss_clf, self.loss_loc, acc_bg, acc_obj]
+        def acc_clf(y_true, y_pred):
+            """分類の正解率。"""
+            gt_obj = y_true[:, :, 1]
+            gt_classes, pred_classes = y_true[:, :, 2:-4], y_pred[:, :, 2:-4]
+            acc = K.cast(K.equal(K.argmax(gt_classes), K.argmax(pred_classes)), K.floatx())
+            return K.sum(acc * gt_obj, axis=-1) / K.sum(gt_obj, axis=-1)
+
+        return [self.loss_obj, self.loss_clf, self.loss_loc, rec_bg, rec_obj, acc_clf]
 
     def loss_obj(self, y_true, y_pred):
         """Objectness scoreのloss。(Focal loss)"""
