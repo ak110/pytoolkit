@@ -91,9 +91,9 @@ class ObjectsAnnotation(object):
     @classmethod
     def load_voc_0712_trainval(cls, data_dir, class_name_to_id=None, without_difficult=False):
         """PASCAL VOCデータセットの、よくある07+12 trainvalの読み込み。"""
-        y1 = cls.load_voc(data_dir, 2007, 'trainval', class_name_to_id, without_difficult=without_difficult)
-        y2 = cls.load_voc(data_dir, 2012, 'trainval', class_name_to_id, without_difficult=without_difficult)
-        return np.concatenate([y1, y2])
+        X1, y1 = cls.load_voc(data_dir, 2007, 'trainval', class_name_to_id, without_difficult=without_difficult)
+        X2, y2 = cls.load_voc(data_dir, 2012, 'trainval', class_name_to_id, without_difficult=without_difficult)
+        return np.concatenate([X1, X2]), np.concatenate([y1, y2])
 
     @classmethod
     def load_voc_07_test(cls, data_dir, class_name_to_id=None):
@@ -114,7 +114,8 @@ class ObjectsAnnotation(object):
         names = io.read_all_lines(data_dir / f'VOCdevkit/VOC{year}/ImageSets/Main/{set_name}.txt')
         y = cls.load_voc_files(data_dir / f'VOCdevkit/VOC{year}/Annotations',
                                names, class_name_to_id, without_difficult)
-        return np.array(y)
+        X = cls.get_path_list(data_dir, y)
+        return X, y
 
     @classmethod
     def load_voc_files(cls, annotations_dir, names, class_name_to_id=None, without_difficult=False):
@@ -124,8 +125,8 @@ class ObjectsAnnotation(object):
         戻り値はObjectsAnnotationの配列。
         """
         d = pathlib.Path(annotations_dir)
-        return [cls.load_voc_file(d / (name + '.xml'), class_name_to_id, without_difficult)
-                for name in names]
+        return np.array([cls.load_voc_file(d / (name + '.xml'), class_name_to_id, without_difficult)
+                         for name in names])
 
     @staticmethod
     def load_voc_file(f, class_name_to_id, without_difficult):
