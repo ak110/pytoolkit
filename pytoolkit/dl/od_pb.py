@@ -4,6 +4,7 @@ import numpy as np
 import sklearn.cluster
 import sklearn.metrics
 
+from . import losses
 from .. import log, math, ml, utils
 
 _VAR_LOC = 0.2  # SSD風(?)適当スケーリング
@@ -13,9 +14,11 @@ _VAR_SIZE = 0.2  # SSD風適当スケーリング
 class PriorBoxes(object):
     """Prior boxの集合を管理するクラス。 """
 
-    def __init__(self, map_sizes):
+    def __init__(self, map_sizes, num_classes):
         # 出力するfeature mapのサイズ(降順)。例：[40, 20, 10]なら、40x40、20x20、10x10の出力を持つ
         self.map_sizes = np.array(sorted(map_sizes)[::-1])
+        # クラス数
+        self.num_classes = num_classes
         # feature mapのグリッドサイズに対する、prior boxの基準サイズの割合(面積昇順)。[1.5, 0.5] なら横が1.5倍、縦が0.5倍。
         self.pb_size_patterns = np.empty((0,))
         # shape=(box数, 4)で座標(アスペクト比などを適用する前のグリッド)
@@ -54,7 +57,7 @@ class PriorBoxes(object):
         self._check_state()
 
     @log.trace()
-    def fit(self, input_size, y_train: [ml.ObjectsAnnotation], pb_size_pattern_count=8):
+    def fit(self, y_train: [ml.ObjectsAnnotation], input_size, pb_size_pattern_count=8):
         """訓練データからパラメータを適当に決めてインスタンスを作成する。
 
         # 引数
@@ -64,6 +67,7 @@ class PriorBoxes(object):
 
         """
         logger = log.get(__name__)
+        logger.info(f'number of classes:    {self.num_classes}')
         logger.info(f'objects per image:    {np.mean([len(y.bboxes) for y in y_train]):.1f}')
         logger.info(f'difficults per image: {np.mean([np.sum(y.difficults) for y in y_train]):.1f}')
 
@@ -166,7 +170,7 @@ class PriorBoxes(object):
         decoded = pred * (_VAR_LOC * np.tile(self.pb_sizes, 2)) + self.pb_locs
         return xp.clip(decoded, 0, 1)
 
-    def check_prior_boxes(self, y_test: [ml.ObjectsAnnotation], num_classes):
+    def check_prior_boxes(self, y_test: [ml.ObjectsAnnotation]):
         """データに対してprior boxがどれくらいマッチしてるか調べる。"""
         y_true = []
         y_pred = []
@@ -188,7 +192,7 @@ class PriorBoxes(object):
                 delta_locs.append(self.encode_locs(y.bboxes, assigned_gt, assigned_pb))
             # オブジェクトごとの集計
             for gt_ix, (class_id, difficult) in enumerate(zip(y.classes, y.difficults)):
-                assert 0 <= class_id < num_classes
+                assert 0 <= class_id < self.num_classes
                 if difficult:
                     continue
                 gt_mask = assigned_gt_list == gt_ix
@@ -221,7 +225,7 @@ class PriorBoxes(object):
         # 再現率
         logger.info('recall (prior box iou >= 0.5):')
         y_true, y_pred = np.array(y_true), np.array(y_pred)
-        for class_id in range(num_classes):
+        for class_id in range(self.num_classes):
             y_mask = y_true == class_id
             class_ok, class_all = (y_pred[y_mask] == class_id).sum(), y_mask.sum()
             logger.info(f'  class{class_id:02d} : {class_ok:5d} / {class_all:5d} = {100 * class_ok / class_all:5.1f}%')
@@ -241,12 +245,12 @@ class PriorBoxes(object):
         logger.info('delta loc: mean=%.2f std=%.2f min=%.2f max=%.2f',
                     delta_locs.mean(), delta_locs.std(), delta_locs.min(), delta_locs.max())
 
-    def encode_truth(self, y_gt: [ml.ObjectsAnnotation], num_classes):
+    def encode_truth(self, y_gt: [ml.ObjectsAnnotation]):
         """学習用の`y_true`の作成。"""
         # mask, objs, clfs, locs
-        y_true = np.zeros((len(y_gt), len(self.pb_locs), 1 + 1 + num_classes + 4), dtype=np.float32)
+        y_true = np.zeros((len(y_gt), len(self.pb_locs), 1 + 1 + self.num_classes + 4), dtype=np.float32)
         for i, y in enumerate(y_gt):
-            assert math.in_range(y.classes, 0, num_classes).all()
+            assert math.in_range(y.classes, 0, self.num_classes).all()
             assigned_pb_list, assigned_gt_list, pb_valids = self._assign_boxes(y.bboxes)
             y_true[i, pb_valids, 0] = 1  # 正例 or 負例なら1。微妙なのは0。
             for pb_ix, gt_ix in zip(assigned_pb_list, assigned_gt_list):
@@ -320,6 +324,79 @@ class PriorBoxes(object):
         pb_valids[pb_indices] = True  # 割り当て済みのところは有効
 
         return pb_indices, pb_assigned_gt[pb_indices], pb_valids
+
+    def loss(self, y_true, y_pred):
+        """損失関数。"""
+        import keras.backend as K
+        loss_obj = self.loss_obj(y_true, y_pred)
+        loss_clf = self.loss_clf(y_true, y_pred)
+        loss_loc = self.loss_loc(y_true, y_pred)
+        loss = loss_obj + loss_clf + loss_loc
+        assert len(K.int_shape(loss)) == 1  # (None,)
+        return loss
+
+    @property
+    def metrics(self):
+        """各種metricをまとめて返す。"""
+        import keras.backend as K
+
+        def rec_bg(y_true, y_pred):
+            """背景の再現率。"""
+            gt_mask = y_true[:, :, 0]
+            gt_obj, pred_obj = y_true[:, :, 1], y_pred[:, :, 1]
+            gt_bg = (1 - gt_obj) * gt_mask   # 背景
+            acc = K.cast(K.equal(K.greater(gt_obj, 0.5), K.greater(pred_obj, 0.5)), K.floatx())
+            return K.sum(acc * gt_bg, axis=-1) / K.sum(gt_bg, axis=-1)
+
+        def rec_obj(y_true, y_pred):
+            """物体の再現率。"""
+            gt_obj, pred_obj = y_true[:, :, 1], y_pred[:, :, 1]
+            acc = K.cast(K.equal(K.greater(gt_obj, 0.5), K.greater(pred_obj, 0.5)), K.floatx())
+            return K.sum(acc * gt_obj, axis=-1) / K.sum(gt_obj, axis=-1)
+
+        def acc_clf(y_true, y_pred):
+            """分類の正解率。"""
+            gt_obj = y_true[:, :, 1]
+            gt_classes, pred_classes = y_true[:, :, 2:-4], y_pred[:, :, 2:-4]
+            acc = K.cast(K.equal(K.argmax(gt_classes), K.argmax(pred_classes)), K.floatx())
+            return K.sum(acc * gt_obj, axis=-1) / K.sum(gt_obj, axis=-1)
+
+        return [self.loss_obj, self.loss_clf, self.loss_loc, rec_bg, rec_obj, acc_clf]
+
+    def loss_obj(self, y_true, y_pred):
+        """Objectness scoreのloss。(Focal loss)"""
+        import keras.backend as K
+        import tensorflow as tf
+        gt_mask = y_true[:, :, 0]
+        gt_obj, pred_obj = y_true[:, :, 1], y_pred[:, :, 1]
+        gt_obj_count = K.sum(gt_obj, axis=-1)  # 各batch毎のobj数。
+        with tf.control_dependencies([tf.assert_positive(gt_obj_count)]):  # obj_countが1以上であることの確認
+            gt_obj_count = tf.identity(gt_obj_count)
+        pb_mask = np.expand_dims(self.pb_mask, axis=0)
+        loss = losses.binary_focal_loss(gt_obj, pred_obj)
+        loss = K.sum(loss * gt_mask * pb_mask, axis=-1) / gt_obj_count  # normalized by the number of anchors assigned to a ground-truth box
+        return loss
+
+    @staticmethod
+    def loss_clf(y_true, y_pred):
+        """クラス分類のloss。(cross entropy)"""
+        import keras.backend as K
+        gt_obj = y_true[:, :, 1]
+        gt_classes, pred_classes = y_true[:, :, 2:-4], y_pred[:, :, 2:-4]
+        loss = K.categorical_crossentropy(gt_classes, pred_classes)
+        loss = K.sum(gt_obj * loss, axis=-1) / K.sum(gt_obj, axis=-1)  # mean (box)
+        return loss
+
+    @staticmethod
+    def loss_loc(y_true, y_pred):
+        """位置のloss。(l2 smooth loss)"""
+        import keras.backend as K
+        gt_obj = y_true[:, :, 1]
+        gt_locs, pred_locs = y_true[:, :, -4:], y_pred[:, :, -4:]
+        loss = losses.l1_smooth_loss(gt_locs, pred_locs)
+        loss = K.sum(loss, axis=-1)  # loss(x1) + loss(y1) + loss(x2) + loss(y2)
+        loss = K.sum(gt_obj * loss, axis=-1) / K.sum(gt_obj, axis=-1)  # mean (box)
+        return loss
 
 
 def _create_pb_pattern(map_sizes, bboxes_sizes, pb_size_pattern_count):

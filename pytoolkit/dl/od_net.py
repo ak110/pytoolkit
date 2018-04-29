@@ -16,7 +16,7 @@ def get_preprocess_input(base_network):
 
 
 @log.trace()
-def create_network(base_network, input_size, pb, num_classes, mode, strict_nms=None):
+def create_network(base_network, input_size, pb, mode, strict_nms=None):
     """学習とか予測とか用のネットワークを作って返す。"""
     assert mode in ('pretrain', 'train', 'predict')
     import keras
@@ -30,7 +30,7 @@ def create_network(base_network, input_size, pb, num_classes, mode, strict_nms=N
         model = keras.models.Model(inputs=inputs, outputs=x)
     else:
         for_predict = mode == 'predict'
-        model = _create_detector(pb, num_classes, builder, inputs, x, ref, lr_multipliers, for_predict, strict_nms)
+        model = _create_detector(pb, builder, inputs, x, ref, lr_multipliers, for_predict, strict_nms)
 
     logger = log.get(__name__)
     logger.info('network depth: %d', models.count_network_depth(model))
@@ -104,7 +104,7 @@ def _create_basenet(base_network, builder, x, load_weights):
 
 
 @log.trace()
-def _create_detector(pb, num_classes, builder, inputs, x, ref, lr_multipliers, for_predict, strict_nms):
+def _create_detector(pb, builder, inputs, x, ref, lr_multipliers, for_predict, strict_nms):
     """ネットワークのcenter以降の部分を作る。"""
     import keras
     import keras.backend as K
@@ -136,10 +136,10 @@ def _create_detector(pb, num_classes, builder, inputs, x, ref, lr_multipliers, f
         map_size *= 2
 
     # prediction module
-    objs, clfs, locs = _create_pm(pb, num_classes, builder, ref, lr_multipliers)
+    objs, clfs, locs = _create_pm(pb, builder, ref, lr_multipliers)
 
     if for_predict:
-        model = _create_predict_network(pb, num_classes, inputs, objs, clfs, locs, strict_nms)
+        model = _create_predict_network(pb, inputs, objs, clfs, locs, strict_nms)
     else:
         assert strict_nms is None
         # ラベル側とshapeを合わせるためのダミー
@@ -153,7 +153,7 @@ def _create_detector(pb, num_classes, builder, inputs, x, ref, lr_multipliers, f
 
 
 @log.trace()
-def _create_pm(pb, num_classes, builder, ref, lr_multipliers):
+def _create_pm(pb, builder, ref, lr_multipliers):
     """Prediction module."""
     import keras
 
@@ -175,7 +175,7 @@ def _create_pm(pb, num_classes, builder, ref, lr_multipliers):
             use_bn=False,
             name=f'pm-{pat_ix}_obj')
         shared_layers[f'pm-{pat_ix}_clf'] = builder.conv2d(
-            num_classes, 1,
+            pb.num_classes, 1,
             kernel_initializer='zeros',
             activation='softmax',
             use_bias=True,
@@ -207,7 +207,7 @@ def _create_pm(pb, num_classes, builder, ref, lr_multipliers):
             clf = shared_layers[f'pm-{pat_ix}_clf'](x)
             loc = shared_layers[f'pm-{pat_ix}_loc'](x)
             obj = keras.layers.Reshape((-1, 1), name=f'pm{map_size}-{pat_ix}_r1')(obj)
-            clf = keras.layers.Reshape((-1, num_classes), name=f'pm{map_size}-{pat_ix}_r2')(clf)
+            clf = keras.layers.Reshape((-1, pb.num_classes), name=f'pm{map_size}-{pat_ix}_r2')(clf)
             loc = keras.layers.Reshape((-1, 4), name=f'pm{map_size}-{pat_ix}_r3')(loc)
             objs.append(obj)
             clfs.append(clf)
@@ -218,7 +218,7 @@ def _create_pm(pb, num_classes, builder, ref, lr_multipliers):
     return objs, clfs, locs
 
 
-def _create_predict_network(pb, num_classes, inputs, objs, clfs, locs, strict_nms):
+def _create_predict_network(pb, inputs, objs, clfs, locs, strict_nms):
     """予測用ネットワークの作成"""
     import keras
     import keras.backend as K
@@ -236,5 +236,5 @@ def _create_predict_network(pb, num_classes, inputs, objs, clfs, locs, strict_nm
     confs = layers.channel_max()(name='confs')(clfs)
     objconfs = keras.layers.Lambda(_conf, K.int_shape(clfs)[1:-1], name='objconfs')([objs, confs])
     locs = keras.layers.Lambda(pb.decode_locs, name='locs')(locs)
-    nms = layers.nms()(num_classes, len(pb.pb_locs), nms_all_threshold=nms_all_threshold, name='nms')([classes, objconfs, locs])
+    nms = layers.nms()(pb.num_classes, len(pb.pb_locs), nms_all_threshold=nms_all_threshold, name='nms')([classes, objconfs, locs])
     return keras.models.Model(inputs=inputs, outputs=nms)

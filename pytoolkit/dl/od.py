@@ -7,7 +7,7 @@ import typing
 
 import numpy as np
 
-from . import hvd, losses, models, od_gen, od_net, od_pb
+from . import hvd, models, od_gen, od_net, od_pb
 from .. import jsonex, log, ml, utils
 
 # バージョン
@@ -23,8 +23,7 @@ class ObjectDetector(object):
     def __init__(self, base_network, input_size, map_sizes, num_classes):
         self.base_network = base_network
         self.input_size = tuple(input_size)
-        self.pb = od_pb.PriorBoxes(map_sizes)
-        self.num_classes = num_classes
+        self.pb = od_pb.PriorBoxes(map_sizes, num_classes)
         self.model: models.Model = None
 
     def save(self, path: typing.Union[str, pathlib.Path]):
@@ -34,7 +33,7 @@ class ObjectDetector(object):
             'base_network': self.base_network,
             'input_size': self.input_size,
             'pb': self.pb.to_dict(),
-            'num_classes': self.num_classes,
+            'num_classes': self.pb.num_classes,
         }, path)
 
     @staticmethod
@@ -57,8 +56,7 @@ class ObjectDetector(object):
             logger = log.get(__name__)
             logger.info(f'base network:         {self.base_network}')
             logger.info(f'input size:           {self.input_size}')
-            logger.info(f'number of classes:    {self.num_classes}')
-            self.pb.fit(self.input_size, y_train, pb_size_pattern_count)
+            self.pb.fit(y_train, self.input_size, pb_size_pattern_count)
             pb_dict = self.pb.to_dict()
         else:
             pb_dict = None
@@ -67,7 +65,7 @@ class ObjectDetector(object):
         # prior boxのチェック
         if hvd.is_master():
             self.pb.summary()
-            self.pb.check_prior_boxes(y_val, self.num_classes)
+            self.pb.check_prior_boxes(y_val)
         hvd.barrier()
         # モデルの作成
         self._create_model(mode='train', weights=initial_weights, batch_size=batch_size)
@@ -127,15 +125,13 @@ class ObjectDetector(object):
         logger = log.get(__name__)
 
         network, lr_multipliers = od_net.create_network(
-            base_network=self.base_network, input_size=self.input_size,
-            pb=self.pb, num_classes=self.num_classes,
+            base_network=self.base_network, input_size=self.input_size, pb=self.pb,
             mode=mode, strict_nms=strict_nms)
         pi = od_net.get_preprocess_input(self.base_network)
         if mode == 'pretrain':
             gen = od_gen.create_pretrain_generator(self.input_size, pi)
         else:
-            gen = od_gen.create_generator(
-                self.input_size, pi, lambda y_gt: self.pb.encode_truth(y_gt, self.num_classes))
+            gen = od_gen.create_generator(self.input_size, pi, self.pb.encode_truth)
         self.model = models.Model(network, gen, batch_size)
         if mode in ('pretrain', 'train'):
             self.model.summary()
@@ -157,79 +153,6 @@ class ObjectDetector(object):
         elif mode == 'train':
             # Object detectionとしてコンパイル
             sgd_lr = 0.5 / 256 / 3  # lossが複雑なので微調整
-            self.model.compile(sgd_lr=sgd_lr, lr_multipliers=lr_multipliers, loss=self.loss, metrics=self.metrics)
+            self.model.compile(sgd_lr=sgd_lr, lr_multipliers=lr_multipliers, loss=self.pb.loss, metrics=self.pb.metrics)
         else:
             assert mode == 'predict'
-
-    def loss(self, y_true, y_pred):
-        """損失関数。"""
-        import keras.backend as K
-        loss_obj = self.loss_obj(y_true, y_pred)
-        loss_clf = self.loss_clf(y_true, y_pred)
-        loss_loc = self.loss_loc(y_true, y_pred)
-        loss = loss_obj + loss_clf + loss_loc
-        assert len(K.int_shape(loss)) == 1  # (None,)
-        return loss
-
-    @property
-    def metrics(self):
-        """各種metricをまとめて返す。"""
-        import keras.backend as K
-
-        def rec_bg(y_true, y_pred):
-            """背景の再現率。"""
-            gt_mask = y_true[:, :, 0]
-            gt_obj, pred_obj = y_true[:, :, 1], y_pred[:, :, 1]
-            gt_bg = (1 - gt_obj) * gt_mask   # 背景
-            acc = K.cast(K.equal(K.greater(gt_obj, 0.5), K.greater(pred_obj, 0.5)), K.floatx())
-            return K.sum(acc * gt_bg, axis=-1) / K.sum(gt_bg, axis=-1)
-
-        def rec_obj(y_true, y_pred):
-            """物体の再現率。"""
-            gt_obj, pred_obj = y_true[:, :, 1], y_pred[:, :, 1]
-            acc = K.cast(K.equal(K.greater(gt_obj, 0.5), K.greater(pred_obj, 0.5)), K.floatx())
-            return K.sum(acc * gt_obj, axis=-1) / K.sum(gt_obj, axis=-1)
-
-        def acc_clf(y_true, y_pred):
-            """分類の正解率。"""
-            gt_obj = y_true[:, :, 1]
-            gt_classes, pred_classes = y_true[:, :, 2:-4], y_pred[:, :, 2:-4]
-            acc = K.cast(K.equal(K.argmax(gt_classes), K.argmax(pred_classes)), K.floatx())
-            return K.sum(acc * gt_obj, axis=-1) / K.sum(gt_obj, axis=-1)
-
-        return [self.loss_obj, self.loss_clf, self.loss_loc, rec_bg, rec_obj, acc_clf]
-
-    def loss_obj(self, y_true, y_pred):
-        """Objectness scoreのloss。(Focal loss)"""
-        import keras.backend as K
-        import tensorflow as tf
-        gt_mask = y_true[:, :, 0]
-        gt_obj, pred_obj = y_true[:, :, 1], y_pred[:, :, 1]
-        gt_obj_count = K.sum(gt_obj, axis=-1)  # 各batch毎のobj数。
-        with tf.control_dependencies([tf.assert_positive(gt_obj_count)]):  # obj_countが1以上であることの確認
-            gt_obj_count = tf.identity(gt_obj_count)
-        pb_mask = np.expand_dims(self.pb.pb_mask, axis=0)
-        loss = losses.binary_focal_loss(gt_obj, pred_obj)
-        loss = K.sum(loss * gt_mask * pb_mask, axis=-1) / gt_obj_count  # normalized by the number of anchors assigned to a ground-truth box
-        return loss
-
-    @staticmethod
-    def loss_clf(y_true, y_pred):
-        """クラス分類のloss。(cross entropy)"""
-        import keras.backend as K
-        gt_obj = y_true[:, :, 1]
-        gt_classes, pred_classes = y_true[:, :, 2:-4], y_pred[:, :, 2:-4]
-        loss = K.categorical_crossentropy(gt_classes, pred_classes)
-        loss = K.sum(gt_obj * loss, axis=-1) / K.sum(gt_obj, axis=-1)  # mean (box)
-        return loss
-
-    @staticmethod
-    def loss_loc(y_true, y_pred):
-        """位置のloss。(l2 smooth loss)"""
-        import keras.backend as K
-        gt_obj = y_true[:, :, 1]
-        gt_locs, pred_locs = y_true[:, :, -4:], y_pred[:, :, -4:]
-        loss = losses.l1_smooth_loss(gt_locs, pred_locs)
-        loss = K.sum(loss, axis=-1)  # loss(x1) + loss(y1) + loss(x2) + loss(y2)
-        loss = K.sum(gt_obj * loss, axis=-1) / K.sum(gt_obj, axis=-1)  # mean (box)
-        return loss
