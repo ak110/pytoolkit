@@ -14,7 +14,9 @@ _VAR_SIZE = 0.2  # SSD風適当スケーリング
 class PriorBoxes(object):
     """Prior boxの集合を管理するクラス。 """
 
-    def __init__(self, map_sizes, num_classes):
+    def __init__(self, input_size, map_sizes, num_classes):
+        # 入力画像のサイズ。(縦, 横)のタプル。
+        self.input_size = tuple(input_size)
         # 出力するfeature mapのサイズ(降順)。例：[40, 20, 10]なら、40x40、20x20、10x10の出力を持つ
         self.map_sizes = np.array(sorted(map_sizes)[::-1])
         # クラス数
@@ -42,22 +44,17 @@ class PriorBoxes(object):
 
     def from_dict(self, data: dict):
         """読み込み。"""
+        # dataから復元
         try:
             self.map_sizes = np.array(data['map_sizes'])
             self.pb_size_patterns = np.array(data['pb_size_patterns'])
-            self.pb_grid = np.array(data['pb_grid'])
-            self.pb_locs = np.array(data['pb_locs'])
-            self.pb_info_indices = np.array(data['pb_info_indices'])
-            self.pb_centers = np.array(data['pb_centers'])
-            self.pb_sizes = np.array(data['pb_sizes'])
-            self.pb_mask = np.array(data['pb_mask'])
-            self.pb_info = data['pb_info']
         except KeyError as e:
             raise ValueError(f'PriorBoxes load error: data={data}') from e
-        self._check_state()
+        # 再構築
+        self._create_pb()
 
     @log.trace()
-    def fit(self, y_train: [ml.ObjectsAnnotation], input_size, pb_size_pattern_count=8):
+    def fit(self, y_train: [ml.ObjectsAnnotation], pb_size_pattern_count=8):
         """訓練データからパラメータを適当に決めてインスタンスを作成する。
 
         # 引数
@@ -67,28 +64,54 @@ class PriorBoxes(object):
 
         """
         logger = log.get(__name__)
+        logger.info(f'input size:           {self.input_size}')
         logger.info(f'number of classes:    {self.num_classes}')
         logger.info(f'objects per image:    {np.mean([len(y.bboxes) for y in y_train]):.1f}')
         logger.info(f'difficults per image: {np.mean([np.sum(y.difficults) for y in y_train]):.1f}')
+        self._create_pb_pattern(y_train, pb_size_pattern_count)
+        self._create_pb()
 
-        # bboxのサイズ
+    def _create_pb_pattern(self, y_train: [ml.ObjectsAnnotation], pb_size_pattern_count):
+        """Prior boxのサイズのパターンを作成。"""
+        # 訓練データのbboxのサイズ
         bboxes = np.concatenate([y.bboxes_ar_fixed for y in y_train])
         bboxes_sizes = bboxes[:, 2:] - bboxes[:, :2]
+        # feature mapの格子のサイズ
+        grid_sizes = 1 / self.map_sizes
+        # bboxのサイズごとにどこかのfeature mapに割り当てたことにして相対サイズをリストアップ
+        min_area_pattern = 0.5  # タイルの半分を下限としてみる
+        max_area_pattern = 1 / grid_sizes.max()  # 一番荒いmapが画像全体になるくらいのスケールを上限としてみる
+        bboxes_size_patterns = []
+        for grid_size in grid_sizes:
+            size_pattern = bboxes_sizes / grid_size
+            area_pattern = np.sqrt(size_pattern.prod(axis=-1))  # 縦幅・横幅の相乗平均のリスト
+            mask = math.between(area_pattern, min_area_pattern, max_area_pattern)
+            bboxes_size_patterns.append(size_pattern[mask])
+        bboxes_size_patterns = np.concatenate(bboxes_size_patterns)
+        assert len(bboxes_size_patterns.shape) == 2
+        assert bboxes_size_patterns.shape[1] == 2
 
-        # Prior boxのサイズのパターンを作成
-        self.pb_size_patterns = _create_pb_pattern(self.map_sizes, bboxes_sizes, pb_size_pattern_count)
+        # リストアップしたものをクラスタリング。(YOLOv2のDimension Clustersのようなもの)。
+        cluster = sklearn.cluster.KMeans(n_clusters=pb_size_pattern_count, n_jobs=-1, random_state=123)
+        pb_size_patterns = cluster.fit(bboxes_size_patterns).cluster_centers_
+        assert pb_size_patterns.shape == (pb_size_pattern_count, 2)
 
-        # prior boxのサイズなどを算出
+        # 面積昇順でソート
+        pb_size_patterns = pb_size_patterns[pb_size_patterns.prod(axis=-1).argsort(), :].astype(np.float32)
+        self.pb_size_patterns = pb_size_patterns
+
+    def _create_pb(self):
+        """prior boxのサイズなどを算出する。"""
         self.pb_grid = []
         self.pb_locs = []
         self.pb_info_indices = []
         self.pb_centers = []
         self.pb_sizes = []
         for map_size in self.map_sizes:
-            # 敷き詰める間隔
-            tile_size = 1.0 / map_size
+            # feature mapの格子のサイズ
+            grid_size = 1.0 / map_size
             # 敷き詰めたときの中央の位置のリスト
-            lin = np.linspace(0.5 * tile_size, 1 - 0.5 * tile_size, map_size, dtype=np.float32)
+            lin = np.linspace(0.5 * grid_size, 1 - 0.5 * grid_size, map_size, dtype=np.float32)
             # 縦横に敷き詰め
             centers_x, centers_y = np.meshgrid(lin, lin)
             centers_x = centers_x.reshape(-1, 1)
@@ -99,17 +122,17 @@ class PriorBoxes(object):
             assert prior_boxes_center.shape == (map_size ** 2, 4)
             # グリッド
             grid = np.copy(prior_boxes_center)
-            grid[:, :2] -= tile_size / 2
-            grid[:, 2:] += tile_size / 2 + (1 / np.array(input_size))
+            grid[:, :2] -= grid_size / 2
+            grid[:, 2:] += grid_size / 2 + (1 / np.array(self.input_size))
             # パターンごとにループ
             for pb_pat in self.pb_size_patterns:
                 # prior boxのサイズの基準
-                pb_size = tile_size * pb_pat
+                pb_size = grid_size * pb_pat
                 # prior boxのサイズ
                 # (x1, y1, x2, y2)の位置を調整。縦横半分ずつ動かす。
                 prior_boxes = np.copy(prior_boxes_center)
                 prior_boxes[:, :2] -= pb_size / 2
-                prior_boxes[:, 2:] += pb_size / 2 + (1 / np.array(input_size))
+                prior_boxes[:, 2:] += pb_size / 2 + (1 / np.array(self.input_size))
                 # 追加
                 self.pb_grid.extend(grid)
                 self.pb_locs.extend(prior_boxes)
@@ -397,29 +420,3 @@ class PriorBoxes(object):
         loss = K.sum(loss, axis=-1)  # loss(x1) + loss(y1) + loss(x2) + loss(y2)
         loss = K.sum(gt_obj * loss, axis=-1) / K.sum(gt_obj, axis=-1)  # mean (box)
         return loss
-
-
-def _create_pb_pattern(map_sizes, bboxes_sizes, pb_size_pattern_count):
-    """Prior boxのサイズのパターンを作成。"""
-    tile_sizes = 1 / map_sizes
-    # bboxのサイズごとにどこかのfeature mapに割り当てたことにして相対サイズをリストアップ
-    min_area_pattern = 0.5  # タイルの半分を下限としてみる
-    max_area_pattern = 1 / tile_sizes.max()  # 一番荒いmapが画像全体になるくらいのスケールを上限としてみる
-    bboxes_size_patterns = []
-    for tile_size in tile_sizes:
-        size_pattern = bboxes_sizes / tile_size
-        area_pattern = np.sqrt(size_pattern.prod(axis=-1))  # 縦幅・横幅の相乗平均のリスト
-        mask = math.between(area_pattern, min_area_pattern, max_area_pattern)
-        bboxes_size_patterns.append(size_pattern[mask])
-    bboxes_size_patterns = np.concatenate(bboxes_size_patterns)
-    assert len(bboxes_size_patterns.shape) == 2
-    assert bboxes_size_patterns.shape[1] == 2
-
-    # リストアップしたものをクラスタリング。(YOLOv2のDimension Clustersのようなもの)。
-    cluster = sklearn.cluster.KMeans(n_clusters=pb_size_pattern_count, n_jobs=-1, random_state=123)
-    pb_size_patterns = cluster.fit(bboxes_size_patterns).cluster_centers_
-    assert pb_size_patterns.shape == (pb_size_pattern_count, 2)
-
-    # 面積昇順でソート
-    pb_size_patterns = pb_size_patterns[pb_size_patterns.prod(axis=-1).argsort(), :].astype(np.float32)
-    return pb_size_patterns

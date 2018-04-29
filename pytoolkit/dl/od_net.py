@@ -16,12 +16,12 @@ def get_preprocess_input(base_network):
 
 
 @log.trace()
-def create_network(base_network, input_size, pb, mode, strict_nms=None):
+def create_network(base_network, pb, mode, strict_nms=None):
     """学習とか予測とか用のネットワークを作って返す。"""
     assert mode in ('pretrain', 'train', 'predict')
     import keras
     builder = layers.Builder()
-    x = inputs = keras.layers.Input(input_size + (3,))
+    x = inputs = keras.layers.Input(pb.input_size + (3,))
     x, ref, lr_multipliers = _create_basenet(base_network, builder, x, load_weights=mode != 'predict')
     if mode == 'pretrain':
         assert len(lr_multipliers) == 0
