@@ -40,7 +40,10 @@ class PriorBoxes(object):
 
     def to_dict(self):
         """保存。"""
-        return self.__dict__
+        return {
+            'map_sizes': self.map_sizes,
+            'pb_size_patterns': self.pb_size_patterns,
+        }
 
     def from_dict(self, data: dict):
         """読み込み。"""

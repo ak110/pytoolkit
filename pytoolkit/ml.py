@@ -384,7 +384,7 @@ def compute_scores(gt, pred, iou_threshold=0.5):
     for y_true, y_pred in zip(gt, pred):
         pred_mask = np.ones((y_pred.num_objects,), dtype=bool)
         # 各正解が予測結果に含まれるか否か: true positive/negative
-        for gt_class, gt_bbox in zip(y_true.classes, y_true.bboxes):
+        for gt_class, gt_bbox, gt_difficult in zip(y_true.classes, y_true.bboxes, y_true.difficults):
             pred_bboxes = y_pred.bboxes[np.logical_and(pred_mask, y_pred.classes == gt_class)]
             if not pred_bboxes.any():
                 continue
@@ -392,11 +392,13 @@ def compute_scores(gt, pred, iou_threshold=0.5):
             pred_ix = iou.argmax()
             if iou[pred_ix] >= iou_threshold:
                 # 検出成功
-                tp[gt_class] += 1
+                if not gt_difficult:
+                    tp[gt_class] += 1
                 pred_mask[pred_ix] = False
             else:
                 # 検出失敗
-                tn[gt_class] += 1
+                if not gt_difficult:
+                    tn[gt_class] += 1
         # 正解に含まれなかった予測結果: false positive
         for pred_class in y_pred.classes[pred_mask]:
             fp[pred_class] += 1
