@@ -110,6 +110,7 @@ class PriorBoxes(object):
         self.pb_info_indices = []
         self.pb_centers = []
         self.pb_sizes = []
+        self.pb_info = []
         for map_size in self.map_sizes:
             # feature mapの格子のサイズ
             grid_size = 1.0 / map_size
