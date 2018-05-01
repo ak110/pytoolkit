@@ -1,5 +1,5 @@
 """Kerasのoptimizer関連。"""
-import copy
+import logging
 
 
 def nsgd():
@@ -41,9 +41,13 @@ def nsgd():
             shapes = [K.get_variable_shape(p) for p in params]
             moments = [K.zeros(shape) for shape in shapes]
             self.weights = [self.iterations] + moments
-            lr_multipliers = copy.deepcopy(self.lr_multipliers)
+            applied_lr_multipliers = 0
             for p, g, m in zip(params, grads, moments):
-                mlr = lr * lr_multipliers.pop(p.name) if p.name in lr_multipliers else lr
+                if p.name in self.lr_multipliers:
+                    mlr = lr * self.lr_multipliers[p.name]
+                    applied_lr_multipliers += 1
+                else:
+                    mlr = lr
                 v = self.momentum * m - mlr * g  # velocity
                 self.updates.append(K.update(m, v))
 
@@ -58,7 +62,8 @@ def nsgd():
 
                 self.updates.append(K.update(p, new_p))
 
-            assert len(lr_multipliers) == 0, f'Invalid lr_multipliers: {lr_multipliers}'
+            logger = logging.getLogger(__name__)
+            logger.info(f'lr_multipliers: applied = {applied_lr_multipliers}')
             return self.updates
 
         def get_config(self):
