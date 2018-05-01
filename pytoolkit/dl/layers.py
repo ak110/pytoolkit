@@ -672,18 +672,14 @@ def parallel_grid_gather_2d():
             self.pool_size = keras.utils.conv_utils.normalize_tuple(pool_size, 2, 'pool_size')
 
         def compute_output_shape(self, input_shape):
-            assert len(input_shape) == 4
-            if input_shape[0] is None:
-                return input_shape
-            else:
-                assert input_shape[0] % (self.pool_size[0] * self.pool_size[1]) == 0
-                return (input_shape[0] // self.pool_size[0] // self.pool_size[1],) + input_shape[1:]
+            return input_shape
 
         def call(self, inputs, **kwargs):
             shape = K.shape(inputs)
             rh, rw = self.pool_size
-            b, h, w, c = shape[0], shape[1], shape[2], shape[3]
-            inputs = K.reshape(inputs, (rh, rw, b // rh // rw, h // rh, w // rw, c))
+            b = shape[0]
+            gather_shape = K.concatenate([[rh, rw, b // rh // rw], shape[1:]], axis=0)
+            inputs = K.reshape(inputs, gather_shape)
             inputs = K.mean(inputs, axis=[0, 1])
             return inputs
 
