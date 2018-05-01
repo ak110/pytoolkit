@@ -613,6 +613,90 @@ def weighted_mean():
     return WeightedMean
 
 
+def parallel_grid_pooling_2d():
+    """Parallel Grid Poolingレイヤー。
+
+    - Parallel Grid Pooling for Data Augmentation
+      https://arxiv.org/abs/1803.11370
+
+    - akitotakeki/pgp-chainer: Chainer Implementation of Parallel Grid Pooling for Data Augmentation
+      https://github.com/akitotakeki/pgp-chainer
+
+    """
+    import keras
+    import keras.backend as K
+    import tensorflow as tf
+
+    class ParallelGridPooling2D(keras.engine.topology.Layer):
+        """Parallel Grid Poolingレイヤー。"""
+
+        def __init__(self, pool_size=(2, 2), **kargs):
+            super().__init__(**kargs)
+            self.pool_size = keras.utils.conv_utils.normalize_tuple(pool_size, 2, 'pool_size')
+
+        def compute_output_shape(self, input_shape):
+            assert len(input_shape) == 4
+            assert input_shape[1] % self.pool_size[0] == 0  # パディングはとりあえず未対応
+            assert input_shape[2] % self.pool_size[1] == 0  # パディングはとりあえず未対応
+            return input_shape[0], input_shape[1] // self.pool_size[0], input_shape[2] // self.pool_size[1], input_shape[3]
+
+        def call(self, inputs, **kwargs):
+            shape = K.shape(inputs)
+            rh, rw = self.pool_size
+            b, h, w, c = shape[0], shape[1], shape[2], shape[3]
+            inputs = K.reshape(inputs, (b, h // rh, rh, w // rw, rw, c))
+            inputs = tf.transpose(inputs, perm=(2, 4, 0, 1, 3, 5))
+            inputs = K.reshape(inputs, (rh * rw * b, h // rh, w // rw, c))
+            return inputs
+
+        def get_config(self):
+            config = {
+                'pool_size': self.pool_size,
+            }
+            base_config = super().get_config()
+            return dict(list(base_config.items()) + list(config.items()))
+
+    return ParallelGridPooling2D
+
+
+def parallel_grid_gather_2d():
+    """ParallelGridPooling2Dでparallelにしたのを戻すレイヤー。"""
+    import keras
+    import keras.backend as K
+
+    class ParallelGridGather2D(keras.engine.topology.Layer):
+        """ParallelGridPooling2Dでparallelにしたのを戻すレイヤー。"""
+
+        def __init__(self, pool_size=(2, 2), **kargs):
+            super().__init__(**kargs)
+            self.pool_size = keras.utils.conv_utils.normalize_tuple(pool_size, 2, 'pool_size')
+
+        def compute_output_shape(self, input_shape):
+            assert len(input_shape) == 4
+            if input_shape[0] is None:
+                return input_shape
+            else:
+                assert input_shape[0] % (self.pool_size[0] * self.pool_size[1]) == 0
+                return (input_shape[0] // self.pool_size[0] // self.pool_size[1],) + input_shape[1:]
+
+        def call(self, inputs, **kwargs):
+            shape = K.shape(inputs)
+            rh, rw = self.pool_size
+            b, h, w, c = shape[0], shape[1], shape[2], shape[3]
+            inputs = K.reshape(inputs, (rh, rw, b // rh // rw, h // rh, w // rw, c))
+            inputs = K.mean(inputs, axis=[0, 1])
+            return inputs
+
+        def get_config(self):
+            config = {
+                'pool_size': self.pool_size,
+            }
+            base_config = super().get_config()
+            return dict(list(base_config.items()) + list(config.items()))
+
+    return ParallelGridGather2D
+
+
 def nms():
     """Non maximum suppressionを行うレイヤー。
 
