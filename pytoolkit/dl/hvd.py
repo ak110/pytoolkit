@@ -28,6 +28,13 @@ def is_master():
     return get().rank() == 0
 
 
+def is_local_master():
+    """Horovod未使用 or hvd.local_rank() == 0ならTrue。"""
+    if not initialized():
+        return True
+    return get().local_rank() == 0
+
+
 def barrier():
     """全員が揃うまで待つ。"""
     if not initialized():

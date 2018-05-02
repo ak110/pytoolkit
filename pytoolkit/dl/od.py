@@ -12,6 +12,28 @@ from .. import jsonex, log, ml, utils
 
 # バージョン
 _JSON_VERSION = '0.0.2'
+# PASCAL VOC 07+12 trainvalで学習したときのmodel.json
+_VOC_JSON_DATA = {
+    "base_network": "vgg16",
+    "input_size": [320, 320],
+    "map_sizes": [40, 20, 10],
+    "num_classes": 20,
+    "pb_size_patterns": [
+        [1.3966931104660034, 2.1220061779022217],
+        [2.081390857696533, 5.119766712188721],
+        [3.0007710456848145, 8.67410659790039],
+        [5.763144016265869, 4.750326156616211],
+        [4.065821170806885, 13.425251960754395],
+        [10.922301292419434, 6.070690155029297],
+        [7.031608581542969, 9.765619277954102],
+        [3.765132427215576, 19.532089233398438]
+    ],
+    "version": "0.0.2",
+}
+# PASCAL VOC 07+12 trainvalで学習したときの重みファイル
+_VOC_WEIGHTS_NAME = 'pytoolkit_od_voc.h5'
+_VOC_WEIGHTS_URL = 'https://github.com/ak110/object_detector/releases/download/v0.0.1/model.h5'
+_VOC_WEIGHTS_MD5 = '7adccff18e4e56cac3090da023b97afb'
 
 
 class ObjectDetector(object):
@@ -39,8 +61,12 @@ class ObjectDetector(object):
 
     @staticmethod
     def load(path: typing.Union[str, pathlib.Path]):
-        """読み込み。"""
-        data = jsonex.load(path)
+        """読み込み。(ファイル)"""
+        return ObjectDetector.loads(jsonex.load(path))
+
+    @staticmethod
+    def loads(data: dict):
+        """読み込み。(dict)"""
         if data['version'] == '0.0.1':
             data.update(data.pop('pb'))
         od = ObjectDetector(
@@ -49,6 +75,21 @@ class ObjectDetector(object):
             map_sizes=data['map_sizes'],
             num_classes=data['num_classes'])
         od.pb.from_dict(data)
+        return od
+
+    @staticmethod
+    def load_voc(batch_size, strict_nms=True, use_multi_gpu=True):
+        """PASCAL VOC 07+12 trainvalで学習済みのモデルを読み込む。
+
+        # 引数
+        - batch_size: 予測時のバッチサイズ。
+        - strict_nms: クラスによらずNon-maximum suppressionするならTrue。(mAPは下がるが、重複したワクが出ないので実用上は良いはず)
+        - use_multi_gpu: 予測をマルチGPUで行うならTrue。
+
+        """
+        od = ObjectDetector.loads(_VOC_JSON_DATA)
+        od.load_weights(weights='voc', batch_size=batch_size,
+                        strict_nms=strict_nms, use_multi_gpu=use_multi_gpu)
         return od
 
     def fit(self, X_train: [pathlib.Path], y_train: [ml.ObjectsAnnotation],
@@ -94,12 +135,20 @@ class ObjectDetector(object):
         assert self.model is not None
         self.model.save(path)
 
-    def load_weights(self, path: typing.Union[str, pathlib.Path], batch_size, strict_nms=True, use_multi_gpu=True):
-        """重みの読み込み。(予測用)"""
+    def load_weights(self, weights: typing.Union[str, pathlib.Path], batch_size, strict_nms=True, use_multi_gpu=True):
+        """重みの読み込み。(予測用)
+
+        # 引数
+        - weights: 読み込む重み。'voc'ならVOC07+12で学習したものを読み込む。pathlib.Pathならそのまま読み込む。
+        - batch_size: 予測時のバッチサイズ。
+        - strict_nms: クラスによらずNon-maximum suppressionするならTrue。(mAPは下がるが、重複したワクが出ないので実用上は良いはず)
+        - use_multi_gpu: 予測をマルチGPUで行うならTrue。
+
+        """
         assert self.model is None
-        self._create_model(mode='predict', weights=path, batch_size=batch_size,
+        self._create_model(mode='predict', weights=weights, batch_size=batch_size,
                            flip_h=False, flip_v=False, rotate90=False, strict_nms=strict_nms)
-        # 予マルチGPU化。
+        # マルチGPU化。
         if use_multi_gpu:
             gpus = utils.get_gpu_count()
             self.model.set_multi_gpu_model(gpus)
@@ -137,7 +186,7 @@ class ObjectDetector(object):
 
         # 引数
         - mode: 'pretrain', 'train', 'predict'のいずれか。(出力などが違う)
-        - weights: 読み込む重み。Noneなら読み込まない。'imagenet'ならバックボーンだけ。'voc'ならVOC07+12で学習したものを読み込む。pathlib.Pathならそのまま読み込む。
+        - weights: 読み込む重み。Noneなら読み込まない。'imagenet'ならバックボーンだけ。'voc'ならVOC07+12で学習したものを読み込む。その他str, pathlib.Pathならそのまま読み込む。
 
         """
         logger = log.get(__name__)
@@ -156,8 +205,15 @@ class ObjectDetector(object):
             self.model.summary()
 
         if weights == 'voc':
-            pass  # TODO: githubに学習済みモデル置いてkeras.applicationsみたいなダウンロード機能作る。
-        elif isinstance(weights, pathlib.Path):
+            import keras
+            if hvd.is_local_master():
+                keras.utils.get_file(_VOC_WEIGHTS_NAME, _VOC_WEIGHTS_URL, file_hash=_VOC_WEIGHTS_MD5, cache_subdir='models')
+            hvd.barrier()
+            weights_path = keras.utils.get_file(_VOC_WEIGHTS_NAME, _VOC_WEIGHTS_URL, file_hash=_VOC_WEIGHTS_MD5, cache_subdir='models')
+            weights_path = pathlib.Path(weights_path)
+            self.model.load_weights(weights_path)
+            logger.info(f'{weights_path.name} loaded.')
+        elif isinstance(weights, (str, pathlib.Path)):
             self.model.load_weights(weights)
             if mode == 'predict':
                 logger.info(f'{weights.name} loaded.')
