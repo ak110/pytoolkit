@@ -659,38 +659,36 @@ def parallel_grid_pooling_2d():
     return ParallelGridPooling2D
 
 
-def parallel_grid_gather_2d():
-    """ParallelGridPooling2Dでparallelにしたのを戻すレイヤー。"""
+def parallel_grid_gather():
+    """ParallelGridPoolingでparallelにしたのを戻すレイヤー。"""
     import keras
     import keras.backend as K
 
-    class ParallelGridGather2D(keras.engine.topology.Layer):
-        """ParallelGridPooling2Dでparallelにしたのを戻すレイヤー。"""
+    class ParallelGridGather(keras.engine.topology.Layer):
+        """ParallelGridPoolingでparallelにしたのを戻すレイヤー。"""
 
-        def __init__(self, pool_size=(2, 2), **kargs):
+        def __init__(self, r, **kargs):
             super().__init__(**kargs)
-            self.pool_size = keras.utils.conv_utils.normalize_tuple(pool_size, 2, 'pool_size')
+            self.r = r
 
         def compute_output_shape(self, input_shape):
             return input_shape
 
         def call(self, inputs, **kwargs):
-            shape = K.shape(inputs)
-            rh, rw = self.pool_size
-            b = shape[0]
-            gather_shape = K.concatenate([[rh, rw, b // rh // rw], shape[1:]], axis=0)
+            b = K.shape(inputs)[0]
+            gather_shape = K.concatenate([[self.r, b // self.r], shape[1:]], axis=0)
             inputs = K.reshape(inputs, gather_shape)
-            inputs = K.mean(inputs, axis=[0, 1])
+            inputs = K.mean(inputs, axis=0)
             return inputs
 
         def get_config(self):
             config = {
-                'pool_size': self.pool_size,
+                'r': self.r,
             }
             base_config = super().get_config()
             return dict(list(base_config.items()) + list(config.items()))
 
-    return ParallelGridGather2D
+    return ParallelGridGather
 
 
 def nms():
