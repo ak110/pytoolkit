@@ -167,10 +167,14 @@ class ObjectsAnnotation(object):
     @property
     def bboxes_ar_fixed(self):
         """縦横比を補正したbboxesを返す。(prior box算出など用)"""
+        assert self.width > 0 and self.height > 0
         bboxes = np.copy(self.bboxes)
-        ar = np.sqrt(self.width / self.height)
-        bboxes[:, [0, 2]] /= ar
-        bboxes[:, [1, 3]] *= ar
+        if self.width > self.height:
+            # 横長の場合、上下にパディングする想定で補正
+            bboxes[:, [1, 3]] *= self.height / self.width
+        elif self.width < self.height:
+            # 縦長の場合、左右にパディングする想定で補正
+            bboxes[:, [0, 2]] *= self.width / self.height
         return bboxes
 
 
