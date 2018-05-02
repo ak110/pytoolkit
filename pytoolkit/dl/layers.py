@@ -675,7 +675,8 @@ def parallel_grid_gather():
             return input_shape
 
         def call(self, inputs, **kwargs):
-            b = K.shape(inputs)[0]
+            shape = K.shape(inputs)
+            b = shape[0]
             gather_shape = K.concatenate([[self.r, b // self.r], shape[1:]], axis=0)
             inputs = K.reshape(inputs, gather_shape)
             inputs = K.mean(inputs, axis=0)
