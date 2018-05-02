@@ -5,13 +5,13 @@ import pathlib
 import numpy as np
 
 
-def dump(value, filename, ensure_ascii=True, indent=2, sort_keys=True, separators=(',', ': ')):
+def dump(value, filename, ensure_ascii=False, indent=2, sort_keys=True, separators=(',', ': ')):
     """保存。"""
     with pathlib.Path(filename).open('w', encoding='utf-8') as f:
         json.dump(value, f, default=_default, ensure_ascii=ensure_ascii, indent=indent, sort_keys=sort_keys, separators=separators)
 
 
-def dumps(value, ensure_ascii=True, indent=2, sort_keys=True, separators=(',', ': ')):
+def dumps(value, ensure_ascii=False, indent=2, sort_keys=True, separators=(',', ': ')):
     """保存。"""
     return json.dumps(value, default=_default, ensure_ascii=ensure_ascii, indent=indent, sort_keys=sort_keys, separators=separators)
 

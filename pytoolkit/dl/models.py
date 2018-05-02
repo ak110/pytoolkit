@@ -83,12 +83,15 @@ class Model(object):
             epochs=1, verbose=1, callbacks=None,
             validation_data: tuple = None,
             class_weight=None, initial_epoch=0,
-            balanced=False):
+            balanced=False, mixup=False):
         """学習。"""
         callbacks = callbacks or []
         has_val = validation_data is not None
         X_val, y_val = validation_data if has_val else (None, None)
         gen1 = self.gen.flow(X_train, y_train, batch_size=self.batch_size, data_augmentation=True, shuffle=True, balanced=balanced)
+        if mixup:
+            gen1t = self.gen.flow(X_train, y_train, batch_size=self.batch_size, data_augmentation=True, shuffle=True, balanced=balanced)
+            gen1 = generator.mixup_generator(gen1, gen1t)
         gen2 = self.gen.flow(X_val, y_val, batch_size=self.batch_size, shuffle=hvd.initialized()) if has_val else None
         steps1 = self.gen.steps_per_epoch(len(X_train), self.batch_size)
         steps2 = self.gen.steps_per_epoch(len(X_val), self.batch_size) if has_val else None

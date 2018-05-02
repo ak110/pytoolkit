@@ -196,3 +196,24 @@ def _get_result(X, y, weights, rx, ry, rw):
         return _arr(rx, isinstance(X, list)), _arr(ry, isinstance(y, list))
     else:
         return _arr(rx, isinstance(X, list)), _arr(ry, isinstance(y, list)), np.array(rw)
+
+
+def mixup_generator(gen1, gen2, alpha=0.2, beta=0.2, random_state=None):
+    """generator2つをmixupしたgeneratorを返す。
+
+    - mixup: Beyond Empirical Risk Minimization
+      https://arxiv.org/abs/1710.09412
+
+    """
+    random_state = sklearn.utils.check_random_state(random_state)
+    for b1, b2 in zip(gen1, gen2):
+        assert isinstance(b1, list)
+        assert isinstance(b2, list)
+        assert len(b1) in (2, 3)
+        assert len(b2) in (2, 3)
+        assert len(b1) == len(b2)
+        # 混ぜる
+        m = random_state.beta(alpha, beta)
+        assert 0 <= m <= 1
+        b = [x1 * m + x2 * (1 - m) for x1, x2 in zip(b1, b2)]
+        yield b
