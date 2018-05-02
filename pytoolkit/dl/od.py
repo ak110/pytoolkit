@@ -94,10 +94,25 @@ class ObjectDetector(object):
 
     def fit(self, X_train: [pathlib.Path], y_train: [ml.ObjectsAnnotation],
             X_val: [pathlib.Path], y_val: [ml.ObjectsAnnotation],
-            batch_size, epochs, initial_weights=None, pb_size_pattern_count=8,
+            batch_size, epochs, lr_scale=1, initial_weights='voc', pb_size_pattern_count=8,
             flip_h=True, flip_v=False, rotate90=False,
             plot_path=None, history_path=None):
-        """学習。"""
+        """学習。
+
+        # 引数
+        - lr_scale: 学習率を調整するときの係数
+        - initial_weights: 重みの初期値。
+                           'imagenet'ならバックボーンのみ。
+                           'voc'ならPASCAL VOC 07+12 trainvalで学習済みのもの。
+                           ファイルパスならそれを読む。
+                           Noneなら何も読まない。
+        - pb_size_pattern_count: Prior boxのサイズ・アスペクト比のパターンの種類数。
+        - flip_h: Data augmentationで水平flipを行うか否か。
+        - flip_v: Data augmentationで垂直flipを行うか否か。
+        - rotate90: Data augmentationで0, 90, 180, 270度の回転を行うか否か。
+        - plot_path: ネットワークの図を出力するならそのパス。拡張子はpngやsvgなど。
+        - history_path: lossなどをtsvファイルに出力するならそのパス。
+        """
         assert self.model is None
         # 訓練データに合わせたprior boxの作成
         if hvd.is_master():
@@ -116,7 +131,7 @@ class ObjectDetector(object):
         hvd.barrier()
         # モデルの作成
         self._create_model(mode='train', weights=initial_weights, batch_size=batch_size,
-                           flip_h=flip_h, flip_v=flip_v, rotate90=rotate90)
+                           lr_scale=lr_scale, flip_h=flip_h, flip_v=flip_v, rotate90=rotate90)
         if plot_path:
             self.model.plot(plot_path)
         # 学習
@@ -147,7 +162,7 @@ class ObjectDetector(object):
         """
         assert self.model is None
         self._create_model(mode='predict', weights=weights, batch_size=batch_size,
-                           flip_h=False, flip_v=False, rotate90=False, strict_nms=strict_nms)
+                           lr_scale=None, flip_h=False, flip_v=False, rotate90=False, strict_nms=strict_nms)
         # マルチGPU化。
         if use_multi_gpu:
             gpus = utils.get_gpu_count()
@@ -181,7 +196,7 @@ class ObjectDetector(object):
         return pred
 
     @log.trace()
-    def _create_model(self, mode, weights, batch_size, flip_h, flip_v, rotate90, strict_nms=None):
+    def _create_model(self, mode, weights, batch_size, lr_scale, flip_h, flip_v, rotate90, strict_nms=None):
         """学習とか予測とか用に`tk.dl.models.Model`を作成して返す。
 
         # 引数
@@ -227,7 +242,9 @@ class ObjectDetector(object):
             self.model.compile(sgd_lr=0.5 / 256, loss='categorical_crossentropy', metrics=['acc'])
         elif mode == 'train':
             # Object detectionとしてコンパイル
-            sgd_lr = 0.5 / 256 / 3  # lossが複雑なので微調整
+            assert lr_scale is not None
+            sgd_lr = lr_scale * 0.5 / 256 / 3  # lossが複雑なので微調整
             self.model.compile(sgd_lr=sgd_lr, lr_multipliers=lr_multipliers, loss=self.pb.loss, metrics=self.pb.metrics)
         else:
             assert mode == 'predict'
+            assert lr_scale is None
