@@ -39,7 +39,11 @@ def barrier():
     """全員が揃うまで待つ。"""
     if not initialized():
         return
-    get().allreduce([], name='Barrier')
+    import mpi4py
+    mpi4py.rc.initialize = False
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    comm.barrier()
 
 
 def bcast(buf, root=0):
