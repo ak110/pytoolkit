@@ -71,6 +71,11 @@ class PriorBoxes(object):
         logger.info(f'number of classes:    {self.num_classes}')
         logger.info(f'objects per image:    {np.mean([len(y.bboxes) for y in y_train]):.1f}')
         logger.info(f'difficults per image: {np.mean([np.sum(y.difficults) for y in y_train]):.1f}')
+        logger.info('class balance:')
+        bc = np.bincount(np.concatenate([y.classes for y in y_train]))
+        total_objects = np.sum(bc)
+        for class_id, count in enumerate(bc):
+            logger.info(f'  class{class_id:02d}: {count:5d} ({100 * count / total_objects:5.1f}%)')
         self._create_pb_pattern(y_train, pb_size_pattern_count)
         self._create_pb()
 
