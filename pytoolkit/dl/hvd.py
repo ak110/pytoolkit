@@ -1,4 +1,5 @@
 """Horovodの薄いwrapper。"""
+import logging
 
 _initialized = False
 
@@ -12,8 +13,12 @@ def get():
 def init():
     """初期化。"""
     global _initialized
-    _initialized = True
-    get().init()
+    try:
+        get().init()
+        _initialized = True
+    except ModuleNotFoundError:
+        logger = logging.getLogger(__name__)
+        logger.warning('Horovod読み込み失敗', exc_info=True)
 
 
 def initialized():

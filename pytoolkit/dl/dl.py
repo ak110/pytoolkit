@@ -49,7 +49,8 @@ def session(config=None, gpu_options=None, use_horovod=False):
         def __enter__(self):
             if use_horovod:
                 hvd.init()
-                self.gpu_options['visible_device_list'] = str(hvd.get().local_rank())
+                if hvd.initialized():
+                    self.gpu_options['visible_device_list'] = str(hvd.get().local_rank())
             if K.backend() == 'tensorflow':
                 self.config['allow_soft_placement'] = True
                 self.gpu_options['allow_growth'] = True
