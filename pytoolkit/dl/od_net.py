@@ -232,9 +232,8 @@ def _create_predict_network(pb, inputs, objs, clfs, locs, strict_nms):
     def _conf(x):
         objs = x[0][:, :, 0]
         confs = x[1]
-        # objectnessとconfidenceの重み付き平均をconfidenceということにしてみる
-        # conf = 1.0 / (0.75 / objs + 0.25 / confs)
-        conf = 0.75 * objs + 0.25 * confs
+        # objectnessとconfidenceの幾何平均をconfidenceということにしてみる
+        conf = K.sqrt(objs * confs)
         return conf * np.expand_dims(pb.pb_mask, axis=0)
 
     classes = layers.channel_argmax()(name='classes')(clfs)
