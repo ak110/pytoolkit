@@ -102,10 +102,10 @@ class ObjectDetector(object):
         # 引数
         - lr_scale: 学習率を調整するときの係数
         - initial_weights: 重みの初期値。
+                           Noneなら何も読まない。
                            'imagenet'ならバックボーンのみ。
                            'voc'ならPASCAL VOC 07+12 trainvalで学習済みのもの。
                            ファイルパスならそれを読む。
-                           Noneなら何も読まない。
         - pb_size_pattern_count: Prior boxのサイズ・アスペクト比のパターンの種類数。
         - flip_h: Data augmentationで水平flipを行うか否か。
         - flip_v: Data augmentationで垂直flipを行うか否か。
@@ -219,7 +219,11 @@ class ObjectDetector(object):
         if mode in ('pretrain', 'train'):
             self.model.summary()
 
-        if weights == 'voc':
+        if weights is None:
+            logger.info(f'cold start.')
+        elif weights == 'imagenet':
+            logger.info(f'cold start with imagenet weights.')
+        elif weights == 'voc':
             import keras
             if hvd.is_local_master():
                 keras.utils.get_file(_VOC_WEIGHTS_NAME, _VOC_WEIGHTS_URL, file_hash=_VOC_WEIGHTS_MD5, cache_subdir='models')
@@ -228,14 +232,12 @@ class ObjectDetector(object):
             weights_path = pathlib.Path(weights_path)
             self.model.load_weights(weights_path)
             logger.info(f'{weights_path.name} loaded.')
-        elif isinstance(weights, (str, pathlib.Path)):
+        else:
             self.model.load_weights(weights)
             if mode == 'predict':
                 logger.info(f'{weights.name} loaded.')
             else:
                 logger.info(f'warm start: {weights.name}')
-        else:
-            logger.info(f'cold start.')
 
         if mode == 'pretrain':
             # 事前学習：通常の分類としてコンパイル
