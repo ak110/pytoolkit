@@ -94,7 +94,7 @@ class Model(object):
         if mixup:
             gen1t = self.gen.flow(X_train, y_train, batch_size=self.batch_size, data_augmentation=True, shuffle=True, balanced=balanced)
             gen1 = generator.mixup_generator(gen1, gen1t)
-        gen2 = self.gen.flow(X_val, y_val, batch_size=self.batch_size, shuffle=hvd.initialized()) if has_val else None
+        gen2 = self.gen.flow(X_val, y_val, batch_size=self.batch_size, shuffle=hvd.initialized() or balanced, balanced=balanced) if has_val else None
         steps1 = self.gen.steps_per_epoch(len(X_train), self.batch_size)
         steps2 = self.gen.steps_per_epoch(len(X_val), self.batch_size) if has_val else None
 

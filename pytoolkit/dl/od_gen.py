@@ -12,7 +12,7 @@ def create_pretrain_generator(image_size, preprocess_input):
     gen.add(image.RandomFlipLR(probability=0.5))
     gen.add(image.RandomErasing(probability=0.5))
     gen.add(image.RotationsLearning())
-    gen.add(image.ProcessInput(preprocess_input, batch_axis=True))
+    gen.add(generator.ProcessInput(preprocess_input, batch_axis=True))
     return gen
 
 
@@ -33,7 +33,7 @@ def create_generator(image_size, preprocess_input, encode_truth, flip_h, flip_v,
         return rgb, y, w
 
     gen = image.ImageDataGenerator()
-    gen.add(image.CustomAugmentation(_transform, probability=1))
+    gen.add(generator.CustomAugmentation(_transform, probability=1))
     gen.add(image.Resize(image_size))
     if flip_h:
         gen.add(image.RandomFlipLR(probability=0.5))
@@ -43,9 +43,9 @@ def create_generator(image_size, preprocess_input, encode_truth, flip_h, flip_v,
         gen.add(image.RandomRotate90(probability=1))
     gen.add(image.RandomColorAugmentors(probability=0.5))
     gen.add(image.RandomErasing(probability=0.5))
-    gen.add(image.ProcessInput(preprocess_input, batch_axis=True))
+    gen.add(generator.ProcessInput(preprocess_input, batch_axis=True))
     if encode_truth is not None:
-        gen.add(image.ProcessOutput(lambda y: y if y is None else encode_truth([y])[0]))
+        gen.add(generator.ProcessOutput(lambda y: y if y is None else encode_truth([y])[0]))
     return gen
 
 

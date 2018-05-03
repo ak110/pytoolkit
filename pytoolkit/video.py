@@ -3,7 +3,7 @@ import pathlib
 
 import numpy as np
 
-from . import generator, image, ndimage
+from . import generator, image
 
 
 class VideoDataGenerator(generator.Generator):
