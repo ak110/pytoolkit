@@ -404,6 +404,39 @@ class RandomHue(generator.Operator):
         return x, y, w
 
 
+class RandomLight(generator.Operator):
+    """画像の一部の色をランダムに少し変える。"""
+
+    def __init__(self, probability=1, std=16, scale_low=0.1, scale_high=0.6, rate_1=1 / 3, rate_2=3, max_tries=30):
+        assert 0 < probability <= 1
+        assert scale_low <= scale_high
+        assert rate_1 <= rate_2
+        self.probability = probability
+        self.std = std
+        self.scale_low = scale_low
+        self.scale_high = scale_high
+        self.rate_1 = rate_1
+        self.rate_2 = rate_2
+        self.max_tries = max_tries
+
+    def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
+            for _ in range(self.max_tries):
+                s = x.shape[0] * x.shape[1] * rand.uniform(self.scale_low, self.scale_high)
+                r = np.exp(rand.uniform(np.log(self.rate_1), np.log(self.rate_2)))
+                ew = int(np.sqrt(s / r))
+                eh = int(np.sqrt(s * r))
+                if ew <= 0 or eh <= 0 or ew >= x.shape[1] or eh >= x.shape[0]:
+                    continue
+                ex = rand.randint(0, x.shape[1] - ew)
+                ey = rand.randint(0, x.shape[0] - eh)
+
+                rgb_bias = rand.normal(0, self.std, size=3)
+                x[ey:ey + eh, ex:ex + ew, :] += rgb_bias[np.newaxis, np.newaxis, :]
+                break
+        return x, y, w
+
+
 class RandomErasing(generator.Operator):
     """Random Erasing。
 

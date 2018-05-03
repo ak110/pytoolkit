@@ -32,7 +32,7 @@ def test_filters():
         (0, 'flip_tb', tk.ndimage.flip_tb),
         (0, 'resize', lambda rgb: tk.ndimage.resize(rgb, 128, 64, padding='edge')),
         (0, 'resize', lambda rgb: tk.ndimage.resize(rgb, 128, 64, padding=None)),
-        (1, 'gaussian_noise', lambda rgb: tk.ndimage.gaussian_noise(rgb, rand, 5)),
+        (1, 'gaussian_noise', lambda rgb: tk.ndimage.gaussian_noise(rgb, rand, 16)),
         (1, 'blur', lambda rgb: tk.ndimage.blur(rgb, 0.5)),
         (1, 'unsharp_mask', lambda rgb: tk.ndimage.unsharp_mask(rgb, 0.5, 1.5)),
         (1, 'median_3', lambda rgb: tk.ndimage.median(rgb, 3)),
