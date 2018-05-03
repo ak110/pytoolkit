@@ -292,8 +292,8 @@ def mixup_generator(gen1, gen2, alpha=0.2, beta=0.2, random_state=None):
     """
     random_state = sklearn.utils.check_random_state(random_state)
     for b1, b2 in zip(gen1, gen2):
-        assert isinstance(b1, list)
-        assert isinstance(b2, list)
+        assert isinstance(b1, tuple)
+        assert isinstance(b2, tuple)
         assert len(b1) in (2, 3)
         assert len(b2) in (2, 3)
         assert len(b1) == len(b2)
