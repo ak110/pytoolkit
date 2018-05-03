@@ -19,7 +19,7 @@ class ImageDataGenerator(generator.Generator):
     # 使用例
     ```
     gen = tk.image.ImageDataGenerator()
-    gen.add(tk.image.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
+    gen.add(tk.generator.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
     gen.add(tk.image.Resize((300, 300)))
     gen.add(tk.image.Mixup(probability=1, num_classes=num_classes))
     gen.add(tk.image.RandomPadding(probability=1))
@@ -29,7 +29,7 @@ class ImageDataGenerator(generator.Generator):
     gen.add(tk.image.RandomFlipLR(probability=0.5))
     gen.add(tk.image.RandomColorAugmentors(probability=0.5))
     gen.add(tk.image.RandomErasing(probability=0.5))
-    gen.add(tk.image.ProcessInput(tk.image.preprocess_input_abs1))
+    gen.add(tk.generator.ProcessInput(tk.image.preprocess_input_abs1))
     ```
 
     """
@@ -45,6 +45,7 @@ def preprocess_input_mean(x: np.ndarray):
     `keras.applications.imagenet_utils.preprocess_input` のようなもの。(ただし `channels_last` 限定)
     `keras.applications`のVGG16/VGG19/ResNet50で使われる。
     """
+    assert x.shape[-1] == 3, f'shape error: {x.shape}'
     # 'RGB'->'BGR'
     x = x[..., ::-1]
     # Zero-center by mean pixel
@@ -72,7 +73,7 @@ def unpreprocess_input_abs1(x: np.ndarray):
 
 
 class LoadImage(generator.Operator):
-    """画像のリサイズ。
+    """画像の読み込み。
 
     # 引数
 
@@ -116,66 +117,6 @@ class Resize(generator.Operator):
         """処理。"""
         assert rand is not None  # noqa
         x = ndimage.resize(x, self.image_size[1], self.image_size[0], padding=self.padding)
-        return x, y, w
-
-
-class ProcessInput(generator.Operator):
-    """画像に対する任意の処理。
-
-    # 引数
-
-    func: 画像のndarrayを受け取り、処理結果を返す関数
-    batch_axis: Trueの場合、funcに渡されるndarrayのshapeが(1, height, width, channels)になる。Falseなら(height, width, channels)。
-
-    # 例1
-    ```py
-    gen.add(ProcessInput(tk.image.preprocess_input_abs1))
-    ```
-
-    # 例2
-    ```py
-    gen.add(ProcessInput(tk.image.preprocess_input_mean))
-    ```
-
-    # 例3
-    ```py
-    gen.add(ProcessInput(keras.applications.vgg16.preprocess_input, batch_axis=True))
-    ```
-    """
-
-    def __init__(self, func, batch_axis=False):
-        self.func = func
-        self.batch_axis = batch_axis
-
-    def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
-        """処理。"""
-        assert rand is not None  # noqa
-        if self.batch_axis:
-            x = np.expand_dims(x, axis=0)
-            x = self.func(x)
-            x = np.squeeze(x, axis=0)
-        else:
-            x = self.func(x)
-        return x, y, w
-
-
-class ProcessOutput(generator.Operator):
-    """ラベルに対する任意の処理。"""
-
-    def __init__(self, func, batch_axis=False):
-        self.func = func
-        self.batch_axis = batch_axis
-
-    def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
-        """処理。"""
-        assert rand is not None  # noqa
-        if y is not None:
-            if self.batch_axis:
-                y = np.expand_dims(y, axis=0)
-                y = self.func(y)
-                y = np.squeeze(y, axis=0)
-            else:
-                y = self.func(y)
         return x, y, w
 
 
@@ -663,29 +604,4 @@ class RotationsLearning(generator.Operator):
         x = ndimage.rot90(x, k)
         y = np.zeros((4,))
         y[k] = 1
-        return x, y, w
-
-
-class CustomOperator(generator.Operator):
-    """カスタム処理用。"""
-
-    def __init__(self, process):
-        self.process = process
-
-    def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
-        x, y, w = self.process(x, y, w, rand, ctx)
-        return x, y, w
-
-
-class CustomAugmentation(generator.Operator):
-    """カスタム処理用。"""
-
-    def __init__(self, process, probability=1):
-        assert 0 < probability <= 1
-        self.process = process
-        self.probability = probability
-
-    def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
-        if ctx.do_augmentation(rand, self.probability):
-            x, y, w = self.process(x, y, w, rand, ctx)
         return x, y, w

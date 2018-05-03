@@ -45,6 +45,7 @@ def _create_basenet(base_network, builder, x, load_weights):
     basenet = None
     ref_list = []
     if base_network == 'custom':
+        builder.use_gn = True  # 大きいサイズ用なので常にGroupNormalizationを使用
         x = builder.conv2d(32, 7, strides=2, name='stage0_ds')(x)
         x = builder.conv2d(64, strides=2, name='stage2_ds')(x)
         x = builder.conv2d(64, strides=1, name='stage2_conv1')(x)

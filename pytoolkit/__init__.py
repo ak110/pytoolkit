@@ -13,4 +13,5 @@ from . import math
 from . import ml
 from . import ndimage
 from . import thread
+from . import video
 from . import web

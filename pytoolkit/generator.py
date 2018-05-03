@@ -198,6 +198,91 @@ def _get_result(X, y, weights, rx, ry, rw):
         return _arr(rx, isinstance(X, list)), _arr(ry, isinstance(y, list)), np.array(rw)
 
 
+class ProcessInput(Operator):
+    """入力に対する任意の処理。
+
+    # 引数
+
+    func: 入力のndarrayを受け取り、処理結果を返す関数
+    batch_axis: Trueの場合、funcに渡されるndarrayのshapeが(1, height, width, channels)になる。Falseなら(height, width, channels)。
+
+    # 例1
+    ```py
+    gen.add(tk.generator.ProcessInput(tk.image.preprocess_input_abs1))
+    ```
+
+    # 例2
+    ```py
+    gen.add(tk.generator.ProcessInput(tk.image.preprocess_input_mean))
+    ```
+
+    # 例3
+    ```py
+    gen.add(tk.generator.ProcessInput(keras.applications.vgg16.preprocess_input, batch_axis=True))
+    ```
+    """
+
+    def __init__(self, func, batch_axis=False):
+        self.func = func
+        self.batch_axis = batch_axis
+
+    def execute(self, x, y, w, rand, ctx: GeneratorContext):
+        """処理。"""
+        assert rand is not None  # noqa
+        if self.batch_axis:
+            x = np.expand_dims(x, axis=0)
+            x = self.func(x)
+            x = np.squeeze(x, axis=0)
+        else:
+            x = self.func(x)
+        return x, y, w
+
+
+class ProcessOutput(Operator):
+    """ラベルに対する任意の処理。"""
+
+    def __init__(self, func, batch_axis=False):
+        self.func = func
+        self.batch_axis = batch_axis
+
+    def execute(self, x, y, w, rand, ctx: GeneratorContext):
+        """処理。"""
+        assert rand is not None  # noqa
+        if y is not None:
+            if self.batch_axis:
+                y = np.expand_dims(y, axis=0)
+                y = self.func(y)
+                y = np.squeeze(y, axis=0)
+            else:
+                y = self.func(y)
+        return x, y, w
+
+
+class CustomOperator(Operator):
+    """カスタム処理用。"""
+
+    def __init__(self, process):
+        self.process = process
+
+    def execute(self, x, y, w, rand, ctx: GeneratorContext):
+        x, y, w = self.process(x, y, w, rand, ctx)
+        return x, y, w
+
+
+class CustomAugmentation(Operator):
+    """カスタム処理用。"""
+
+    def __init__(self, process, probability=1):
+        assert 0 < probability <= 1
+        self.process = process
+        self.probability = probability
+
+    def execute(self, x, y, w, rand, ctx: GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
+            x, y, w = self.process(x, y, w, rand, ctx)
+        return x, y, w
+
+
 def mixup_generator(gen1, gen2, alpha=0.2, beta=0.2, random_state=None):
     """generator2つをmixupしたgeneratorを返す。
 

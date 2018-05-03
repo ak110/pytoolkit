@@ -342,6 +342,7 @@ def group_normalization():
 
         def build(self, input_shape):
             dim = input_shape[-1]
+            assert dim >= self.groups
             shape = (dim,)
             if self.scale:
                 self.gamma = self.add_weight(shape=shape,
@@ -363,13 +364,26 @@ def group_normalization():
 
         def call(self, inputs, **kwargs):
             x = inputs
+            ndim = K.ndim(x)
             shape = K.shape(x)
-            N, H, W, C = shape[0], shape[1], shape[2], shape[3]
-            x = K.reshape(x, [N, H, W, self.groups, C // self.groups])
-            mean, var = tf.nn.moments(x, [1, 2, 4], keep_dims=True)
-            x = (x - mean) / K.sqrt(var + self.epsilon)
-            x = K.reshape(x, [N, H, W, C])
+            if ndim == 4:  # 2D
+                N, H, W, C = shape[0], shape[1], shape[2], shape[3]
+                x = K.reshape(x, [N, H, W, self.groups, C // self.groups])
+                mean, var = tf.nn.moments(x, [1, 2, 4], keep_dims=True)
+                x = (x - mean) / K.sqrt(var + self.epsilon)
+                x = K.reshape(x, [N, H, W, C])
+            elif ndim == 5:  # 3D
+                N, T, H, W, C = shape[0], shape[1], shape[2], shape[3], shape[4]
+                x = K.reshape(x, [N, T, H, W, self.groups, C // self.groups])
+                mean, var = tf.nn.moments(x, [1, 2, 3, 5], keep_dims=True)
+                x = (x - mean) / K.sqrt(var + self.epsilon)
+                x = K.reshape(x, [N, T, H, W, C])
+            else:
+                assert ndim in (4, 5)
             return x * self.gamma + self.beta
+
+        def compute_output_shape(self, input_shape):
+            return input_shape
 
         def get_config(self):
             config = {

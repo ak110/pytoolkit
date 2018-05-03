@@ -82,7 +82,9 @@ class Model(object):
     def fit(self, X_train, y_train,
             epochs=1, verbose=1, callbacks=None,
             validation_data: tuple = None,
-            class_weight=None, initial_epoch=0,
+            class_weight=None,
+            max_queue_size=10, workers=1, use_multiprocessing=False,
+            shuffle=True, initial_epoch=0,
             balanced=False, mixup=False):
         """学習。"""
         callbacks = callbacks or []
@@ -117,6 +119,10 @@ class Model(object):
             validation_data=gen2,
             validation_steps=steps2,
             class_weight=class_weight,
+            max_queue_size=max_queue_size,
+            workers=workers,
+            use_multiprocessing=use_multiprocessing,
+            shuffle=shuffle,
             initial_epoch=initial_epoch)
         return hist
 
