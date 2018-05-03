@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """ImageDataGeneratorのチェック用コード。"""
 import pathlib
 
@@ -20,8 +20,8 @@ def _main():
     import pytoolkit as tk
 
     gen = tk.image.ImageDataGenerator(profile=True)
+    gen.add(tk.generator.ProcessOutput(tk.ml.to_categorical(10), batch_axis=True))
     gen.add(tk.image.Resize(_IMAGE_SIZE))
-    gen.add(tk.image.ProcessOutput(tk.ml.to_categorical(10), batch_axis=True))
     gen.add(tk.image.Mixup(probability=1, num_classes=10))
     gen.add(tk.image.ToGrayScale())
     gen.add(tk.image.SamplewiseStandardize())
@@ -35,7 +35,7 @@ def _main():
     gen.add(tk.image.RandomRotate90(probability=1))
     gen.add(tk.image.RandomColorAugmentors(probability=0.5))
     gen.add(tk.image.RandomErasing(probability=0.5))
-    gen.add(tk.image.ProcessInput(lambda x: x))
+    gen.add(tk.generator.ProcessInput(lambda x: x))
 
     X = np.array([data_dir / '9ab919332a1dceff9a252b43c0fb34a0_m.jpg'] * 16)
     y = np.zeros((len(X),), dtype=int)
