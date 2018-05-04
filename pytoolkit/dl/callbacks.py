@@ -26,12 +26,11 @@ def learning_rate(reduce_epoch_rates=(0.5, 0.75), factor=0.1, logger_name=None):
 
         def on_train_begin(self, logs=None):
             epochs = self.params['epochs']
-            self.reduce_epochs = [min(max(int(epochs * r), 1), epochs) for r in sorted(self.reduce_epoch_rates)]
+            self.reduce_epochs = [min(max(int(epochs * r), 1), epochs) for r in self.reduce_epoch_rates]
             # 重複は禁止
-            assert len(self.reduce_epochs) == len(np.unique(self.reduce_epochs)), '重複チェックエラー'
-            if hvd.initialized():
-                # Horovod使用時はWarmupとぶつかりかねないので5epoch以下でのreduceは禁止
-                assert self.reduce_epochs[0] <= 5, '重複チェックエラー'
+            assert len(self.reduce_epochs) == len(np.unique(self.reduce_epochs)), f'reduce_epochsエラー: {self.reduce_epochs}'
+            # Horovod使用時はWarmupとぶつかりかねないので5epoch以下でのreduceは禁止
+            assert not (hvd.initialized() and self.reduce_epochs[0] <= 5), 'reduce_epochsエラー: {self.reduce_epochs}'
 
         def on_epoch_begin(self, epoch, logs=None):
             if epoch + 1 in self.reduce_epochs:
