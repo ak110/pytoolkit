@@ -346,9 +346,9 @@ def mixup(gen1, gen2, alpha=0.2, beta=0.2, random_state=None):
       https://arxiv.org/abs/1710.09412
 
     """
-    def _generator():
-        random_state = sklearn.utils.check_random_state(random_state)
+    random_state = sklearn.utils.check_random_state(random_state)
 
+    def _generator():
         for b1, b2 in zip(gen1, gen2):
             assert isinstance(b1, tuple)
             assert isinstance(b2, tuple)
