@@ -79,7 +79,7 @@ class Model(object):
         """学習。
 
         # 引数
-        - tsv_log_path: `tk.dl.callbacks.tsv_logger()` を使用する場合のTSVファイルのパス。
+        - tsv_log_path: lossなどをtsvファイルに出力するならそのパス。
         - balanced: クラス間のバランスが均等になるようにオーバーサンプリングするか否か。
         - mixup: Data augmentationにmixupを使用するか否か。
 

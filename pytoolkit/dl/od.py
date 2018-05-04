@@ -96,7 +96,7 @@ class ObjectDetector(object):
             X_val: [pathlib.Path], y_val: [ml.ObjectsAnnotation],
             batch_size, epochs, lr_scale=1, initial_weights='voc', pb_size_pattern_count=8,
             flip_h=True, flip_v=False, rotate90=False,
-            plot_path=None, history_path=None):
+            plot_path=None, tsv_log_path=None):
         """学習。
 
         # 引数
@@ -111,7 +111,7 @@ class ObjectDetector(object):
         - flip_v: Data augmentationで垂直flipを行うか否か。
         - rotate90: Data augmentationで0, 90, 180, 270度の回転を行うか否か。
         - plot_path: ネットワークの図を出力するならそのパス。拡張子はpngやsvgなど。
-        - history_path: lossなどをtsvファイルに出力するならそのパス。
+        - tsv_log_path: lossなどをtsvファイルに出力するならそのパス。
         """
         assert self.model is None
         # 訓練データに合わせたprior boxの作成
@@ -135,7 +135,8 @@ class ObjectDetector(object):
         if plot_path:
             self.model.plot(plot_path)
         # 学習
-        self.model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=epochs)
+        self.model.fit(X_train, y_train, validation_data=(X_val, y_val),
+                       epochs=epochs, tsv_log_path=tsv_log_path)
 
     def save_weights(self, path: typing.Union[str, pathlib.Path]):
         """重みの保存。(学習後用)"""
