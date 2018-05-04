@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CIFAR100."""
+"""実験用コード：CIFAR100."""
 import argparse
 import pathlib
 
@@ -52,8 +52,6 @@ def _run(args):
         model = keras.models.Model(inputs=inp, outputs=x)
 
     gen = tk.image.ImageDataGenerator()
-    gen.add(tk.generator.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
-    gen.add(tk.image.Mixup(probability=1, num_classes=num_classes))
     gen.add(tk.image.RandomPadding(probability=1))
     gen.add(tk.image.RandomRotate(probability=0.5))
     gen.add(tk.image.RandomCrop(probability=1))
@@ -67,6 +65,7 @@ def _run(args):
     ]))
     gen.add(tk.image.RandomErasing(probability=0.5))
     gen.add(tk.generator.ProcessInput(tk.image.preprocess_input_abs1))
+    gen.add(tk.generator.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
 
     model = tk.dl.models.Model(model, gen, args.batch_size)
     model.compile(sgd_lr=0.5 / 256, loss='categorical_crossentropy', metrics=['acc'])
@@ -79,7 +78,8 @@ def _run(args):
     callbacks.append(tk.dl.callbacks.freeze_bn(0.95))
 
     model.fit(X_train, y_train, validation_data=(X_val, y_val),
-              epochs=args.epochs, callbacks=callbacks)
+              epochs=args.epochs, callbacks=callbacks,
+              mixup=True)
     model.save(args.result_dir / 'model.h5')
     if tk.dl.hvd.is_master():
         proba_val = model.predict(X_val)

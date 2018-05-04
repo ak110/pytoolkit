@@ -93,7 +93,7 @@ class Model(object):
         seq1 = self.gen.flow(X_train, y_train, batch_size=self.batch_size, data_augmentation=True, shuffle=True, balanced=balanced)
         if mixup:
             seq1t = self.gen.flow(X_train, y_train, batch_size=self.batch_size, data_augmentation=True, shuffle=True, balanced=balanced)
-            seq1 = generator.mixup_generator(seq1, seq1t)
+            seq1 = generator.mixup(seq1, seq1t)
         seq2 = self.gen.flow(X_val, y_val, batch_size=self.batch_size, shuffle=hvd.initialized() or balanced, balanced=balanced) if has_val else None
         steps1 = len(seq1)
         steps2 = len(seq2) if has_val else None

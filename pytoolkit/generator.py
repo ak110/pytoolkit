@@ -339,22 +339,32 @@ def generator_sequence(generator, steps):
     return GeneratorSequence(generator, steps)
 
 
-def mixup_generator(gen1, gen2, alpha=0.2, beta=0.2, random_state=None):
+def mixup(gen1, gen2, alpha=0.2, beta=0.2, random_state=None):
     """generator2つをmixupしたgeneratorを返す。
 
     - mixup: Beyond Empirical Risk Minimization
       https://arxiv.org/abs/1710.09412
 
     """
-    random_state = sklearn.utils.check_random_state(random_state)
-    for b1, b2 in zip(gen1, gen2):
-        assert isinstance(b1, tuple)
-        assert isinstance(b2, tuple)
-        assert len(b1) in (2, 3)
-        assert len(b2) in (2, 3)
-        assert len(b1) == len(b2)
-        # 混ぜる
-        m = random_state.beta(alpha, beta)
-        assert 0 <= m <= 1
-        b = [x1 * m + x2 * (1 - m) for x1, x2 in zip(b1, b2)]
-        yield b
+    def _generator():
+        random_state = sklearn.utils.check_random_state(random_state)
+
+        for b1, b2 in zip(gen1, gen2):
+            assert isinstance(b1, tuple)
+            assert isinstance(b2, tuple)
+            assert len(b1) in (2, 3)
+            assert len(b2) in (2, 3)
+            assert len(b1) == len(b2)
+            # 混ぜる
+            m = random_state.beta(alpha, beta)
+            assert 0 <= m <= 1
+            b = [x1 * m + x2 * (1 - m) for x1, x2 in zip(b1, b2)]
+            yield b
+
+    import keras
+    if isinstance(gen1, keras.utils.Sequence) and isinstance(gen2, keras.utils.Sequence):
+        assert len(gen1) == len(gen2)
+        return generator_sequence(_generator, len(gen1))
+
+    return _generator()
+
