@@ -52,9 +52,9 @@ def test_trace():
     tk.log.close(logger)
 
     lines = stderr.getvalue().split('\n')
-    assert lines[0] == '_traced_func 開始'
+    assert lines[0] == 'test_trace.<locals>._traced_func 開始'
     assert lines[1] == 'あいうえお'
-    assert lines[2].startswith('_traced_func 終了 (')
-    assert lines[3] == '_traced_func 開始'
+    assert lines[2].startswith('test_trace.<locals>._traced_func 終了 (')
+    assert lines[3] == 'test_trace.<locals>._traced_func 開始'
     assert lines[4] == 'あいうえお'
-    assert lines[5].startswith('_traced_func 終了 (')
+    assert lines[5].startswith('test_trace.<locals>._traced_func 終了 (')

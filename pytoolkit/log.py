@@ -78,7 +78,7 @@ def trace(process_name=None, logger_name=__name__):
     def _decorator(func):
         @functools.wraps(func)
         def _decorated_func(*args, **kwargs):
-            with trace_scope(process_name or func.__name__, logger_name):
+            with trace_scope(process_name or func.__qualname__, logger_name):
                 return func(*args, **kwargs)
         return _decorated_func
     return _decorator
