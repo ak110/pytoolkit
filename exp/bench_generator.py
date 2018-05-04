@@ -4,6 +4,8 @@ import pathlib
 
 import numpy as np
 
+import pytoolkit as tk
+
 _BATCH_SIZE = 16
 _ITER = 32
 _IMAGE_SIZE = (256, 256)
@@ -14,10 +16,6 @@ def _main():
     data_dir = base_dir / 'tests' / 'data'
     save_dir = base_dir / '___check' / 'bench'
     save_dir.mkdir(parents=True, exist_ok=True)
-
-    import sys
-    sys.path.insert(0, str(base_dir.parent))
-    import pytoolkit as tk
 
     gen = tk.image.ImageDataGenerator(profile=True)
     gen.add(tk.generator.ProcessOutput(tk.ml.to_categorical(10), batch_axis=True))
