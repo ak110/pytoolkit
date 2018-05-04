@@ -7,16 +7,16 @@ import pytoolkit as tk
 def test_generator():
     gen = tk.generator.Generator()
 
-    assert gen.steps_per_epoch(3, 2) == 2
+    # シャッフル無しならバッチサイズが変わってぴったり一周になることを確認
+    seq = iter(gen.flow(np.array([1, 2, 3]), batch_size=2, shuffle=False))
+    assert (next(seq) == np.array([1, 2])).all()
+    assert (next(seq) == np.array([3])).all()
+    assert (next(seq) == np.array([1, 2])).all()
+    seq.close()
 
-    g = gen.flow(np.array([1, 2, 3]), batch_size=2, shuffle=False)
-    assert (g.__next__() == np.array([1, 2])).all()
-    assert (g.__next__() == np.array([3])).all()
-    assert (g.__next__() == np.array([1, 2])).all()
-    g.close()
-
-    g = gen.flow(np.array([1, 2, 3]), batch_size=2, shuffle=True)
-    assert g.__next__().shape == (2,)
-    assert g.__next__().shape == (2,)
-    assert g.__next__().shape == (2,)
-    g.close()
+    # シャッフルありなら毎回同じバッチサイズであることを確認
+    seq = iter(gen.flow(np.array([1, 2, 3]), batch_size=2, shuffle=True))
+    assert next(seq).shape == (2,)
+    assert next(seq).shape == (2,)
+    assert next(seq).shape == (2,)
+    seq.close()

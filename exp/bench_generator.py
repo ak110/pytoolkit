@@ -40,11 +40,11 @@ def _main():
 
     X = np.array([data_dir / '9ab919332a1dceff9a252b43c0fb34a0_m.jpg'] * 16)
     y = np.zeros((len(X),), dtype=int)
-    g = gen.flow(X, y, batch_size=_BATCH_SIZE, data_augmentation=True, random_state=123)
+    seq = gen.flow(X, y, batch_size=_BATCH_SIZE, data_augmentation=True, random_state=123)
     # 適当にループして速度を見る
     X_batch = []
     with tk.tqdm(total=_BATCH_SIZE * _ITER, unit='f') as pbar:
-        for it, (X_batch, y_batch) in enumerate(g):
+        for it, (X_batch, y_batch) in enumerate(seq):
             assert len(y_batch.shape) == 2
             pbar.update(len(X_batch))
             if it + 1 >= _ITER:

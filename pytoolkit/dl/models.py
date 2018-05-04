@@ -83,20 +83,20 @@ class Model(object):
             epochs=1, verbose=1, callbacks=None,
             validation_data: tuple = None,
             class_weight=None,
-            max_queue_size=10, workers=1, use_multiprocessing=False,
-            shuffle=True, initial_epoch=0,
+            max_queue_size=10, use_multiprocessing=False,
+            initial_epoch=0,
             balanced=False, mixup=False):
         """学習。"""
         callbacks = callbacks or []
         has_val = validation_data is not None
         X_val, y_val = validation_data if has_val else (None, None)
-        gen1 = self.gen.flow(X_train, y_train, batch_size=self.batch_size, data_augmentation=True, shuffle=True, balanced=balanced)
+        seq1 = self.gen.flow(X_train, y_train, batch_size=self.batch_size, data_augmentation=True, shuffle=True, balanced=balanced)
         if mixup:
-            gen1t = self.gen.flow(X_train, y_train, batch_size=self.batch_size, data_augmentation=True, shuffle=True, balanced=balanced)
-            gen1 = generator.mixup_generator(gen1, gen1t)
-        gen2 = self.gen.flow(X_val, y_val, batch_size=self.batch_size, shuffle=hvd.initialized() or balanced, balanced=balanced) if has_val else None
-        steps1 = self.gen.steps_per_epoch(len(X_train), self.batch_size)
-        steps2 = self.gen.steps_per_epoch(len(X_val), self.batch_size) if has_val else None
+            seq1t = self.gen.flow(X_train, y_train, batch_size=self.batch_size, data_augmentation=True, shuffle=True, balanced=balanced)
+            seq1 = generator.mixup_generator(seq1, seq1t)
+        seq2 = self.gen.flow(X_val, y_val, batch_size=self.batch_size, shuffle=hvd.initialized() or balanced, balanced=balanced) if has_val else None
+        steps1 = len(seq1)
+        steps2 = len(seq2) if has_val else None
 
         if hvd.initialized():
             hvd_size = hvd.get().size()
@@ -113,32 +113,29 @@ class Model(object):
         callbacks = callbacks + [keras.callbacks.TerminateOnNaN()]
 
         hist = self.model.fit_generator(
-            gen1, steps1, epochs=epochs,
+            seq1, steps1, epochs=epochs,
             verbose=verbose if hvd.is_master() else 0,
             callbacks=callbacks,
-            validation_data=gen2,
+            validation_data=seq2,
             validation_steps=steps2,
             class_weight=class_weight,
             max_queue_size=max_queue_size,
-            workers=workers,
             use_multiprocessing=use_multiprocessing,
-            shuffle=shuffle,
+            shuffle=False,
             initial_epoch=initial_epoch)
         return hist
 
     @log.trace()
     def predict(self, X, data_augmentation=False):
         """予測。"""
-        gen = self.gen.flow(X, batch_size=self.batch_size, data_augmentation=data_augmentation)
-        steps = self.gen.steps_per_epoch(len(X), batch_size=self.batch_size)
-        return self.model.predict_generator(gen, steps)
+        seq = self.gen.flow(X, batch_size=self.batch_size, data_augmentation=data_augmentation)
+        return self.model.predict_generator(seq)
 
     @log.trace()
     def evaluate(self, X, y, data_augmentation=False):
         """評価。"""
-        gen = self.gen.flow(X, y, batch_size=self.batch_size, data_augmentation=data_augmentation)
-        steps = self.gen.steps_per_epoch(len(X), batch_size=self.batch_size)
-        return self.model.evaluate_generator(gen, steps)
+        seq = self.gen.flow(X, y, batch_size=self.batch_size, data_augmentation=data_augmentation)
+        return self.model.evaluate_generator(seq)
 
     @log.trace()
     def save(self, filepath, overwrite=True, include_optimizer=True):

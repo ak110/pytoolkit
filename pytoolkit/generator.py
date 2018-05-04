@@ -33,6 +33,30 @@ class GeneratorContext(object):
         """DataAugmentationを確率的にやるときの判定。"""
         return self.data_augmentation and (probability >= 1 or rand.rand() <= probability)
 
+    @property
+    def y_classes(self):
+        """クラスIDの配列を返す。"""
+        y_type = sklearn.utils.multiclass.type_of_target(self.y)
+        if y_type == 'continuous':
+            return (self.y >= 0.5).astype(np.int32)  # binary
+        elif y_type == 'continuous-multioutput':
+            return self.y.argmax(axis=-1)  # multiclass
+        elif y_type in ('binary', 'multiclass'):
+            return self.y
+        else:
+            assert False, f'Unknown type: {y_type}'
+
+    @property
+    def steps_per_epoch(self):
+        """1 Epochあたりのイテレーション数を返す。"""
+        if self.balanced:
+            # 「最も個数の少ないクラスの個数×クラス数」を1 Epochということにする
+            bc = np.bincount(self.y_classes)
+            return bc.min() * len(bc)
+        else:
+            # 端数切り上げで割り算するだけ
+            return (self.data_count + self.batch_size - 1) // self.batch_size
+
 
 class Operator(metaclass=abc.ABCMeta):
     """ImageDataGeneratorで行う操作の基底クラス。"""
@@ -62,9 +86,13 @@ class Generator(object):
         - balanced: クラス間のバランスが均等になるようにサンプリングする。(shuffle=Trueな場合のみ有効。yはクラスのindexかそれをone-hot化したものなどである必要あり)
 
         """
-        cpu_count = os.cpu_count()
-        worker_count = min(batch_size, cpu_count * 3)
         ctx = GeneratorContext(X, y, weights, batch_size, shuffle, data_augmentation, random_state, balanced)
+        return generator_sequence(lambda: self._generator(ctx), ctx.steps_per_epoch)
+
+    def _generator(self, ctx):
+        """generator。"""
+        cpu_count = os.cpu_count()
+        worker_count = min(ctx.batch_size, cpu_count * 3)
         with joblib.Parallel(n_jobs=worker_count, backend='threading') as parallel:
             for indices, seeds in self._flow_batch(ctx):
                 batch = [joblib.delayed(self._work, check_pickle=False)(ix, seed, ctx) for ix, seed in zip(indices, seeds)]
@@ -74,21 +102,20 @@ class Generator(object):
     def _flow_batch(self, ctx):
         """データのindexとseedをバッチサイズずつ列挙し続けるgenerator。"""
         if ctx.balanced:
-            # クラス間のバランスが均等になるようにサンプリング
+            # クラス間のバランスが均等になるようにサンプリング: 常にbatch_size分を返す (horovodとかはそれが都合が良い)
             assert ctx.shuffle
             assert isinstance(ctx.y, np.ndarray)
             assert len(ctx.y.shape) in (1, 2)
-            classes = ctx.y if len(ctx.y.shape) == 1 else ctx.y.argmax(axis=-1)
-            unique_classes = np.unique(classes)
-            assert len(unique_classes) < len(classes)
+            y_classes = ctx.y_classes
+            unique_classes = np.unique(y_classes)
             indices = np.arange(ctx.data_count)
             while True:
-                y_batch = ctx.random_state.choice(classes, ctx.batch_size)
-                batch_indices = [ctx.random_state.choice(indices[classes == y]) for y in y_batch]
+                y_batch = ctx.random_state.choice(unique_classes, ctx.batch_size)
+                batch_indices = [ctx.random_state.choice(indices[y_classes == y]) for y in y_batch]
                 seeds = ctx.random_state.randint(0, 2 ** 31, size=(len(batch_indices),))
                 yield batch_indices, seeds
         elif ctx.shuffle:
-            # シャッフルありの場合、常にbatch_size分を返す (horovodとかはそれが都合が良い)
+            # シャッフルあり: 常にbatch_size分を返す (horovodとかはそれが都合が良い)
             batch_indices = []
             seeds = []
             for ix, seed in _flow_instance(ctx.data_count, ctx.shuffle, ctx.random_state):
@@ -99,7 +126,7 @@ class Generator(object):
                     batch_indices = []
                     seeds = []
         else:
-            # シャッフル無しの場合、1epoch分でぴったり終わるようにする (predict_generatorとか用)
+            # シャッフル無し: 1epoch分でぴったり終わるようにする (predict_generatorとか用)
             steps = self.steps_per_epoch(ctx.data_count, ctx.batch_size)
             indices = np.arange(ctx.data_count)
             while True:
@@ -281,6 +308,35 @@ class CustomAugmentation(Operator):
         if ctx.do_augmentation(rand, self.probability):
             x, y, w = self.process(x, y, w, rand, ctx)
         return x, y, w
+
+
+def generator_sequence(generator, steps):
+    """generatorを`keras.utils.Sequence`に変換する。"""
+    import keras
+
+    class GeneratorSequence(keras.utils.Sequence):
+        """generatorによる`keras.utils.Sequence`。"""
+
+        def __init__(self, generator, steps):
+            self.generator = generator
+            self.it = None
+            self.steps = steps
+
+        def __len__(self):
+            return self.steps
+
+        def __getitem__(self, index):
+            assert 0 <= index < self.steps
+            if self.it is None:
+                self.it = self.generator()
+            return next(self.it)
+
+        def __iter__(self):
+            """無限ループ。"""
+            while True:
+                yield from self.generator()
+
+    return GeneratorSequence(generator, steps)
 
 
 def mixup_generator(gen1, gen2, alpha=0.2, beta=0.2, random_state=None):

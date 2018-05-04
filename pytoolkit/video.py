@@ -42,25 +42,44 @@ class LoadVideo(generator.Operator):
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         """処理。"""
         assert rand is not None  # noqa
-        if isinstance(x, np.ndarray):
-            # ndarrayならそのまま画像扱い
-            x = np.copy(x).astype(np.float32)
-        else:
-            # ファイルパスなら読み込み
-            assert isinstance(x, (str, pathlib.Path))
-            import cv2
-            cap = cv2.VideoCapture(str(x))
-            frames = []
-            while True:
-                ret, frame = cap.read()
-                if not ret:
-                    break
-                frames.append(frame)
-            x = np.asarray(frames)[..., ::-1]  # BGR -> RGB
-            x = x.astype(np.float32)
+        x = load_video(x)
         assert len(x.shape) == 4
         assert x.shape[-1] == 3
         return x, y, w
+
+
+class RandomFlipLR(generator.Operator):
+    """左右反転。"""
+
+    def __init__(self, probability=1):
+        assert 0 < probability <= 1
+        self.probability = probability
+
+    def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
+            x = x[:, :, ::-1, :]
+        return x, y, w
+
+
+def load_video(x):
+    """動画の読み込み。"""
+    if isinstance(x, np.ndarray):
+        # ndarrayならそのまま画像扱い
+        x = np.copy(x).astype(np.float32)
+    else:
+        # ファイルパスなら読み込み
+        assert isinstance(x, (str, pathlib.Path))
+        import cv2
+        cap = cv2.VideoCapture(str(x))
+        frames = []
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frames.append(frame)
+        x = np.asarray(frames)[..., ::-1]  # BGR -> RGB
+        x = x.astype(np.float32)
+    return x
 
 
 # 画像と同じのをそのまま使えるものたち
