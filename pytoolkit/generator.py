@@ -83,7 +83,8 @@ class Generator(object):
         """`fit_generator`などに渡すgeneratorと、1epochあたりのステップ数を返す。
 
         # 引数
-        - balanced: クラス間のバランスが均等になるようにサンプリングする。(shuffle=Trueな場合のみ有効。yはクラスのindexかそれをone-hot化したものなどである必要あり)
+        - balanced: クラス間のバランスが均等になるようにオーバーサンプリングするか否か。
+                    (shuffle=Trueな場合のみ有効。yはクラスのindexかそれをone-hot化したものなどである必要あり)
 
         """
         ctx = GeneratorContext(X, y, weights, batch_size, shuffle, data_augmentation, random_state, balanced)

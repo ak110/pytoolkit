@@ -135,15 +135,7 @@ class ObjectDetector(object):
         if plot_path:
             self.model.plot(plot_path)
         # 学習
-        callbacks = []
-        callbacks.append(dl_callbacks.learning_rate(reduce_epoch_rates=(0.5, 0.75, 0.875)))
-        callbacks.extend(self.model.horovod_callbacks())
-        if history_path:
-            callbacks.append(dl_callbacks.tsv_logger(history_path))
-        callbacks.append(dl_callbacks.epoch_logger())
-        callbacks.append(dl_callbacks.freeze_bn(0.95))
-        self.model.fit(X_train, y_train, validation_data=(X_val, y_val),
-                       epochs=epochs, callbacks=callbacks)
+        self.model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=epochs)
 
     def save_weights(self, path: typing.Union[str, pathlib.Path]):
         """重みの保存。(学習後用)"""

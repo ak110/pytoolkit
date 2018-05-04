@@ -72,14 +72,8 @@ def _run(args):
     model.compile(sgd_lr=0.5 / 256, loss='categorical_crossentropy', metrics=['acc'])
     model.summary()
 
-    callbacks = []
-    callbacks.append(tk.dl.callbacks.learning_rate())
-    callbacks.extend(model.horovod_callbacks())
-    callbacks.append(tk.dl.callbacks.tsv_logger(args.result_dir / 'history.tsv'))
-    callbacks.append(tk.dl.callbacks.freeze_bn(0.95))
-
     model.fit(X_train, y_train, validation_data=(X_val, y_val),
-              epochs=args.epochs, callbacks=callbacks,
+              epochs=args.epochs, tsv_log_path=args.result_dir / 'history.tsv',
               mixup=True)
     model.save(args.result_dir / 'model.h5')
     if tk.dl.hvd.is_master():

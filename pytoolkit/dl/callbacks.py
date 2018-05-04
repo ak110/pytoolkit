@@ -152,8 +152,8 @@ def tsv_logger(filename, append=False):
     return _TSVLogger(filename=filename, append=append, enabled=enabled)
 
 
-def epoch_logger(name=None):
-    """`logging.getLogger(name)`にDEBUGログを色々出力するcallback。Horovod使用時はrank() == 0のみ有効。"""
+def epoch_logger(logger_name=None):
+    """`logging.getLogger(logger_name)`にDEBUGログを色々出力するcallback。Horovod使用時はrank() == 0のみ有効。"""
     import keras
     import keras.backend as K
 
@@ -161,10 +161,10 @@ def epoch_logger(name=None):
 
     class _EpochLogger(keras.callbacks.Callback):
 
-        def __init__(self, name, enabled):
-            self.name = name
+        def __init__(self, logger_name, enabled):
+            self.logger_name = logger_name
             self.enabled = enabled
-            self.logger = log.get(name or __name__)
+            self.logger = log.get(self.logger_name or __name__)
             self.epoch_start_time = None
             super().__init__()
 
@@ -179,7 +179,7 @@ def epoch_logger(name=None):
                 self.logger.debug('Epoch %3d: lr=%.1e %s time=%d',
                                   epoch + 1, lr, metrics, int(np.ceil(elapsed_time)))
 
-    return _EpochLogger(name=name, enabled=enabled)
+    return _EpochLogger(logger_name=logger_name, enabled=enabled)
 
 
 def freeze_bn(freeze_epoch_rate: float, logger_name=None):

@@ -1,6 +1,6 @@
 """Kerasのモデル関連。"""
 
-from . import hvd, optimizers
+from . import callbacks, hvd, optimizers
 from .. import draw, generator, log, utils
 
 
@@ -32,8 +32,8 @@ class Model(object):
                 sgd_lr=None, lr_multipliers=None):
         """コンパイル。
 
-        lrを指定するとSGD+Nesterov momentumでoptimizerを作る。
-        このlrはhorovodを考慮してない値。
+        sgd_lrを指定するとSGD+Nesterov momentumでoptimizerを作る。
+        この値はバッチサイズとHorovodを考慮してない値。
 
         """
         import keras
@@ -67,27 +67,26 @@ class Model(object):
         self.model.summary(print_fn=print_fn)
         print_fn(f'network depth: {count_network_depth(self.model)}')
 
-    @staticmethod
-    def horovod_callbacks():
-        """Horovodのコールバック3つをまとめて返すだけ。"""
-        if not hvd.initialized():
-            return []
-        return [
-            hvd.get().callbacks.BroadcastGlobalVariablesCallback(0),
-            hvd.get().callbacks.MetricAverageCallback(),
-            hvd.get().callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1),
-        ]
-
     @log.trace()
     def fit(self, X_train, y_train,
-            epochs=1, verbose=1, callbacks=None,
+            epochs=1, verbose=1,
             validation_data: tuple = None,
             class_weight=None,
             max_queue_size=10, use_multiprocessing=False,
             initial_epoch=0,
+            tsv_log_path=None,
             balanced=False, mixup=False):
-        """学習。"""
-        callbacks = callbacks or []
+        """学習。
+
+        # 引数
+        - tsv_log_path: `tk.dl.callbacks.tsv_logger()` を使用する場合のTSVファイルのパス。
+        - balanced: クラス間のバランスが均等になるようにオーバーサンプリングするか否か。
+        - mixup: Data augmentationにmixupを使用するか否か。
+
+        """
+        import keras
+
+        # generatorの用意
         has_val = validation_data is not None
         X_val, y_val = validation_data if has_val else (None, None)
         g1, steps1 = self.gen.flow(X_train, y_train, batch_size=self.batch_size, data_augmentation=True, shuffle=True, balanced=balanced)
@@ -98,24 +97,35 @@ class Model(object):
         shuffle_val = hvd.initialized() or balanced
         g2, steps2 = self.gen.flow(X_val, y_val, batch_size=self.batch_size, shuffle=shuffle_val, balanced=balanced) if has_val else None, None
 
+        # horovod使用時のsteps per epochの調整
         if hvd.initialized():
             hvd_size = hvd.get().size()
             steps1 //= hvd_size
-            steps2 //= hvd_size  # Horovodのサンプルでは * 3 だけど早く進んで欲しいので省略
-            # 安全装置
-            if steps1 <= 0:
+            if steps1 <= 0:  # 安全装置
                 steps1 = 1
-            if steps2 <= 0:
-                steps2 = 1
+            if steps2 is not None:
+                steps2 //= hvd_size  # Horovodのサンプルでは * 3 だけど早く進んで欲しいので省略
+                if steps2 <= 0:  # 安全装置
+                    steps2 = 1
 
-        # TerminateOnNaNは常に付けちゃう
-        import keras
-        callbacks = callbacks + [keras.callbacks.TerminateOnNaN()]
+        # callback
+        cb = []
+        cb.append(callbacks.learning_rate(reduce_epoch_rates=(0.5, 0.75), factor=0.1))
+        if hvd.initialized():
+            cb.append(hvd.get().callbacks.BroadcastGlobalVariablesCallback(0))
+            cb.append(hvd.get().callbacks.MetricAverageCallback())
+            cb.append(hvd.get().callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1))
+        if tsv_log_path is not None:
+            cb.append(callbacks.tsv_logger(tsv_log_path))
+        cb.append(callbacks.epoch_logger())
+        cb.append(callbacks.freeze_bn(0.95))
+        cb.append(keras.callbacks.TerminateOnNaN())
 
+        # 学習
         hist = self.model.fit_generator(
             g1, steps1, epochs=epochs,
             verbose=verbose if hvd.is_master() else 0,
-            callbacks=callbacks,
+            callbacks=cb,
             validation_data=g2,
             validation_steps=steps2,
             class_weight=class_weight,

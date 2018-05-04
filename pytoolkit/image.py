@@ -430,10 +430,9 @@ class RandomAlpha(generator.Operator):
                     continue
                 ex = rand.randint(0, x.shape[1] - ew)
                 ey = rand.randint(0, x.shape[0] - eh)
-
-                rgb = rand.randint(0, 256, size=3)
-                x[ey:ey + eh, ex:ex + ew, :] *= (1 - self.alpha)
-                x[ey:ey + eh, ex:ex + ew, :] += rgb * self.alpha
+                x_ref = x[ey:ey + eh, ex:ex + ew, :]
+                x_ref *= (1 - self.alpha)
+                x_ref += rand.randint(0, 256, size=3) * self.alpha
                 break
         return x, y, w
 
