@@ -1,9 +1,6 @@
 """主にmatplotlib関連。
 
-ディスプレイが無い環境などでは環境変数MPLBACKENDをAggとかにしておく前提とする。
-(ソースコード上では対策しない)
-
-基本的にobject-oriented interfaceを使用する。
+出来るだけobject-oriented interfaceを使用する。
 
 例：
 ```

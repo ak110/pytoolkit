@@ -26,7 +26,12 @@ def learning_rate(reduce_epoch_rates=(0.5, 0.75), factor=0.1, logger_name=None):
 
         def on_train_begin(self, logs=None):
             epochs = self.params['epochs']
-            self.reduce_epochs = [min(max(int(epochs * r), 1), epochs) for r in self.reduce_epoch_rates]
+            self.reduce_epochs = [min(max(int(epochs * r), 1), epochs) for r in sorted(self.reduce_epoch_rates)]
+            # 重複は禁止
+            assert len(self.reduce_epochs) == len(np.unique(self.reduce_epochs)), '重複チェックエラー'
+            if hvd.initialized():
+                # Horovod使用時はWarmupとぶつかりかねないので5epoch以下でのreduceは禁止
+                assert self.reduce_epochs[0] <= 5, '重複チェックエラー'
 
         def on_epoch_begin(self, epoch, logs=None):
             if epoch + 1 in self.reduce_epochs:
@@ -46,9 +51,6 @@ def learning_curve_plot(filename, metric='loss'):
     - filename: 保存先ファイル名。「{metric}」はmetricの値に置換される。str or pathlib.Path
     - metric: 対象とするmetric名。lossとかaccとか。
 
-    # 「Invalid DISPLAY variable」対策
-
-    環境変数MPLBACKEND=Aggを設定しておく。
     """
     import keras
 
@@ -188,11 +190,11 @@ def freeze_bn(freeze_epoch_rate: float, logger_name=None):
     ■Squeeze-and-Excitation Networks
     https://arxiv.org/abs/1709.01507
 
-    ## 引数
+    # 引数
     - freeze_epoch_rate: 発動するepoch数の割合を指定。
     - logger_name: ログ出力先
 
-    ## 使用例
+    # 使用例
 
     ```
     callbacks.append(tk.dl.callbacks.freeze_bn(0.95))

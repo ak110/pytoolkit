@@ -25,3 +25,7 @@
 - pandas
 - sqlalchemy
 - tensorflow-gpu
+
+## matplotlibの「Invalid DISPLAY variable」対策
+
+必要に応じて環境変数 `MPLBACKEND` を `Agg` とかにしておく前提とする。ソースコード上では対策しない。
