@@ -90,22 +90,22 @@ class Model(object):
         callbacks = callbacks or []
         has_val = validation_data is not None
         X_val, y_val = validation_data if has_val else (None, None)
-        seq1 = self.gen.flow(X_train, y_train, batch_size=self.batch_size, data_augmentation=True, shuffle=True, balanced=balanced)
+        g1, steps1 = self.gen.flow(X_train, y_train, batch_size=self.batch_size, data_augmentation=True, shuffle=True, balanced=balanced)
         if mixup:
-            seq1t = self.gen.flow(X_train, y_train, batch_size=self.batch_size, data_augmentation=True, shuffle=True, balanced=balanced)
-            seq1 = generator.mixup(seq1, seq1t)
-        seq2 = self.gen.flow(X_val, y_val, batch_size=self.batch_size, shuffle=hvd.initialized() or balanced, balanced=balanced) if has_val else None
-        steps1 = len(seq1)
-        steps2 = len(seq2) if has_val else None
+            g1t, steps1t = self.gen.flow(X_train, y_train, batch_size=self.batch_size, data_augmentation=True, shuffle=True, balanced=balanced)
+            assert steps1 == steps1t
+            g1 = generator.mixup(g1, g1t)
+        shuffle_val = hvd.initialized() or balanced
+        g2, steps2 = self.gen.flow(X_val, y_val, batch_size=self.batch_size, shuffle=shuffle_val, balanced=balanced) if has_val else None, None
 
         if hvd.initialized():
             hvd_size = hvd.get().size()
             steps1 //= hvd_size
             steps2 //= hvd_size  # Horovodのサンプルでは * 3 だけど早く進んで欲しいので省略
             # 安全装置
-            if steps1 == 0:
+            if steps1 <= 0:
                 steps1 = 1
-            if steps2 == 0:
+            if steps2 <= 0:
                 steps2 = 1
 
         # TerminateOnNaNは常に付けちゃう
@@ -113,10 +113,10 @@ class Model(object):
         callbacks = callbacks + [keras.callbacks.TerminateOnNaN()]
 
         hist = self.model.fit_generator(
-            seq1, steps1, epochs=epochs,
+            g1, steps1, epochs=epochs,
             verbose=verbose if hvd.is_master() else 0,
             callbacks=callbacks,
-            validation_data=seq2,
+            validation_data=g2,
             validation_steps=steps2,
             class_weight=class_weight,
             max_queue_size=max_queue_size,
@@ -128,14 +128,14 @@ class Model(object):
     @log.trace()
     def predict(self, X, data_augmentation=False):
         """予測。"""
-        seq = self.gen.flow(X, batch_size=self.batch_size, data_augmentation=data_augmentation)
-        return self.model.predict_generator(seq)
+        g, steps = self.gen.flow(X, batch_size=self.batch_size, data_augmentation=data_augmentation)
+        return self.model.predict_generator(g, steps)
 
     @log.trace()
     def evaluate(self, X, y, data_augmentation=False):
         """評価。"""
-        seq = self.gen.flow(X, y, batch_size=self.batch_size, data_augmentation=data_augmentation)
-        return self.model.evaluate_generator(seq)
+        g, steps = self.gen.flow(X, y, batch_size=self.batch_size, data_augmentation=data_augmentation)
+        return self.model.evaluate_generator(g, steps)
 
     @log.trace()
     def save(self, filepath, overwrite=True, include_optimizer=True):

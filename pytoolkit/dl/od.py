@@ -176,9 +176,9 @@ class ObjectDetector(object):
         """予測。"""
         assert self.model is not None
         pred = []
-        seq = self.model.gen.flow(X, batch_size=self.model.batch_size)
+        g, steps = self.model.gen.flow(X, batch_size=self.model.batch_size)
         with utils.tqdm(total=len(X), unit='f', desc='predict', disable=verbose == 0) as pbar:
-            for i, X_batch in enumerate(seq):
+            for i, X_batch in enumerate(g):
                 # 予測
                 pred_list = self.model.model.predict_on_batch(X_batch)
                 # 整形：キャストしたりマスクしたり
@@ -190,8 +190,8 @@ class ObjectDetector(object):
                     pred.append(ml.ObjectsPrediction(pred_classes[mask], pred_confs[mask], pred_locs[mask, :]))
                 # 次へ
                 pbar.update(len(X_batch))
-                if i + 1 >= len(seq):
-                    assert i + 1 == len(seq)
+                if i + 1 >= steps:
+                    assert i + 1 == steps
                     break
         return pred
 

@@ -37,8 +37,8 @@ def test_image_data_generator_save():
     for X, dir_name in zip(X_list, ['image1', 'image2']):
         save_dir = base_dir.parent / '___check' / dir_name
         save_dir.mkdir(parents=True, exist_ok=True)
-        seq = gen.flow(X, batch_size=1, data_augmentation=True, random_state=123)
-        for i, X_batch in enumerate(seq):
+        g, _ = gen.flow(X, batch_size=1, data_augmentation=True, random_state=123)
+        for i, X_batch in enumerate(g):
             assert X_batch.shape == (1, 64, 64, 3)
             tk.ndimage.save(save_dir / f'{i}.png', X_batch[0])
             if i >= 31:
@@ -54,18 +54,21 @@ def test_image_data_generator_repro():
         str(data_dir / 'ai_shigoto_makaseru.png'),
         str(data_dir / 'ai_shigoto_ubau.png'),
     ])
-    seq1 = iter(gen.flow(X, batch_size=2, data_augmentation=True, random_state=123))
-    seq2 = iter(gen.flow(X, batch_size=2, data_augmentation=True, random_state=234))
-    seq3 = iter(gen.flow(X, batch_size=2, data_augmentation=True, random_state=123))
-    b1_1 = next(seq1)
-    b1_2 = next(seq1)
-    b2_1 = next(seq2)
-    b2_2 = next(seq2)
-    b3_1 = next(seq3)
-    b3_2 = next(seq3)
-    seq1.close()
-    seq2.close()
-    seq3.close()
+    g1, steps1 = gen.flow(X, batch_size=2, data_augmentation=True, random_state=123)
+    g2, steps2 = gen.flow(X, batch_size=2, data_augmentation=True, random_state=234)
+    g3, steps3 = gen.flow(X, batch_size=2, data_augmentation=True, random_state=123)
+    assert steps1 == 2
+    assert steps2 == 2
+    assert steps3 == 2
+    b1_1 = next(g1)
+    b1_2 = next(g1)
+    b2_1 = next(g2)
+    b2_2 = next(g2)
+    b3_1 = next(g3)
+    b3_2 = next(g3)
+    g1.close()
+    g2.close()
+    g3.close()
     assert b1_1.shape == (2, 64, 64, 3)
     assert b1_2.shape == (1, 64, 64, 3)
     assert b2_1.shape == (2, 64, 64, 3)
