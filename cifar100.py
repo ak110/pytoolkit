@@ -9,6 +9,7 @@ import pytoolkit as tk
 
 
 def _main():
+    tk.better_exceptions()
     parser = argparse.ArgumentParser()
     parser.add_argument('--result-dir', default=pathlib.Path('results_cifar100'), type=pathlib.Path)
     parser.add_argument('--epochs', default=300, type=int)

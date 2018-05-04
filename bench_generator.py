@@ -12,6 +12,7 @@ _IMAGE_SIZE = (256, 256)
 
 
 def _main():
+    tk.better_exceptions()
     base_dir = pathlib.Path(__file__).resolve().parent.parent
     data_dir = base_dir / 'tests' / 'data'
     save_dir = base_dir / '___check' / 'bench'

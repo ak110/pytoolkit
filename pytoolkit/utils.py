@@ -1,4 +1,5 @@
 """各種ユーティリティ"""
+import logging
 import functools
 import multiprocessing as mp
 import os
@@ -106,3 +107,13 @@ def tqdm(iterable=None, desc=None, total=None, leave=True, **kwargs):
     """`tqdm`の簡単なラッパー。"""
     from tqdm import tqdm as t
     return t(iterable, desc, total, leave, ascii=True, ncols=100, **kwargs)
+
+
+def better_exceptions():
+    """`better_exceptions`するだけ。"""
+    try:
+        import better_exceptions as be  # pip install better_exceptions
+        be.MAX_LENGTH = 128
+    except BaseException:
+        logger = logging.getLogger(__name__)
+        logger.warning('better_exceptions is not installed?', exc_info=True)
