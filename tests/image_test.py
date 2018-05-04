@@ -19,6 +19,7 @@ def _gen():
     gen.add(tk.image.RandomFlipTB(probability=0.5))
     gen.add(tk.image.RandomRotate90(probability=1))
     gen.add(tk.image.RandomColorAugmentors(probability=0.5))
+    gen.add(tk.image.RandomAlpha(probability=0.5))
     gen.add(tk.image.RandomErasing(probability=0.5))
     gen.add(tk.generator.ProcessInput(lambda x: x))
     gen.add(tk.generator.ProcessOutput(lambda y: y))

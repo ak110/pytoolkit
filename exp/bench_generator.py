@@ -10,7 +10,7 @@ _IMAGE_SIZE = (256, 256)
 
 
 def _main():
-    base_dir = pathlib.Path(__file__).resolve().parent
+    base_dir = pathlib.Path(__file__).resolve().parent.parent
     data_dir = base_dir / 'tests' / 'data'
     save_dir = base_dir / '___check' / 'bench'
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -34,6 +34,7 @@ def _main():
     gen.add(tk.image.RandomFlipTB(probability=0.5))
     gen.add(tk.image.RandomRotate90(probability=1))
     gen.add(tk.image.RandomColorAugmentors(probability=0.5))
+    gen.add(tk.image.RandomAlpha(probability=0.5))
     gen.add(tk.image.RandomErasing(probability=0.5))
     gen.add(tk.generator.ProcessInput(lambda x: x))
 

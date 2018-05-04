@@ -5,6 +5,6 @@ set -eux
 #
 
 SCRIPT="pip install numpy scikit-learn scipy ; python -c 'import pytoolkit ; print(\"OK!\")'"
-docker run --interactive --tty --rm --volume="$PWD:/pytoolkit" python:3.6 bash -c "$SCRIPT"
+docker run --interactive --tty --rm --volume="$PWD/..:/pytoolkit" python:3.6 bash -c "$SCRIPT"
 
 

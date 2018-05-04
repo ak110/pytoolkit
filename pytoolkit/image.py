@@ -404,15 +404,15 @@ class RandomHue(generator.Operator):
         return x, y, w
 
 
-class RandomLight(generator.Operator):
-    """画像の一部の色をランダムに少し変える。"""
+class RandomAlpha(generator.Operator):
+    """画像の一部にランダムな色の半透明の矩形を描画する。"""
 
-    def __init__(self, probability=1, std=16, scale_low=0.1, scale_high=0.6, rate_1=1 / 3, rate_2=3, max_tries=30):
+    def __init__(self, probability=1, alpha=0.25, scale_low=0.1, scale_high=0.6, rate_1=1 / 3, rate_2=3, max_tries=30):
         assert 0 < probability <= 1
         assert scale_low <= scale_high
         assert rate_1 <= rate_2
         self.probability = probability
-        self.std = std
+        self.alpha = alpha
         self.scale_low = scale_low
         self.scale_high = scale_high
         self.rate_1 = rate_1
@@ -431,8 +431,9 @@ class RandomLight(generator.Operator):
                 ex = rand.randint(0, x.shape[1] - ew)
                 ey = rand.randint(0, x.shape[0] - eh)
 
-                rgb_bias = rand.normal(0, self.std, size=3)
-                x[ey:ey + eh, ex:ex + ew, :] += rgb_bias[np.newaxis, np.newaxis, :]
+                rgb = rand.randint(0, 256, size=3)
+                x[ey:ey + eh, ex:ex + ew, :] *= (1 - self.alpha)
+                x[ey:ey + eh, ex:ex + ew, :] += rgb * self.alpha
                 break
         return x, y, w
 
@@ -522,7 +523,7 @@ class RandomErasing(generator.Operator):
                 if (area_inter >= area_bb * 0.25).any():
                     continue
 
-            x[ey:ey + eh, ex:ex + ew, :] = rand.randint(0, 255, size=3)[np.newaxis, np.newaxis, :]
+            x[ey:ey + eh, ex:ex + ew, :] = rand.randint(0, 256, size=3)[np.newaxis, np.newaxis, :]
             break
 
         return x
