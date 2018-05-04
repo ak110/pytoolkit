@@ -148,6 +148,23 @@ def test_non_maximum_suppression():
     assert idx.shape == (0,)
 
 
+def test_print_classification_metrics_multi():
+    y_true = [0, 1, 1, 2]
+    prob_pred = [
+        [0.75, 0.00, 0.25],
+        [0.25, 0.75, 0.00],
+        [0.25, 0.00, 0.75],
+        [0.25, 0.75, 0.00],
+    ]
+    tk.ml.print_classification_metrics(y_true, prob_pred)
+
+
+def test_print_classification_metrics_binary():
+    y_true = [0, 1, 1, 0]
+    prob_pred = [0.25, 0.25, 0.75, 0.25]
+    tk.ml.print_classification_metrics(y_true, prob_pred)
+
+
 def test_plot_cm():
     filepath = pathlib.Path(__file__).resolve().parent.parent / '___check' / 'plot_cm.png'
     cm = [
