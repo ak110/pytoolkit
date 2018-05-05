@@ -31,10 +31,6 @@ def create_network(base_network, pb, mode, strict_nms=None):
     else:
         for_predict = mode == 'predict'
         model = _create_detector(pb, builder, inputs, x, ref, lr_multipliers, for_predict, strict_nms)
-
-    logger = log.get(__name__)
-    logger.info('network depth: %d', models.count_network_depth(model))
-    logger.info('trainable params: %d', models.count_trainable_params(model))
     return model, lr_multipliers
 
 

@@ -94,7 +94,8 @@ class ObjectDetector(object):
 
     def fit(self, X_train: [pathlib.Path], y_train: [ml.ObjectsAnnotation],
             X_val: [pathlib.Path], y_val: [ml.ObjectsAnnotation],
-            batch_size, epochs, lr_scale=1, initial_weights='voc', pb_size_pattern_count=8,
+            batch_size, epochs, lr_scale=1, freeze_end_layer_name=None,
+            initial_weights='voc', pb_size_pattern_count=8,
             flip_h=True, flip_v=False, rotate90=False,
             plot_path=None, tsv_log_path=None):
         """学習。
@@ -131,7 +132,8 @@ class ObjectDetector(object):
         hvd.barrier()
         # モデルの作成
         self._create_model(mode='train', weights=initial_weights, batch_size=batch_size,
-                           lr_scale=lr_scale, flip_h=flip_h, flip_v=flip_v, rotate90=rotate90)
+                           lr_scale=lr_scale, freeze_end_layer_name=freeze_end_layer_name,
+                           flip_h=flip_h, flip_v=flip_v, rotate90=rotate90)
         if plot_path:
             self.model.plot(plot_path)
         # 学習
@@ -155,7 +157,8 @@ class ObjectDetector(object):
         """
         assert self.model is None
         self._create_model(mode='predict', weights=weights, batch_size=batch_size,
-                           lr_scale=None, flip_h=False, flip_v=False, rotate90=False, strict_nms=strict_nms)
+                           lr_scale=None, freeze_end_layer_name=None,
+                           flip_h=False, flip_v=False, rotate90=False, strict_nms=strict_nms)
         # マルチGPU化。
         if use_multi_gpu:
             gpus = utils.get_gpu_count()
@@ -189,7 +192,7 @@ class ObjectDetector(object):
         return pred
 
     @log.trace()
-    def _create_model(self, mode, weights, batch_size, lr_scale, flip_h, flip_v, rotate90, strict_nms=None):
+    def _create_model(self, mode, weights, batch_size, lr_scale, freeze_end_layer_name, flip_h, flip_v, rotate90, strict_nms=None):
         """学習とか予測とか用に`tk.dl.models.Model`を作成して返す。
 
         # 引数
@@ -202,6 +205,8 @@ class ObjectDetector(object):
         network, lr_multipliers = od_net.create_network(
             base_network=self.base_network, pb=self.pb,
             mode=mode, strict_nms=strict_nms)
+        if freeze_end_layer_name is not None:
+            models.freeze_to_name(network, freeze_end_layer_name, skip_bn=True)
         pi = od_net.get_preprocess_input(self.base_network)
         if mode == 'pretrain':
             gen = od_gen.create_pretrain_generator(self.pb.input_size, pi)
@@ -209,8 +214,23 @@ class ObjectDetector(object):
             gen = od_gen.create_generator(self.pb.input_size, pi, self.pb.encode_truth,
                                           flip_h=flip_h, flip_v=flip_v, rotate90=rotate90)
         self.model = models.Model(network, gen, batch_size)
+
+        if mode == 'pretrain':
+            # 事前学習：通常の分類としてコンパイル
+            self.model.compile(sgd_lr=0.5 / 256, loss='categorical_crossentropy', metrics=['acc'])
+        elif mode == 'train':
+            # Object detectionとしてコンパイル
+            assert lr_scale is not None
+            sgd_lr = lr_scale * 0.5 / 256 / 3  # lossが複雑なので微調整
+            self.model.compile(sgd_lr=sgd_lr, lr_multipliers=lr_multipliers, loss=self.pb.loss, metrics=self.pb.metrics)
+        else:
+            assert mode == 'predict'
+            assert lr_scale is None
+
         if mode in ('pretrain', 'train'):
             self.model.summary()
+        else:
+            logger.info('trainable params: %d', models.count_trainable_params(network))
 
         if weights is None:
             logger.info(f'cold start.')
@@ -226,18 +246,6 @@ class ObjectDetector(object):
                 logger.info(f'{weights.name} loaded.')
             else:
                 logger.info(f'warm start: {weights.name}')
-
-        if mode == 'pretrain':
-            # 事前学習：通常の分類としてコンパイル
-            self.model.compile(sgd_lr=0.5 / 256, loss='categorical_crossentropy', metrics=['acc'])
-        elif mode == 'train':
-            # Object detectionとしてコンパイル
-            assert lr_scale is not None
-            sgd_lr = lr_scale * 0.5 / 256 / 3  # lossが複雑なので微調整
-            self.model.compile(sgd_lr=sgd_lr, lr_multipliers=lr_multipliers, loss=self.pb.loss, metrics=self.pb.metrics)
-        else:
-            assert mode == 'predict'
-            assert lr_scale is None
 
 
 def _get_voc_weights():
