@@ -166,7 +166,7 @@ class ObjectDetector(object):
         else:
             gpus = 1
         # 1回予測して計算グラフを構築
-        self.model.model.predict_on_batch(np.zeros((gpus,) + self.pb.input_size + (3,), np.float32))
+        self.model.model.predict_on_batch(np.zeros((gpus,) + tuple(self.pb.input_size) + (3,), np.float32))
 
     def predict(self, X, conf_threshold=0.1, verbose=1) -> [ml.ObjectsPrediction]:
         """予測。"""

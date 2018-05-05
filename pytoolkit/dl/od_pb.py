@@ -16,7 +16,7 @@ class PriorBoxes(object):
 
     def __init__(self, input_size, map_sizes, num_classes):
         # 入力画像のサイズ。(縦, 横)のタプル。
-        self.input_size = np.array(input_size)
+        self.input_size = tuple(input_size)
         # 出力するfeature mapのサイズ(降順)。例：[40, 20, 10]なら、40x40、20x20、10x10の出力を持つ
         self.map_sizes = np.array(sorted(map_sizes)[::-1])
         # クラス数
@@ -38,7 +38,7 @@ class PriorBoxes(object):
         # 各prior boxの情報をdictで保持
         self.pb_info = []
         # チェック
-        assert self.input_size.shape == (2,)
+        assert np.array(self.input_size).shape == (2,)
         assert len(self.map_sizes.shape) == 1 and len(self.map_sizes) >= 1
         assert self.num_classes >= 1
 
@@ -142,7 +142,7 @@ class PriorBoxes(object):
             # グリッド
             grid = np.copy(prior_boxes_center)
             grid[:, :2] -= grid_size / 2
-            grid[:, 2:] += grid_size / 2 + (1 / self.input_size)
+            grid[:, 2:] += grid_size / 2 + (1 / np.array(self.input_size))
             # パターンごとにループ
             for pb_pat in self.pb_size_patterns:
                 # prior boxのサイズの基準
@@ -151,7 +151,7 @@ class PriorBoxes(object):
                 # (x1, y1, x2, y2)の位置を調整。縦横半分ずつ動かす。
                 prior_boxes = np.copy(prior_boxes_center)
                 prior_boxes[:, :2] -= pb_size / 2
-                prior_boxes[:, 2:] += pb_size / 2 + (1 / self.input_size)
+                prior_boxes[:, 2:] += pb_size / 2 + (1 / np.array(self.input_size))
                 # 追加
                 self.pb_grid.extend(grid)
                 self.pb_locs.extend(prior_boxes)
