@@ -263,6 +263,7 @@ def compute_ap(precision, recall, use_voc2007_metric=False):
 def compute_scores(gt, pred, iou_threshold=0.5):
     """物体検出の正解と予測結果から、適合率、再現率、F値、該当回数を算出して返す。"""
     assert len(gt) == len(pred)
+    assert 0 < iou_threshold < 1
     num_classes = len(np.unique(np.concatenate([y.classes for y in gt], axis=0)))
 
     tp = np.zeros((num_classes,), dtype=int)  # true positive
@@ -274,11 +275,13 @@ def compute_scores(gt, pred, iou_threshold=0.5):
         # 各正解が予測結果に含まれるか否か: true positive/negative
         for gt_class, gt_bbox, gt_difficult in zip(y_true.classes, y_true.bboxes, y_true.difficults):
             pred_bboxes = y_pred.bboxes[np.logical_and(pred_mask, y_pred.classes == gt_class)]
-            if not pred_bboxes.any():
-                continue
-            iou = compute_iou(np.expand_dims(gt_bbox, axis=0), pred_bboxes)[0, :]
-            pred_ix = iou.argmax()
-            if iou[pred_ix] >= iou_threshold:
+            if pred_bboxes.any():
+                iou = compute_iou(np.expand_dims(gt_bbox, axis=0), pred_bboxes)[0, :]
+                pred_ix = iou.argmax()
+                pred_iou = iou[pred_ix]
+            else:
+                pred_iou = -1   # 検出失敗
+            if pred_iou >= iou_threshold:
                 # 検出成功
                 if not gt_difficult:
                     tp[gt_class] += 1
