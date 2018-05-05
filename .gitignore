@@ -1,6 +1,6 @@
 __pycache__/
 
 # 実験用コード関連
-data/
-results_*/
+/data/
+/results_*/
 
