@@ -95,7 +95,7 @@ class Model(object):
             assert steps1 == steps1t
             g1 = generator.mixup(g1, g1t)
         shuffle_val = hvd.initialized() or balanced
-        g2, steps2 = self.gen.flow(X_val, y_val, batch_size=self.batch_size, shuffle=shuffle_val, balanced=balanced) if has_val else None, None
+        g2, steps2 = self.gen.flow(X_val, y_val, batch_size=self.batch_size, shuffle=shuffle_val, balanced=balanced) if has_val else (None, None)
 
         # horovod使用時のsteps per epochの調整
         if hvd.initialized():
