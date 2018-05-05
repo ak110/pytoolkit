@@ -86,22 +86,29 @@ class PriorBoxes(object):
         bboxes_sizes = bboxes[:, 2:] - bboxes[:, :2]
         # feature mapの格子のサイズ
         grid_sizes = 1 / self.map_sizes
-        # bboxのサイズごとにどこかのfeature mapに割り当てたことにして相対サイズをリストアップ
-        min_area_pattern = 0.5  # タイルの半分を下限としてみる
-        max_area_pattern = 1 / grid_sizes.max()  # 一番荒いmapが画像全体になるくらいのスケールを上限としてみる
-        bboxes_size_patterns = []
-        for grid_size in grid_sizes:
-            size_pattern = bboxes_sizes / grid_size
-            area_pattern = np.sqrt(size_pattern.prod(axis=-1))  # 縦幅・横幅の相乗平均のリスト
-            mask = math.between(area_pattern, min_area_pattern, max_area_pattern)
-            bboxes_size_patterns.append(size_pattern[mask])
-        bboxes_size_patterns = np.concatenate(bboxes_size_patterns)
-        assert len(bboxes_size_patterns.shape) == 2
-        assert bboxes_size_patterns.shape[1] == 2
+        # bboxのサイズごとにどこかのfeature mapに割り当てたことにして相対サイズのパターンをリストアップ
+        size_patterns = np.array([bboxes_sizes / grid_size for grid_size in grid_sizes])
+        assert len(size_patterns.shape) == 2
+        assert size_patterns.shape[1] == 2
+        # augmentation
+        # SSDに倣って結構大きくpadding/cropをしているので、それに合わせてバリエーションを増強。
+        size_patterns = np.concatenate([
+            size_patterns * (10 ** 0.5),
+            size_patterns * (10 ** 0.25),
+            size_patterns,
+            size_patterns * (0.1 ** 0.25),
+            size_patterns * (0.1 ** 0.5),
+        ])
+        # 極端なパターンの削除
+        min_pattern_size = 0.5  # タイルの半分を下限としてみる
+        max_pattern_size = 1 / grid_sizes.max()  # 一番荒いmapが画像全体になるくらいのスケールを上限としてみる
+        pattern_sizes = np.sqrt(size_patterns.prod(axis=-1))
+        pattern_mask = math.between(pattern_sizes, min_pattern_size, max_pattern_size)
+        size_patterns = size_patterns[pattern_mask]
 
-        # リストアップしたものをクラスタリング。(YOLOv2のDimension Clustersのようなもの)。
+        # パターンをクラスタリング (YOLOv2のDimension Clustersのようなもの)
         cluster = sklearn.cluster.KMeans(n_clusters=pb_size_pattern_count, n_jobs=-1, random_state=123)
-        pb_size_patterns = cluster.fit(bboxes_size_patterns).cluster_centers_
+        pb_size_patterns = cluster.fit(size_patterns).cluster_centers_
         assert pb_size_patterns.shape == (pb_size_pattern_count, 2)
 
         # 面積昇順でソート
