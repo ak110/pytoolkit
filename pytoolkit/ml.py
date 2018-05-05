@@ -4,7 +4,6 @@ import itertools
 import json
 import multiprocessing as mp
 import pathlib
-import xml.etree.ElementTree
 
 import numpy as np
 import sklearn.base
@@ -16,43 +15,15 @@ import sklearn.utils
 
 from . import draw, log, ndimage
 
-# VOC2007のクラス名のリスト (20クラス)
-VOC_CLASS_NAMES = [
-    'aeroplane',
-    'bicycle',
-    'bird',
-    'boat',
-    'bottle',
-    'bus',
-    'car',
-    'cat',
-    'chair',
-    'cow',
-    'diningtable',
-    'dog',
-    'horse',
-    'motorbike',
-    'person',
-    'pottedplant',
-    'sheep',
-    'sofa',
-    'train',
-    'tvmonitor',
-]
-# 0～19のIDへの変換
-VOC_CLASS_NAMES_TO_ID = {class_name: i for i, class_name in enumerate(VOC_CLASS_NAMES)}
-
 
 class ObjectsAnnotation(object):
-    """VOC2007などのアノテーションデータを持つためのクラス。"""
+    """物体検出のアノテーションデータを持つためのクラス。"""
 
-    def __init__(self, folder, filename, width, height, classes, bboxes, difficults=None):
+    def __init__(self, path, width, height, classes, bboxes, difficults=None):
         assert len(classes) == len(bboxes)
         assert difficults is None or len(classes) == len(difficults)
-        # 画像のフォルダパス (データのディレクトリからの相対パス)
-        self.folder = folder
-        # ファイル名
-        self.filename = filename
+        # 画像ファイルのフルパス
+        self.path = pathlib.Path(path)
         # 画像の横幅(px)
         self.width = width
         # 画像の縦幅(px)
@@ -76,94 +47,6 @@ class ObjectsAnnotation(object):
     def num_objects(self):
         """物体の数を返す。"""
         return len(self.classes)
-
-    @staticmethod
-    def get_path_list(data_dir, y):
-        """画像ファイルのパス(pathlib.Path)のndarrayを作って返す。
-
-        # 引数
-        - data_dir: VOCdevkitディレクトリが置いてあるディレクトリのパス
-        - y: ObjectsAnnotationの配列
-
-        """
-        data_dir = pathlib.Path(data_dir)
-        return np.array([data_dir / y_.folder / y_.filename for y_ in y])
-
-    @classmethod
-    def load_voc_0712_trainval(cls, data_dir, class_name_to_id=None, without_difficult=False):
-        """PASCAL VOCデータセットの、よくある07+12 trainvalの読み込み。"""
-        X1, y1 = cls.load_voc(data_dir, 2007, 'trainval', class_name_to_id, without_difficult=without_difficult)
-        X2, y2 = cls.load_voc(data_dir, 2012, 'trainval', class_name_to_id, without_difficult=without_difficult)
-        return np.concatenate([X1, X2]), np.concatenate([y1, y2])
-
-    @classmethod
-    def load_voc_07_test(cls, data_dir, class_name_to_id=None):
-        """PASCAL VOCデータセットの、よくある07 testの読み込み。"""
-        return cls.load_voc(data_dir, 2007, 'test', class_name_to_id)
-
-    @classmethod
-    def load_voc(cls, data_dir, year, set_name, class_name_to_id=None, without_difficult=False):
-        """PASCAL VOCデータセットの読み込み。
-
-        # 引数
-        - data_dir: VOCdevkitディレクトリが置いてあるディレクトリのパス
-        - year: 2007とか2012とか
-        - set_name: 'trainval'とか'test'とか
-
-        """
-        from . import io
-        names = io.read_all_lines(data_dir / f'VOCdevkit/VOC{year}/ImageSets/Main/{set_name}.txt')
-        y = cls.load_voc_files(data_dir / f'VOCdevkit/VOC{year}/Annotations',
-                               names, class_name_to_id, without_difficult)
-        X = cls.get_path_list(data_dir, y)
-        return X, y
-
-    @classmethod
-    def load_voc_files(cls, annotations_dir, names, class_name_to_id=None, without_difficult=False):
-        """VOC2007などのアノテーションデータの読み込み。
-
-        namesは「画像ファイル名拡張子なし」のリスト。
-        戻り値はObjectsAnnotationの配列。
-        """
-        d = pathlib.Path(annotations_dir)
-        return np.array([cls.load_voc_file(d / (name + '.xml'), class_name_to_id, without_difficult)
-                         for name in names])
-
-    @staticmethod
-    def load_voc_file(f, class_name_to_id, without_difficult):
-        """VOC2007などのアノテーションデータの読み込み。"""
-        class_name_to_id = class_name_to_id or VOC_CLASS_NAMES_TO_ID
-        root = xml.etree.ElementTree.parse(str(f)).getroot()
-        folder = root.find('folder').text
-        filename = root.find('filename').text
-        size_tree = root.find('size')
-        width = float(size_tree.find('width').text)
-        height = float(size_tree.find('height').text)
-        classes = []
-        bboxes = []
-        difficults = []
-        for object_tree in root.findall('object'):
-            difficult = object_tree.find('difficult').text == '1'
-            if without_difficult and difficult:
-                continue
-            class_id = class_name_to_id[object_tree.find('name').text]
-            bndbox = object_tree.find('bndbox')
-            xmin = float(bndbox.find('xmin').text) / width
-            ymin = float(bndbox.find('ymin').text) / height
-            xmax = float(bndbox.find('xmax').text) / width
-            ymax = float(bndbox.find('ymax').text) / height
-            classes.append(class_id)
-            bboxes.append([xmin, ymin, xmax, ymax])
-            difficults.append(difficult)
-        annotation = ObjectsAnnotation(
-            folder=f'VOCdevkit/{folder}/JPEGImages',
-            filename=filename,
-            width=width,
-            height=height,
-            classes=classes,
-            bboxes=bboxes,
-            difficults=difficults)
-        return annotation
 
     @property
     def bboxes_ar_fixed(self):

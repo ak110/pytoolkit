@@ -7,7 +7,7 @@ import typing
 
 import numpy as np
 
-from . import callbacks as dl_callbacks, hvd, models, od_gen, od_net, od_pb
+from . import hvd, models, od_gen, od_net, od_pb
 from .. import jsonex, log, ml, utils
 
 # バージョン
@@ -217,12 +217,7 @@ class ObjectDetector(object):
         elif weights == 'imagenet':
             logger.info(f'cold start with imagenet weights.')
         elif weights == 'voc':
-            import keras
-            if hvd.is_local_master():
-                keras.utils.get_file(_VOC_WEIGHTS_NAME, _VOC_WEIGHTS_URL, file_hash=_VOC_WEIGHTS_MD5, cache_subdir='models')
-            hvd.barrier()
-            weights_path = keras.utils.get_file(_VOC_WEIGHTS_NAME, _VOC_WEIGHTS_URL, file_hash=_VOC_WEIGHTS_MD5, cache_subdir='models')
-            weights_path = pathlib.Path(weights_path)
+            weights_path = _get_voc_weights()
             self.model.load_weights(weights_path)
             logger.info(f'{weights_path.name} loaded.')
         else:
@@ -243,3 +238,14 @@ class ObjectDetector(object):
         else:
             assert mode == 'predict'
             assert lr_scale is None
+
+
+def _get_voc_weights():
+    """学習済みモデルのダウンロード。"""
+    import keras
+    if hvd.is_local_master():  # horovod対策
+        keras.utils.get_file(_VOC_WEIGHTS_NAME, _VOC_WEIGHTS_URL, file_hash=_VOC_WEIGHTS_MD5, cache_subdir='models')
+    hvd.barrier()
+    weights_path = keras.utils.get_file(_VOC_WEIGHTS_NAME, _VOC_WEIGHTS_URL, file_hash=_VOC_WEIGHTS_MD5, cache_subdir='models')
+    weights_path = pathlib.Path(weights_path)
+    return weights_path

@@ -110,10 +110,13 @@ def tqdm(iterable=None, desc=None, total=None, leave=True, **kwargs):
 
 
 def better_exceptions():
-    """`better_exceptions`するだけ。"""
+    """`better_exceptions`を有効にする。"""
     try:
+        # サブプロセスとか用に環境変数を設定
+        os.environ['BETTER_EXCEPTIONS'] = '1'
+        # 今のスレッドでアクティブにする
         import better_exceptions as be  # pip install better_exceptions
-        be.MAX_LENGTH = 128
+        be.hook()
     except BaseException:
         logger = logging.getLogger(__name__)
-        logger.warning('better_exceptions is not installed?', exc_info=True)
+        logger.warning('better_exceptions error', exc_info=True)

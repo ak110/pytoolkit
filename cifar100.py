@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""実験用コード：CIFAR100."""
+"""実験用コード：CIFAR100。"""
 import argparse
 import pathlib
 

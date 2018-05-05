@@ -6,42 +6,27 @@ import pytest
 import pytoolkit as tk
 
 
-def test_load_voc_file():
-    base_dir = pathlib.Path(__file__).resolve().parent
-    xml_path = base_dir / 'data' / 'VOC2007_000001.xml'
-    ann = tk.ml.ObjectsAnnotation.load_voc_file(xml_path, tk.ml.VOC_CLASS_NAMES_TO_ID, without_difficult=False)
-    assert ann.folder == 'VOCdevkit/VOC2007/JPEGImages'
-    assert ann.filename == '000001.jpg'
-    assert ann.width == 353
-    assert ann.height == 500
-    assert len(ann.classes) == 2
-    assert ann.classes[0] == tk.ml.VOC_CLASS_NAMES_TO_ID['dog']
-    assert ann.classes[1] == tk.ml.VOC_CLASS_NAMES_TO_ID['person']
-    assert (ann.difficults == np.array([False, False])).all()
-    assert ann.bboxes[0] == pytest.approx(np.array([48, 240, 195, 371]) / [353, 500, 353, 500])
-    assert ann.bboxes[1] == pytest.approx(np.array([8, 12, 352, 498]) / [353, 500, 353, 500])
-
-
 def test_plot_objects():
     base_dir = pathlib.Path(__file__).resolve().parent
-    xml_path = base_dir / 'data' / 'VOC2007_000001.xml'
-    img_path = base_dir / 'data' / 'VOC2007_000001.jpg'
-    ann = tk.ml.ObjectsAnnotation.load_voc_file(xml_path, tk.ml.VOC_CLASS_NAMES_TO_ID, without_difficult=False)
+    data_dir = base_dir / 'data'
+    xml_path = data_dir / 'VOC2007_000001.xml'
+    img_path = data_dir / 'VOC2007_000001.jpg'
+    ann = tk.data.voc.load_annotation(data_dir, xml_path)
 
     img = tk.ml.plot_objects(img_path, ann.classes, None, ann.bboxes, None)
     tk.ndimage.save(base_dir.parent / '___check' / 'plot_objects1.png', img)
 
-    img = tk.ml.plot_objects(img_path, ann.classes, None, ann.bboxes, tk.ml.VOC_CLASS_NAMES)
+    img = tk.ml.plot_objects(img_path, ann.classes, None, ann.bboxes, tk.data.voc.CLASS_NAMES)
     tk.ndimage.save(base_dir.parent / '___check' / 'plot_objects2.png', img)
 
-    img = tk.ml.plot_objects(img_path, ann.classes, np.array([0.5, 0.5]), ann.bboxes, tk.ml.VOC_CLASS_NAMES)
+    img = tk.ml.plot_objects(img_path, ann.classes, np.array([0.5, 0.5]), ann.bboxes, tk.data.voc.CLASS_NAMES)
     tk.ndimage.save(base_dir.parent / '___check' / 'plot_objects3.png', img)
 
 
 def test_compute_map():
     gt = [
         tk.ml.ObjectsAnnotation(
-            '', '', 2000, 2000,
+            'path/to/dummy.jpg', 2000, 2000,
             np.array([1, 2]),
             np.array([
                 [0.000, 0.000, 0.200, 0.200],

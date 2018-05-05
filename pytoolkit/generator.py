@@ -45,6 +45,7 @@ class GeneratorContext(object):
             return self.y
         else:
             assert False, f'Unknown type: {y_type}'
+            return None
 
     @property
     def steps_per_epoch(self):
