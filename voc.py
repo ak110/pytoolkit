@@ -50,7 +50,7 @@ def _train(args, X_train, y_train, X_val, y_val):
 
     # 学習
     num_classes = len(tk.data.voc.CLASS_NAMES)
-    od = tk.dl.od.ObjectDetector(args.base_network, (args.input_size, args.input_size), args.map_sizes, num_classes)
+    od = tk.dl.od.ObjectDetector(args.base_network, args.input_size, args.map_sizes, num_classes)
     od.fit(X_train, y_train, X_val, y_val,
            batch_size=args.batch_size, epochs=args.epochs, initial_weights=weights, pb_size_pattern_count=args.pb_sizes,
            flip_h=True, flip_v=False, rotate90=False,
