@@ -19,9 +19,8 @@ class ImageDataGenerator(generator.Generator):
     # 使用例
     ```
     gen = tk.image.ImageDataGenerator()
-    gen.add(tk.generator.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
     gen.add(tk.image.Resize((300, 300)))
-    gen.add(tk.image.Mixup(probability=1, num_classes=num_classes))
+    gen.add(tk.image.RandomAlpha(probability=0.5))
     gen.add(tk.image.RandomPadding(probability=1))
     gen.add(tk.image.RandomRotate(probability=0.5))
     gen.add(tk.image.RandomCrop(probability=1))
@@ -30,6 +29,7 @@ class ImageDataGenerator(generator.Generator):
     gen.add(tk.image.RandomColorAugmentors(probability=0.5))
     gen.add(tk.image.RandomErasing(probability=0.5))
     gen.add(tk.generator.ProcessInput(tk.image.preprocess_input_abs1))
+    gen.add(tk.generator.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
     ```
 
     """
@@ -407,7 +407,7 @@ class RandomHue(generator.Operator):
 class RandomAlpha(generator.Operator):
     """画像の一部にランダムな色の半透明の矩形を描画する。"""
 
-    def __init__(self, probability=1, alpha=0.25, scale_low=0.1, scale_high=0.6, rate_1=1 / 3, rate_2=3, max_tries=30):
+    def __init__(self, probability=1, alpha=0.25, scale_low=0.02, scale_high=0.4, rate_1=1 / 3, rate_2=3, max_tries=30):
         assert 0 < probability <= 1
         assert scale_low <= scale_high
         assert rate_1 <= rate_2

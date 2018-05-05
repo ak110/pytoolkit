@@ -11,6 +11,7 @@ data_dir = base_dir / 'data'
 
 def _gen():
     gen = tk.image.ImageDataGenerator()
+    gen.add(tk.image.RandomAlpha(probability=0.5))
     gen.add(tk.image.RandomPadding(probability=1))
     gen.add(tk.image.RandomRotate(probability=0.5))
     gen.add(tk.image.RandomCrop(probability=1))
@@ -19,7 +20,6 @@ def _gen():
     gen.add(tk.image.RandomFlipTB(probability=0.5))
     gen.add(tk.image.RandomRotate90(probability=1))
     gen.add(tk.image.RandomColorAugmentors(probability=0.5))
-    gen.add(tk.image.RandomAlpha(probability=0.5))
     gen.add(tk.image.RandomErasing(probability=0.5))
     gen.add(tk.generator.ProcessInput(lambda x: x))
     gen.add(tk.generator.ProcessOutput(lambda y: y))

@@ -4,7 +4,7 @@ import numpy as np
 import pytoolkit as tk
 
 
-def test_xor(tmpdir):
+def test_xor():
     import keras
 
     X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]], dtype=np.float32)

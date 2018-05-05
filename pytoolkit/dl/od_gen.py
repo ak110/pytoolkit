@@ -33,6 +33,7 @@ def create_generator(image_size, preprocess_input, encode_truth, flip_h, flip_v,
         return rgb, y, w
 
     gen = image.ImageDataGenerator()
+    gen.add(image.RandomAlpha(probability=0.5))
     gen.add(generator.CustomAugmentation(_transform, probability=1))
     gen.add(image.Resize(image_size))
     if flip_h:
