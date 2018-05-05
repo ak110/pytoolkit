@@ -303,7 +303,8 @@ def print_scores(precisions, recalls, fscores, supports, class_names=None, print
     assert len(precisions) == len(recalls)
     assert len(precisions) == len(fscores)
     assert len(precisions) == len(supports)
-    class_names = class_names or [f'class{i:02d}' for i in range(len(precisions))]
+    if class_names is None:
+        class_names = [f'class{i:02d}' for i in range(len(precisions))]
     print_fn = print_fn or log.get(__name__).info
 
     print_fn('                   適合率  再現率  F値    件数')
