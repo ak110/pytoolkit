@@ -87,7 +87,7 @@ class PriorBoxes(object):
         # feature mapの格子のサイズ
         grid_sizes = 1 / self.map_sizes
         # bboxのサイズごとにどこかのfeature mapに割り当てたことにして相対サイズのパターンをリストアップ
-        size_patterns = np.array([bboxes_sizes / grid_size for grid_size in grid_sizes])
+        size_patterns = np.concatenate([bboxes_sizes / grid_size for grid_size in grid_sizes])
         assert len(size_patterns.shape) == 2
         assert size_patterns.shape[1] == 2
         # augmentation
