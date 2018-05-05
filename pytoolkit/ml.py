@@ -642,7 +642,7 @@ def plot_objects(base_image, classes, confs, bboxes, class_names):
         assert 0 <= np.max(classes) < len(class_names)
 
     img = ndimage.load(base_image, grayscale=False)
-    colors = draw.get_colors(len(class_names) if class_names else 1)
+    colors = draw.get_colors(len(class_names) if class_names is not None else 1)
 
     for classid, conf, bbox in zip(classes, confs, bboxes):
         xmin = int(round(bbox[0] * img.shape[1]))
