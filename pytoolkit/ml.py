@@ -286,13 +286,13 @@ def compute_scores(gt, pred, iou_threshold=0.5):
                 # 検出成功
                 if not gt_difficult:
                     tp[gt_class] += 1
-                pred_enabled[pred_mask][pred_ix] = False
+                pred_enabled[np.where(pred_mask)[0][pred_ix]] = False
             else:
                 # 検出失敗
                 if not gt_difficult:
                     tn[gt_class] += 1
         # 正解に含まれなかった予測結果: false positive
-        for pred_class in y_pred.classes[pred_mask]:
+        for pred_class in y_pred.classes[pred_enabled]:
             fp[pred_class] += 1
 
     supports = tp + tn
