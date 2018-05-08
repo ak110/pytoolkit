@@ -188,14 +188,12 @@ class RandomAugmentors(generator.Operator):
 
     # 引数
     augmentors: Augmentorの配列
-    clip_rgb: RGB値をnp.clip(x, 0, 255)するならTrue
     """
 
-    def __init__(self, augmentors, probability=1, clip_rgb=True):
+    def __init__(self, augmentors, probability=1):
         assert 0 < probability <= 1
         self.probability = probability
         self.augmentors = augmentors
-        self.clip_rgb = clip_rgb
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         if ctx.do_augmentation(rand, self.probability):
@@ -204,9 +202,6 @@ class RandomAugmentors(generator.Operator):
             for a in augmentors:
                 x, y, w = a.execute(x, y, w, rand, ctx)
                 assert x.dtype == np.float32, f'dtype error: {a.__class__}'
-            # 色が範囲外になっていたら補正(飽和)
-            if self.clip_rgb:
-                x = np.clip(x, 0, 255)
         return x, y, w
 
 
@@ -223,7 +218,7 @@ class RandomColorAugmentors(RandomAugmentors):
             RandomContrast(probability=probability),
             RandomHue(probability=probability),
         ]
-        super().__init__(argumentors, probability=1, clip_rgb=True)
+        super().__init__(argumentors, probability=1)
 
 
 class RandomFlipLR(generator.Operator):
