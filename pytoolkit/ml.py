@@ -320,7 +320,7 @@ def print_scores(precisions, recalls, fscores, supports, class_names=None, print
     cn = 'avg / total'
     prec = np.average(precisions, weights=supports)
     rec = np.average(recalls, weights=supports)
-    f1 = 2 / (1 / (prec + 1e-7) + 1 / (rec + 1e-7))
+    f1 = np.average(fscores, weights=supports)  # sklearnで言うaverage='weighted'
     sup = np.sum(supports)
     print_fn(f'{cn:16s}:  {prec:.3f}   {rec:.3f}   {f1:.3f}  {sup:7d}')
 
