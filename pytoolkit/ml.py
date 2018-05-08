@@ -554,12 +554,19 @@ class WeakModel(object):
                 json.dump(self.data_, f, indent=4, sort_keys=True)
 
 
-def print_classification_metrics(y_true, proba_pred, print_fn=None):
-    """分類の指標色々を表示する。"""
+def print_classification_metrics(y_true, proba_pred, average='macro', print_fn=None):
+    """分類の指標色々を表示する。
+
+    # 引数
+    - average: 'micro' ならF値などをサンプルごとに計算。'macro'ならクラスごとの重み無し平均。
+
+    """
     print_fn = print_fn or log.get(__name__).info
+    true_type = sklearn.utils.multiclass.type_of_target(y_true)
     pred_type = sklearn.utils.multiclass.type_of_target(proba_pred)
     assert pred_type in ('continuous', 'continuous-multioutput')
     if pred_type == 'continuous':  # binary
+        assert true_type == 'binary'
         y_pred = (np.asarray(proba_pred) >= 0.5).astype(np.int32)
         acc = sklearn.metrics.accuracy_score(y_true, y_pred)
         f1 = sklearn.metrics.f1_score(y_true, y_pred)
@@ -570,15 +577,18 @@ def print_classification_metrics(y_true, proba_pred, print_fn=None):
         print_fn(f'AUC:      {auc:.3f}')
         print_fn(f'Logloss:  {logloss:.3f}')
     else:  # multiclass
+        assert true_type == 'multiclass'
+        num_classes = len(np.unique(y_true))
+        ohe_true = to_categorical(num_classes)(np.asarray(y_true))
         y_pred = np.argmax(proba_pred, axis=-1)
         acc = sklearn.metrics.accuracy_score(y_true, y_pred)
-        f1mi = sklearn.metrics.f1_score(y_true, y_pred, average='micro')
-        f1ma = sklearn.metrics.f1_score(y_true, y_pred, average='macro')
-        logloss = sklearn.metrics.log_loss(y_true, proba_pred)
-        print_fn(f'Accuracy: {acc:.3f}')
-        print_fn(f'F1-micro: {f1mi:.3f}')  # クラス間の重み付き平均
-        print_fn(f'F1-macro: {f1ma:.3f}')  # クラス間の平均(balanced accuracyみたいなやつ)
-        print_fn(f'Logloss:  {logloss:.3f}')
+        f1 = sklearn.metrics.f1_score(y_true, y_pred, average=average)
+        auc = sklearn.metrics.roc_auc_score(ohe_true, proba_pred, average=average)
+        logloss = sklearn.metrics.log_loss(ohe_true, proba_pred)
+        print_fn(f'Accuracy:  {acc:.3f}')
+        print_fn(f'F1-{average}:  {f1:.3f}')
+        print_fn(f'AUC-{average}: {auc:.3f}')
+        print_fn(f'Logloss:   {logloss:.3f}')
 
 
 def plot_cm(cm, to_file='confusion_matrix.png', classes=None, normalize=True, title='Confusion matrix'):
