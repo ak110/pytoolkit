@@ -93,7 +93,7 @@ def pad(rgb: np.ndarray, width: int, height: int, padding='edge', rand=None) -> 
 
 def pad_ltrb(rgb: np.ndarray, x1: int, y1: int, x2: int, y2: int, padding='edge', rand=None):
     """パディング。x1/y1/x2/y2は左/上/右/下のパディング量。"""
-    assert padding in ('edge', 'zero', 'half', 'one', 'reflect', 'wrap', 'rand')
+    assert padding in ('edge', 'zero', 'half', 'one', 'reflect', 'wrap', 'rand', 'mean')
     kwargs = {}
     if padding == 'zero':
         mode = 'constant'
@@ -106,7 +106,10 @@ def pad_ltrb(rgb: np.ndarray, x1: int, y1: int, x2: int, y2: int, padding='edge'
     elif padding == 'rand':
         assert rand is not None
         mode = 'constant'
-        kwargs['constant_values'] = rand.randint(0, 255)
+        kwargs['constant_values'] = (rand.randint(0, 255),)
+    elif padding == 'mean':
+        mode = 'constant'
+        kwargs['constant_values'] = (rgb.mean(),)
     else:
         mode = padding
 

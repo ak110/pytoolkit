@@ -14,13 +14,15 @@ _VAR_SIZE = 0.2  # SSD風適当スケーリング
 class PriorBoxes(object):
     """Prior boxの集合を管理するクラス。 """
 
-    def __init__(self, input_size, map_sizes, num_classes):
+    def __init__(self, input_size, map_sizes, num_classes, keep_aspect):
         # 入力画像のサイズ。(縦, 横)のタプル。
         self.input_size = tuple(input_size)
         # 出力するfeature mapのサイズ(降順)。例：[40, 20, 10]なら、40x40、20x20、10x10の出力を持つ
         self.map_sizes = np.array(sorted(map_sizes)[::-1])
         # クラス数
         self.num_classes = num_classes
+        # アスペクト比を保持するようにパディングして処理するのか、アスペクト比を無視して入力サイズ全体にリサイズして処理するのか。
+        self.keep_aspect = keep_aspect
         # feature mapのグリッドサイズに対する、prior boxの基準サイズの割合(面積昇順)。[1.5, 0.5] なら横が1.5倍、縦が0.5倍。
         self.pb_size_patterns = np.empty((0,))
         # shape=(box数, 4)で座標(アスペクト比などを適用する前のグリッド)
@@ -61,7 +63,7 @@ class PriorBoxes(object):
         self._create_pb()
 
     @log.trace()
-    def fit(self, y_train: [ml.ObjectsAnnotation], pb_size_pattern_count=8):
+    def fit(self, y_train: [ml.ObjectsAnnotation], pb_size_pattern_count=8, rotate90=False):
         """訓練データからパラメータを適当に決めてインスタンスを作成する。
 
         # 引数
@@ -80,13 +82,18 @@ class PriorBoxes(object):
         total_objects = np.sum(bc)
         for class_id, count in enumerate(bc):
             logger.info(f'  class{class_id:02d}: {count:5d} ({100 * count / total_objects:5.1f}%)')
-        self._create_pb_pattern(y_train, pb_size_pattern_count)
+        self._create_pb_pattern(y_train, pb_size_pattern_count, rotate90)
         self._create_pb()
 
-    def _create_pb_pattern(self, y_train: [ml.ObjectsAnnotation], pb_size_pattern_count):
+    def _create_pb_pattern(self, y_train: [ml.ObjectsAnnotation], pb_size_pattern_count, rotate90):
         """Prior boxのサイズのパターンを作成。"""
         # 訓練データのbboxのサイズ
-        bboxes = np.concatenate([y.bboxes_ar_fixed for y in y_train])
+        if self.keep_aspect:
+            bboxes = np.concatenate([y.bboxes_ar_fixed for y in y_train])
+        else:
+            bboxes = np.concatenate([y.bboxes for y in y_train])
+        if rotate90:
+            bboxes = np.concatenate([bboxes, bboxes[:, [1, 0, 3, 2]]])  # swap x y
         bboxes_sizes = bboxes[:, 2:] - bboxes[:, :2]
         # feature mapの格子のサイズ
         grid_sizes = 1 / self.map_sizes

@@ -42,10 +42,11 @@ class ObjectDetector(object):
     候補として最初に準備するboxの集合を持つ。
     """
 
-    def __init__(self, base_network, input_size, map_sizes, num_classes):
+    def __init__(self, base_network, input_size, map_sizes, num_classes, keep_aspect=False):
         self.base_network = base_network
-        self.pb = od_pb.PriorBoxes(input_size, map_sizes, num_classes)
+        self.pb = od_pb.PriorBoxes(input_size, map_sizes, num_classes, keep_aspect)
         self.model: models.Model = None
+        self.keep_aspect = keep_aspect
 
     def save(self, path: typing.Union[str, pathlib.Path]):
         """保存。"""
@@ -55,6 +56,7 @@ class ObjectDetector(object):
             'input_size': self.pb.input_size,
             'map_sizes': self.pb.map_sizes,
             'num_classes': self.pb.num_classes,
+            'keep_aspect': self.pb.keep_aspect,
         }
         data.update(self.pb.to_dict())
         jsonex.dump(data, path)
@@ -73,7 +75,8 @@ class ObjectDetector(object):
             base_network=data['base_network'],
             input_size=data['input_size'],
             map_sizes=data['map_sizes'],
-            num_classes=data['num_classes'])
+            num_classes=data['num_classes'],
+            keep_aspect=data.get('keep_aspect', False))
         od.pb.from_dict(data)
         return od
 
@@ -119,7 +122,7 @@ class ObjectDetector(object):
         if hvd.is_master():
             logger = log.get(__name__)
             logger.info(f'base network:         {self.base_network}')
-            self.pb.fit(y_train, pb_size_pattern_count)
+            self.pb.fit(y_train, pb_size_pattern_count, rotate90=rotate90)
             pb_dict = self.pb.to_dict()
         else:
             pb_dict = None
@@ -211,7 +214,7 @@ class ObjectDetector(object):
         if mode == 'pretrain':
             gen = od_gen.create_pretrain_generator(self.pb.input_size, pi)
         else:
-            gen = od_gen.create_generator(self.pb.input_size, pi, self.pb.encode_truth,
+            gen = od_gen.create_generator(self.pb.input_size, self.keep_aspect, pi, self.pb.encode_truth,
                                           flip_h=flip_h, flip_v=flip_v, rotate90=rotate90)
         self.model = models.Model(network, gen, batch_size)
 

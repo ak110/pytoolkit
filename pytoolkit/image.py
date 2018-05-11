@@ -4,7 +4,7 @@ import warnings
 
 import numpy as np
 
-from . import generator, ml, ndimage
+from . import generator, math, ml, ndimage
 
 
 class ImageDataGenerator(generator.Generator):
@@ -116,6 +116,7 @@ class Resize(generator.Operator):
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         """処理。"""
         assert rand is not None  # noqa
+        assert self.padding is None or not isinstance(y, ml.ObjectsAnnotation)  # paddingありで物体検出はとりあえず未対応
         x = ndimage.resize(x, self.image_size[1], self.image_size[0], padding=self.padding)
         return x, y, w
 
@@ -181,6 +182,128 @@ class RandomCrop(generator.Operator):
             crop_y = rand.randint(0, x.shape[0] - cropped_h + 1)
             x = ndimage.crop(x, crop_x, crop_y, cropped_w, cropped_h)
         return x, y, w
+
+
+class RandomZoom(generator.Operator):
+    """Padding or crop + アスペクト比変更を行う。とりあえず物体検知用。"""
+
+    def __init__(self, probability=1, output_size=(300, 300), keep_aspect=False, aspect_prob=0.5, max_aspect_ratio=4 / 3):
+        assert 0 < probability <= 1
+        assert max_aspect_ratio >= 1
+        self.probability = probability
+        self.output_size = np.asarray(output_size)
+        self.keep_aspect = keep_aspect
+        self.aspect_prob = aspect_prob
+        self.max_aspect_ratio = max_aspect_ratio
+        self.min_aspect_ratio = 1 / self.max_aspect_ratio
+
+    def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
+            # padding or crop
+            base_ar = x.shape[1] / x.shape[0] if self.keep_aspect else self.output_size[0] / self.output_size[1]
+            rand_ar = np.exp(rand.uniform(np.log(self.min_aspect_ratio), np.log(self.max_aspect_ratio))) if rand.rand() <= self.aspect_prob else 1
+            root_ar = np.sqrt(base_ar * rand_ar)
+            ar = np.array([root_ar, 1 / root_ar])
+            if rand.rand() <= 0.5:
+                x = self._padding(x, y, rand, ar)
+            else:
+                x = self._crop(x, y, rand, ar)
+        else:
+            # リサイズ
+            if self.keep_aspect:
+                # アスペクト比保持
+                input_size = np.asarray(x.shape[-2::-1])
+                resize_rate = (self.output_size / input_size).min()
+                resized = np.floor(input_size * resize_rate + 0.1).astype(np.int32)
+                assert all(resized <= self.output_size) and any(resized == self.output_size)
+                x = ndimage.resize(x, resized[0], resized[1], padding=None)
+                # パディング
+                space = self.output_size - resized
+                xy1 = space // 2
+                xy2 = space - xy1
+                assert all(xy1 + resized + xy2 == self.output_size)
+                assert all(xy1) >= 0 and all(xy2 >= 0)
+                x = ndimage.pad_ltrb(x, xy1[0], xy1[1], xy2[0], xy2[1], padding='mean')
+                # 座標の修正
+                if isinstance(y, ml.ObjectsAnnotation):
+                    y.bboxes = (np.tile(xy1, 2) + y.bboxes * np.tile(resized, 2)) / np.tile(self.output_size, 2)
+            else:
+                # アスペクト比無視
+                x = ndimage.resize(x, self.output_size[0], self.output_size[1], padding=None)
+        assert all(x.shape[-2::-1] == self.output_size)
+        return x, y, w
+
+    def _padding(self, rgb, y, rand, ar):
+        """Padding(zoom-out)。"""
+        input_size = np.asarray(rgb.shape[-2::-1])
+        for _ in range(30):
+            pr = np.exp(rand.uniform(np.log(1), np.log(4)))  # SSD風：[1, 16]
+            padded_size = np.ceil(input_size * pr * ar).astype(int)
+            padded_size = np.maximum(padded_size, input_size)
+            padding_size = padded_size - input_size
+            paste_xy = np.array([rand.randint(0, padding_size[0] + 1), rand.randint(0, padding_size[1] + 1)])
+            if isinstance(y, ml.ObjectsAnnotation):
+                bboxes = np.copy(y.bboxes)
+                bboxes = (np.tile(paste_xy, 2) + bboxes * np.tile(input_size, 2)) / np.tile(padded_size, 2)
+                sb = bboxes * np.tile(self.output_size, 2)
+                if (sb[:, 2:] - sb[:, :2] < 4).any():  # あまりに小さいbboxが発生するのはNG
+                    continue
+                y.bboxes = bboxes
+            # 先に縮小
+            new_size = np.floor(input_size * self.output_size / padded_size).astype(int)
+            rgb = ndimage.resize(rgb, new_size[0], new_size[1], padding=None)
+            # パディング
+            paste_lr = np.floor(paste_xy * self.output_size / padded_size).astype(int)
+            paste_tb = self.output_size - (paste_lr + new_size)
+            padding = rand.choice(('edge', 'zero', 'one', 'rand'))
+            rgb = ndimage.pad_ltrb(rgb, paste_lr[0], paste_lr[1], paste_tb[0], paste_tb[1], padding, rand)
+            assert all(rgb.shape[-2::-1] == self.output_size)
+            break
+        return rgb
+
+    def _crop(self, rgb, y, rand, ar):
+        """Crop(zoom-in)。"""
+        # SSDでは結構複雑なことをやっているが、とりあえず簡単に実装
+        if isinstance(y, ml.ObjectsAnnotation):
+            bb_center = ml.bboxes_center(y.bboxes)
+            bb_area = ml.bboxes_area(y.bboxes)
+        input_size = np.asarray(rgb.shape[-2::-1])
+        for _ in range(30):
+            cr = np.exp(rand.uniform(np.log(np.sqrt(0.1)), np.log(1)))  # SSD風：[0.1, 1]
+            cropped_wh = np.floor(input_size * cr * ar).astype(int)
+            cropped_wh = np.minimum(cropped_wh, input_size)
+            cropping_size = input_size - cropped_wh
+            crop_xy = np.array([rand.randint(0, cropping_size[0] + 1), rand.randint(0, cropping_size[1] + 1)])
+            crop_box = np.concatenate([crop_xy, crop_xy + cropped_wh]) / np.tile(input_size, 2)
+            if isinstance(y, ml.ObjectsAnnotation):
+                # 中心を含むbboxのみ有効
+                bb_mask = math.in_range(bb_center, crop_box[:2], crop_box[2:]).all(axis=-1)
+                if not bb_mask.any():
+                    continue
+                # あまり極端に面積が減っていないbboxのみ有効
+                lt = np.maximum(crop_box[np.newaxis, :2], y.bboxes[:, :2])
+                rb = np.minimum(crop_box[np.newaxis, 2:], y.bboxes[:, 2:])
+                cropped_area = (rb - lt).prod(axis=-1) * (lt < rb).all(axis=-1)
+                bb_mask = np.logical_and(bb_mask, cropped_area >= bb_area * 0.3)
+                # bboxが一つも残らなければやり直し
+                if not bb_mask.any():
+                    continue
+                bboxes = np.copy(y.bboxes)
+                bboxes = (bboxes * np.tile(input_size, 2) - np.tile(crop_xy, 2)) / np.tile(cropped_wh, 2)
+                bboxes = np.clip(bboxes, 0, 1)
+                sb = bboxes * np.tile(self.output_size, 2)
+                if (sb[:, 2:] - sb[:, :2] < 4).any():  # あまりに小さいbboxが発生するのはNG
+                    continue
+                y.bboxes = bboxes[bb_mask]
+                y.classes = y.classes[bb_mask]
+                y.difficults = y.difficults[bb_mask]
+            # 切り抜き
+            rgb = ndimage.crop(rgb, crop_xy[0], crop_xy[1], cropped_wh[0], cropped_wh[1])
+            assert (rgb.shape[-2::-1] == cropped_wh).all()
+            # リサイズ
+            rgb = ndimage.resize(rgb, self.output_size[0], self.output_size[1])
+            break
+        return rgb
 
 
 class RandomAugmentors(generator.Operator):
