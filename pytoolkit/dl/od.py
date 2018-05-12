@@ -241,10 +241,10 @@ class ObjectDetector(object):
             logger.info(f'cold start with imagenet weights.')
         elif weights == 'voc':
             weights_path = _get_voc_weights()
-            self.model.load_weights(weights_path)
+            self.model.load_weights(weights_path, strict_warnings=False)
             logger.info(f'{weights_path.name} loaded.')
         else:
-            self.model.load_weights(weights)
+            self.model.load_weights(weights, strict_warnings=False)
             if mode == 'predict':
                 logger.info(f'{weights.name} loaded.')
             else:

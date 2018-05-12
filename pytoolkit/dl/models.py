@@ -13,13 +13,13 @@ class Model(object):
         self.gen = gen
         self.batch_size = batch_size
 
-    def load_weights(self, filepath, where_fn=None):
+    def load_weights(self, filepath, where_fn=None, strict_warnings=True):
         """重みの読み込み。
 
         model.load_weights()は重みの形が違うと読み込めないが、
         警告を出しつつ読むようにしたもの。
         """
-        load_weights(self.model, filepath, where_fn)
+        load_weights(self.model, filepath, where_fn, strict_warnings)
 
     def set_multi_gpu_model(self, gpus=None):
         """マルチGPU化。"""
@@ -273,7 +273,7 @@ def load_model(filepath, compile=True):  # pylint: disable=W0622
 
 
 @log.trace()
-def load_weights(model, filepath, where_fn=None):
+def load_weights(model, filepath, where_fn=None, strict_warnings=True):
     """重みの読み込み。
 
     model.load_weights()は重みの形が違うと読み込めないが、
@@ -283,6 +283,7 @@ def load_weights(model, filepath, where_fn=None):
     - model: 読み込み先モデル。
     - filepath: モデルのファイルパス。(str or pathlib.Path)
     - where_fn: 読み込むレイヤー名を受け取り、読み込むか否かを返すcallable。
+    - strict_warnings: 重みを持たないレイヤーについてもレイヤー名の不一致などにwarningログを出す。
     """
     import h5py
     import keras
@@ -303,7 +304,7 @@ def load_weights(model, filepath, where_fn=None):
 
             g = f[name]
             weight_names = [n.decode('utf8') for n in g.attrs['weight_names']]
-            if len(weight_names) == 0:
+            if not strict_warnings and len(weight_names) == 0:
                 continue
             weight_values = [g[weight_name] for weight_name in weight_names]
 
