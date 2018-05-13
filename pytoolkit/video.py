@@ -61,6 +61,19 @@ class RandomFlipLR(generator.Operator):
         return x, y, w
 
 
+class RandomFlipTB(generator.Operator):
+    """上下反転。"""
+
+    def __init__(self, probability=1):
+        assert 0 < probability <= 1
+        self.probability = probability
+
+    def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
+            x = x[:, ::-1, :, :]
+        return x, y, w
+
+
 def load_video(x):
     """動画の読み込み。"""
     if isinstance(x, np.ndarray):
