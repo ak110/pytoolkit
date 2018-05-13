@@ -106,7 +106,7 @@ def listup_classification(dirpath, class_names=None):
     return class_names, np.array(X), np.array(y)
 
 
-def split(X, y, validation_split=None, cv_count=None, cv_index=None, split_seed=None, stratify=None):
+def split(X, y, split_seed, validation_split=None, cv_count=None, cv_index=None, stratify=None):
     """データの分割。
 
     # 引数
@@ -126,14 +126,20 @@ def split(X, y, validation_split=None, cv_count=None, cv_index=None, split_seed=
         # cross validation
         assert cv_count is not None
         assert cv_index in range(cv_count)
-        if stratify is None:
-            stratify = isinstance(y, np.ndarray) and len(y.shape) == 1
-        cv = sklearn.model_selection.StratifiedKFold if stratify else sklearn.model_selection.KFold
-        cv = cv(cv_count, shuffle=True, random_state=split_seed)
-        train_indices, val_indices = list(cv.split(X, y))[cv_index]
+        train_indices, val_indices = cv_indices(stratify, y, cv_count, split_seed, X, cv_index)
         X_train, y_train = X[train_indices], y[train_indices]
         X_val, y_val = X[val_indices], y[val_indices]
     return (X_train, y_train), (X_val, y_val)
+
+
+def cv_indices(X, y, cv_count, cv_index, split_seed, stratify=None):
+    """cross validationのインデックスを返す。"""
+    if stratify is None:
+        stratify = isinstance(y, np.ndarray) and len(y.shape) == 1
+    cv = sklearn.model_selection.StratifiedKFold if stratify else sklearn.model_selection.KFold
+    cv = cv(cv_count, shuffle=True, random_state=split_seed)
+    train_indices, val_indices = list(cv.split(X, y))[cv_index]
+    return train_indices, val_indices
 
 
 class _ToCategorical(object):
