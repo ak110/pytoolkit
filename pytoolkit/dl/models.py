@@ -136,16 +136,27 @@ class Model(object):
         return hist
 
     @log.trace()
-    def predict(self, X, data_augmentation=False):
+    def predict(self, X, data_augmentation=False,
+                max_queue_size=10, workers=1,
+                use_multiprocessing=False, verbose=0):
         """予測。"""
         g, steps = self.gen.flow(X, batch_size=self.batch_size, data_augmentation=data_augmentation)
-        return self.model.predict_generator(g, steps)
+        return self.model.predict_generator(g, steps,
+                                            max_queue_size=max_queue_size,
+                                            workers=workers,
+                                            use_multiprocessing=use_multiprocessing,
+                                            verbose=verbose)
 
     @log.trace()
-    def evaluate(self, X, y, data_augmentation=False):
+    def evaluate(self, X, y, data_augmentation=False,
+                 max_queue_size=10, workers=1,
+                 use_multiprocessing=False):
         """評価。"""
         g, steps = self.gen.flow(X, y, batch_size=self.batch_size, data_augmentation=data_augmentation)
-        return self.model.evaluate_generator(g, steps)
+        return self.model.evaluate_generator(g, steps,
+                                             max_queue_size=max_queue_size,
+                                             workers=workers,
+                                             use_multiprocessing=use_multiprocessing)
 
     @log.trace()
     def save(self, filepath, overwrite=True, include_optimizer=True):
