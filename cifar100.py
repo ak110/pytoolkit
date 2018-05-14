@@ -34,10 +34,9 @@ def _run(args):
     with tk.log.trace_scope('create network'):
         builder = tk.dl.layers.Builder()
         x = inp = keras.layers.Input(input_shape)
+        x = builder.conv2d(128, use_act=False, name=f'start')(x)
         for block, filters in enumerate([128, 256, 512]):
             name = f'stage{block + 1}_block'
-            strides = 1 if block == 0 else 2
-            x = builder.conv2d(filters, strides=strides, use_act=False, name=f'{name}_start')(x)
             for res in range(4):
                 sc = x
                 x = builder.conv2d(filters // 4, name=f'{name}_r{res}_c1')(x)
@@ -47,6 +46,7 @@ def _run(args):
                 x = builder.conv2d(filters, 1, use_act=False, name=f'{name}_r{res}_c2')(x)
                 x = keras.layers.add([sc, x], name=f'{name}_r{res}_add')
             x = builder.bn_act(name=f'{name}')(x)
+            x = builder.conv2d(min(filters * 2, 512), strides=2, use_act=False, name=f'{name}_ds')(x)
         x = keras.layers.Dropout(0.5, name='dropout')(x)
         x = keras.layers.GlobalAveragePooling2D(name='pooling')(x)
         x = builder.dense(num_classes, activation='softmax', name='predictions')(x)
