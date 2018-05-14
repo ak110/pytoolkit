@@ -14,7 +14,7 @@ from .. import jsonex, log, ml, utils
 _JSON_VERSION = '0.0.2'
 # PASCAL VOC 07+12 trainvalで学習したときのmodel.json
 _VOC_JSON_DATA = {
-    "base_network": "vgg16",
+    "network": "current",
     "input_size": [320, 320],
     "map_sizes": [40, 20, 10],
     "num_classes": 20,
@@ -42,8 +42,9 @@ class ObjectDetector(object):
     候補として最初に準備するboxの集合を持つ。
     """
 
-    def __init__(self, base_network, input_size, map_sizes, num_classes, keep_aspect=False):
-        self.base_network = base_network
+    def __init__(self, network='current', input_size, map_sizes, num_classes, keep_aspect=False):
+        assert network in ('current', 'experimental', 'experimental_large')
+        self.network = network
         self.pb = od_pb.PriorBoxes(input_size, map_sizes, num_classes, keep_aspect)
         self.model: models.Model = None
         self.keep_aspect = keep_aspect
@@ -52,7 +53,7 @@ class ObjectDetector(object):
         """保存。"""
         data = {
             'version': _JSON_VERSION,
-            'base_network': self.base_network,
+            'network': self.network,
             'input_size': self.pb.input_size,
             'map_sizes': self.pb.map_sizes,
             'num_classes': self.pb.num_classes,
@@ -72,10 +73,10 @@ class ObjectDetector(object):
         if data['version'] == '0.0.1':
             data.update(data.pop('pb'))
         od = ObjectDetector(
-            base_network=data['base_network'],
-            input_size=data['input_size'],
-            map_sizes=data['map_sizes'],
-            num_classes=data['num_classes'],
+            network=data.get('network', 'current'),
+            input_size=data.get('input_size'),
+            map_sizes=data.get('map_sizes'),
+            num_classes=data.get('num_classes'),
             keep_aspect=data.get('keep_aspect', False))
         od.pb.from_dict(data)
         return od
@@ -121,7 +122,7 @@ class ObjectDetector(object):
         # 訓練データに合わせたprior boxの作成
         if hvd.is_master():
             logger = log.get(__name__)
-            logger.info(f'base network:         {self.base_network}')
+            logger.info(f'network:              {self.network}')
             self.pb.fit(y_train, pb_size_pattern_count, rotate90=rotate90)
             pb_dict = self.pb.to_dict()
         else:
@@ -206,11 +207,11 @@ class ObjectDetector(object):
         logger = log.get(__name__)
 
         network, lr_multipliers = od_net.create_network(
-            base_network=self.base_network, pb=self.pb,
+            network=self.network, pb=self.pb,
             mode=mode, strict_nms=strict_nms)
         if freeze_end_layer_name is not None:
             models.freeze_to_name(network, freeze_end_layer_name, skip_bn=True)
-        pi = od_net.get_preprocess_input(self.base_network)
+        pi = od_net.get_preprocess_input(self.network)
         if mode == 'pretrain':
             gen = od_gen.create_pretrain_generator(self.pb.input_size, pi)
         else:

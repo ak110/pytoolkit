@@ -11,7 +11,7 @@ def _main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--vocdevkit-dir', default=pathlib.Path('data/VOCdevkit'), type=pathlib.Path)
     parser.add_argument('--result-dir', default=pathlib.Path('results_voc'), type=pathlib.Path)
-    parser.add_argument('--base_network', default='vgg16', choices=('vgg16', 'resnet50'))
+    parser.add_argument('--network', default='current', choices=('current', 'experimental', 'experimental_large'))
     parser.add_argument('--input-size', default=(320, 320), type=int, nargs=2)
     parser.add_argument('--map-sizes', default=(40, 20, 10), type=int, nargs='+')
     parser.add_argument('--pb-sizes', default=8, type=int)
@@ -50,7 +50,7 @@ def _train(args, X_train, y_train, X_val, y_val):
 
     # 学習
     num_classes = len(tk.data.voc.CLASS_NAMES)
-    od = tk.dl.od.ObjectDetector(args.base_network, args.input_size, args.map_sizes, num_classes)
+    od = tk.dl.od.ObjectDetector(args.network, args.input_size, args.map_sizes, num_classes)
     od.fit(X_train, y_train, X_val, y_val,
            batch_size=args.batch_size, epochs=args.epochs, initial_weights=weights, pb_size_pattern_count=args.pb_sizes,
            flip_h=True, flip_v=False, rotate90=False,
