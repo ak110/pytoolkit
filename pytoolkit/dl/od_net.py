@@ -261,7 +261,8 @@ def _create_predict_network(pb, inputs, objs, clfs, locs, strict_nms):
         objs = x[0][:, :, 0]
         confs = x[1]
         # objectnessとconfidenceの幾何平均をconfidenceということにしてみる
-        conf = K.sqrt(objs * confs)
+        # → √すると1.0寄りになりすぎるので√無しに。(objectnessをgateにしたようなもの？)
+        conf = objs * confs
         return conf * np.expand_dims(pb.pb_mask, axis=0)
 
     classes = layers.channel_argmax()(name='classes')(clfs)
