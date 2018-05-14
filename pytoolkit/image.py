@@ -187,7 +187,7 @@ class RandomCrop(generator.Operator):
 class RandomZoom(generator.Operator):
     """Padding or crop + アスペクト比変更を行う。とりあえず物体検知用。"""
 
-    def __init__(self, probability=1, output_size=(300, 300), keep_aspect=False, aspect_prob=0.5, max_aspect_ratio=4 / 3):
+    def __init__(self, probability=1, output_size=(300, 300), keep_aspect=False, aspect_prob=0.5, max_aspect_ratio=3 / 2):
         assert 0 < probability <= 1
         assert max_aspect_ratio >= 1
         self.probability = probability
@@ -208,8 +208,9 @@ class RandomZoom(generator.Operator):
                 x = self._padding(x, y, rand, ar)
             else:
                 x = self._crop(x, y, rand, ar)
-        else:
-            # リサイズ
+
+        # DataAugmentation無しの場合や失敗時のリサイズ
+        if not all(x.shape[-2::-1] == self.output_size):
             if self.keep_aspect:
                 # アスペクト比保持
                 input_size = np.asarray(x.shape[-2::-1])
@@ -230,6 +231,7 @@ class RandomZoom(generator.Operator):
             else:
                 # アスペクト比無視
                 x = ndimage.resize(x, self.output_size[0], self.output_size[1], padding=None)
+
         assert all(x.shape[-2::-1] == self.output_size)
         return x, y, w
 
@@ -302,6 +304,7 @@ class RandomZoom(generator.Operator):
             assert (rgb.shape[-2::-1] == cropped_wh).all()
             # リサイズ
             rgb = ndimage.resize(rgb, self.output_size[0], self.output_size[1])
+            assert all(rgb.shape[-2::-1] == self.output_size)
             break
         return rgb
 

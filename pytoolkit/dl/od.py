@@ -42,7 +42,7 @@ class ObjectDetector(object):
     候補として最初に準備するboxの集合を持つ。
     """
 
-    def __init__(self, network='current', input_size, map_sizes, num_classes, keep_aspect=False):
+    def __init__(self, network, input_size, map_sizes, num_classes, keep_aspect=False):
         assert network in ('current', 'experimental', 'experimental_large')
         self.network = network
         self.pb = od_pb.PriorBoxes(input_size, map_sizes, num_classes, keep_aspect)
