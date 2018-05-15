@@ -110,8 +110,8 @@ def _create_detector(network, pb, builder, inputs, x, ref, lr_multipliers, for_p
 
     # center
     if network == 'current':
-        x = builder.conv2d(64, (1, 1), name='center_conv1')(x)
-        x = builder.conv2d(64, (map_size, map_size), padding='valid', name='center_conv2')(x)
+        x = builder.conv2d(64, 1, name='center_conv1')(x)
+        x = builder.conv2d(64, map_size, padding='valid', name='center_conv2')(x)
     else:
         x = keras.layers.AveragePooling2D(map_size)(x)
         x = builder.conv2d(64, 1, name='center_conv')(x)
@@ -178,9 +178,8 @@ def _create_pm(network, pb, builder, ref, lr_multipliers):
         shared_layers['pm_layer2'] = builder.res_block(256, name='pm_res1')
         shared_layers['pm_layer3'] = builder.res_block(256, name='pm_res2')
     else:
-        shared_layers['pm_layer1'] = lambda x: x
-        shared_layers['pm_layer2'] = builder.res_block(256, name='pm_res1')
-        shared_layers['pm_layer3'] = builder.res_block(256, name='pm_res2')
+        shared_layers['pm_layer1'] = builder.res_block(256, name='pm_res1')
+        shared_layers['pm_layer2'] = builder.res_block(256, name='pm_res2')
     shared_layers['pm_bn_act'] = builder.bn_act(name='pm')
     for pat_ix in range(len(pb.pb_size_patterns)):
         shared_layers[f'pm-{pat_ix}_obj'] = builder.conv2d(
@@ -221,10 +220,10 @@ def _create_pm(network, pb, builder, ref, lr_multipliers):
     for map_size in pb.map_sizes:
         assert f'out{map_size}' in ref, f'map_size error: {ref}'
         x = ref[f'out{map_size}']
-        x = shared_layers[f'pm_layer1'](x)
-        x = shared_layers[f'pm_layer2'](x)
-        x = shared_layers[f'pm_layer3'](x)
-        x = shared_layers[f'pm_bn_act'](x)
+        x = shared_layers['pm_layer1'](x)
+        x = shared_layers['pm_layer2'](x)
+        x = shared_layers['pm_layer3'](x) if 'pm_layer3' in shared_layers else x
+        x = shared_layers['pm_bn_act'](x)
         for pat_ix in range(len(pb.pb_size_patterns)):
             obj = shared_layers[f'pm-{pat_ix}_obj'](x)
             clf = shared_layers[f'pm-{pat_ix}_clf'](x)
@@ -245,9 +244,9 @@ def _block(builder, filters, name):
     """downsamplingで使用するブロック。"""
     import keras
     return layers.Sequence([
-        builder.dwconv2d(name=f'{name}_c1'),
-        builder.dwconv2d(name=f'{name}_c2'),
-        builder.conv2d(filters, 1, use_act=False, name=f'{name}_c3'),
+        builder.conv2d(filters // 4, 1, name=f'{name}_sq'),
+        builder.conv2d(filters, name=f'{name}_c1'),
+        builder.dwconv2d(use_act=False, name=f'{name}_c2'),
     ], keras.layers.Add(name=f'{name}_add'))
 
 

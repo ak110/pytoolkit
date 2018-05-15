@@ -11,7 +11,7 @@ def _main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--vocdevkit-dir', default=pathlib.Path('data/VOCdevkit'), type=pathlib.Path)
     parser.add_argument('--result-dir', default=pathlib.Path('results_voc'), type=pathlib.Path)
-    parser.add_argument('--network', default='current', choices=('current', 'experimental', 'experimental_large'))
+    parser.add_argument('--network', default='experimental', choices=('current', 'experimental', 'experimental_large'))
     parser.add_argument('--input-size', default=(320, 320), type=int, nargs=2)
     parser.add_argument('--map-sizes', default=(40, 20, 10), type=int, nargs='+')
     parser.add_argument('--pb-sizes', default=8, type=int)
