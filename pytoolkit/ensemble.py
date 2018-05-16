@@ -1,4 +1,5 @@
 """スタッキングとか関連。"""
+import abc
 import pathlib
 
 import numpy as np
@@ -7,7 +8,7 @@ import sklearn.externals.joblib as joblib
 from . import dl, log, ml, utils
 
 
-class WeakModel(object):
+class WeakModel(metaclass=abc.ABCMeta):
     """CVしたりout-of-fold predictionを作ったりするクラス。
 
     継承してfit()とかpredict()とかを実装する。
@@ -32,24 +33,25 @@ class WeakModel(object):
         model_dir.mkdir(parents=True, exist_ok=True)
         return model_dir
 
-    def fit(self, X, y):
-        """クロスバリデーション。"""
-        for cv_index in range(self.cv_count):
-            self.fit_fold(X, y, cv_index)
+    @abc.abstractmethod
+    def predict(self, X):
+        """予測。"""
+        utils.noqa(X)
 
-    def fit_fold(self, X, y, cv_index):
-        """クロスバリデーションの1fold分の処理。"""
+    def split(self, X, y, cv_index):
+        """クロスバリデーションの1fold分のデータを返す。"""
         assert cv_index in range(self.cv_count)
-        # データ分割
         train_indices, val_indices = ml.cv_indices(
             X, y, self.cv_count, cv_index, self.split_seed, stratify=self.stratify)
+        logger = log.get(__name__)
+        logger.info(f'Training data count:   {len(train_indices):7d}')
+        logger.info(f'Validation data count: {len(val_indices):7d}')
         X_train, y_train = X[train_indices], y[train_indices]
         X_val, y_val = X[val_indices], y[val_indices]
-        logger = log.get(__name__)
-        logger.info(f'training data count = {len(train_indices)}, validation data count = {len(val_indices)}')
-        # 学習＆予測
-        proba_val = self.fit_impl(X_train, y_train, X_val, y_val, cv_index)
-        # 予測結果の保存
+        return (X_train, y_train), (X_val, y_val)
+
+    def save_prediction(self, proba_val, cv_index):
+        """予測結果の保存。"""
         if dl.hvd.is_master():
             joblib.dump(proba_val, self.model_dir / f'proba_val.fold{cv_index}.pkl')
         dl.hvd.barrier()
@@ -58,27 +60,11 @@ class WeakModel(object):
         """学習時に作成したout-of-folds predictionを読み込んで返す。"""
         proba_val_list = [joblib.load(self.model_dir / f'proba_val.fold{cv_index}.pkl')
                           for cv_index in range(self.cv_count)]
-
         proba_val = np.empty((len(y),) + proba_val_list[0].shape[1:])
         for cv_index in range(self.cv_count):
             _, val_indices = ml.cv_indices(X, y, self.cv_count, cv_index, self.split_seed, stratify=self.stratify)
             proba_val[val_indices] = proba_val_list[cv_index]
-
         return proba_val
-
-    def fit_impl(self, X_train, y_train, X_val, y_val, cv_index):
-        """学習の実装。X_valに対する予測結果を返す。"""
-        utils.noqa(X_train)
-        utils.noqa(y_train)
-        utils.noqa(X_val)
-        utils.noqa(y_val)
-        utils.noqa(cv_index)
-        assert False
-
-    def predict(self, X):
-        """予測の実装。"""
-        utils.noqa(X)
-        assert False
 
 
 class WeakModelManager(object):
@@ -94,8 +80,27 @@ class WeakModelManager(object):
 
     def add(self, model: WeakModel):
         """WeakModelの追加。"""
+        assert model.name not in self.models, f'WeakModel duplicate name error: {model.name}'
         self.models[model.name] = model
         model.set_manager(self)
 
     def get(self, name: str) -> WeakModel:
         """WeakModelの取得。"""
+        assert name in self.models, f'WeakModel name error: {name}'
+        return self.models[name]
+
+    @property
+    def model_names(self) -> tuple:
+        """モデルの名前のタプルを返す。"""
+        return tuple(sorted(self.models.keys()))
+
+    def load_oopf(self, X, y, names):
+        """スタッキング用に各モデルのout-of-folds predictionを読み込んでくっつけて返す。"""
+        oopf_list = [self.get(name).load_oopf(X, y) for name in names]
+        return np.concatenate(oopf_list, axis=-1)
+
+    def predict(self, X, names):
+        """スタッキング用に各モデルのpredictを読み込んでくっつけて返す。"""
+        mf_list_list = [self.get(name).predict(X) for name in names]
+        mf_list = [np.concatenate(mf_list, axis=-1) for mf_list in zip(*mf_list_list)]
+        return mf_list

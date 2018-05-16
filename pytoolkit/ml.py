@@ -1,14 +1,11 @@
 """機械学習(主にsklearn)関連。"""
 import collections
 import itertools
-import json
-import multiprocessing as mp
 import pathlib
 
 import numpy as np
 import sklearn.base
 import sklearn.cluster
-import sklearn.externals.joblib as joblib
 import sklearn.metrics
 import sklearn.model_selection
 import sklearn.utils
