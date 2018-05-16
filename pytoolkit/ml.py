@@ -493,9 +493,11 @@ def print_classification_metrics(y_true, proba_pred, average='macro', print_fn=N
     print_fn = print_fn or log.get(__name__).info
     true_type = sklearn.utils.multiclass.type_of_target(y_true)
     pred_type = sklearn.utils.multiclass.type_of_target(proba_pred)
-    assert pred_type in ('continuous', 'continuous-multioutput')
-    if pred_type == 'continuous':  # binary
-        assert true_type == 'binary'
+    if true_type == 'binary':  # binary
+        assert pred_type in ('continuous', 'continuous-multioutput')
+        if pred_type == 'continuous-multioutput':
+            assert proba_pred.shape == (len(proba_pred), 2), f'Shape error: {proba_pred.shape}'
+            proba_pred = proba_pred[:, 1]
         y_pred = (np.asarray(proba_pred) >= 0.5).astype(np.int32)
         acc = sklearn.metrics.accuracy_score(y_true, y_pred)
         f1 = sklearn.metrics.f1_score(y_true, y_pred)
@@ -507,6 +509,7 @@ def print_classification_metrics(y_true, proba_pred, average='macro', print_fn=N
         print_fn(f'Logloss:  {logloss:.3f}')
     else:  # multiclass
         assert true_type == 'multiclass'
+        assert pred_type == 'continuous-multioutput'
         num_classes = len(np.unique(y_true))
         ohe_true = to_categorical(num_classes)(np.asarray(y_true))
         y_pred = np.argmax(proba_pred, axis=-1)
