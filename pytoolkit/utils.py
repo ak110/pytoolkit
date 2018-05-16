@@ -12,7 +12,6 @@ import numpy as np
 def noqa(*args):
     """pylintなどの誤検知対策用の空の関数。"""
     assert args is None or args is not None  # noqa
-    assert args is None or args is not None  # noqa
 
 
 def memoize(func):

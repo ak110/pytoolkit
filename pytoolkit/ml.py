@@ -87,19 +87,23 @@ def listup_classification(dirpath, class_names=None):
     """画像分類でよくある、クラス名ディレクトリの列挙。クラス名の配列, X, yを返す。"""
     dirpath = pathlib.Path(dirpath)
 
+    def _is_valid_file(p):
+        return p.is_file() and p.name.lower() != 'thumbs.db'
+
     # クラス名
     if class_names is None:
         def _empty(it):
-            for _ in it:
-                return False
+            for p in it:
+                if _is_valid_file(p):
+                    return False
             return True
 
         class_names = list(sorted([p.name for p in dirpath.iterdir() if p.is_dir() and not _empty(p.iterdir())]))
 
-    # 各クラスのデータ
+    # 各クラスのデータを列挙
     X, y = [], []
     for class_id, class_name in enumerate(class_names):
-        t = [p for p in (dirpath / class_name).iterdir() if p.is_file()]
+        t = [p for p in (dirpath / class_name).iterdir() if _is_valid_file(p)]
         X.extend(t)
         y.extend([class_id] * len(t))
     assert len(X) == len(y)
@@ -480,84 +484,6 @@ def non_maximum_suppression(boxes, scores, top_k=200, iou_threshold=0.45):
                 break
 
     return sorted_indices[selected]
-
-
-class WeakModel(object):
-    """CVしたりout-of-folds predictionを作ったりするクラス。"""
-
-    def __init__(self, model_dir, base_estimator, cv=5, fit_params=None):
-        self.model_dir = pathlib.Path(model_dir)
-        self.base_estimator = base_estimator
-        self.cv = cv
-        self.fit_params = fit_params
-        self.estimators_ = None
-        self.data_ = {}
-
-    def fit(self, X, y, groups=None, pool=None):
-        """学習"""
-        if not pool:
-            pool = mp.Pool()
-        func, args = self.make_fit_tasks(X, y, groups)
-        pool.map(func, args)
-
-    def make_fit_tasks(self, X, y, groups=None):
-        """学習の処理を作って返す。(func, args)形式。"""
-        self._init_data()
-        args = []
-        for fold in range(self.cv):
-            estimator = sklearn.base.clone(self.base_estimator)
-            args.append((estimator, fold, X, y, groups))
-        return self._fit, args
-
-    def split(self, fold, X, y, groups=None):
-        """データの分割"""
-        rs = np.random.RandomState(self.data_['split_seed'])
-        classifier = sklearn.base.is_classifier(self.base_estimator)
-        # cv = sklearn.model_selection.check_cv(self.cv, y, classifier=classifier)
-        if classifier:
-            cv = sklearn.model_selection.StratifiedKFold(n_splits=self.cv, shuffle=True, random_state=rs)
-        else:
-            cv = sklearn.model_selection.KFold(n_splits=self.cv, shuffle=True, random_state=rs)
-        return list(cv.split(X, y, groups))[fold]
-
-    def _fit(self, estimator, fold, X, y, groups=None):
-        """学習。"""
-        X, y, groups = sklearn.utils.indexable(X, y, groups)  # pylint: disable=E0632
-        fit_params = self.fit_params if self.fit_params is not None else {}
-
-        train, _ = self.split(fold, X, y, groups)
-        estimator.fit(X[train], y[train], **fit_params)
-        pred = estimator.predict_proba(X)
-        joblib.dump(pred, str(self.model_dir / f'predict.fold{fold}.train.pkl'))
-        joblib.dump(estimator, str(self.model_dir / f'model.fold{fold}.pkl'))
-
-    def oopf(self, X, y, groups=None):
-        """out-of-folds predictionを作って返す。
-
-        Xはデータの順序が変わってないかのチェック用。
-        """
-        self._init_data()
-        oopf = joblib.load(str(self.model_dir / f'predict.fold{0}.train.pkl'))
-        for fold in range(1, self.cv):
-            pred = joblib.load(str(self.model_dir / f'predict.fold{fold}.train.pkl'))
-            _, test = self.split(fold, X, y, groups)
-            oopf[test] = pred[test]
-        return oopf
-
-    def _init_data(self):
-        """self.data_の初期化。今のところ(?)split_seedのみ。"""
-        model_json_file = self.model_dir / 'model.json'
-        if model_json_file.is_file():
-            # あれば読み込み
-            with model_json_file.open() as f:
-                self.data_ = json.load(f)
-        else:
-            # 無ければ生成して保存
-            self.data_ = {
-                'split_seed': int(np.random.randint(0, 2 ** 31)),
-            }
-            with model_json_file.open('w') as f:
-                json.dump(self.data_, f, indent=4, sort_keys=True)
 
 
 def print_classification_metrics(y_true, proba_pred, average='macro', print_fn=None):

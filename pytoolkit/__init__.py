@@ -5,6 +5,7 @@ from . import data
 from . import dl
 from . import db
 from . import draw
+from . import ensemble
 from . import generator
 from . import image
 from . import io
