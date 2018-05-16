@@ -48,7 +48,9 @@ def session(config=None, gpu_options=None, use_horovod=False):
 
         def __enter__(self):
             if use_horovod:
-                if not hvd.initialized():
+                if hvd.initialized():
+                    hvd.barrier()  # 初期化済みなら初期化はしない。念のためタイミングだけ合わせる。
+                else:
                     hvd.init()
                 if hvd.initialized():
                     self.gpu_options['visible_device_list'] = str(hvd.get().local_rank())

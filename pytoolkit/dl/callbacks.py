@@ -30,7 +30,7 @@ def learning_rate(reduce_epoch_rates=(0.5, 0.75), factor=0.1, logger_name=None):
             # 重複は禁止
             assert len(self.reduce_epochs) == len(np.unique(self.reduce_epochs)), f'reduce_epochsエラー: {self.reduce_epochs}'
             # Horovod使用時はWarmupとぶつかりかねないので5epoch以下でのreduceは禁止
-            assert not (hvd.initialized() and self.reduce_epochs[0] <= 5), 'reduce_epochsエラー: {self.reduce_epochs}'
+            assert not (hvd.initialized() and self.reduce_epochs[0] <= 5), f'reduce_epochsエラー: {self.reduce_epochs}'
 
         def on_epoch_begin(self, epoch, logs=None):
             if epoch + 1 in self.reduce_epochs:
