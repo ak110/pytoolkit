@@ -134,6 +134,7 @@ class RandomPadding(generator.Operator):
         self.padding_rate = padding_rate
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
+        assert not isinstance(y, ml.ObjectsAnnotation)  # 物体検出は今のところ未対応
         if ctx.do_augmentation(rand, self.probability):
             padding = rand.choice(('edge', 'zero', 'one', 'rand'))
             padded_w = int(np.ceil(x.shape[1] * (1 + self.padding_rate)))
@@ -151,6 +152,7 @@ class RandomRotate(generator.Operator):
         self.degrees = degrees
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
+        assert not isinstance(y, ml.ObjectsAnnotation)  # 物体検出は今のところ未対応
         if ctx.do_augmentation(rand, self.probability):
             x = ndimage.rotate(x, rand.uniform(-self.degrees, self.degrees))
         return x, y, w
@@ -173,6 +175,7 @@ class RandomCrop(generator.Operator):
         self.aspect_rations = aspect_rations
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
+        assert not isinstance(y, ml.ObjectsAnnotation)  # 物体検出は今のところ未対応
         if ctx.do_augmentation(rand, self.probability):
             cr = rand.uniform(1 - self.crop_rate, 1)
             ar = np.sqrt(rand.choice(self.aspect_rations)) if rand.rand() <= self.aspect_prob else 1
@@ -187,15 +190,24 @@ class RandomCrop(generator.Operator):
 class RandomZoom(generator.Operator):
     """Padding or crop + アスペクト比変更を行う。とりあえず物体検知用。"""
 
-    def __init__(self, probability=1, output_size=(300, 300), keep_aspect=False, aspect_prob=0.5, max_aspect_ratio=3 / 2):
+    def __init__(self, probability=1, output_size=(300, 300),
+                 padding_rate=16, crop_rate=0.1,
+                 keep_aspect=False, aspect_prob=0.5, max_aspect_ratio=3 / 2,
+                 min_object_px=4):
         assert 0 < probability <= 1
         assert max_aspect_ratio >= 1
+        assert padding_rate is None or padding_rate > 1
+        assert crop_rate is None or (0 < crop_rate < 1)
+        assert padding_rate is not None or crop_rate is not None
         self.probability = probability
         self.output_size = np.asarray(output_size)
+        self.padding_rate = padding_rate
+        self.crop_rate = crop_rate
         self.keep_aspect = keep_aspect
         self.aspect_prob = aspect_prob
         self.max_aspect_ratio = max_aspect_ratio
         self.min_aspect_ratio = 1 / self.max_aspect_ratio
+        self.min_object_px = min_object_px
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         if ctx.do_augmentation(rand, self.probability):
@@ -204,7 +216,7 @@ class RandomZoom(generator.Operator):
             rand_ar = np.exp(rand.uniform(np.log(self.min_aspect_ratio), np.log(self.max_aspect_ratio))) if rand.rand() <= self.aspect_prob else 1
             root_ar = np.sqrt(base_ar * rand_ar)
             ar = np.array([root_ar, 1 / root_ar])
-            if rand.rand() <= 0.5:
+            if self.padding_rate is not None and (self.crop_rate is None or rand.rand() <= 0.5):
                 x = self._padding(x, y, rand, ar)
             else:
                 x = self._crop(x, y, rand, ar)
@@ -239,7 +251,7 @@ class RandomZoom(generator.Operator):
         """Padding(zoom-out)。"""
         input_size = np.asarray(rgb.shape[-2::-1])
         for _ in range(30):
-            pr = np.exp(rand.uniform(np.log(1), np.log(4)))  # SSD風：[1, 16]
+            pr = np.exp(rand.uniform(np.log(1), np.log(np.sqrt(self.padding_rate))))  # SSD風：[1, 16]
             padded_size = np.ceil(input_size * pr * ar).astype(int)
             padded_size = np.maximum(padded_size, input_size)
             padding_size = padded_size - input_size
@@ -248,7 +260,7 @@ class RandomZoom(generator.Operator):
                 bboxes = np.copy(y.bboxes)
                 bboxes = (np.tile(paste_xy, 2) + bboxes * np.tile(input_size, 2)) / np.tile(padded_size, 2)
                 sb = bboxes * np.tile(self.output_size, 2)
-                if (sb[:, 2:] - sb[:, :2] < 4).any():  # あまりに小さいbboxが発生するのはNG
+                if (sb[:, 2:] - sb[:, :2] < self.min_object_px).any():  # あまりに小さいbboxが発生するのはNG
                     continue
                 y.bboxes = bboxes
             # 先に縮小
@@ -271,7 +283,7 @@ class RandomZoom(generator.Operator):
             bb_area = ml.bboxes_area(y.bboxes)
         input_size = np.asarray(rgb.shape[-2::-1])
         for _ in range(30):
-            cr = np.exp(rand.uniform(np.log(np.sqrt(0.1)), np.log(1)))  # SSD風：[0.1, 1]
+            cr = np.exp(rand.uniform(np.log(np.sqrt(self.crop_rate)), np.log(1)))  # SSD風：[0.1, 1]
             cropped_wh = np.floor(input_size * cr * ar).astype(int)
             cropped_wh = np.minimum(cropped_wh, input_size)
             cropping_size = input_size - cropped_wh
@@ -294,7 +306,7 @@ class RandomZoom(generator.Operator):
                 bboxes = (bboxes * np.tile(input_size, 2) - np.tile(crop_xy, 2)) / np.tile(cropped_wh, 2)
                 bboxes = np.clip(bboxes, 0, 1)
                 sb = bboxes * np.tile(self.output_size, 2)
-                if (sb[:, 2:] - sb[:, :2] < 4).any():  # あまりに小さいbboxが発生するのはNG
+                if (sb[:, 2:] - sb[:, :2] < self.min_object_px).any():  # あまりに小さいbboxが発生するのはNG
                     continue
                 y.bboxes = bboxes[bb_mask]
                 y.classes = y.classes[bb_mask]
