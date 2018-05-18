@@ -34,6 +34,12 @@ class WeakModel(metaclass=abc.ABCMeta):
         return model_dir
 
     @abc.abstractmethod
+    def fit(self, X, y):
+        """学習。"""
+        utils.noqa(X)
+        utils.noqa(y)
+
+    @abc.abstractmethod
     def predict(self, X):
         """予測。"""
         utils.noqa(X)
@@ -49,6 +55,10 @@ class WeakModel(metaclass=abc.ABCMeta):
         X_train, y_train = X[train_indices], y[train_indices]
         X_val, y_val = X[val_indices], y[val_indices]
         return (X_train, y_train), (X_val, y_val)
+
+    def has_prediction(self, cv_index):
+        """予測結果が存在するか否かを返す。"""
+        return (self.model_dir / f'proba_val.fold{cv_index}.pkl').is_file()
 
     def save_prediction(self, proba_val, cv_index):
         """予測結果の保存。"""

@@ -628,6 +628,32 @@ def weighted_mean():
     return WeightedMean
 
 
+def serial_grid_pooling_2d():
+    """物体検出とか向けに適当に考えてみたpoolingレイヤー。"""
+    import keras
+    import keras.backend as K
+
+    class SerialGridPooling2D(keras.engine.topology.Layer):
+        """物体検出とか向けに適当に考えてみたpoolingレイヤー。"""
+
+        def compute_output_shape(self, input_shape):
+            assert len(input_shape) == 4
+            assert input_shape[1] % 2 == 0  # パディングはとりあえず未対応
+            assert input_shape[2] % 2 == 0  # パディングはとりあえず未対応
+            b, h, w, c = input_shape
+            return b, h // 2, w // 2, c * 2
+
+        def call(self, inputs, **kwargs):
+            shape = K.shape(inputs)
+            b, h, w, c = shape[0], shape[1], shape[2], shape[3]
+            inputs = K.reshape(inputs, (b, h // 2, 2, w // 2, 2, c))
+            filter1 = inputs[:, :, 1, :, 0, :] - inputs[:, :, 0, :, 0, :] + inputs[:, :, 1, :, 1, :] - inputs[:, :, 0, :, 1, :]
+            filter2 = inputs[:, :, 0, :, 1, :] - inputs[:, :, 0, :, 0, :] + inputs[:, :, 1, :, 1, :] - inputs[:, :, 1, :, 0, :]
+            return K.concatenate([filter1, filter2], axis=-1)
+
+    return SerialGridPooling2D
+
+
 def parallel_grid_pooling_2d():
     """Parallel Grid Poolingレイヤー。
 
@@ -653,7 +679,8 @@ def parallel_grid_pooling_2d():
             assert len(input_shape) == 4
             assert input_shape[1] % self.pool_size[0] == 0  # パディングはとりあえず未対応
             assert input_shape[2] % self.pool_size[1] == 0  # パディングはとりあえず未対応
-            return input_shape[0], input_shape[1] // self.pool_size[0], input_shape[2] // self.pool_size[1], input_shape[3]
+            b, h, w, c = input_shape
+            return b, h // self.pool_size[0], w // self.pool_size[1], c
 
         def call(self, inputs, **kwargs):
             shape = K.shape(inputs)

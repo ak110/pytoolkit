@@ -16,6 +16,9 @@ def get_custom_objects():
         layers.normal_noise(),
         layers.l2normalization(),
         layers.weighted_mean(),
+        layers.serial_grid_pooling_2d(),
+        layers.parallel_grid_pooling_2d(),
+        layers.parallel_grid_gather(),
         optimizers.nsgd(),
     ]
     return {c.__name__: c for c in classes}
