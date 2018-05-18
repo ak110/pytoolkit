@@ -41,24 +41,48 @@ def _create_basenet(network, builder, x, load_weights):
     import keras
     basenet = None
     ref_list = []
-    if network in ('current', 'experimental'):
+    if network in ('current',):
         basenet = keras.applications.VGG16(include_top=False, input_tensor=x, weights='imagenet' if load_weights else None)
         ref_list.append(basenet.get_layer(name='block4_pool').input)
         ref_list.append(basenet.get_layer(name='block5_pool').input)
+    elif network == 'experimental':
+        basenet = keras.applications.VGG16(include_top=False, input_shape=(None, None, 3), weights='imagenet' if load_weights else None)
+        x = basenet.get_layer(name='block1_conv1')(x)
+        x = basenet.get_layer(name='block1_conv2')(x)
+        ref_list.append(x)
+        x = builder.conv2d(64, 2, strides=2, name='block1_pool')(x)
+        x = basenet.get_layer(name='block2_conv1')(x)
+        x = basenet.get_layer(name='block2_conv2')(x)
+        ref_list.append(x)
+        x = builder.conv2d(128, 2, strides=2, name='block2_pool')(x)
+        x = basenet.get_layer(name='block3_conv1')(x)
+        x = basenet.get_layer(name='block3_conv2')(x)
+        x = basenet.get_layer(name='block3_conv3')(x)
+        ref_list.append(x)
+        x = builder.conv2d(256, 2, strides=2, name='block3_pool')(x)
+        x = basenet.get_layer(name='block4_conv1')(x)
+        x = basenet.get_layer(name='block4_conv2')(x)
+        x = basenet.get_layer(name='block4_conv3')(x)
+        ref_list.append(x)
+        x = builder.conv2d(512, 2, strides=2, name='block4_pool')(x)
+        x = basenet.get_layer(name='block5_conv1')(x)
+        x = basenet.get_layer(name='block5_conv2')(x)
+        x = basenet.get_layer(name='block5_conv3')(x)
+        ref_list.append(x)
     elif network == 'experimental_large':
         builder.use_gn = True  # 大きいサイズ用なので常にGroupNormalizationを使用
         x = builder.conv2d(32, 7, strides=2, name='stage0_ds')(x)
         x = builder.conv2d(64, strides=2, name='stage2_ds')(x)
-        x = _block(builder, 64, 'stage2_block1')(x)
+        x = builder.res_block(64, 'stage2_block1')(x)
         x = builder.bn_act(name='stage2')(x)
         x = builder.conv2d(128, strides=2, name='stage3_ds')(x)
-        x = _block(builder, 128, 'stage3_block1')(x)
-        x = _block(builder, 128, 'stage3_block2')(x)
+        x = builder.res_block(128, 'stage3_block1')(x)
+        x = builder.res_block(128, 'stage3_block2')(x)
         x = builder.bn_act(name='stage3')(x)
         x = builder.conv2d(256, strides=2, name='stage4_ds')(x)
-        x = _block(builder, 256, 'stage4_block1')(x)
-        x = _block(builder, 256, 'stage4_block2')(x)
-        x = _block(builder, 256, 'stage4_block3')(x)
+        x = builder.res_block(256, 'stage4_block1')(x)
+        x = builder.res_block(256, 'stage4_block2')(x)
+        x = builder.res_block(256, 'stage4_block3')(x)
         x = builder.bn_act(name='stage4')(x)
         ref_list.append(x)
     else:
@@ -87,11 +111,9 @@ def _create_basenet(network, builder, x, load_weights):
             x = builder.conv2d(256, strides=1, name=f'down{down_index}_conv1')(x)
             x = builder.dwconv2d(name=f'down{down_index}_conv2')(x)
         else:
-            x = builder.conv2d(256, strides=2, name=f'down{down_index}_ds')(x)
-            x = _block(builder, 256, f'down{down_index}_block1')(x)
-            x = _block(builder, 256, f'down{down_index}_block2')(x)
-            x = _block(builder, 256, f'down{down_index}_block3')(x)
-            x = builder.bn_act(name=f'down{down_index}')(x)
+            x = builder.conv2d(256, 2, strides=2, name=f'down{down_index}_ds')(x)
+            x = builder.conv2d(256, name=f'down{down_index}_conv1')(x)
+            x = builder.conv2d(256, name=f'down{down_index}_conv2')(x)
         assert builder.shape(x)[1] == map_size
         ref_list.append(x)
         if map_size <= 4 or map_size % 2 != 0:  # 充分小さくなるか奇数になったら終了
@@ -113,8 +135,8 @@ def _create_detector(network, pb, builder, inputs, x, ref, lr_multipliers, for_p
         x = builder.conv2d(64, 1, name='center_conv1')(x)
         x = builder.conv2d(64, map_size, padding='valid', name='center_conv2')(x)
     else:
+        x = builder.conv2d(64, 1, name='center_conv1')(x)
         x = keras.layers.AveragePooling2D(map_size)(x)
-        x = builder.conv2d(64, 1, name='center_conv')(x)
 
     # upsampling
     up_index = 0
@@ -139,10 +161,10 @@ def _create_detector(network, pb, builder, inputs, x, ref, lr_multipliers, for_p
             x = builder.conv2d(256, 1, use_act=False, name=f'up{up_index}_ex')(x)
             t = builder.conv2d(256, 1, use_act=False, name=f'up{up_index}_lt')(ref[f'down{map_size}'])
             x = keras.layers.add([x, t], name=f'up{up_index}_mix')
-            x = _block(builder, 256, f'up{up_index}_block1')(x)
-            x = _block(builder, 256, f'up{up_index}_block2')(x)
-            ref[f'out{map_size}'] = x
             x = builder.bn_act(name=f'up{up_index}_mix')(x)
+            x = builder.conv2d(256, name=f'up{up_index}_conv1')(x)
+            x = builder.conv2d(256, name=f'up{up_index}_conv2')(x)
+            ref[f'out{map_size}'] = x
 
         if pb.map_sizes[0] <= map_size:
             break
@@ -238,16 +260,6 @@ def _create_pm(network, pb, builder, ref, lr_multipliers):
     clfs = keras.layers.concatenate(clfs, axis=-2, name='output_clfs')
     locs = keras.layers.concatenate(locs, axis=-2, name='output_locs')
     return objs, clfs, locs
-
-
-def _block(builder, filters, name):
-    """downsamplingで使用するブロック。"""
-    import keras
-    return layers.Sequence([
-        builder.conv2d(filters // 4, 1, name=f'{name}_sq'),
-        builder.conv2d(filters, name=f'{name}_c1'),
-        builder.dwconv2d(use_act=False, name=f'{name}_c2'),
-    ], keras.layers.Add(name=f'{name}_add'))
 
 
 def _create_predict_network(pb, inputs, objs, clfs, locs, strict_nms):
