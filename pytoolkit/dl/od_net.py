@@ -91,9 +91,7 @@ def _create_basenet(network, builder, x, load_weights):
     # 転移学習元部分の学習率は控えめにする
     lr_multipliers = {}
     if basenet is not None:
-        for layer in basenet.layers:
-            w = layer.trainable_weights
-            lr_multipliers.update(zip(w, [0.01] * len(w)))
+        lr_multipliers.update(zip(basenet.layers, [0.01] * len(basenet.layers)))
 
     # チャンネル数が多ければここで減らす
     x = ref_list[-1]
@@ -232,9 +230,7 @@ def _create_pm(network, pb, builder, ref, lr_multipliers):
             use_bn=False,
             use_act=False,
             name=f'pm-{pat_ix}_loc')
-    for layer in shared_layers.values():
-        w = layer.trainable_weights
-        lr_multipliers.update(zip(w, [1 / len(pb.map_sizes)] * len(w)))  # 共有部分の学習率調整
+    lr_multipliers.update(zip(shared_layers.values(), [1 / len(pb.map_sizes)] * len(shared_layers)))  # 共有部分の学習率調整
 
     builder.use_gn = old_gn
 
