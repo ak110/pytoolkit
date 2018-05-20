@@ -195,6 +195,26 @@ class Sequence(object):
         return sum([layer.trainable_weights for layer in self.layers], [])
 
 
+def get_custom_objects():
+    """独自オブジェクトのdictを返す。"""
+    classes = [
+        channel_argmax(),
+        channel_max(),
+        pad2d(),
+        group_normalization(),
+        destandarization(),
+        stocastic_add(),
+        normal_noise(),
+        l2normalization(),
+        weighted_mean(),
+        serial_grid_pooling_2d(),
+        parallel_grid_pooling_2d(),
+        parallel_grid_gather(),
+        nms(),
+    ]
+    return {c.__name__: c for c in classes}
+
+
 def channel_argmax():
     """チャンネルをargmaxするレイヤー。"""
     import keras

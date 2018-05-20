@@ -7,9 +7,15 @@ import pytoolkit as tk
 _BASE_DIR = pathlib.Path(__file__).resolve().parent
 
 
+def test_saveload_alpha(tmpdir):
+    img = tk.ndimage.load(_BASE_DIR / 'data' / 'Alpha.png')
+    assert img.shape[-1] == 3
+    tk.ndimage.save(str(tmpdir.join('output.png')), img)
+
+
 def test_saveload_grayscale(tmpdir):
-    rgb = tk.ndimage.load(_BASE_DIR / 'data' / 'Lenna.png', grayscale=True)
-    tk.ndimage.save(str(tmpdir.join('output.png')), rgb)
+    img = tk.ndimage.load(_BASE_DIR / 'data' / 'Lenna.png', grayscale=True)
+    tk.ndimage.save(str(tmpdir.join('output.png')), img)
 
 
 def test_filters():

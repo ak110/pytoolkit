@@ -2,6 +2,14 @@
 import logging
 
 
+def get_custom_objects():
+    """独自オブジェクトのdictを返す。"""
+    classes = [
+        nsgd(),
+    ]
+    return {c.__name__: c for c in classes}
+
+
 def nsgd():
     """重み別に学習率の係数を設定できるSGD+Nesterov momentum Optimizer。"""
     import keras
@@ -23,15 +31,19 @@ def nsgd():
 
         def __init__(self, lr=0.1, lr_multipliers=None, momentum=0.9, decay=0., nesterov=True, **kwargs):
             super().__init__(lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, **kwargs)
-            self.lr_multipliers = lr_multipliers
+            # {レイヤー: multiplier} or {重みの名前: multiplier}
+            # model.save()時に前者はそのまま保存できないので、後者に統一する。
+            self.lr_multipliers = {}
+            for layer_or_weights_name, mp in (lr_multipliers or {}).items():
+                if isinstance(layer_or_weights_name, str):
+                    self.lr_multipliers[layer_or_weights_name] = mp
+                else:
+                    for w in layer_or_weights_name.trainable_weights:
+                        self.lr_multipliers[w.name] = mp
 
         @keras.legacy.interfaces.legacy_get_updates_support
         def get_updates(self, loss, params):
             applied_lr_multipliers = 0
-            lr_multipliers = {}
-            for layer, mp in (self.lr_multipliers or {}).items():
-                for w in layer.trainable_weights:
-                    lr_multipliers[w.name] = mp
 
             grads = self.get_gradients(loss, params)
             self.updates = []
@@ -46,8 +58,8 @@ def nsgd():
             moments = [K.zeros(shape) for shape in shapes]
             self.weights = [self.iterations] + moments
             for p, g, m in zip(params, grads, moments):
-                if p.name in lr_multipliers:
-                    mlr = lr * lr_multipliers[p.name]
+                if p.name in self.lr_multipliers:
+                    mlr = lr * self.lr_multipliers[p.name]
                     applied_lr_multipliers += 1
                 else:
                     mlr = lr

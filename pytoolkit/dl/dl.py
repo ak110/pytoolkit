@@ -7,21 +7,10 @@ from . import hvd
 def get_custom_objects():
     """独自オブジェクトのdictを返す。"""
     from . import layers, optimizers
-    classes = [
-        layers.channel_argmax(),
-        layers.channel_max(),
-        layers.group_normalization(),
-        layers.destandarization(),
-        layers.stocastic_add(),
-        layers.normal_noise(),
-        layers.l2normalization(),
-        layers.weighted_mean(),
-        layers.serial_grid_pooling_2d(),
-        layers.parallel_grid_pooling_2d(),
-        layers.parallel_grid_gather(),
-        optimizers.nsgd(),
-    ]
-    return {c.__name__: c for c in classes}
+    custom_objects = {}
+    custom_objects.update(layers.get_custom_objects())
+    custom_objects.update(optimizers.get_custom_objects())
+    return custom_objects
 
 
 def session(config=None, gpu_options=None, use_horovod=False):
