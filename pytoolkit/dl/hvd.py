@@ -13,12 +13,13 @@ def get():
 def init():
     """初期化。"""
     global _initialized
-    try:
-        get().init()
-        _initialized = True
-    except ModuleNotFoundError:
-        logger = logging.getLogger(__name__)
-        logger.warning('Horovod読み込み失敗', exc_info=True)
+    if not _initialized:
+        try:
+            get().init()
+            _initialized = True
+        except ModuleNotFoundError:
+            logger = logging.getLogger(__name__)
+            logger.warning('Horovod読み込み失敗', exc_info=True)
 
 
 def initialized():

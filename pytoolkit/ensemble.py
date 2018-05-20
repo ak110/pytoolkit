@@ -114,3 +114,30 @@ class WeakModelManager(object):
         mf_list_list = [self.get(name).predict(X) for name in names]
         mf_list = [np.concatenate(mf_list, axis=-1) for mf_list in zip(*mf_list_list)]
         return mf_list
+
+
+class KerasWeakModel(WeakModel):
+    """KerasなWeakModel。"""
+
+    def fit(self, X, y):
+        for cv_index in range(self.cv_count):
+            if self.has_prediction(cv_index):
+                pass
+            else:
+                (X_train, y_train), (X_val, y_val) = self.split(X, y, cv_index)
+                with self.session():
+                    proba_val = self.fit_fold(X_train, y_train, X_val, y_val, cv_index)
+                self.save_prediction(proba_val, cv_index)
+
+    def session(self):
+        """`tk.dl.session()`を返す。(オプション変えるときはこれをオーバーライドする。)"""
+        return dl.session(use_horovod=True)
+
+    @abc.abstractmethod
+    def fit_fold(self, X_train, y_train, X_val, y_val, cv_index):
+        """1-fold分の学習をしてX_valに対する予測結果を返す。"""
+        utils.noqa(X_train)
+        utils.noqa(y_train)
+        utils.noqa(X_val)
+        utils.noqa(y_val)
+        utils.noqa(cv_index)
