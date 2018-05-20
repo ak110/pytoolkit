@@ -42,7 +42,9 @@ class Model(object):
         if lr_multipliers is not None:
             assert sgd_lr is not None
 
-        if sgd_lr is not None:
+        if sgd_lr is None:
+            optimizer = keras.optimizers.get(optimizer)
+        else:
             if hvd.initialized():
                 sgd_lr *= hvd.get().size()
             lr = sgd_lr * self.batch_size
@@ -65,6 +67,7 @@ class Model(object):
         """サマリ表示。"""
         print_fn = log.get(__name__).info if hvd.is_master() else lambda _: None
         self.model.summary(print_fn=print_fn)
+        print_largest_layers(self.model, print_fn=print_fn)
         print_fn(f'network depth: {count_network_depth(self.model)}')
 
     @log.trace()
@@ -255,6 +258,18 @@ def count_trainable_params(model):
     """modelのtrainable paramsを数える"""
     import keras.backend as K
     return sum([sum([K.count_params(p) for p in layer.trainable_weights]) for layer in model.layers])
+
+
+def print_largest_layers(model, top_n=10, print_fn=None):
+    """パラメータ数の多いレイヤー`top_n`個を表示する。"""
+    import keras.backend as K
+    print_fn = print_fn or log.get(__name__).info
+    layers = [(layer.name, sum([K.count_params(p) for p in layer.trainable_weights])) for layer in model.layers]
+    total_params = sum(layer_params for _, layer_params in layers)
+    layers = sorted(layers, key=lambda p: p[1], reverse=True)[:top_n]
+    print_fn(f'Top-{top_n} largest layers:')
+    for layer_name, layer_params in layers:
+        print_fn(f'  {layer_name:32s} {layer_params:6d} ({100 * layer_params / total_params:4.1f}%)')
 
 
 def count_network_depth(model):

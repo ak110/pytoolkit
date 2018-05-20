@@ -32,7 +32,7 @@ def _run(args):
     num_classes = len(np.unique(y_train))
 
     with tk.log.trace_scope('create network'):
-        builder = tk.dl.layers.Builder()
+        builder = tk.dl.networks.Builder()
         x = inp = keras.layers.Input(input_shape)
         x = builder.conv2d(128, use_act=False, name=f'start')(x)
         for block, filters in enumerate([128, 256, 512]):

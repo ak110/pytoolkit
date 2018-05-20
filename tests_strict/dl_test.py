@@ -10,7 +10,7 @@ def test_xor():
     X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]], dtype=np.float32)
     y = np.array([0, 1, 1, 0], dtype=np.int32)
 
-    builder = tk.dl.layers.Builder()
+    builder = tk.dl.networks.Builder()
     inp = x = keras.layers.Input(shape=(2,))
     x = builder.dense(16, use_bias=False)(x)
     x = builder.bn_act()(x)
@@ -19,6 +19,7 @@ def test_xor():
     gen = tk.generator.Generator()
     model = tk.dl.models.Model(network, gen, batch_size=32)
     model.compile('adam', 'binary_crossentropy', ['acc'])
+    model.summary()
     model.fit(X.repeat(4096, axis=0), y.repeat(4096, axis=0), epochs=8, verbose=2)
 
     proba = model.predict(X)

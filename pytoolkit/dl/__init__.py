@@ -6,13 +6,14 @@ importしただけではkerasがimportされないように作っている。
 
 """
 
-from .dl import *
 from . import callbacks
+from .dl import *
 from . import hvd
 from . import layers
 from . import losses
 from . import metrics
 from . import models
+from . import networks
 from . import od
 from . import optimizers
 from . import utils

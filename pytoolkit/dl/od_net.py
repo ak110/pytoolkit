@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from . import layers, losses
+from . import layers, losses, networks
 from .. import image, log
 
 
@@ -21,7 +21,7 @@ def create_network(network, pb, mode, strict_nms=None):
     """学習とか予測とか用のネットワークを作って返す。"""
     assert mode in ('pretrain', 'train', 'predict')
     import keras
-    builder = layers.Builder()
+    builder = networks.Builder()
     x = inputs = keras.layers.Input(pb.input_size + (3,))
     x, ref, lr_multipliers = _create_basenet(network, builder, x, load_weights=mode != 'predict')
     if mode == 'pretrain':
