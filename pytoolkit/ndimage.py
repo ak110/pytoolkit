@@ -21,15 +21,9 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
         img = np.copy(path_or_array)  # 念のためコピー
         assert len(img.shape) == 3
         assert img.shape[-1] == (1 if grayscale else 3)
-    elif isinstance(path_or_array, io.IOBase):
-        # file-like objectならPillowで読み込み (OpenCVは未対応なので)
-        import PIL.Image
-        with PIL.Image.open(path_or_array) as pil:
-            target_mode = 'L' if grayscale else 'RGB'
-            if pil.mode != target_mode:
-                pil = pil.convert(target_mode)
-            img = np.asarray(pil)
-    else:
+        return img.astype(np.float32)
+
+    if isinstance(path_or_array, (str, pathlib.Path)):
         # ファイルパスならOpenCVで読み込み (Pillowより早いので)
         flags = cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR
         img = cv2.imread(str(path_or_array), flags)
@@ -41,7 +35,16 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
             img = np.expand_dims(img, axis=-1)
         else:
             img = img[:, :, ::-1]
-    return img.astype(np.float32)
+        return img.astype(np.float32)
+
+    # file-like objectならPillowで読み込み (OpenCVは未対応なので)
+    import PIL.Image
+    with PIL.Image.open(path_or_array) as pil:
+        target_mode = 'L' if grayscale else 'RGB'
+        if pil.mode != target_mode:
+            pil = pil.convert(target_mode)
+        img = np.asarray(pil)
+        return img.astype(np.float32)
 
 
 def save(path: typing.Union[str, pathlib.Path], img: np.ndarray) -> None:
