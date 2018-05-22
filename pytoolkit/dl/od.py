@@ -176,16 +176,21 @@ class ObjectDetector(object):
         """予測。"""
         assert self.model is not None
         pred = []
-        g, steps = self.model.gen.flow(X, batch_size=self.model.batch_size)
+        # ややトリッキーだが、パディングなどに備えて画像全体のboxをyとして与える。
+        y = np.array([ml.ObjectsAnnotation(x, 300, 300, [0], [[0, 0, 1, 1]]) for x in X])
+        g, steps = self.model.gen.flow(X, y, batch_size=self.model.batch_size)
         with utils.tqdm(total=len(X), unit='f', desc='predict', disable=verbose == 0) as pbar:
-            for i, X_batch in enumerate(g):
+            for i, (X_batch, y_batch) in enumerate(g):
                 # 予測
                 pred_list = self.model.model.predict_on_batch(X_batch)
                 # 整形：キャストしたりマスクしたり
-                for p in pred_list:
+                for yp, p in zip(y_batch, pred_list):
+                    offset = np.tile(yp.bboxes[0, :2], (1, 2))
+                    size = np.tile(yp.bboxes[0, 2:] - yp.bboxes[0, :2], (1, 2))
                     pred_classes = p[:, 0].astype(np.int32)
                     pred_confs = p[:, 1]
                     pred_locs = p[:, 2:]
+                    pred_locs = (pred_locs - offset) / size  # パディング分の補正
                     mask = pred_confs >= conf_threshold
                     pred.append(ml.ObjectsPrediction(pred_classes[mask], pred_confs[mask], pred_locs[mask, :]))
                 # 次へ
@@ -215,7 +220,8 @@ class ObjectDetector(object):
         if mode == 'pretrain':
             gen = od_gen.create_pretrain_generator(self.pb.input_size, pi)
         else:
-            gen = od_gen.create_generator(self.pb.input_size, self.keep_aspect, pi, self.pb.encode_truth,
+            encode_truth = None if mode == 'predict' else self.pb.encode_truth  # 予測時はencodeしない。
+            gen = od_gen.create_generator(self.pb.input_size, self.keep_aspect, pi, encode_truth,
                                           flip_h=flip_h, flip_v=flip_v, rotate90=rotate90)
         self.model = models.Model(network, gen, batch_size)
 
