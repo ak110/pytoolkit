@@ -177,7 +177,7 @@ class ObjectDetector(object):
         assert self.model is not None
         pred = []
         # ややトリッキーだが、パディングなどに備えて画像全体のboxをyとして与える。
-        y = np.array([ml.ObjectsAnnotation(x, 300, 300, [0], [[0, 0, 1, 1]]) for x in X])
+        y = np.array([ml.ObjectsAnnotation('.', 300, 300, [0], [[0, 0, 1, 1]]) for _ in range(len(X))])
         g, steps = self.model.gen.flow(X, y, batch_size=self.model.batch_size)
         with utils.tqdm(total=len(X), unit='f', desc='predict', disable=verbose == 0) as pbar:
             for i, (X_batch, y_batch) in enumerate(g):
