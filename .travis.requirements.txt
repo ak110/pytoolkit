@@ -1,0 +1,16 @@
+# Travis CI用 requirements
+Pillow
+graphviz
+h5py
+keras
+matplotlib
+numpy
+opencv-python
+pandas
+pydot_ng
+pytest
+scikit-learn
+scipy
+sqlalchemy
+tensorflow
+tqdm
