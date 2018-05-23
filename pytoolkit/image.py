@@ -34,8 +34,8 @@ class ImageDataGenerator(generator.Generator):
 
     """
 
-    def __init__(self, grayscale=False, profile=False):
-        super().__init__(profile=profile)
+    def __init__(self, grayscale=False, multiple_input=False, multiple_output=False, profile=False):
+        super().__init__(multiple_input=multiple_input, multiple_output=multiple_output, profile=profile)
         self.add(LoadImage(grayscale))
 
 

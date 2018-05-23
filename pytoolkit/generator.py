@@ -71,7 +71,9 @@ class Operator(metaclass=abc.ABCMeta):
 class Generator(object):
     """`fit_generator`などに渡すgeneratorを作るためのベースクラス。"""
 
-    def __init__(self, profile=False):
+    def __init__(self, multiple_input=False, multiple_output=False, profile=False):
+        self.multiple_input = multiple_input
+        self.multiple_output = multiple_output
         self.profile = profile
         self.profile_data = {}
         self.operators = []
@@ -99,7 +101,7 @@ class Generator(object):
             for indices, seeds in self._flow_batch(ctx):
                 batch = [joblib.delayed(self._work, check_pickle=False)(ix, seed, ctx) for ix, seed in zip(indices, seeds)]
                 rx, ry, rw = zip(*parallel(batch))
-                yield _get_result(ctx.X, ctx.y, ctx.weights, rx, ry, rw)
+                yield _get_result(ctx.X, ctx.y, ctx.weights, rx, ry, rw, self.multiple_input, self.multiple_output)
 
     def _flow_batch(self, ctx):
         """データのindexとseedをバッチサイズずつ列挙し続けるgenerator。"""
@@ -211,20 +213,20 @@ def _pick_next(ix, X, y, weights):
     return _pick(X, ix), _pick(y, ix), _pick(weights, ix)
 
 
-def _get_result(X, y, weights, rx, ry, rw):
+def _get_result(X, y, weights, rx, ry, rw, multiple_input, multiple_output):
     """Kerasに渡すデータを返す。"""
-    def _arr(arr, islist):
-        if islist:
-            return [np.array(a) for a in arr]
-        return np.array(arr)
+    def _get(arr, multiple):
+        if multiple:
+            return [np.asarray(a) for a in zip(*arr)]
+        return np.asarray(arr)
 
     if y is None:
         assert weights is None
-        return _arr(rx, isinstance(X, list))
+        return _get(rx, multiple_input)
     elif weights is None:
-        return _arr(rx, isinstance(X, list)), _arr(ry, isinstance(y, list))
+        return _get(rx, multiple_input), _get(ry, multiple_output)
     else:
-        return _arr(rx, isinstance(X, list)), _arr(ry, isinstance(y, list)), np.array(rw)
+        return _get(rx, multiple_input), _get(ry, multiple_output), np.array(rw)
 
 
 class ProcessInput(Operator):
