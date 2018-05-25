@@ -188,7 +188,22 @@ class RandomCrop(generator.Operator):
 
 
 class RandomZoom(generator.Operator):
-    """Padding or crop + アスペクト比変更を行う。とりあえず物体検知用。"""
+    """Padding or crop + アスペクト比変更を行う。とりあえず物体検知用。
+
+    # 引数
+
+    - output_size: 出力画像サイズ (width, heightのタプル)
+    - padding_rate: paddingする場合の面積の比の最大値。16なら最大で縦横4倍。
+    - crop_rate: cropする場合の面積の比の最大値。0.1なら最小で縦横0.32倍。
+    - keep_aspect: padding / cropの際にアスペクト比を保持するならTrue、正方形にリサイズしてしまうならFalse。
+    - aspect_prob: アスペクト比を歪ませる確率。
+    - max_aspect_ratio: アスペクト比を最大どこまで歪ませるか。(1.5なら正方形から3:2までランダムに歪ませる)
+    - min_object_px: paddingなどでどこまでオブジェクトが小さくなるのを許容するか。(ピクセル数)
+
+    padding_rateはNoneだとpaddingしない。
+    crop_rateもNoneだとcropしない。
+
+    """
 
     def __init__(self, probability=1, output_size=(300, 300),
                  padding_rate=16, crop_rate=0.1,
@@ -198,7 +213,6 @@ class RandomZoom(generator.Operator):
         assert max_aspect_ratio >= 1
         assert padding_rate is None or padding_rate > 1
         assert crop_rate is None or (0 < crop_rate < 1)
-        assert padding_rate is not None or crop_rate is not None
         self.probability = probability
         self.output_size = np.asarray(output_size)
         self.padding_rate = padding_rate
@@ -218,7 +232,7 @@ class RandomZoom(generator.Operator):
             ar = np.array([root_ar, 1 / root_ar])
             if self.padding_rate is not None and (self.crop_rate is None or rand.rand() <= 0.5):
                 x = self._padding(x, y, rand, ar)
-            else:
+            elif self.crop_rate is not None:
                 x = self._crop(x, y, rand, ar)
 
         # DataAugmentation無しの場合や失敗時のリサイズ

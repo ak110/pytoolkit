@@ -1,8 +1,6 @@
 """お手製Object detectionのGenerator。"""
 
-import numpy as np
-
-from .. import generator, image, math, ml, ndimage
+from .. import generator, image
 
 
 def create_pretrain_generator(image_size, preprocess_input):
@@ -16,11 +14,18 @@ def create_pretrain_generator(image_size, preprocess_input):
     return gen
 
 
-def create_generator(image_size, keep_aspect, preprocess_input, encode_truth, flip_h, flip_v, rotate90):
+def create_generator(image_size, preprocess_input, encode_truth,
+                     padding_rate=16, crop_rate=0.1, keep_aspect=False,
+                     aspect_prob=0.5, max_aspect_ratio=3 / 2,
+                     min_object_px=4,
+                     flip_h=True, flip_v=False, rotate90=False):
     """ImageDataGeneratorを作って返す。"""
     gen = image.ImageDataGenerator()
     gen.add(image.RandomAlpha(probability=0.5))
-    gen.add(image.RandomZoom(probability=1, output_size=image_size, keep_aspect=keep_aspect))
+    gen.add(image.RandomZoom(probability=1, output_size=image_size, keep_aspect=keep_aspect,
+                             padding_rate=padding_rate, crop_rate=crop_rate,
+                             aspect_prob=aspect_prob, max_aspect_ratio=max_aspect_ratio,
+                             min_object_px=min_object_px))
     if flip_h:
         gen.add(image.RandomFlipLR(probability=0.5))
     if flip_v:

@@ -42,12 +42,11 @@ class ObjectDetector(object):
     候補として最初に準備するboxの集合を持つ。
     """
 
-    def __init__(self, network, input_size, map_sizes, num_classes, keep_aspect=False):
+    def __init__(self, network, input_size, map_sizes, num_classes):
         assert network in ('current', 'experimental', 'experimental_large')
         self.network = network
-        self.pb = od_pb.PriorBoxes(input_size, map_sizes, num_classes, keep_aspect)
+        self.pb = od_pb.PriorBoxes(input_size, map_sizes, num_classes)
         self.model: models.Model = None
-        self.keep_aspect = keep_aspect
 
     def save(self, path: typing.Union[str, pathlib.Path]):
         """保存。"""
@@ -57,7 +56,6 @@ class ObjectDetector(object):
             'input_size': self.pb.input_size,
             'map_sizes': self.pb.map_sizes,
             'num_classes': self.pb.num_classes,
-            'keep_aspect': self.pb.keep_aspect,
         }
         data.update(self.pb.to_dict())
         jsonex.dump(data, path)
@@ -76,23 +74,23 @@ class ObjectDetector(object):
             network=data.get('network', 'current'),
             input_size=data.get('input_size'),
             map_sizes=data.get('map_sizes'),
-            num_classes=data.get('num_classes'),
-            keep_aspect=data.get('keep_aspect', False))
+            num_classes=data.get('num_classes'))
         od.pb.from_dict(data)
         return od
 
     @staticmethod
-    def load_voc(batch_size, strict_nms=True, use_multi_gpu=True):
+    def load_voc(batch_size, keep_aspect=False, strict_nms=True, use_multi_gpu=True):
         """PASCAL VOC 07+12 trainvalで学習済みのモデルを読み込む。
 
         # 引数
         - batch_size: 予測時のバッチサイズ。
+        - keep_aspect: padding / cropの際にアスペクト比を保持するならTrue、正方形にリサイズしてしまうならFalse。
         - strict_nms: クラスによらずNon-maximum suppressionするならTrue。(mAPは下がるが、重複したワクが出ないので実用上は良いはず)
         - use_multi_gpu: 予測をマルチGPUで行うならTrue。
 
         """
         od = ObjectDetector.loads(_VOC_JSON_DATA)
-        od.load_weights(weights='voc', batch_size=batch_size,
+        od.load_weights(weights='voc', batch_size=batch_size, keep_aspect=keep_aspect,
                         strict_nms=strict_nms, use_multi_gpu=use_multi_gpu)
         return od
 
@@ -101,6 +99,8 @@ class ObjectDetector(object):
             batch_size, epochs, lr_scale=1, freeze_end_layer_name=None,
             initial_weights='voc', pb_size_pattern_count=8,
             flip_h=True, flip_v=False, rotate90=False,
+            padding_rate=16, crop_rate=0.1, keep_aspect=False,
+            aspect_prob=0.5, max_aspect_ratio=3 / 2, min_object_px=4,
             plot_path=None, tsv_log_path=None):
         """学習。
 
@@ -115,6 +115,12 @@ class ObjectDetector(object):
         - flip_h: Data augmentationで水平flipを行うか否か。
         - flip_v: Data augmentationで垂直flipを行うか否か。
         - rotate90: Data augmentationで0, 90, 180, 270度の回転を行うか否か。
+        - padding_rate: paddingする場合の面積の比の最大値。16なら最大で縦横4倍。
+        - crop_rate: cropする場合の面積の比の最大値。0.1なら最小で縦横0.32倍。
+        - keep_aspect: padding / cropの際にアスペクト比を保持するならTrue、正方形にリサイズしてしまうならFalse。
+        - aspect_prob: アスペクト比を歪ませる確率。
+        - max_aspect_ratio: アスペクト比を最大どこまで歪ませるか。(1.5なら正方形から3:2までランダムに歪ませる)
+        - min_object_px: paddingなどでどこまでオブジェクトが小さくなるのを許容するか。(ピクセル数)
         - plot_path: ネットワークの図を出力するならそのパス。拡張子はpngやsvgなど。
         - tsv_log_path: lossなどをtsvファイルに出力するならそのパス。
         """
@@ -123,7 +129,7 @@ class ObjectDetector(object):
         if hvd.is_master():
             logger = log.get(__name__)
             logger.info(f'network:              {self.network}')
-            self.pb.fit(y_train, pb_size_pattern_count, rotate90=rotate90)
+            self.pb.fit(y_train, pb_size_pattern_count, rotate90=rotate90, keep_aspect=keep_aspect)
             pb_dict = self.pb.to_dict()
         else:
             pb_dict = None
@@ -137,7 +143,11 @@ class ObjectDetector(object):
         # モデルの作成
         self._create_model(mode='train', weights=initial_weights, batch_size=batch_size,
                            lr_scale=lr_scale, freeze_end_layer_name=freeze_end_layer_name,
-                           flip_h=flip_h, flip_v=flip_v, rotate90=rotate90)
+                           flip_h=flip_h, flip_v=flip_v, rotate90=rotate90,
+                           padding_rate=padding_rate, crop_rate=crop_rate, keep_aspect=keep_aspect,
+                           aspect_prob=aspect_prob, max_aspect_ratio=max_aspect_ratio,
+                           min_object_px=min_object_px,
+                           strict_nms=None)
         if plot_path:
             self.model.plot(plot_path)
         # 学習
@@ -149,12 +159,14 @@ class ObjectDetector(object):
         assert self.model is not None
         self.model.save(path)
 
-    def load_weights(self, weights: typing.Union[str, pathlib.Path], batch_size, strict_nms=True, use_multi_gpu=True):
+    def load_weights(self, weights: typing.Union[str, pathlib.Path], batch_size,
+                     keep_aspect=False, strict_nms=True, use_multi_gpu=True):
         """重みの読み込み。(予測用)
 
         # 引数
         - weights: 読み込む重み。'voc'ならVOC07+12で学習したものを読み込む。pathlib.Pathならそのまま読み込む。
         - batch_size: 予測時のバッチサイズ。
+        - keep_aspect: padding / cropの際にアスペクト比を保持するならTrue、正方形にリサイズしてしまうならFalse。
         - strict_nms: クラスによらずNon-maximum suppressionするならTrue。(mAPは下がるが、重複したワクが出ないので実用上は良いはず)
         - use_multi_gpu: 予測をマルチGPUで行うならTrue。
 
@@ -162,7 +174,10 @@ class ObjectDetector(object):
         assert self.model is None
         self._create_model(mode='predict', weights=weights, batch_size=batch_size,
                            lr_scale=None, freeze_end_layer_name=None,
-                           flip_h=False, flip_v=False, rotate90=False, strict_nms=strict_nms)
+                           flip_h=False, flip_v=False, rotate90=False,
+                           padding_rate=None, crop_rate=None, keep_aspect=keep_aspect,
+                           aspect_prob=0, max_aspect_ratio=1, min_object_px=0,
+                           strict_nms=strict_nms)
         # マルチGPU化。
         if use_multi_gpu:
             gpus = utils.get_gpu_count()
@@ -201,7 +216,11 @@ class ObjectDetector(object):
         return pred
 
     @log.trace()
-    def _create_model(self, mode, weights, batch_size, lr_scale, freeze_end_layer_name, flip_h, flip_v, rotate90, strict_nms=None):
+    def _create_model(self, mode, weights, batch_size, lr_scale, freeze_end_layer_name,
+                      flip_h, flip_v, rotate90,
+                      padding_rate, crop_rate, keep_aspect,
+                      aspect_prob, max_aspect_ratio, min_object_px,
+                      strict_nms):
         """学習とか予測とか用に`tk.dl.models.Model`を作成して返す。
 
         # 引数
@@ -221,8 +240,11 @@ class ObjectDetector(object):
             gen = od_gen.create_pretrain_generator(self.pb.input_size, pi)
         else:
             encode_truth = None if mode == 'predict' else self.pb.encode_truth  # 予測時はencodeしない。
-            gen = od_gen.create_generator(self.pb.input_size, self.keep_aspect, pi, encode_truth,
-                                          flip_h=flip_h, flip_v=flip_v, rotate90=rotate90)
+            gen = od_gen.create_generator(self.pb.input_size, pi, encode_truth,
+                                          flip_h=flip_h, flip_v=flip_v, rotate90=rotate90,
+                                          padding_rate=padding_rate, crop_rate=crop_rate, keep_aspect=keep_aspect,
+                                          aspect_prob=aspect_prob, max_aspect_ratio=max_aspect_ratio,
+                                          min_object_px=min_object_px)
         self.model = models.Model(network, gen, batch_size)
 
         if mode == 'pretrain':
