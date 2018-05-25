@@ -77,7 +77,7 @@ class WeakModel(metaclass=abc.ABCMeta):
         return proba_val
 
 
-class WeakModelManager(object):
+class WeakModelManager(metaclass=abc.ABCMeta):
     """WeakModelたちを管理するクラス。
 
     - models_dir: 各モデルの処理結果などの保存先
@@ -115,6 +115,12 @@ class WeakModelManager(object):
         mf_list = [np.concatenate(mf_list, axis=-1) for mf_list in zip(*mf_list_list)]
         return mf_list
 
+    @abc.abstractmethod
+    def evaluate(self, y_true, proba_pred):
+        """予測結果の評価。"""
+        utils.noqa(y_true)
+        utils.noqa(proba_pred)
+
 
 class KerasWeakModel(WeakModel):
     """KerasなWeakModel。"""
@@ -125,13 +131,24 @@ class KerasWeakModel(WeakModel):
                 pass
             else:
                 (X_train, y_train), (X_val, y_val) = self.split(X, y, cv_index)
-                with self.session():
-                    proba_val = self.fit_fold(X_train, y_train, X_val, y_val, cv_index)
-                self.save_prediction(proba_val, cv_index)
+                # 学習
+                with self.session(train=True):
+                    self.fit_fold(X_train, y_train, X_val, y_val, cv_index)
+                # 検証
+                if dl.hvd.is_master():
+                    with self.session(train=False):
+                        proba_val = self.predict_fold(X_val, cv_index)
+                    self.manager.evaluate(y_val, proba_val)
+                    self.save_prediction(proba_val, cv_index)
+                dl.hvd.barrier()
 
-    def session(self):
+    def predict(self, X):
+        """予測。"""
+        return [self.predict_fold(X, cv_index=cv_index) for cv_index in range(self.cv_count)]
+
+    def session(self, train):
         """`tk.dl.session()`を返す。(オプション変えるときはこれをオーバーライドする。)"""
-        return dl.session(use_horovod=True)
+        return dl.session(use_horovod=train)
 
     @abc.abstractmethod
     def fit_fold(self, X_train, y_train, X_val, y_val, cv_index):
@@ -141,3 +158,10 @@ class KerasWeakModel(WeakModel):
         utils.noqa(X_val)
         utils.noqa(y_val)
         utils.noqa(cv_index)
+
+    @abc.abstractmethod
+    def predict_fold(self, X, cv_index):
+        """1-fold分の予測。テストデータの場合はcv_index=-1。"""
+        utils.noqa(X)
+        utils.noqa(cv_index)
+        return None

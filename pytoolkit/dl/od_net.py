@@ -22,8 +22,12 @@ def create_network(network, pb, mode, strict_nms=None):
     assert mode in ('pretrain', 'train', 'predict')
     import keras
     builder = networks.Builder()
+    if network != 'current':
+        builder.conv_defaults['padding'] = 'reflect'
     x = inputs = keras.layers.Input(pb.input_size + (3,))
     x, ref, lr_multipliers = _create_basenet(network, builder, x, load_weights=mode != 'predict')
+    if network != 'current':
+        _create_auxnet(builder, inputs, ref)
     if mode == 'pretrain':
         assert len(lr_multipliers) == 0
         x = keras.layers.GlobalAveragePooling2D()(x)
@@ -98,6 +102,21 @@ def _create_basenet(network, builder, x, load_weights):
 
 
 @log.trace()
+def _create_auxnet(builder, x, ref):
+    """補助的なネットワーク。"""
+    aux_index = 0
+    while True:
+        aux_index += 1
+        map_size = builder.shape(x)[1] // 2
+        x = builder.conv2d(16, 2, strides=2, name=f'aux{aux_index}_ds')(x)
+        x = builder.conv2d(16, name=f'aux{aux_index}_conv')(x)
+        assert builder.shape(x)[1] == map_size
+        ref[f'aux{map_size}'] = x
+        if map_size <= 4 or map_size % 2 != 0:  # 充分小さくなるか奇数になったら終了
+            break
+
+
+@log.trace()
 def _create_detector(network, pb, builder, inputs, x, ref, lr_multipliers, for_predict, strict_nms):
     """ネットワークのcenter以降の部分を作る。"""
     import keras
@@ -132,9 +151,10 @@ def _create_detector(network, pb, builder, inputs, x, ref, lr_multipliers, for_p
             ref[f'out{map_size}'] = x
         else:
             x = builder.conv2dtr(64, up_size, strides=up_size, padding='valid', name=f'up{up_index}_us')(x)
-            x = builder.conv2d(256, 1, use_act=False, name=f'up{up_index}_ex')(x)
+            x = builder.conv2d(256, 1, use_act=False, name=f'up{up_index}_ex', kernel_initializer='zeros')(x)
             t = builder.conv2d(256, 1, use_act=False, name=f'up{up_index}_lt')(ref[f'down{map_size}'])
-            x = keras.layers.add([x, t], name=f'up{up_index}_mix')
+            a = builder.conv2d(256, 1, use_act=False, name=f'up{up_index}_ax', kernel_initializer='zeros')(ref[f'aux{map_size}'])
+            x = keras.layers.add([x, t, a], name=f'up{up_index}_mix')
             x = builder.bn_act(name=f'up{up_index}_mix')(x)
             x = builder.conv2d(256, name=f'up{up_index}_conv1')(x)
             x = builder.dwconv2d(name=f'up{up_index}_conv2')(x)

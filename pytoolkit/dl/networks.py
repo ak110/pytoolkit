@@ -33,29 +33,29 @@ class Builder(object):
     def conv1d(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """Conv1D+BN+Act。"""
         import keras.layers
-        return self._conv(keras.layers.Conv1D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+        return self._conv(1, keras.layers.Conv1D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
     def conv2d(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """Conv2D+BN+Act。"""
         import keras.layers
-        return self._conv(keras.layers.Conv2D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+        return self._conv(2, keras.layers.Conv2D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
     def conv3d(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """Conv3D+BN+Act。"""
         import keras.layers
-        return self._conv(keras.layers.Conv3D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+        return self._conv(3, keras.layers.Conv3D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
     def conv2dtr(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """Conv2DTranspose+BN+Act。"""
         import keras.layers
-        return self._conv(keras.layers.Conv2DTranspose, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+        return self._conv(2, keras.layers.Conv2DTranspose, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
     def dwconv2d(self, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """DepthwiseConv2D+BN+Act。"""
         import keras.layers
-        return self._conv(keras.layers.DepthwiseConv2D, None, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+        return self._conv(2, keras.layers.DepthwiseConv2D, None, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
-    def _conv(self, conv, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs):
+    def _conv(self, rank, conv, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs):
         """ConvND+BN+Act。"""
         import keras.layers
         kwargs = copy.copy(kwargs)
@@ -86,7 +86,15 @@ class Builder(object):
 
         seq = []
         if kwargs['padding'] in ('reflect', 'symmetric'):
-            seq.append(layers.pad2d()(mode=kwargs['padding'], name=f'{name}_pad' if name is not None else None))  # とりあえず3x3 convのみ対応
+            kernel_size = keras.utils.conv_utils.normalize_tuple(kernel_size, rank, 'kernel_size')
+            strides = keras.utils.conv_utils.normalize_tuple(kwargs.get('strides', 1), rank, 'strides')
+            if kernel_size == strides:
+                pass  # padding無しのはず
+            elif kernel_size == (3, 3):
+                # とりあえず3x3 convのみ対応
+                seq.append(layers.pad2d()(mode=kwargs['padding'], name=f'{name}_pad' if name is not None else None))
+            else:
+                assert False  # 未対応
             kwargs['padding'] = 'valid'
         seq.append(conv(*args, **kwargs))
         if use_bn:
