@@ -7,11 +7,12 @@ from .. import draw, generator, log, utils
 class Model(object):
     """`keras.models.Model` + `tk.dl.generators.Generator`の薄いラッパー。"""
 
-    def __init__(self, model, gen: generator.Generator, batch_size):
+    def __init__(self, model, gen: generator.Generator, batch_size, postprocess=None):
         import keras
         self.model: keras.models.Model = model
         self.gen = gen
         self.batch_size = batch_size
+        self.postprocess = postprocess
 
     def load_weights(self, filepath, where_fn=None, strict_warnings=True):
         """重みの読み込み。
@@ -144,11 +145,14 @@ class Model(object):
                 use_multiprocessing=False, verbose=0):
         """予測。"""
         g, steps = self.gen.flow(X, batch_size=self.batch_size, data_augmentation=data_augmentation)
-        return self.model.predict_generator(g, steps,
+        pred = self.model.predict_generator(g, steps,
                                             max_queue_size=max_queue_size,
                                             workers=workers,
                                             use_multiprocessing=use_multiprocessing,
                                             verbose=verbose)
+        if self.postprocess is not None:
+            pred = self.postprocess(pred)
+        return pred
 
     @log.trace()
     def evaluate(self, X, y, data_augmentation=False,
