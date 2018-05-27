@@ -270,8 +270,8 @@ def equalize(rgb: np.ndarray) -> np.ndarray:
     return rgb
 
 
-def auto_contrast(rgb: np.ndarray) -> np.ndarray:
+def auto_contrast(rgb: np.ndarray, scale=255) -> np.ndarray:
     """オートコントラスト。"""
     gray = np.mean(rgb, axis=-1)
     b, w = gray.min(), gray.max()
-    return (rgb - b) * 255 / (w - b)
+    return (rgb - b) * (scale / (w - b))

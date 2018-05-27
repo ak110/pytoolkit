@@ -593,6 +593,23 @@ class RandomAutoContrast(generator.Operator):
         return x, y, w
 
 
+class Normalize(generator.Operator):
+    """正規化。
+
+    scale=2, shift=-0.5なら-1 ～ +1。
+    scale=255, shift=-0.5なら-127.5 ～ +127.5。
+    scale=1, shift=0なら0 ～ 1。
+    """
+
+    def __init__(self, scale=2, shift=-0.5):
+        self.scale = scale
+        self.shift = shift
+
+    def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
+        x = ndimage.auto_contrast(x, self.scale) + self.scale * self.shift
+        return x, y, w
+
+
 class RandomAlpha(generator.Operator):
     """画像の一部にランダムな色の半透明の矩形を描画する。"""
 
