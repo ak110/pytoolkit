@@ -369,6 +369,8 @@ class RandomColorAugmentors(RandomAugmentors):
             RandomBrightness(probability=probability),
             RandomContrast(probability=probability),
             RandomHue(probability=probability),
+            RandomEqualize(probability=probability),
+            RandomAutoContrast(probability=probability),
         ]
         super().__init__(argumentors, probability=1)
 
@@ -548,6 +550,46 @@ class RandomHue(generator.Operator):
             alpha = rand.uniform(1 - self.var, 1 + self.var, (3,))
             beta = rand.uniform(- self.shift, + self.shift, (3,))
             x = ndimage.hue_lite(x, alpha, beta)
+        return x, y, w
+
+
+class RandomEqualize(generator.Operator):
+    """ヒストグラム平坦化。
+
+    ↓で有効そうだったので。
+
+    ■AutoAugment: Learning Augmentation Policies from Data
+    https://arxiv.org/abs/1805.09501
+
+    """
+
+    def __init__(self, probability=1):
+        assert 0 < probability <= 1
+        self.probability = probability
+
+    def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
+            x = ndimage.equalize(x)
+        return x, y, w
+
+
+class RandomAutoContrast(generator.Operator):
+    """オートコントラスト。
+
+    ↓で有効そうだったので。
+
+    ■AutoAugment: Learning Augmentation Policies from Data
+    https://arxiv.org/abs/1805.09501
+
+    """
+
+    def __init__(self, probability=1):
+        assert 0 < probability <= 1
+        self.probability = probability
+
+    def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
+            x = ndimage.auto_contrast(x)
         return x, y, w
 
 

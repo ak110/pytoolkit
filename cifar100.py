@@ -63,6 +63,8 @@ def _run(args):
         tk.image.RandomBrightness(probability=0.5),
         tk.image.RandomContrast(probability=0.5),
         tk.image.RandomHue(probability=0.5),
+        tk.image.RandomEqualize(probability=0.5),
+        tk.image.RandomAutoContrast(probability=0.5),
     ]))
     gen.add(tk.image.RandomErasing(probability=0.5))
     gen.add(tk.generator.ProcessInput(tk.image.preprocess_input_abs1))

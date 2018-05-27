@@ -52,6 +52,8 @@ def test_filters():
         (1, 'hue_lite_g', lambda rgb: tk.ndimage.hue_lite(rgb, np.array([0.95, 1.05, 0.95]), np.array([-8, +8, -8]))),
         (1, 'hue_lite_r', lambda rgb: tk.ndimage.hue_lite(rgb, np.array([1.05, 0.95, 0.95]), np.array([+8, -8, -8]))),
         (1, 'standardize', tk.ndimage.standardize),
+        (1, 'equalize', tk.ndimage.equalize),
+        (1, 'auto_contrast', tk.ndimage.auto_contrast),
         (1, 'binarize_1', lambda rgb: tk.ndimage.binarize(rgb, 128 - 32)),
         (1, 'binarize_2', lambda rgb: tk.ndimage.binarize(rgb, 128 + 32)),
         (0, 'rot90', lambda rgb: tk.ndimage.rot90(rgb, 1)),

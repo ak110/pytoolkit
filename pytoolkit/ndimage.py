@@ -259,3 +259,19 @@ def rot90(rgb: np.ndarray, k) -> np.ndarray:
     elif k == 3:
         rgb = np.swapaxes(rgb, 0, 1)[:, ::-1, :]
     return rgb
+
+
+def equalize(rgb: np.ndarray) -> np.ndarray:
+    """ヒストグラム平坦化。"""
+    import cv2
+    gray = np.clip(np.mean(rgb, axis=-1, keepdims=True), 0, 255)
+    eq = np.expand_dims(cv2.equalizeHist(gray.astype(np.uint8)), axis=-1)
+    rgb += eq - gray
+    return rgb
+
+
+def auto_contrast(rgb: np.ndarray) -> np.ndarray:
+    """オートコントラスト。"""
+    gray = np.mean(rgb, axis=-1)
+    b, w = gray.min(), gray.max()
+    return (rgb - b) * 255 / (w - b)
