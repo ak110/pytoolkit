@@ -45,6 +45,9 @@ def _create_basenet(network, builder, x, load_weights):
     ref_list = []
     if network in ('current', 'experimental'):
         basenet = keras.applications.VGG16(include_top=False, input_tensor=x, weights='imagenet' if load_weights else None)
+        ref_list.append(basenet.get_layer(name='block1_pool').input)
+        ref_list.append(basenet.get_layer(name='block2_pool').input)
+        ref_list.append(basenet.get_layer(name='block3_pool').input)
         ref_list.append(basenet.get_layer(name='block4_pool').input)
         ref_list.append(basenet.get_layer(name='block5_pool').input)
     elif network == 'experimental_large':
@@ -71,29 +74,52 @@ def _create_basenet(network, builder, x, load_weights):
     if basenet is not None:
         lr_multipliers.update(zip(basenet.layers, [0.01] * len(basenet.layers)))
 
-    # チャンネル数が多ければここで減らす
-    x = ref_list[-1]
-    if builder.shape(x)[-1] > 256:
-        x = builder.conv2d(256, (1, 1), name='tail_sq')(x)
-    assert builder.shape(x)[-1] == 256
+    if network == 'current':
+        # チャンネル数が多ければここで減らす
+        x = ref_list[-1]
+        if builder.shape(x)[-1] > 256:
+            x = builder.conv2d(256, (1, 1), name='tail_sq')(x)
+        assert builder.shape(x)[-1] == 256
 
-    # downsampling
-    down_index = 0
-    while True:
-        down_index += 1
-        map_size = builder.shape(x)[1] // 2
-        if network == 'current':
-            x = builder.conv2d(256, strides=2, name=f'down{down_index}_ds')(x)
-            x = builder.conv2d(256, strides=1, name=f'down{down_index}_conv1')(x)
+        # downsampling
+        down_index = 0
+        while True:
+            down_index += 1
+            map_size = builder.shape(x)[1] // 2
+            if network == 'current':
+                x = builder.conv2d(256, strides=2, name=f'down{down_index}_ds')(x)
+                x = builder.conv2d(256, strides=1, name=f'down{down_index}_conv1')(x)
+                x = builder.dwconv2d(name=f'down{down_index}_conv2')(x)
+            else:
+                x = builder.conv2d(256, 2, strides=2, name=f'down{down_index}_ds')(x)
+                x = builder.conv2d(256, name=f'down{down_index}_conv1')(x)
+                x = builder.dwconv2d(name=f'down{down_index}_conv2')(x)
+            assert builder.shape(x)[1] == map_size
+            ref_list.append(x)
+            if map_size <= 4 or map_size % 2 != 0:  # 充分小さくなるか奇数になったら終了
+                break
+    else:
+        x = ref_list[0]
+        ref = {f'down{builder.shape(x)[1]}': x for x in ref_list}
+        ref_list = []
+        # downsampling
+        down_index = 0
+        while True:
+            down_index += 1
+            filters = min(8 * (2 ** down_index), 256)
+            map_size = builder.shape(x)[1] // 2
+            x = builder.conv2d(filters, 2, strides=2, use_act=False, name=f'down{down_index}_ds')(x)
+            if f'down{builder.shape(x)[1]}' in ref:
+                t = ref[f'down{builder.shape(x)[1]}']
+                t = builder.conv2d(filters, 1, use_act=False, name=f'down{down_index}_lt')(t)
+                x = keras.layers.add([x, t], name=f'down{down_index}_mix')
+            x = builder.bn_act(name=f'down{down_index}_mix')(x)
+            x = builder.conv2d(filters, name=f'down{down_index}_conv1')(x)
             x = builder.dwconv2d(name=f'down{down_index}_conv2')(x)
-        else:
-            x = builder.conv2d(256, 2, strides=2, name=f'down{down_index}_ds')(x)
-            x = builder.conv2d(256, name=f'down{down_index}_conv1')(x)
-            x = builder.dwconv2d(name=f'down{down_index}_conv2')(x)
-        assert builder.shape(x)[1] == map_size
-        ref_list.append(x)
-        if map_size <= 4 or map_size % 2 != 0:  # 充分小さくなるか奇数になったら終了
-            break
+            assert builder.shape(x)[1] == map_size
+            ref_list.append(x)
+            if map_size <= 4 or map_size % 2 != 0:  # 充分小さくなるか奇数になったら終了
+                break
 
     ref = {f'down{builder.shape(x)[1]}': x for x in ref_list}
     return x, ref, lr_multipliers
@@ -148,10 +174,10 @@ def _create_detector(network, pb, builder, inputs, x, ref, lr_multipliers, for_p
         map_size *= 2
 
     # prediction module
-    objs, clfs, locs = _create_pm(network, pb, builder, ref, lr_multipliers)
+    objs, locs, clfs = _create_pm(network, pb, builder, ref, lr_multipliers)
 
     if for_predict:
-        model = _create_predict_network(pb, inputs, objs, clfs, locs, strict_nms)
+        model = _create_predict_network(pb, inputs, objs, locs, clfs, strict_nms)
     else:
         assert strict_nms is None
         # ラベル側とshapeを合わせるためのダミー
@@ -209,7 +235,7 @@ def _create_pm(network, pb, builder, ref, lr_multipliers):
 
     builder.use_gn = old_gn
 
-    objs, clfs, locs = [], [], []
+    objs, locs, clfs = [], [], []
     for map_size in pb.map_sizes:
         assert f'out{map_size}' in ref, f'map_size error: {ref}'
         x = ref[f'out{map_size}']
@@ -219,21 +245,25 @@ def _create_pm(network, pb, builder, ref, lr_multipliers):
         x = shared_layers['pm_bn_act'](x)
         for pat_ix in range(len(pb.pb_size_patterns)):
             obj = shared_layers[f'pm-{pat_ix}_obj'](x)
-            clf = shared_layers[f'pm-{pat_ix}_clf'](x)
+            if network != 'current':
+                x = keras.layers.concatenate([x, obj], name=f'pm-{pat_ix}_obj_mix')
             loc = shared_layers[f'pm-{pat_ix}_loc'](x)
+            if network != 'current':
+                x = keras.layers.concatenate([x, loc], name=f'pm-{pat_ix}_loc_mix')
+            clf = shared_layers[f'pm-{pat_ix}_clf'](x)
             obj = keras.layers.Reshape((-1, 1), name=f'pm{map_size}-{pat_ix}_r1')(obj)
-            clf = keras.layers.Reshape((-1, pb.num_classes), name=f'pm{map_size}-{pat_ix}_r2')(clf)
             loc = keras.layers.Reshape((-1, 4), name=f'pm{map_size}-{pat_ix}_r3')(loc)
+            clf = keras.layers.Reshape((-1, pb.num_classes), name=f'pm{map_size}-{pat_ix}_r2')(clf)
             objs.append(obj)
-            clfs.append(clf)
             locs.append(loc)
+            clfs.append(clf)
     objs = keras.layers.concatenate(objs, axis=-2, name='output_objs')
-    clfs = keras.layers.concatenate(clfs, axis=-2, name='output_clfs')
     locs = keras.layers.concatenate(locs, axis=-2, name='output_locs')
-    return objs, clfs, locs
+    clfs = keras.layers.concatenate(clfs, axis=-2, name='output_clfs')
+    return objs, locs, clfs
 
 
-def _create_predict_network(pb, inputs, objs, clfs, locs, strict_nms):
+def _create_predict_network(pb, inputs, objs, locs, clfs, strict_nms):
     """予測用ネットワークの作成"""
     import keras
     import keras.backend as K
