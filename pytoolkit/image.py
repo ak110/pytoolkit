@@ -26,7 +26,7 @@ class ImageDataGenerator(generator.Generator):
     gen.add(tk.image.RandomCrop(probability=1))
     gen.add(tk.image.Resize((300, 300)))
     gen.add(tk.image.RandomFlipLR(probability=0.5))
-    gen.add(tk.image.RandomColorAugmentors(probability=0.5))
+    gen.add(tk.image.RandomColorAugmentors())
     gen.add(tk.image.RandomErasing(probability=0.5))
     gen.add(tk.generator.ProcessInput(tk.image.preprocess_input_abs1))
     gen.add(tk.generator.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
@@ -360,17 +360,17 @@ class RandomAugmentors(generator.Operator):
 class RandomColorAugmentors(RandomAugmentors):
     """色関連のDataAugmentationをいくつかまとめたもの。"""
 
-    def __init__(self, probability=1):
+    def __init__(self):
         argumentors = [
-            RandomBlur(probability=probability),
-            RandomUnsharpMask(probability=probability),
-            GaussianNoise(probability=probability),
-            RandomSaturation(probability=probability),
-            RandomBrightness(probability=probability),
-            RandomContrast(probability=probability),
-            RandomHue(probability=probability),
-            RandomEqualize(probability=probability),
-            RandomAutoContrast(probability=probability),
+            RandomBlur(probability=0.25),
+            RandomUnsharpMask(probability=0.25),
+            GaussianNoise(probability=0.25),
+            RandomSaturation(probability=0.5),
+            RandomBrightness(probability=0.5),
+            RandomContrast(probability=0.5),
+            RandomHue(probability=0.5),
+            RandomEqualize(probability=0.25),
+            RandomAutoContrast(probability=0.25),
         ]
         super().__init__(argumentors, probability=1)
 

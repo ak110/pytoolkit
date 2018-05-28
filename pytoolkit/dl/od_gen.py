@@ -32,7 +32,7 @@ def create_generator(image_size, preprocess_input, encode_truth,
         gen.add(image.RandomFlipTB(probability=0.5))
     if rotate90:
         gen.add(image.RandomRotate90(probability=1))
-    gen.add(image.RandomColorAugmentors(probability=0.5))
+    gen.add(image.RandomColorAugmentors())
     gen.add(image.RandomErasing(probability=0.5))
     gen.add(generator.ProcessInput(preprocess_input, batch_axis=True))
     if encode_truth is not None:
