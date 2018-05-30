@@ -69,3 +69,12 @@ def get_all_entries(dir_path):
         yield parent
         for file in files:
             yield parent / file
+
+
+def get_size(path):
+    """ファイル・ディレクトリのサイズを返す。"""
+    path = pathlib.Path(path)
+    if path.is_dir():
+        return sum([p.stat().st_size for p in path.glob('**/*') if not p.is_dir()])
+    else:
+        return path.stat().st_size
