@@ -1,4 +1,4 @@
 # pylint: skip-file
 """学習済みモデルなど。"""
 
-from . import yolov3
+from .darknet53 import darknet53
