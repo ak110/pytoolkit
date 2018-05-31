@@ -94,6 +94,30 @@ class ObjectDetector(object):
                         strict_nms=strict_nms, use_multi_gpu=use_multi_gpu)
         return od
 
+    def pretrain(self, X_train: [pathlib.Path], X_val: [pathlib.Path], batch_size, epochs,
+                 plot_path=None, tsv_log_path=None):
+        """事前学習。
+
+        # 引数
+        - plot_path: ネットワークの図を出力するならそのパス。拡張子はpngやsvgなど。
+        - tsv_log_path: lossなどをtsvファイルに出力するならそのパス。
+        """
+        # モデルの作成
+        self._create_model(mode='pretrain', weights='imagenet', batch_size=batch_size,
+                           lr_scale=None, freeze_end_layer_name=None,
+                           flip_h=False, flip_v=False, rotate90=False,
+                           padding_rate=None, crop_rate=None, keep_aspect=False,
+                           aspect_prob=0, max_aspect_ratio=1, min_object_px=0,
+                           strict_nms=None)
+        if plot_path:
+            self.model.plot(plot_path)
+        # 学習
+        y_train = np.zeros((len(X_train),))
+        y_val = np.zeros((len(X_val),))
+        self.model.fit(X_train, y_train, validation_data=(X_val, y_val),
+                       epochs=epochs, tsv_log_path=tsv_log_path,
+                       reduce_lr_epoch_rates=None)
+
     def fit(self, X_train: [pathlib.Path], y_train: [ml.ObjectsAnnotation],
             X_val: [pathlib.Path], y_val: [ml.ObjectsAnnotation],
             batch_size, epochs, lr_scale=1, freeze_end_layer_name=None,

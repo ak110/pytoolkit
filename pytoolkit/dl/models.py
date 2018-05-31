@@ -79,7 +79,9 @@ class Model(object):
             max_queue_size=10, use_multiprocessing=False,
             initial_epoch=0,
             tsv_log_path=None,
-            balanced=False, mixup=False):
+            balanced=False, mixup=False,
+            reduce_lr_epoch_rates=(0.5, 0.75),
+            reduce_lr_factor=0.1):
         """学習。
 
         # 引数
@@ -114,7 +116,8 @@ class Model(object):
 
         # callback
         cb = []
-        cb.append(callbacks.learning_rate(reduce_epoch_rates=(0.5, 0.75), factor=0.1))
+        if reduce_lr_epoch_rates is not None and len(reduce_lr_epoch_rates) >= 1:
+            cb.append(callbacks.learning_rate(reduce_epoch_rates=reduce_lr_epoch_rates, factor=reduce_lr_factor))
         if hvd.initialized():
             cb.append(hvd.get().callbacks.BroadcastGlobalVariablesCallback(0))
             cb.append(hvd.get().callbacks.MetricAverageCallback())

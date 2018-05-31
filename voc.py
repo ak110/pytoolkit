@@ -24,6 +24,12 @@ def _main():
     X_train, y_train = tk.data.voc.load_0712_trainval(args.vocdevkit_dir)
     X_val, y_val = tk.data.voc.load_07_test(args.vocdevkit_dir)
 
+    # 事前学習
+    if args.network == 'experimental_large' and not (args.result_dir / 'model.base.h5').is_file():
+        with tk.dl.session(use_horovod=True):
+            tk.log.init(args.result_dir / 'pretrain.log')
+            _pretrain(args, X_train, X_val)
+
     # 学習(model.h5が存在しない場合のみ。学習後に消さずに再実行した場合は検証だけする。)
     if not (args.result_dir / 'model.h5').is_file():
         with tk.dl.session(use_horovod=True):
@@ -37,6 +43,16 @@ def _main():
             _evaluate(args, X_val, y_val)
         with tk.dl.session():
             _validate(args, X_val, y_val)
+
+
+@tk.log.trace()
+def _pretrain(args, X_train, X_val):
+    """事前学習"""
+    od = tk.dl.od.ObjectDetector(args.network, args.input_size, args.map_sizes, 1)
+    od.pretrain(X_train, X_val, batch_size=args.batch_size, epochs=100,
+                plot_path=args.result_dir / 'pretrain.model.svg',
+                tsv_log_path=args.result_dir / 'pretrain.history.tsv')
+    od.save_weights(args.result_dir / 'pretrain.model.h5')
 
 
 @tk.log.trace()
@@ -56,7 +72,6 @@ def _train(args, X_train, y_train, X_val, y_val):
            flip_h=True, flip_v=False, rotate90=False,
            plot_path=args.result_dir / 'model.svg',
            tsv_log_path=args.result_dir / 'train.history.tsv')
-    # 保存
     od.save(args.result_dir / 'model.json')
     od.save_weights(args.result_dir / 'model.h5')
 
