@@ -274,7 +274,7 @@ def auto_contrast(rgb: np.ndarray, scale=255) -> np.ndarray:
     """オートコントラスト。"""
     gray = np.mean(rgb, axis=-1)
     b, w = gray.min(), gray.max()
-    return (rgb - b) * (scale / (w - b))
+    return (rgb - b) * (scale / (w - b + 1e-5))
 
 
 def posterize(rgb: np.ndarray, bits) -> np.ndarray:
