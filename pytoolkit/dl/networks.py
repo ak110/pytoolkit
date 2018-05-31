@@ -90,9 +90,9 @@ class Builder(object):
             strides = keras.utils.conv_utils.normalize_tuple(kwargs.get('strides', 1), rank, 'strides')
             if kernel_size == strides:
                 pass  # padding無しのはず
-            elif kernel_size == (3, 3):
-                # とりあえず3x3 convのみ対応
-                seq.append(layers.pad2d()(mode=kwargs['padding'], name=f'{name}_pad' if name is not None else None))
+            elif len(kernel_size) == 2:
+                pad = (kernel_size[0] - 1) // 2, (kernel_size[1] - 1) // 2
+                seq.append(layers.pad2d()(pad, mode=kwargs['padding'], name=f'{name}_pad' if name is not None else None))
             else:
                 assert False  # 未対応
             kwargs['padding'] = 'valid'
