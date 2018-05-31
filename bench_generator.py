@@ -13,7 +13,7 @@ _IMAGE_SIZE = (256, 256)
 
 def _main():
     tk.better_exceptions()
-    base_dir = pathlib.Path(__file__).resolve().parent.parent
+    base_dir = pathlib.Path(__file__).resolve().parent
     data_dir = base_dir / 'tests' / 'data'
     save_dir = base_dir / '___check' / 'bench'
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -21,9 +21,9 @@ def _main():
     gen = tk.image.ImageDataGenerator(profile=True)
     gen.add(tk.image.Resize(_IMAGE_SIZE))
     gen.add(tk.image.RandomAlpha(probability=0.5))
-    gen.add(tk.image.ToGrayScale())
+    # gen.add(tk.image.ToGrayScale())
     gen.add(tk.image.SamplewiseStandardize())
-    gen.add(tk.image.RandomBinarize())
+    # gen.add(tk.image.RandomBinarize())
     gen.add(tk.image.RandomPadding(probability=1))
     gen.add(tk.image.RandomRotate(probability=0.5))
     gen.add(tk.image.RandomCrop(probability=1))

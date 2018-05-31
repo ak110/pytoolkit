@@ -1,5 +1,4 @@
 """画像処理関連"""
-import pathlib
 import warnings
 
 import numpy as np
@@ -86,13 +85,7 @@ class LoadImage(generator.Operator):
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         """処理。"""
         assert rand is not None  # noqa
-        if isinstance(x, np.ndarray):
-            # ndarrayならそのまま画像扱い
-            x = np.copy(x).astype(np.float32)
-        else:
-            # ファイルパスなら読み込み
-            assert isinstance(x, (str, pathlib.Path))
-            x = ndimage.load(x, self.grayscale)
+        x = ndimage.load(x, self.grayscale)
         assert len(x.shape) == 3
         assert x.shape[-1] == (1 if self.grayscale else 3)
         return x, y, w

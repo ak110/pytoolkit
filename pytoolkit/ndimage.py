@@ -27,10 +27,12 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
         # ファイルパスならOpenCVで読み込み (Pillowより早いので)
         flags = cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR
         img = cv2.imread(str(path_or_array), flags)
-        if img is None and (pathlib.Path(path_or_array).suffix or '').lower() == '.gif':
-            gif = cv2.VideoCapture(str(path_or_array))
-            assert gif is not None, f'load error: {path_or_array}'
-            _, img = gif.read()
+        if img is None:
+            if (pathlib.Path(path_or_array).suffix or '').lower() == '.gif':
+                gif = cv2.VideoCapture(str(path_or_array))
+                assert gif is not None, f'Load error: {path_or_array}'
+                _, img = gif.read()
+            assert img is not None, f'Load error: {path_or_array}'
         if grayscale:
             img = np.expand_dims(img, axis=-1)
         else:
