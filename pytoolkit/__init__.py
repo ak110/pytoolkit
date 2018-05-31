@@ -1,6 +1,7 @@
 # pylint: skip-file
 
 from .utils import *
+from . import applications
 from . import data
 from . import dl
 from . import db
