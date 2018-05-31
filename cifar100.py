@@ -58,14 +58,7 @@ def _run(args):
     gen.add(tk.image.RandomCrop(probability=1))
     gen.add(tk.image.Resize(input_shape[:2]))
     gen.add(tk.image.RandomFlipLR(probability=0.5))
-    gen.add(tk.image.RandomAugmentors([
-        tk.image.RandomSaturation(probability=0.5),
-        tk.image.RandomBrightness(probability=0.5),
-        tk.image.RandomContrast(probability=0.5),
-        tk.image.RandomHue(probability=0.5),
-        tk.image.RandomEqualize(probability=0.5),
-        tk.image.RandomAutoContrast(probability=0.5),
-    ]))
+    gen.add(tk.image.RandomColorAugmentors())
     gen.add(tk.image.RandomErasing(probability=0.5))
     gen.add(tk.generator.ProcessInput(tk.image.preprocess_input_abs1))
     gen.add(tk.generator.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
