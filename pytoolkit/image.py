@@ -369,8 +369,9 @@ class RandomColorAugmentors(RandomAugmentors):
             RandomBrightness(probability=0.5),
             RandomContrast(probability=0.5),
             RandomHue(probability=0.5),
-            RandomEqualize(probability=0.25),
-            RandomAutoContrast(probability=0.25),
+            RandomEqualize(probability=0.125),
+            RandomAutoContrast(probability=0.125),
+            RandomPosterize(probability=0.125),
         ]
         super().__init__(argumentors, probability=1)
 
@@ -590,6 +591,29 @@ class RandomAutoContrast(generator.Operator):
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         if ctx.do_augmentation(rand, self.probability):
             x = ndimage.auto_contrast(x)
+        return x, y, w
+
+
+class RandomPosterize(generator.Operator):
+    """ポスタリゼーション。
+
+    ↓で有効そうだったので。
+
+    ■AutoAugment: Learning Augmentation Policies from Data
+    https://arxiv.org/abs/1805.09501
+
+    """
+
+    def __init__(self, probability=1, min_bits=4, max_bits=7):
+        assert 0 < probability <= 1
+        self.probability = probability
+        self.min_bits = min_bits
+        self.max_bits = max_bits
+
+    def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
+        if ctx.do_augmentation(rand, self.probability):
+            bits = rand.randint(self.min_bits, self.max_bits + 1)
+            x = ndimage.posterize(x, bits)
         return x, y, w
 
 

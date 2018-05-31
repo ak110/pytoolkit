@@ -275,3 +275,10 @@ def auto_contrast(rgb: np.ndarray, scale=255) -> np.ndarray:
     gray = np.mean(rgb, axis=-1)
     b, w = gray.min(), gray.max()
     return (rgb - b) * (scale / (w - b))
+
+
+def posterize(rgb: np.ndarray, bits) -> np.ndarray:
+    """ポスタリゼーション。"""
+    assert bits in range(1, 8)
+    t = 2 ** (8 - bits) / 255
+    return np.round(rgb * t) / t
