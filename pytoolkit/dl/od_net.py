@@ -22,8 +22,6 @@ def create_network(network, pb, mode, strict_nms=None):
     assert mode in ('pretrain', 'train', 'predict')
     import keras
     builder = networks.Builder()
-    if network != 'current':
-        builder.conv_defaults['padding'] = 'reflect'
     x = inputs = keras.layers.Input(pb.input_size + (3,))
     x, ref, lr_multipliers = _create_basenet(network, builder, x, load_weights=mode != 'predict')
     if mode == 'pretrain':
@@ -92,14 +90,9 @@ def _create_basenet(network, builder, x, load_weights):
     while True:
         down_index += 1
         map_size = builder.shape(x)[1] // 2
-        if network == 'current':
-            x = builder.conv2d(256, strides=2, name=f'down{down_index}_ds')(x)
-            x = builder.conv2d(256, strides=1, name=f'down{down_index}_conv1')(x)
-            x = builder.dwconv2d(name=f'down{down_index}_conv2')(x)
-        else:
-            x = builder.conv2d(256, 2, strides=2, name=f'down{down_index}_ds')(x)
-            x = builder.conv2d(256, name=f'down{down_index}_conv1')(x)
-            x = builder.dwconv2d(name=f'down{down_index}_conv2')(x)
+        x = builder.conv2d(256, strides=2, name=f'down{down_index}_ds')(x)
+        x = builder.conv2d(256, strides=1, name=f'down{down_index}_conv1')(x)
+        x = builder.dwconv2d(name=f'down{down_index}_conv2')(x)
         assert builder.shape(x)[1] == map_size
         ref_list.append(x)
         if map_size <= 4 or map_size % 2 != 0:  # 充分小さくなるか奇数になったら終了
@@ -117,12 +110,8 @@ def _create_detector(network, pb, builder, inputs, x, ref, lr_multipliers, for_p
     map_size = builder.shape(x)[1]
 
     # center
-    if network == 'current':
-        x = builder.conv2d(64, 1, name='center_conv1')(x)
-        x = builder.conv2d(64, map_size, padding='valid', name='center_conv2')(x)
-    else:
-        x = builder.conv2d(64, 1, name='center_conv1')(x)
-        x = keras.layers.AveragePooling2D(map_size)(x)
+    x = builder.conv2d(64, 1, name='center_conv1')(x)
+    x = builder.conv2d(64, map_size, padding='valid', name='center_conv2')(x)
 
     # upsampling
     up_index = 0
@@ -132,26 +121,15 @@ def _create_detector(network, pb, builder, inputs, x, ref, lr_multipliers, for_p
         assert map_size % in_map_size == 0, f'map size error: {in_map_size} -> {map_size}'
         up_size = map_size // in_map_size
 
-        if network == 'current':
-            x = builder.conv2dtr(64, up_size, strides=up_size, padding='valid', name=f'up{up_index}_us')(x)
-            x = builder.conv2d(256, 1, use_act=False, name=f'up{up_index}_ex')(x)
-            t = builder.conv2d(256, 1, use_act=False, name=f'up{up_index}_lt')(ref[f'down{map_size}'])
-            x = keras.layers.add([x, t], name=f'up{up_index}_mix')
-            x = builder.bn_act(name=f'up{up_index}_mix')(x)
-            x = keras.layers.Dropout(0.25)(x)
-            x = builder.conv2d(256, name=f'up{up_index}_conv1')(x)
-            x = builder.dwconv2d(name=f'up{up_index}_conv2')(x)
-            ref[f'out{map_size}'] = x
-        else:
-            x = builder.conv2dtr(64, up_size, strides=up_size, padding='valid', name=f'up{up_index}_us')(x)
-            x = builder.conv2d(256, 1, use_act=False, name=f'up{up_index}_ex')(x)
-            t = builder.conv2d(256, 1, use_act=False, name=f'up{up_index}_lt')(ref[f'down{map_size}'])
-            x = keras.layers.add([x, t], name=f'up{up_index}_mix')
-            x = builder.bn_act(name=f'up{up_index}_mix')(x)
-            x = keras.layers.Dropout(0.25)(x)
-            x = builder.conv2d(256, name=f'up{up_index}_conv1')(x)
-            x = builder.dwconv2d(name=f'up{up_index}_conv2')(x)
-            ref[f'out{map_size}'] = x
+        x = builder.conv2dtr(64, up_size, strides=up_size, padding='valid', name=f'up{up_index}_us')(x)
+        x = builder.conv2d(256, 1, use_act=False, name=f'up{up_index}_ex')(x)
+        t = builder.conv2d(256, 1, use_act=False, name=f'up{up_index}_lt')(ref[f'down{map_size}'])
+        x = keras.layers.add([x, t], name=f'up{up_index}_mix')
+        x = builder.bn_act(name=f'up{up_index}_mix')(x)
+        x = keras.layers.Dropout(0.25)(x)
+        x = builder.conv2d(256, name=f'up{up_index}_conv1')(x)
+        x = builder.dwconv2d(name=f'up{up_index}_conv2')(x)
+        ref[f'out{map_size}'] = x
 
         if pb.map_sizes[0] <= map_size:
             break
