@@ -7,13 +7,14 @@ from . import layers
 class Builder(object):
     """Kerasでネットワークを作るときのヘルパークラス。"""
 
-    def __init__(self, use_gn=False, default_l2=1e-5):
+    def __init__(self, default_l2=1e-5):
+        import keras
         self.conv_defaults = {'kernel_initializer': 'he_uniform', 'padding': 'same', 'use_bias': False}
         self.dense_defaults = {'kernel_initializer': 'he_uniform'}
         self.bn_defaults = {}
-        self.gn_defaults = {}
         self.act_defaults = {'activation': 'elu'}
-        self.use_gn = use_gn
+        self.bn_class = keras.layers.BatchNormalization
+        self.act_class = keras.layers.Activation
         if default_l2:
             self.set_default_l2(default_l2)
 
@@ -27,8 +28,6 @@ class Builder(object):
         self.dense_defaults['bias_regularizer'] = reg
         self.bn_defaults['gamma_regularizer'] = reg
         self.bn_defaults['beta_regularizer'] = reg
-        self.gn_defaults['gamma_regularizer'] = reg
-        self.gn_defaults['beta_regularizer'] = reg
 
     def conv1d(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """Conv1D+BN+Act。"""
@@ -111,15 +110,11 @@ class Builder(object):
 
     def bn(self, **kwargs):
         """BatchNormalization。"""
-        if self.use_gn:
-            return layers.group_normalization()(**self._params(self.gn_defaults, kwargs))
-        import keras.layers
-        return keras.layers.BatchNormalization(**self._params(self.bn_defaults, kwargs))
+        return self.bn_class(**self._params(self.bn_defaults, kwargs))
 
     def act(self, **kwargs):
         """Activation。"""
-        import keras.layers
-        return keras.layers.Activation(**self._params(self.act_defaults, kwargs))
+        return self.act_class(**self._params(self.act_defaults, kwargs))
 
     def dense(self, units, **kwargs):
         """Dense。"""

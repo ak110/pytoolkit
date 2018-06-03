@@ -56,7 +56,7 @@ def _create_basenet(network, builder, x, load_weights):
         ref_list.append(basenet.get_layer(name='add_19').output)  # 320→20
         ref_list.append(basenet.get_layer(name='add_23').output)  # 320→10
     elif network == 'experimental_large':
-        builder.use_gn = True  # 大きいサイズ用なので常にGroupNormalizationを使用
+        builder.bn_class = layers.group_normalization()  # 大きいサイズ用なので常にGroupNormalizationを使用
         x = builder.conv2d(32, 7, strides=2, name='stage0_ds')(x)
         x = builder.conv2d(64, 2, strides=2, name='stage2_ds')(x)
         x = builder.res_block(64, name='stage2_block1')(x)
@@ -158,7 +158,7 @@ def _create_pm(network, pb, builder, ref, lr_multipliers):
     import keras
     assert network is not None
 
-    old_gn, builder.use_gn = builder.use_gn, True
+    old_bn, builder.bn_class = builder.bn_class, layers.group_normalization()
 
     shared_layers = {}
     shared_layers['pm_layer1'] = builder.conv2d(256, use_act=False, name='pm_conv')
@@ -196,7 +196,7 @@ def _create_pm(network, pb, builder, ref, lr_multipliers):
             name=f'pm-{pat_ix}_loc')
     lr_multipliers.update(zip(shared_layers.values(), [1 / len(pb.map_sizes)] * len(shared_layers)))  # 共有部分の学習率調整
 
-    builder.use_gn = old_gn
+    builder.bn_class = old_bn
 
     objs, locs, clfs = [], [], []
     for map_size in pb.map_sizes:
