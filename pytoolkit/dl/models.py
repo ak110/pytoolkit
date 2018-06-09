@@ -319,8 +319,12 @@ def load_weights(model, filepath, where_fn=None, strict_warnings=True):
     - strict_warnings: 重みを持たないレイヤーについてもレイヤー名の不一致などにwarningログを出す。
     """
     import h5py
-    import keras
     import keras.backend as K
+    try:
+        from keras.engine.saving import preprocess_weights_for_loading
+    except BaseException:
+        from keras.engine.topology import preprocess_weights_for_loading  # flake8: noqa
+
     logger = log.get(__name__)
     with h5py.File(str(filepath), mode='r') as f:
         if 'layer_names' not in f.attrs and 'model_weights' in f:
@@ -348,7 +352,7 @@ def load_weights(model, filepath, where_fn=None, strict_warnings=True):
                 continue
 
             symbolic_weights = layer.weights
-            weight_values = keras.engine.topology.preprocess_weights_for_loading(
+            weight_values = preprocess_weights_for_loading(
                 layer,
                 weight_values,
                 original_keras_version,

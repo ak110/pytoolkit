@@ -28,7 +28,7 @@ def channel_argmax():
     import keras
     import keras.backend as K
 
-    class ChannelArgMax(keras.engine.topology.Layer):
+    class ChannelArgMax(keras.layers.Layer):
         """チャンネルをargmaxするレイヤー。"""
 
         def call(self, inputs, **kwargs):
@@ -45,7 +45,7 @@ def channel_max():
     import keras
     import keras.backend as K
 
-    class ChannelMax(keras.engine.topology.Layer):
+    class ChannelMax(keras.layers.Layer):
         """チャンネルをmaxするレイヤー。"""
 
         def call(self, inputs, **kwargs):
@@ -63,7 +63,7 @@ def pad2d():
     import keras.backend as K
     import tensorflow as tf
 
-    class Pad2D(keras.engine.topology.Layer):
+    class Pad2D(keras.layers.Layer):
         """`tf.pad`するレイヤー。"""
 
         def __init__(self, padding=(1, 1), mode='constant', constant_values=0, **kwargs):
@@ -110,7 +110,7 @@ def group_normalization():
     import keras.backend as K
     import tensorflow as tf
 
-    class GroupNormalization(keras.engine.topology.Layer):
+    class GroupNormalization(keras.layers.Layer):
         """Group normalization。
 
         # Arguments
@@ -238,7 +238,7 @@ def destandarization():
     import keras
     import keras.backend as K
 
-    class Destandarization(keras.engine.topology.Layer):
+    class Destandarization(keras.layers.Layer):
         """事前に求めた平均と標準偏差を元に出力を標準化するレイヤー。
 
         # Arguments
@@ -278,7 +278,7 @@ def stocastic_add():
     import keras
     import keras.backend as K
 
-    class StocasticAdd(keras.engine.topology.Layer):
+    class StocasticAdd(keras.layers.Layer):
         """Stocastic Depthのための確率的な加算。
 
         # 引数
@@ -337,7 +337,7 @@ def normal_noise():
     import keras
     import keras.backend as K
 
-    class NormalNoise(keras.engine.topology.Layer):
+    class NormalNoise(keras.layers.Layer):
         """平均0、分散1のノイズをドロップアウト風に適用する。"""
 
         def __init__(self, noise_rate=0.25, **kargs):
@@ -373,7 +373,7 @@ def l2normalization():
     import keras
     import keras.backend as K
 
-    class L2Normalization(keras.engine.topology.Layer):
+    class L2Normalization(keras.layers.Layer):
         """L2 Normalizationレイヤー。"""
 
         def __init__(self, scale=1, **kargs):
@@ -410,7 +410,7 @@ def weighted_mean():
     import keras
     import keras.backend as K
 
-    class WeightedMean(keras.engine.topology.Layer):
+    class WeightedMean(keras.layers.Layer):
         """入力の加重平均を取るレイヤー。"""
 
         def __init__(self,
@@ -461,7 +461,7 @@ def serial_grid_pooling_2d():
     import keras
     import keras.backend as K
 
-    class SerialGridPooling2D(keras.engine.topology.Layer):
+    class SerialGridPooling2D(keras.layers.Layer):
         """物体検出とか向けに適当に考えてみたpoolingレイヤー。"""
 
         def compute_output_shape(self, input_shape):
@@ -496,7 +496,7 @@ def parallel_grid_pooling_2d():
     import keras.backend as K
     import tensorflow as tf
 
-    class ParallelGridPooling2D(keras.engine.topology.Layer):
+    class ParallelGridPooling2D(keras.layers.Layer):
         """Parallel Grid Poolingレイヤー。"""
 
         def __init__(self, pool_size=(2, 2), **kargs):
@@ -534,7 +534,7 @@ def parallel_grid_gather():
     import keras
     import keras.backend as K
 
-    class ParallelGridGather(keras.engine.topology.Layer):
+    class ParallelGridGather(keras.layers.Layer):
         """ParallelGridPoolingでparallelにしたのを戻すレイヤー。"""
 
         def __init__(self, r, **kargs):
@@ -578,7 +578,7 @@ def nms():
     import keras.backend as K
     import tensorflow as tf
 
-    class NMS(keras.engine.topology.Layer):
+    class NMS(keras.layers.Layer):
         """Non maximum suppressionを行うレイヤー。"""
 
         def __init__(self, num_classes, prior_boxes, top_k=200, conf_threshold=0.01, nms_threshold=0.45, nms_all_threshold=None, **kwargs):
