@@ -77,7 +77,7 @@ def rotate(rgb: np.ndarray, degrees: float, interp='lanczos') -> np.ndarray:
     size = (rgb.shape[1], rgb.shape[0])
     center = (size[0] // 2, size[1] // 2)
     rotation_matrix = cv2.getRotationMatrix2D(center=center, angle=degrees, scale=1.0)
-    rgb = cv2.warpAffine(rgb, rotation_matrix, size, flags=cv2_interp)
+    rgb = cv2.warpAffine(rgb, rotation_matrix, size, flags=cv2_interp, borderMode=cv2.BORDER_REPLICATE)
     if len(rgb.shape) == 2:
         rgb = np.expand_dims(rgb, axis=-1)
     return rgb
@@ -276,7 +276,9 @@ def auto_contrast(rgb: np.ndarray, scale=255) -> np.ndarray:
     """オートコントラスト。"""
     gray = np.mean(rgb, axis=-1)
     b, w = gray.min(), gray.max()
-    return (rgb - b) * (scale / (w - b + 1e-5))
+    if b < w:
+        rgb = (rgb - b) * (scale / (w - b))
+    return rgb
 
 
 def posterize(rgb: np.ndarray, bits) -> np.ndarray:

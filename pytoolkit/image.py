@@ -118,7 +118,6 @@ class RandomPadding(generator.Operator):
     """パディング。
 
     この後のRandomCropを前提に、パディングするサイズは固定。
-    パディングのやり方がランダム。
     """
 
     def __init__(self, probability=1, padding_rate=0.25):
@@ -129,10 +128,9 @@ class RandomPadding(generator.Operator):
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         assert not isinstance(y, ml.ObjectsAnnotation)  # 物体検出は今のところ未対応
         if ctx.do_augmentation(rand, self.probability):
-            padding = rand.choice(('zero', 'half', 'one', 'rand'))
             padded_w = int(np.ceil(x.shape[1] * (1 + self.padding_rate)))
             padded_h = int(np.ceil(x.shape[0] * (1 + self.padding_rate)))
-            x = ndimage.pad(x, padded_w, padded_h, padding, rand)
+            x = ndimage.pad(x, padded_w, padded_h, 'edge', rand)
         return x, y, w
 
 
@@ -276,8 +274,7 @@ class RandomZoom(generator.Operator):
             # パディング
             paste_lr = np.floor(paste_xy * self.output_size / padded_size).astype(int)
             paste_tb = self.output_size - (paste_lr + new_size)
-            padding = rand.choice(('zero', 'half', 'one', 'rand'))
-            rgb = ndimage.pad_ltrb(rgb, paste_lr[0], paste_lr[1], paste_tb[0], paste_tb[1], padding, rand)
+            rgb = ndimage.pad_ltrb(rgb, paste_lr[0], paste_lr[1], paste_tb[0], paste_tb[1], 'mean', rand)
             assert all(rgb.shape[-2::-1] == self.output_size)
             break
         return rgb
