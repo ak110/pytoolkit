@@ -16,6 +16,7 @@ def create_network(pb, mode, strict_nms=None):
     """学習とか予測とか用のネットワークを作って返す。"""
     assert mode in ('pretrain', 'train', 'predict')
     import keras
+    keras.backend.reset_uids()  # darknet用。
     builder = networks.Builder()
     x = inputs = keras.layers.Input(pb.input_size + (3,))
     x, ref, lr_multipliers = _create_basenet(builder, x, load_weights=mode != 'predict')
