@@ -303,8 +303,8 @@ def compute_scores(gt, pred, iou_threshold=0.5):
             fp[pred_class] += 1
 
     supports = tp + tn
-    precisions = tp.astype(float) / (tp + fp)
-    recalls = tp.astype(float) / supports
+    precisions = tp.astype(float) / (tp + fp + 1e-7)
+    recalls = tp.astype(float) / (supports + 1e-7)
     fscores = 2 / (1 / (precisions + 1e-7) + 1 / (recalls + 1e-7))
     return precisions, recalls, fscores, supports
 
