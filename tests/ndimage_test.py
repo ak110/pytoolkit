@@ -27,6 +27,7 @@ def test_filters():
         (0, 'pad_edge', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='edge')),
         (0, 'pad_zero', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='zero')),
         (0, 'pad_half', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='half')),
+        (0, 'pad_mean', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='mean')),
         (0, 'pad_one', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='one')),
         (0, 'pad_refl', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='reflect')),
         (0, 'pad_wrap', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='wrap')),
