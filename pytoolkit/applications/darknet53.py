@@ -22,10 +22,7 @@ def darknet53(input_shape=None, input_tensor=None, weights='imagenet'):
     model = keras.models.Model(input_tensor, x, name='darknet53')
 
     if weights == 'imagenet':
-        if hvd.is_local_master():
-            keras.utils.get_file(WEIGHTS_NAME, WEIGHTS_URL, cache_subdir='models', file_hash=WEIGHTS_HASH)
-        hvd.barrier()
-        weights_path = keras.utils.get_file(WEIGHTS_NAME, WEIGHTS_URL, cache_subdir='models', file_hash=WEIGHTS_HASH)
+        weights_path = hvd.get_file(WEIGHTS_NAME, WEIGHTS_URL, file_hash=WEIGHTS_HASH, cache_subdir='models')
         model.load_weights(weights_path)
 
     return model

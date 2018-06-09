@@ -6,24 +6,19 @@ from . import layers, losses, networks
 from .. import image, log, applications
 
 
-def get_preprocess_input(network):
+def get_preprocess_input():
     """`preprocess_input`を返す。"""
-    if network in ('current', 'experimental'):
-        # VGG, ResNet50など
-        return image.preprocess_input_mean
-    else:
-        # Xceptionなど
-        return image.preprocess_input_abs1
+    return image.preprocess_input_mean
 
 
 @log.trace()
-def create_network(network, pb, mode, strict_nms=None):
+def create_network(pb, mode, strict_nms=None):
     """学習とか予測とか用のネットワークを作って返す。"""
     assert mode in ('pretrain', 'train', 'predict')
     import keras
     builder = networks.Builder()
     x = inputs = keras.layers.Input(pb.input_size + (3,))
-    x, ref, lr_multipliers = _create_basenet(network, builder, x, load_weights=mode != 'predict')
+    x, ref, lr_multipliers = _create_basenet(builder, x, load_weights=mode != 'predict')
     if mode == 'pretrain':
         assert len(lr_multipliers) == 0
         x = keras.layers.GlobalAveragePooling2D()(x)
@@ -31,48 +26,20 @@ def create_network(network, pb, mode, strict_nms=None):
         model = keras.models.Model(inputs=inputs, outputs=x)
     else:
         for_predict = mode == 'predict'
-        model = _create_detector(network, pb, builder, inputs, x, ref, lr_multipliers, for_predict, strict_nms)
+        model = _create_detector(pb, builder, inputs, x, ref, lr_multipliers, for_predict, strict_nms)
     return model, lr_multipliers
 
 
 @log.trace()
-def _create_basenet(network, builder, x, load_weights):
+def _create_basenet(builder, x, load_weights):
     """ベースネットワークの作成。"""
-    import keras
-    basenet = None
+    basenet = applications.darknet53(input_tensor=x, weights='imagenet' if load_weights else None)
     ref_list = []
-    if network in ('current',):
-        basenet = keras.applications.VGG16(include_top=False, input_tensor=x, weights='imagenet' if load_weights else None)
-        ref_list.append(basenet.get_layer(name='block1_pool').input)  # 320→160
-        ref_list.append(basenet.get_layer(name='block2_pool').input)  # 320→80
-        ref_list.append(basenet.get_layer(name='block3_pool').input)  # 320→40
-        ref_list.append(basenet.get_layer(name='block4_pool').input)  # 320→20
-        ref_list.append(basenet.get_layer(name='block5_pool').input)  # 320→10
-    elif network == 'experimental':
-        basenet = applications.darknet53(input_tensor=x, weights='imagenet' if load_weights else None)
-        ref_list.append(basenet.get_layer(name='add_1').output)  # 320→160
-        ref_list.append(basenet.get_layer(name='add_3').output)  # 320→80
-        ref_list.append(basenet.get_layer(name='add_11').output)  # 320→40
-        ref_list.append(basenet.get_layer(name='add_19').output)  # 320→20
-        ref_list.append(basenet.get_layer(name='add_23').output)  # 320→10
-    elif network == 'experimental_large':
-        builder.bn_class = layers.group_normalization()  # 大きいサイズ用なので常にGroupNormalizationを使用
-        x = builder.conv2d(32, 7, strides=2, name='stage0_ds')(x)
-        x = builder.conv2d(64, 2, strides=2, name='stage2_ds')(x)
-        x = builder.res_block(64, name='stage2_block1')(x)
-        x = builder.bn_act(name='stage2')(x)
-        x = builder.conv2d(128, 2, strides=2, name='stage3_ds')(x)
-        x = builder.res_block(128, name='stage3_block1')(x)
-        x = builder.res_block(128, name='stage3_block2')(x)
-        x = builder.bn_act(name='stage3')(x)
-        x = builder.conv2d(256, 2, strides=2, name='stage4_ds')(x)
-        x = builder.res_block(256, name='stage4_block1')(x)
-        x = builder.res_block(256, name='stage4_block2')(x)
-        x = builder.res_block(256, name='stage4_block3')(x)
-        x = builder.bn_act(name='stage4')(x)
-        ref_list.append(x)
-    else:
-        assert False
+    ref_list.append(basenet.get_layer(name='add_1').output)  # 320→160
+    ref_list.append(basenet.get_layer(name='add_3').output)  # 320→80
+    ref_list.append(basenet.get_layer(name='add_11').output)  # 320→40
+    ref_list.append(basenet.get_layer(name='add_19').output)  # 320→20
+    ref_list.append(basenet.get_layer(name='add_23').output)  # 320→10
 
     # 転移学習元部分の学習率は控えめにする
     lr_multipliers = {}
@@ -103,7 +70,7 @@ def _create_basenet(network, builder, x, load_weights):
 
 
 @log.trace()
-def _create_detector(network, pb, builder, inputs, x, ref, lr_multipliers, for_predict, strict_nms):
+def _create_detector(pb, builder, inputs, x, ref, lr_multipliers, for_predict, strict_nms):
     """ネットワークのcenter以降の部分を作る。"""
     import keras
     import keras.backend as K
@@ -136,7 +103,7 @@ def _create_detector(network, pb, builder, inputs, x, ref, lr_multipliers, for_p
         map_size *= 2
 
     # prediction module
-    objs, locs, clfs = _create_pm(network, pb, builder, ref, lr_multipliers)
+    objs, locs, clfs = _create_pm(pb, builder, ref, lr_multipliers)
 
     if for_predict:
         model = _create_predict_network(pb, inputs, objs, locs, clfs, strict_nms)
@@ -153,10 +120,9 @@ def _create_detector(network, pb, builder, inputs, x, ref, lr_multipliers, for_p
 
 
 @log.trace()
-def _create_pm(network, pb, builder, ref, lr_multipliers):
+def _create_pm(pb, builder, ref, lr_multipliers):
     """Prediction module."""
     import keras
-    assert network is not None
 
     old_bn, builder.bn_class = builder.bn_class, layers.group_normalization()
 

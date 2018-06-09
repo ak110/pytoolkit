@@ -13,27 +13,31 @@ from .. import jsonex, log, ml, utils
 # バージョン
 _JSON_VERSION = '0.0.2'
 # PASCAL VOC 07+12 trainvalで学習したときのmodel.json
-_VOC_JSON_DATA = {
-    "network": "current",
+_VOC_JSON_DATA_320 = {
     "input_size": [320, 320],
     "map_sizes": [40, 20, 10],
     "num_classes": 20,
     "pb_size_patterns": [
-        [1.3966931104660034, 2.1220061779022217],
-        [2.081390857696533, 5.119766712188721],
-        [3.0007710456848145, 8.67410659790039],
-        [5.763144016265869, 4.750326156616211],
-        [4.065821170806885, 13.425251960754395],
-        [10.922301292419434, 6.070690155029297],
-        [7.031608581542969, 9.765619277954102],
-        [3.765132427215576, 19.532089233398438]
+        [1.2137997150421143, 1.6073973178863525],
+        [2.3104209899902344, 3.817656993865967],
+        [3.239943265914917, 7.371336936950684],
+        [5.479208946228027, 4.491170406341553],
+        [4.76220703125, 11.572043418884277],
+        [10.89842414855957, 5.794517517089844],
+        [7.733386993408203, 8.85787582397461],
+        [4.474754333496094, 16.686479568481445]
     ],
-    "version": "0.0.2",
+    "version": "0.0.2"
 }
+_VOC_JSON_DATA_640 = _VOC_JSON_DATA_320.copy()
+_VOC_JSON_DATA_640['input_size'] = [640, 640]
 # PASCAL VOC 07+12 trainvalで学習したときの重みファイル
-_VOC_WEIGHTS_NAME = 'pytoolkit_od_voc.h5'
-_VOC_WEIGHTS_URL = 'https://github.com/ak110/object_detector/releases/download/v0.0.1/model.h5'
-_VOC_WEIGHTS_MD5 = '7adccff18e4e56cac3090da023b97afb'
+_VOC_WEIGHTS_320_NAME = 'pytoolkit_od_voc_320.h5'
+_VOC_WEIGHTS_320_URL = 'https://github.com/ak110/object_detector/releases/download/v0.0.2/model.320.h5'
+_VOC_WEIGHTS_320_MD5 = 'a76081cb833dd301a381166ee14d574f'
+_VOC_WEIGHTS_640_NAME = 'pytoolkit_od_voc_640.h5'
+_VOC_WEIGHTS_640_URL = 'https://github.com/ak110/object_detector/releases/download/v0.0.2/model.640.h5'
+_VOC_WEIGHTS_640_MD5 = '2b6f424938267634d5a34b43afb54a1b'
 
 
 class ObjectDetector(object):
@@ -42,9 +46,7 @@ class ObjectDetector(object):
     候補として最初に準備するboxの集合を持つ。
     """
 
-    def __init__(self, network, input_size, map_sizes, num_classes):
-        assert network in ('current', 'experimental', 'experimental_large')
-        self.network = network
+    def __init__(self, input_size, map_sizes, num_classes):
         self.pb = od_pb.PriorBoxes(input_size, map_sizes, num_classes)
         self.model: models.Model = None
 
@@ -52,7 +54,6 @@ class ObjectDetector(object):
         """保存。"""
         data = {
             'version': _JSON_VERSION,
-            'network': self.network,
             'input_size': self.pb.input_size,
             'map_sizes': self.pb.map_sizes,
             'num_classes': self.pb.num_classes,
@@ -63,15 +64,14 @@ class ObjectDetector(object):
     @staticmethod
     def load(path: typing.Union[str, pathlib.Path]):
         """読み込み。(ファイル)"""
-        return ObjectDetector.loads(jsonex.load(path))
+        return ObjectDetector.load_from_dict(jsonex.load(path))
 
     @staticmethod
-    def loads(data: dict):
+    def load_from_dict(data: dict):
         """読み込み。(dict)"""
         if data['version'] == '0.0.1':
             data.update(data.pop('pb'))
         od = ObjectDetector(
-            network=data.get('network', 'current'),
             input_size=data.get('input_size'),
             map_sizes=data.get('map_sizes'),
             num_classes=data.get('num_classes'))
@@ -79,7 +79,7 @@ class ObjectDetector(object):
         return od
 
     @staticmethod
-    def load_voc(batch_size, keep_aspect=False, strict_nms=True, use_multi_gpu=True):
+    def load_voc(batch_size, input_size=(320, 320), keep_aspect=False, strict_nms=True, use_multi_gpu=True):
         """PASCAL VOC 07+12 trainvalで学習済みのモデルを読み込む。
 
         # 引数
@@ -89,7 +89,9 @@ class ObjectDetector(object):
         - use_multi_gpu: 予測をマルチGPUで行うならTrue。
 
         """
-        od = ObjectDetector.loads(_VOC_JSON_DATA)
+        assert input_size in ((320, 320), (640, 640))
+        data = _VOC_JSON_DATA_320 if input_size == (320, 320) else _VOC_JSON_DATA_640
+        od = ObjectDetector.load_from_dict(data)
         od.load_weights(weights='voc', batch_size=batch_size, keep_aspect=keep_aspect,
                         strict_nms=strict_nms, use_multi_gpu=use_multi_gpu)
         return od
@@ -151,8 +153,6 @@ class ObjectDetector(object):
         assert self.model is None
         # 訓練データに合わせたprior boxの作成
         if hvd.is_master():
-            logger = log.get(__name__)
-            logger.info(f'network:              {self.network}')
             self.pb.fit(y_train, pb_size_pattern_count, rotate90=rotate90, keep_aspect=keep_aspect)
             pb_dict = self.pb.to_dict()
         else:
@@ -255,11 +255,10 @@ class ObjectDetector(object):
         logger = log.get(__name__)
 
         network, lr_multipliers = od_net.create_network(
-            network=self.network, pb=self.pb,
-            mode=mode, strict_nms=strict_nms)
+            pb=self.pb, mode=mode, strict_nms=strict_nms)
         if freeze_end_layer_name is not None:
             models.freeze_to_name(network, freeze_end_layer_name, skip_bn=True)
-        pi = od_net.get_preprocess_input(self.network)
+        pi = od_net.get_preprocess_input()
         if mode == 'pretrain':
             gen = od_gen.create_pretrain_generator(self.pb.input_size, pi)
         else:
@@ -293,7 +292,14 @@ class ObjectDetector(object):
         elif weights == 'imagenet':
             logger.info(f'cold start with imagenet weights.')
         elif weights == 'voc':
-            weights_path = _get_voc_weights()
+            if self.pb.input_size == (320, 320):
+                weights_path = pathlib.Path(hvd.get_file(
+                    _VOC_WEIGHTS_320_NAME, _VOC_WEIGHTS_320_URL,
+                    file_hash=_VOC_WEIGHTS_320_MD5, cache_subdir='models'))
+            else:
+                weights_path = pathlib.Path(hvd.get_file(
+                    _VOC_WEIGHTS_640_NAME, _VOC_WEIGHTS_640_URL,
+                    file_hash=_VOC_WEIGHTS_640_MD5, cache_subdir='models'))
             self.model.load_weights(weights_path, strict_warnings=False)
             logger.info(f'{weights_path.name} loaded.')
         else:
@@ -302,14 +308,3 @@ class ObjectDetector(object):
                 logger.info(f'{weights.name} loaded.')
             else:
                 logger.info(f'warm start: {weights.name}')
-
-
-def _get_voc_weights():
-    """学習済みモデルのダウンロード。"""
-    import keras
-    if hvd.is_local_master():  # horovod対策
-        keras.utils.get_file(_VOC_WEIGHTS_NAME, _VOC_WEIGHTS_URL, file_hash=_VOC_WEIGHTS_MD5, cache_subdir='models')
-    hvd.barrier()
-    weights_path = keras.utils.get_file(_VOC_WEIGHTS_NAME, _VOC_WEIGHTS_URL, file_hash=_VOC_WEIGHTS_MD5, cache_subdir='models')
-    weights_path = pathlib.Path(weights_path)
-    return weights_path

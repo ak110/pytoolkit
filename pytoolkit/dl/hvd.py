@@ -61,3 +61,12 @@ def bcast(buf, root=0):
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     return comm.bcast(buf, root)
+
+
+def get_file(name, url, **kwargs):
+    """`keras.utils.get_file`のラッパー。"""
+    import keras
+    if is_local_master():
+        keras.utils.get_file(name, url, **kwargs)
+    barrier()
+    return keras.utils.get_file(name, url, **kwargs)
