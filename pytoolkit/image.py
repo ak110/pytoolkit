@@ -19,9 +19,9 @@ class ImageDataGenerator(generator.Generator):
     ```
     gen = tk.image.ImageDataGenerator()
     gen.add(tk.image.Resize((300, 300)))
-    gen.add(tk.image.RandomAlpha(probability=0.5))
+    gen.add(tk.image.RandomAlpha(probability=0.25))
     gen.add(tk.image.RandomPadding(probability=1))
-    gen.add(tk.image.RandomRotate(probability=0.5))
+    gen.add(tk.image.RandomRotate(probability=0.25))
     gen.add(tk.image.RandomCrop(probability=1))
     gen.add(tk.image.Resize((300, 300)))
     gen.add(tk.image.RandomFlipLR(probability=0.5))
@@ -352,13 +352,13 @@ class RandomColorAugmentors(RandomAugmentors):
 
     def __init__(self):
         argumentors = [
-            RandomBlur(probability=0.25),
-            RandomUnsharpMask(probability=0.25),
-            GaussianNoise(probability=0.25),
-            RandomSaturation(probability=0.5),
-            RandomBrightness(probability=0.5),
-            RandomContrast(probability=0.5),
-            RandomHue(probability=0.5),
+            RandomBlur(probability=0.125),
+            RandomUnsharpMask(probability=0.125),
+            GaussianNoise(probability=0.125),
+            RandomSaturation(probability=0.25),
+            RandomBrightness(probability=0.25),
+            RandomContrast(probability=0.25),
+            RandomHue(probability=0.25),
             RandomEqualize(probability=0.125),
             RandomAutoContrast(probability=0.125),
             RandomPosterize(probability=0.125),
