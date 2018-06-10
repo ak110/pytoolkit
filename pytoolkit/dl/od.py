@@ -303,6 +303,7 @@ class ObjectDetector(object):
             self.model.load_weights(weights_path, strict_warnings=False)
             logger.info(f'{weights_path.name} loaded.')
         else:
+            weights = pathlib.Path(weights)
             self.model.load_weights(weights, strict_warnings=False)
             if mode == 'predict':
                 logger.info(f'{weights.name} loaded.')
