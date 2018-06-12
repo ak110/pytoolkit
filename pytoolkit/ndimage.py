@@ -65,7 +65,7 @@ def save(path: typing.Union[str, pathlib.Path], img: np.ndarray) -> None:
     cv2.imwrite(str(path), img)
 
 
-def rotate(rgb: np.ndarray, degrees: float, interp='lanczos') -> np.ndarray:
+def rotate(rgb: np.ndarray, degrees: float, expand=False, interp='lanczos') -> np.ndarray:
     """回転。"""
     import cv2
     cv2_interp = {
@@ -76,8 +76,16 @@ def rotate(rgb: np.ndarray, degrees: float, interp='lanczos') -> np.ndarray:
     }[interp]
     size = (rgb.shape[1], rgb.shape[0])
     center = (size[0] // 2, size[1] // 2)
-    rotation_matrix = cv2.getRotationMatrix2D(center=center, angle=degrees, scale=1.0)
-    rgb = cv2.warpAffine(rgb, rotation_matrix, size, flags=cv2_interp, borderMode=cv2.BORDER_REPLICATE)
+    m = cv2.getRotationMatrix2D(center=center, angle=degrees, scale=1.0)
+    if expand:
+        cos = np.abs(m[0, 0])
+        sin = np.abs(m[0, 1])
+        ex_w = int(np.ceil(size[1] * sin + size[0] * cos))
+        ex_h = int(np.ceil(size[1] * cos + size[0] * sin))
+        m[0, 2] += (ex_w / 2) - center[0]
+        m[1, 2] += (ex_h / 2) - center[1]
+        size = (ex_w, ex_h)
+    rgb = cv2.warpAffine(rgb, m, size, flags=cv2_interp, borderMode=cv2.BORDER_REPLICATE)
     if len(rgb.shape) == 2:
         rgb = np.expand_dims(rgb, axis=-1)
     return rgb
