@@ -21,7 +21,6 @@ def create_generator(image_size, preprocess_input, encode_truth,
                      flip_h=True, flip_v=False, rotate90=False):
     """ImageDataGeneratorを作って返す。"""
     gen = image.ImageDataGenerator()
-    gen.add(image.RandomAlpha(probability=0.5))
     gen.add(image.RandomZoom(probability=1, output_size=image_size, keep_aspect=keep_aspect,
                              padding_rate=padding_rate, crop_rate=crop_rate,
                              aspect_prob=aspect_prob, max_aspect_ratio=max_aspect_ratio,

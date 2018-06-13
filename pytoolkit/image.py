@@ -19,7 +19,6 @@ class ImageDataGenerator(generator.Generator):
     ```
     gen = tk.image.ImageDataGenerator()
     gen.add(tk.image.Resize((300, 300)))
-    gen.add(tk.image.RandomAlpha(probability=0.25))
     gen.add(tk.image.RandomPadding(probability=1))
     gen.add(tk.image.RandomRotate(probability=0.25))
     gen.add(tk.image.RandomCrop(probability=1))
@@ -120,7 +119,7 @@ class RandomPadding(generator.Operator):
     この後のRandomCropを前提に、パディングするサイズは固定。
     """
 
-    def __init__(self, probability=1, padding_rate=0.25):
+    def __init__(self, probability=1, padding_rate=0.125):
         assert 0 < probability <= 1
         self.probability = probability
         self.padding_rate = padding_rate
@@ -137,15 +136,16 @@ class RandomPadding(generator.Operator):
 class RandomRotate(generator.Operator):
     """回転。"""
 
-    def __init__(self, probability=1, degrees=15):
+    def __init__(self, probability=1, degrees=15, expand=True):
         assert 0 < probability <= 1
         self.probability = probability
         self.degrees = degrees
+        self.expand = expand
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         assert not isinstance(y, ml.ObjectsAnnotation)  # 物体検出は今のところ未対応
         if ctx.do_augmentation(rand, self.probability):
-            x = ndimage.rotate(x, rand.uniform(-self.degrees, self.degrees))
+            x = ndimage.rotate(x, rand.uniform(-self.degrees, self.degrees), expand=self.expand)
         return x, y, w
 
 
@@ -153,8 +153,8 @@ class RandomCrop(generator.Operator):
     """切り抜き。
 
     # Padding+Cropの例
-    padding_rate=0.25、crop_rate=0.2で32px四方の画像を処理すると、
-    上下左右に4pxずつパディングした後に、32px四方を切り抜く処理になる。
+    padding_rate=0.125、crop_rate=0.2で32px四方の画像を処理すると、
+    上下左右に2pxずつパディングした後に、32px四方を切り抜く処理になる。
     256px四方だと、32pxパディングで256px四方を切り抜く。
     """
 
@@ -169,9 +169,14 @@ class RandomCrop(generator.Operator):
         assert not isinstance(y, ml.ObjectsAnnotation)  # 物体検出は今のところ未対応
         if ctx.do_augmentation(rand, self.probability):
             cr = rand.uniform(1 - self.crop_rate, 1)
-            ar = np.sqrt(rand.choice(self.aspect_rations)) if rand.rand() <= self.aspect_prob else 1
-            cropped_w = min(int(np.floor(x.shape[1] * cr * ar)), x.shape[1])
-            cropped_h = min(int(np.floor(x.shape[0] * cr / ar)), x.shape[0])
+            ar = rand.choice(self.aspect_rations) if rand.rand() <= self.aspect_prob else 1
+            if ar <= 1:
+                cropped_w = int(np.floor(x.shape[1] * cr * ar))
+                cropped_h = int(np.floor(x.shape[0] * cr))
+            else:
+                cropped_w = int(np.floor(x.shape[1] * cr))
+                cropped_h = int(np.floor(x.shape[0] * cr / ar))
+            assert cropped_w <= x.shape[1] and cropped_h <= x.shape[0]
             crop_x = rand.randint(0, x.shape[1] - cropped_w + 1)
             crop_y = rand.randint(0, x.shape[0] - cropped_h + 1)
             x = ndimage.crop(x, crop_x, crop_y, cropped_w, cropped_h)
@@ -359,9 +364,10 @@ class RandomColorAugmentors(RandomAugmentors):
             RandomBrightness(probability=0.25),
             RandomContrast(probability=0.25),
             RandomHue(probability=0.25),
-            RandomEqualize(probability=0.125),
-            RandomAutoContrast(probability=0.125),
-            RandomPosterize(probability=0.125),
+            RandomEqualize(probability=0.0625),
+            RandomAutoContrast(probability=0.0625),
+            RandomPosterize(probability=0.0625),
+            RandomAlpha(probability=0.125),
         ]
         super().__init__(argumentors, probability=1)
 

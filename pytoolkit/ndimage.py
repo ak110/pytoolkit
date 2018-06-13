@@ -65,7 +65,7 @@ def save(path: typing.Union[str, pathlib.Path], img: np.ndarray) -> None:
     cv2.imwrite(str(path), img)
 
 
-def rotate(rgb: np.ndarray, degrees: float, expand=False, interp='lanczos') -> np.ndarray:
+def rotate(rgb: np.ndarray, degrees: float, expand=True, interp='lanczos') -> np.ndarray:
     """回転。"""
     import cv2
     cv2_interp = {
