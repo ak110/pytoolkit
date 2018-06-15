@@ -51,7 +51,7 @@ class Model(object):
             lr = sgd_lr * self.batch_size
             log.get(__name__).info(f'lr = {lr:.2e}')
             if lr_multipliers is None:
-                optimizer = keras.optimizers.SGD(lr=lr, momentum=0.9, nesterov=True)
+                optimizer = keras.optimizers.SGD(lr=lr, momentum=0.9)
             else:
                 optimizer = optimizers.nsgd()(lr=lr, lr_multipliers=lr_multipliers)
 
@@ -80,14 +80,18 @@ class Model(object):
             initial_epoch=0,
             tsv_log_path=None,
             balanced=False, mixup=False,
+            lr_list=None,
             reduce_lr_epoch_rates=(0.5, 0.75),
-            reduce_lr_factor=0.1):
+            reduce_lr_factor=0.1,
+            cosine_annealing=False):
         """学習。
 
         # 引数
         - tsv_log_path: lossなどをtsvファイルに出力するならそのパス。
         - balanced: クラス間のバランスが均等になるようにオーバーサンプリングするか否か。
         - mixup: Data augmentationにmixupを使用するか否か。
+        - lr_list: 各epochでの学習率の配列。
+        - cosine_annealing: cosine annealingするならTrue。
 
         """
         import keras
@@ -116,7 +120,13 @@ class Model(object):
 
         # callback
         cb = []
-        if reduce_lr_epoch_rates is not None and len(reduce_lr_epoch_rates) >= 1:
+        if lr_list is not None:
+            assert not cosine_annealing
+            epochs = len(lr_list)
+            cb.append(keras.callbacks.LearningRateScheduler(lambda epoch, lr: lr_list[epoch]))
+        elif cosine_annealing:
+            cb.append(callbacks.cosine_annealing())
+        elif reduce_lr_epoch_rates is not None and len(reduce_lr_epoch_rates) >= 1:
             cb.append(callbacks.learning_rate(reduce_epoch_rates=reduce_lr_epoch_rates, factor=reduce_lr_factor))
         if hvd.initialized():
             cb.append(hvd.get().callbacks.BroadcastGlobalVariablesCallback(0))
