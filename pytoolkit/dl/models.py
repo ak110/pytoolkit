@@ -83,7 +83,8 @@ class Model(object):
             lr_list=None,
             reduce_lr_epoch_rates=(0.5, 0.75),
             reduce_lr_factor=0.1,
-            cosine_annealing=False):
+            cosine_annealing=False,
+            lr_warmup=True):
         """学習。
 
         # 引数
@@ -92,6 +93,7 @@ class Model(object):
         - mixup: Data augmentationにmixupを使用するか否か。
         - lr_list: 各epochでの学習率の配列。
         - cosine_annealing: cosine annealingするならTrue。
+        - lr_warmup: HorovodのLearningRateWarmupCallbackを使うか否か。
 
         """
         import keras
@@ -131,7 +133,8 @@ class Model(object):
         if hvd.initialized():
             cb.append(hvd.get().callbacks.BroadcastGlobalVariablesCallback(0))
             cb.append(hvd.get().callbacks.MetricAverageCallback())
-            cb.append(hvd.get().callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1))
+            if lr_warmup:
+                cb.append(hvd.get().callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1))
         if tsv_log_path is not None:
             cb.append(callbacks.tsv_logger(tsv_log_path))
         cb.append(callbacks.epoch_logger())
