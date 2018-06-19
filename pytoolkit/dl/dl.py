@@ -39,7 +39,7 @@ def session(config=None, gpu_options=None, use_horovod=False):
             self.use_horovod = use_horovod
 
         def __enter__(self):
-            if use_horovod:
+            if self.use_horovod:
                 if hvd.initialized():
                     hvd.barrier()  # 初期化済みなら初期化はしない。念のためタイミングだけ合わせる。
                 else:
@@ -59,6 +59,8 @@ def session(config=None, gpu_options=None, use_horovod=False):
             return self
 
         def __exit__(self, *exc_info):
+            if self.use_horovod and hvd.initialized():
+                hvd.barrier()  # 念のためタイミングを合わせる。
             if K.backend() == 'tensorflow':
                 K.clear_session()
 
