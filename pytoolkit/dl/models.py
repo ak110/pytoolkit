@@ -138,7 +138,7 @@ class Model(object):
         if tsv_log_path is not None:
             cb.append(callbacks.tsv_logger(tsv_log_path))
         cb.append(callbacks.epoch_logger())
-        cb.append(callbacks.freeze_bn(0.95))
+        cb.append(callbacks.freeze_bn(0.875))
         cb.append(keras.callbacks.TerminateOnNaN())
 
         # 学習
