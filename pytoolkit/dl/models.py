@@ -51,7 +51,7 @@ class Model(object):
             lr = sgd_lr * self.batch_size
             log.get(__name__).info(f'lr = {lr:.2e}')
             if lr_multipliers is None:
-                optimizer = keras.optimizers.SGD(lr=lr, momentum=0.9)
+                optimizer = keras.optimizers.SGD(lr=lr, momentum=0.9, nesterov=True)
             else:
                 optimizer = optimizers.nsgd()(lr=lr, lr_multipliers=lr_multipliers)
 
