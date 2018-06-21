@@ -158,7 +158,7 @@ class RandomCrop(generator.Operator):
     256px四方だと、32pxパディングで256px四方を切り抜く。
     """
 
-    def __init__(self, probability=1, crop_rate=0.4, aspect_prob=0.5, aspect_rations=(3 / 4, 4 / 3)):
+    def __init__(self, probability=1, crop_rate=0.5, aspect_prob=0.5, aspect_rations=(3 / 4, 4 / 3)):
         assert 0 < probability <= 1
         self.probability = probability
         self.crop_rate = crop_rate
@@ -633,7 +633,7 @@ class Normalize(generator.Operator):
 class RandomAlpha(generator.Operator):
     """画像の一部にランダムな色の半透明の矩形を描画する。"""
 
-    def __init__(self, probability=1, alpha=0.25, scale_low=0.02, scale_high=0.4, rate_1=1 / 3, rate_2=3, max_tries=30):
+    def __init__(self, probability=1, alpha=0.125, scale_low=0.02, scale_high=0.4, rate_1=1 / 3, rate_2=3, max_tries=30):
         assert 0 < probability <= 1
         assert scale_low <= scale_high
         assert rate_1 <= rate_2
