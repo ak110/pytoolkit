@@ -35,18 +35,19 @@ def _run(args):
         builder = tk.dl.networks.Builder()
         x = inp = keras.layers.Input(input_shape)
         x = builder.conv2d(128, use_act=False, name=f'start')(x)
-        for block, filters in enumerate([128, 256, 512]):
-            name = f'stage{block + 1}_block'
-            for res in range(4):
+        for stage, filters in enumerate([128, 256, 512]):
+            name1 = f'stage{stage + 1}'
+            x = builder.conv2d(filters, strides=1 if stage == 0 else 2, use_act=False, name=f'{name1}_ds')(x)
+            for block in range(8):
+                name2 = f'stage{stage + 1}_block{block + 1}'
                 sc = x
-                x = builder.conv2d(filters // 4, name=f'{name}_r{res}_c1')(x)
-                for d in range(8):
-                    t = builder.conv2d(filters // 8, name=f'{name}_r{res}_d{d}')(x)
-                    x = keras.layers.concatenate([x, t], name=f'{name}_r{res}_d{d}_cat')
-                x = builder.conv2d(filters, 1, use_act=False, name=f'{name}_r{res}_c2')(x)
-                x = keras.layers.add([sc, x], name=f'{name}_r{res}_add')
-            x = builder.bn_act(name=f'{name}')(x)
-            x = builder.conv2d(min(filters * 2, 512), strides=2, use_act=False, name=f'{name}_ds')(x)
+                x = builder.conv2d(filters // 4, name=f'{name2}_c1')(x)
+                for d in range(7):
+                    t = builder.conv2d(filters // 4, name=f'{name2}_d{d}')(x)
+                    x = keras.layers.concatenate([x, t], name=f'{name2}_d{d}_cat')
+                x = builder.conv2d(filters, 1, use_act=False, name=f'{name2}_c2')(x)
+                x = keras.layers.add([sc, x], name=f'{name2}_add')
+            x = builder.bn_act(name=f'{name1}')(x)
         x = keras.layers.Dropout(0.5, name='dropout')(x)
         x = keras.layers.GlobalAveragePooling2D(name='pooling')(x)
         x = builder.dense(num_classes, activation='softmax', name='predictions')(x)
