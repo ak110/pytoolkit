@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""実験用コード：CIFAR100。"""
+"""実験用コード。"""
 import argparse
 import pathlib
 
@@ -11,7 +11,8 @@ import pytoolkit as tk
 def _main():
     tk.better_exceptions()
     parser = argparse.ArgumentParser()
-    parser.add_argument('--result-dir', default=pathlib.Path('results_cifar100'), type=pathlib.Path)
+    parser.add_argument('--result-dir', default=pathlib.Path('results_classifier'), type=pathlib.Path)
+    parser.add_argument('--dataset', default='cifar100', choices=('cifar10', 'cifar100'))
     parser.add_argument('--epochs', default=300, type=int)
     parser.add_argument('--batch-size', default=64, type=int)
     args = parser.parse_args()
@@ -25,7 +26,12 @@ def _main():
 def _run(args):
     import keras
 
-    (X_train, y_train), (X_val, y_val) = keras.datasets.cifar100.load_data()
+    if args.dataset == 'cifar10':
+        (X_train, y_train), (X_val, y_val) = keras.datasets.cifar10.load_data()
+    elif args.dataset == 'cifar100':
+        (X_train, y_train), (X_val, y_val) = keras.datasets.cifar100.load_data()
+    else:
+        assert False
     y_train = np.squeeze(y_train)
     y_val = np.squeeze(y_val)
     input_shape = X_train.shape[1:]
@@ -70,7 +76,7 @@ def _run(args):
 
     model.fit(X_train, y_train, validation_data=(X_val, y_val),
               epochs=args.epochs, tsv_log_path=args.result_dir / 'history.tsv',
-              mixup=True)
+              mixup=True, cosine_annealing=True)
     model.save(args.result_dir / 'model.h5')
     if tk.dl.hvd.is_master():
         proba_val = model.predict(X_val)
