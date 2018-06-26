@@ -105,12 +105,11 @@ class ObjectDetector(object):
         - tsv_log_path: lossなどをtsvファイルに出力するならそのパス。
         """
         # モデルの作成
-        self._create_model(mode='pretrain', weights='imagenet', batch_size=batch_size,
-                           lr_scale=None, freeze_end_layer_name=None,
-                           flip_h=False, flip_v=False, rotate90=False,
-                           padding_rate=None, crop_rate=None, keep_aspect=False,
-                           aspect_prob=0, max_aspect_ratio=1, min_object_px=0,
-                           strict_nms=None)
+        network, _ = od_net.create_network(pb=self.pb, mode='pretrain', strict_nms=None)
+        gen = od_gen.create_pretrain_generator(self.pb.input_size, od_net.get_preprocess_input())
+        self.model = models.Model(network, gen, batch_size)
+        self.model.compile(sgd_lr=0.5 / 256, loss='categorical_crossentropy', metrics=['acc'])
+        self.model.summary()
         if plot_path:
             self.model.plot(plot_path)
         # 学習
@@ -122,7 +121,7 @@ class ObjectDetector(object):
 
     def fit(self, X_train: [pathlib.Path], y_train: [ml.ObjectsAnnotation],
             X_val: [pathlib.Path], y_val: [ml.ObjectsAnnotation],
-            batch_size, epochs, lr_scale=1, freeze_end_layer_name=None,
+            batch_size, epochs, lr_scale=1,
             initial_weights='voc', pb_size_pattern_count=8,
             flip_h=True, flip_v=False, rotate90=False,
             padding_rate=16, crop_rate=0.1, keep_aspect=False,
@@ -133,7 +132,6 @@ class ObjectDetector(object):
         # 引数
         - lr_scale: 学習率を調整するときの係数
         - initial_weights: 重みの初期値。
-                           Noneなら何も読まない。
                            'imagenet'ならバックボーンのみ。
                            'voc'ならPASCAL VOC 07+12 trainvalで学習済みのもの。
                            ファイルパスならそれを読む。
@@ -151,6 +149,7 @@ class ObjectDetector(object):
         - tsv_log_path: lossなどをtsvファイルに出力するならそのパス。
         """
         assert self.model is None
+        assert lr_scale > 0
         # 訓練データに合わせたprior boxの作成
         if hvd.is_master():
             self.pb.fit(y_train, pb_size_pattern_count, rotate90=rotate90, keep_aspect=keep_aspect)
@@ -165,16 +164,32 @@ class ObjectDetector(object):
             self.pb.check_prior_boxes(y_val)
         hvd.barrier()
         # モデルの作成
-        self._create_model(mode='train', weights=initial_weights, batch_size=batch_size,
-                           lr_scale=lr_scale, freeze_end_layer_name=freeze_end_layer_name,
-                           flip_h=flip_h, flip_v=flip_v, rotate90=rotate90,
-                           padding_rate=padding_rate, crop_rate=crop_rate, keep_aspect=keep_aspect,
-                           aspect_prob=aspect_prob, max_aspect_ratio=max_aspect_ratio,
-                           min_object_px=min_object_px,
-                           strict_nms=None)
+        network, lr_multipliers = od_net.create_network(pb=self.pb, mode='train', strict_nms=None)
+        pi = od_net.get_preprocess_input()
+        gen = od_gen.create_generator(self.pb.input_size, pi, self.pb.encode_truth,
+                                      flip_h=flip_h, flip_v=flip_v, rotate90=rotate90,
+                                      padding_rate=padding_rate, crop_rate=crop_rate, keep_aspect=keep_aspect,
+                                      aspect_prob=aspect_prob, max_aspect_ratio=max_aspect_ratio,
+                                      min_object_px=min_object_px)
+        self.model = models.Model(network, gen, batch_size)
+        self.model.summary()
         if plot_path:
             self.model.plot(plot_path)
+        # 重みの読み込み
+        logger = log.get(__name__)
+        if initial_weights == 'imagenet':
+            pass  # cold start
+        else:
+            if initial_weights == 'voc':
+                initial_weights = self._get_voc_weights()
+            else:
+                initial_weights = pathlib.Path(initial_weights)
+            self.model.load_weights(initial_weights, strict_warnings=False)
+            logger.info(f'warm start: {initial_weights.name}')
         # 学習
+        mean_objects = np.mean([len(y.bboxes) for y in y_train])  # オブジェクト数の平均
+        sgd_lr = lr_scale * 0.5 / 256 / 6 / mean_objects  # lossが複雑なので微調整
+        self.model.compile(sgd_lr=sgd_lr, lr_multipliers=lr_multipliers, loss=self.pb.loss, metrics=self.pb.metrics)
         self.model.fit(X_train, y_train, validation_data=(X_val, y_val),
                        epochs=epochs, tsv_log_path=tsv_log_path,
                        cosine_annealing=True)
@@ -197,12 +212,21 @@ class ObjectDetector(object):
 
         """
         assert self.model is None
-        self._create_model(mode='predict', weights=weights, batch_size=batch_size,
-                           lr_scale=None, freeze_end_layer_name=None,
-                           flip_h=False, flip_v=False, rotate90=False,
-                           padding_rate=None, crop_rate=None, keep_aspect=keep_aspect,
-                           aspect_prob=0, max_aspect_ratio=1, min_object_px=0,
-                           strict_nms=strict_nms)
+        network, _ = od_net.create_network(pb=self.pb, mode='predict', strict_nms=strict_nms)
+        pi = od_net.get_preprocess_input()
+        gen = od_gen.create_generator(self.pb.input_size, pi, encode_truth=None,
+                                      flip_h=False, flip_v=False, rotate90=False,
+                                      padding_rate=None, crop_rate=None, keep_aspect=keep_aspect,
+                                      aspect_prob=0, max_aspect_ratio=1,
+                                      min_object_px=0)
+        self.model = models.Model(network, gen, batch_size)
+        logger = log.get(__name__)
+        if weights == 'voc':
+            weights = self._get_voc_weights()
+        else:
+            weights = pathlib.Path(weights)
+        self.model.load_weights(weights, strict_warnings=False)
+        logger.info(f'{weights.name} loaded.')
         # マルチGPU化。
         if use_multi_gpu:
             gpus = utils.get_gpu_count()
@@ -211,6 +235,7 @@ class ObjectDetector(object):
             gpus = 1
         # 1回予測して計算グラフを構築
         self.model.model.predict_on_batch(np.zeros((gpus,) + tuple(self.pb.input_size) + (3,), np.float32))
+        logger.info('trainable params: %d', models.count_trainable_params(network))
 
     def predict(self, X, conf_threshold=0.01, verbose=1) -> [ml.ObjectsPrediction]:
         """予測。"""
@@ -240,73 +265,15 @@ class ObjectDetector(object):
                     break
         return pred
 
-    @log.trace()
-    def _create_model(self, mode, weights, batch_size, lr_scale, freeze_end_layer_name,
-                      flip_h, flip_v, rotate90,
-                      padding_rate, crop_rate, keep_aspect,
-                      aspect_prob, max_aspect_ratio, min_object_px,
-                      strict_nms):
-        """学習とか予測とか用に`tk.dl.models.Model`を作成して返す。
-
-        # 引数
-        - mode: 'pretrain', 'train', 'predict'のいずれか。(出力などが違う)
-        - weights: 読み込む重み。Noneなら読み込まない。'imagenet'ならバックボーンだけ。'voc'ならVOC07+12で学習したものを読み込む。その他str, pathlib.Pathならそのまま読み込む。
-
-        """
-        logger = log.get(__name__)
-
-        network, lr_multipliers = od_net.create_network(
-            pb=self.pb, mode=mode, strict_nms=strict_nms)
-        if freeze_end_layer_name is not None:
-            models.freeze_to_name(network, freeze_end_layer_name, skip_bn=True)
-        pi = od_net.get_preprocess_input()
-        if mode == 'pretrain':
-            gen = od_gen.create_pretrain_generator(self.pb.input_size, pi)
+    def _get_voc_weights(self) -> pathlib.Path:
+        """PASCAL VOCの学習済み重みのパスを返す。"""
+        downsampling_count = max(self.pb.input_size) // self.pb.map_sizes[0]
+        if downsampling_count <= 320 // 40:
+            weights = hvd.get_file(
+                _VOC_WEIGHTS_320_NAME, _VOC_WEIGHTS_320_URL,
+                file_hash=_VOC_WEIGHTS_320_MD5, cache_subdir='models')
         else:
-            encode_truth = None if mode == 'predict' else self.pb.encode_truth  # 予測時はencodeしない。
-            gen = od_gen.create_generator(self.pb.input_size, pi, encode_truth,
-                                          flip_h=flip_h, flip_v=flip_v, rotate90=rotate90,
-                                          padding_rate=padding_rate, crop_rate=crop_rate, keep_aspect=keep_aspect,
-                                          aspect_prob=aspect_prob, max_aspect_ratio=max_aspect_ratio,
-                                          min_object_px=min_object_px)
-        self.model = models.Model(network, gen, batch_size)
-
-        if mode == 'pretrain':
-            # 事前学習：通常の分類としてコンパイル
-            self.model.compile(sgd_lr=0.5 / 256, loss='categorical_crossentropy', metrics=['acc'])
-        elif mode == 'train':
-            # Object detectionとしてコンパイル
-            assert lr_scale is not None
-            sgd_lr = lr_scale * 0.5 / 256 / 3  # lossが複雑なので微調整
-            self.model.compile(sgd_lr=sgd_lr, lr_multipliers=lr_multipliers, loss=self.pb.loss, metrics=self.pb.metrics)
-        else:
-            assert mode == 'predict'
-            assert lr_scale is None
-
-        if mode in ('pretrain', 'train'):
-            self.model.summary()
-        else:
-            logger.info('trainable params: %d', models.count_trainable_params(network))
-
-        if weights is None:
-            logger.info(f'cold start.')
-        elif weights == 'imagenet':
-            logger.info(f'cold start with imagenet weights.')
-        elif weights == 'voc':
-            if self.pb.input_size == (320, 320):
-                weights_path = pathlib.Path(hvd.get_file(
-                    _VOC_WEIGHTS_320_NAME, _VOC_WEIGHTS_320_URL,
-                    file_hash=_VOC_WEIGHTS_320_MD5, cache_subdir='models'))
-            else:
-                weights_path = pathlib.Path(hvd.get_file(
-                    _VOC_WEIGHTS_640_NAME, _VOC_WEIGHTS_640_URL,
-                    file_hash=_VOC_WEIGHTS_640_MD5, cache_subdir='models'))
-            self.model.load_weights(weights_path, strict_warnings=False)
-            logger.info(f'{weights_path.name} loaded.')
-        else:
-            weights = pathlib.Path(weights)
-            self.model.load_weights(weights, strict_warnings=False)
-            if mode == 'predict':
-                logger.info(f'{weights.name} loaded.')
-            else:
-                logger.info(f'warm start: {weights.name}')
+            weights = hvd.get_file(
+                _VOC_WEIGHTS_640_NAME, _VOC_WEIGHTS_640_URL,
+                file_hash=_VOC_WEIGHTS_640_MD5, cache_subdir='models')
+        return weights

@@ -15,7 +15,8 @@ def _main():
     parser.add_argument('--map-sizes', default=(40, 20, 10), type=int, nargs='+')
     parser.add_argument('--pb-sizes', default=8, type=int)
     parser.add_argument('--batch-size', default=8, type=int)
-    parser.add_argument('--epochs', default=128, type=int)
+    parser.add_argument('--epochs', default=300, type=int)
+    parser.add_argument('--skip-train', action='store_true')
     args = parser.parse_args()
     args.result_dir.mkdir(parents=True, exist_ok=True)
 
@@ -24,7 +25,7 @@ def _main():
     X_val, y_val = tk.data.voc.load_07_test(args.vocdevkit_dir)
 
     # 学習(model.h5が存在しない場合のみ。学習後に消さずに再実行した場合は検証だけする。)
-    if not (args.result_dir / 'model.h5').is_file():
+    if not args.skip_train:
         with tk.dl.session(use_horovod=True):
             tk.log.init(args.result_dir / 'train.log')
             _train(args, X_train, y_train, X_val, y_val)
@@ -62,7 +63,7 @@ def _train(args, X_train, y_train, X_val, y_val):
 def _evaluate(args, X_val, y_val):
     od = tk.dl.od.ObjectDetector.load(args.result_dir / 'model.json')
     od.load_weights(args.result_dir / 'model.h5', batch_size=args.batch_size, strict_nms=True, use_multi_gpu=True)
-    pred = od.predict(X_val, conf_threshold=0.75)
+    pred = od.predict(X_val, conf_threshold=0.1)
     # 適合率・再現率などを算出・表示
     precisions, recalls, fscores, supports = tk.ml.compute_scores(y_val, pred, iou_threshold=0.5)
     tk.ml.print_scores(precisions, recalls, fscores, supports, tk.data.voc.CLASS_NAMES)

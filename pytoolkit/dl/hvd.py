@@ -1,5 +1,6 @@
 """Horovodの薄いwrapper。"""
 import logging
+import pathlib
 
 _initialized = False
 
@@ -69,4 +70,4 @@ def get_file(name, url, **kwargs):
     if is_local_master():
         keras.utils.get_file(name, url, **kwargs)
     barrier()
-    return keras.utils.get_file(name, url, **kwargs)
+    return pathlib.Path(keras.utils.get_file(name, url, **kwargs))

@@ -3,12 +3,12 @@
 import numpy as np
 
 from . import layers, losses, networks
-from .. import image, log, applications
+from .. import log, applications
 
 
 def get_preprocess_input():
     """`preprocess_input`を返す。"""
-    return image.preprocess_input_mean
+    return applications.darknet53.preprocess_input
 
 
 @log.trace()
@@ -34,7 +34,7 @@ def create_network(pb, mode, strict_nms=None):
 @log.trace()
 def _create_basenet(builder, x, load_weights):
     """ベースネットワークの作成。"""
-    basenet = applications.darknet53(input_tensor=x, weights='imagenet' if load_weights else None)
+    basenet = applications.darknet53.darknet53(input_tensor=x, weights='imagenet' if load_weights else None)
     ref_list = []
     ref_list.append(basenet.get_layer(name='add_1').output)  # 320→160
     ref_list.append(basenet.get_layer(name='add_3').output)  # 320→80

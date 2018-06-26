@@ -26,6 +26,21 @@ class Model(object):
         """マルチGPU化。"""
         self.model, self.batch_size = multi_gpu_model(self.model, self.batch_size, gpus)
 
+    def freeze(self, predicate=lambda layer: True, skip_bn=False):
+        """条件に一致するレイヤーをfreezeする。"""
+        import keras
+        for layer in self.model.layers:
+            if skip_bn and isinstance(layer, keras.layers.BatchNormalization):
+                continue
+            if predicate(layer):
+                layer.trainable = False
+
+    def unfreeze(self, predicate=lambda layer: True):
+        """条件に一致するレイヤーをfreeze解除する。"""
+        for layer in self.model.layers:
+            if predicate(layer):
+                layer.trainable = True
+
     @log.trace()
     def compile(self, optimizer=None, loss=None, metrics=None,
                 sample_weight_mode=None, weighted_metrics=None, target_tensors=None,
@@ -60,6 +75,12 @@ class Model(object):
                            sample_weight_mode=sample_weight_mode,
                            weighted_metrics=weighted_metrics,
                            target_tensors=target_tensors)
+
+    def recompile(self):
+        """オプションを変えずに再コンパイル。"""
+        self.model.compile(self.model.optimizer, self.model.loss, self.model.metrics,
+                           sample_weight_mode=self.model.sample_weight_mode,
+                           weighted_metrics=self.model.weighted_metrics)
 
     def summary(self):
         """サマリ表示。"""

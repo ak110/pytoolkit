@@ -23,6 +23,11 @@ def darknet53(input_shape=None, input_tensor=None, weights='imagenet'):
 
     if weights == 'imagenet':
         weights_path = hvd.get_file(WEIGHTS_NAME, WEIGHTS_URL, file_hash=WEIGHTS_HASH, cache_subdir='models')
-        model.load_weights(weights_path)
+        model.load_weights(str(weights_path))
 
     return model
+
+
+def preprocess_input(x):
+    """前処理。"""
+    return x / 255
