@@ -176,7 +176,8 @@ class ObjectDetector(object):
             self.model.plot(plot_path)
         # 学習
         self.model.fit(X_train, y_train, validation_data=(X_val, y_val),
-                       epochs=epochs, tsv_log_path=tsv_log_path)
+                       epochs=epochs, tsv_log_path=tsv_log_path,
+                       cosine_annealing=True)
 
     def save_weights(self, path: typing.Union[str, pathlib.Path]):
         """重みの保存。(学習後用)"""

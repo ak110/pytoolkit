@@ -15,7 +15,7 @@ def _main():
     parser.add_argument('--map-sizes', default=(40, 20, 10), type=int, nargs='+')
     parser.add_argument('--pb-sizes', default=8, type=int)
     parser.add_argument('--batch-size', default=8, type=int)
-    parser.add_argument('--epochs', default=300, type=int)
+    parser.add_argument('--epochs', default=128, type=int)
     args = parser.parse_args()
     args.result_dir.mkdir(parents=True, exist_ok=True)
 
@@ -34,7 +34,6 @@ def _main():
         tk.log.init(args.result_dir / 'validate.log')
         with tk.dl.session():
             _evaluate(args, X_val, y_val)
-        with tk.dl.session():
             _validate(args, X_val, y_val)
 
 

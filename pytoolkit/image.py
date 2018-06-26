@@ -189,8 +189,8 @@ class RandomZoom(generator.Operator):
     # 引数
 
     - output_size: 出力画像サイズ (width, heightのタプル)
-    - padding_rate: paddingする場合の面積の比の最大値。16なら最大で縦横4倍。
-    - crop_rate: cropする場合の面積の比の最大値。0.1なら最小で縦横0.32倍。
+    - padding_rate: paddingする場合の面積の比の最大値。16なら最大で縦横4倍(SSD風)。
+    - crop_rate: cropする場合の面積の比の最大値。0.1なら最小で縦横0.32倍(SSD風)。
     - keep_aspect: padding / cropの際にアスペクト比を保持するならTrue、正方形にリサイズしてしまうならFalse。
     - aspect_prob: アスペクト比を歪ませる確率。
     - max_aspect_ratio: アスペクト比を最大どこまで歪ませるか。(1.5なら正方形から3:2までランダムに歪ませる)
@@ -261,7 +261,7 @@ class RandomZoom(generator.Operator):
         """Padding(zoom-out)。"""
         input_size = np.asarray(rgb.shape[-2::-1])
         for _ in range(30):
-            pr = np.exp(rand.uniform(np.log(1), np.log(np.sqrt(self.padding_rate))))  # SSD風：[1, 16]
+            pr = rand.uniform(1, np.sqrt(self.padding_rate))
             padded_size = np.ceil(input_size * pr * ar).astype(int)
             padded_size = np.maximum(padded_size, input_size)
             padding_size = padded_size - input_size
@@ -292,7 +292,7 @@ class RandomZoom(generator.Operator):
             bb_area = ml.bboxes_area(y.bboxes)
         input_size = np.asarray(rgb.shape[-2::-1])
         for _ in range(30):
-            cr = np.exp(rand.uniform(np.log(np.sqrt(self.crop_rate)), np.log(1)))  # SSD風：[0.1, 1]
+            cr = rand.uniform(np.sqrt(self.crop_rate), 1)  # SSD風：[0.1, 1]
             cropped_wh = np.floor(input_size * cr * ar).astype(int)
             cropped_wh = np.minimum(cropped_wh, input_size)
             cropping_size = input_size - cropped_wh
