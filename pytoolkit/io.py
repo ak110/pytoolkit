@@ -28,13 +28,13 @@ def write_all_lines(file_path, lines, mode='w', encoding='utf-8'):
 
 
 def read_all_text(file_path, mode='r', encoding='utf-8'):
-    """ファイルの全行を読み込み。戻り値は改行無しの配列。.NETのSystem.IO.File.ReadAllText()風。"""
+    """ファイルの全行を読み込み。戻り値は文字列。.NETのSystem.IO.File.ReadAllText()風。"""
     with pathlib.Path(file_path).open(mode, encoding=encoding) as f:
         return f.read()
 
 
 def write_all_text(file_path, text, mode='w', encoding='utf-8'):
-    """ファイルの全行を書き込み。linesは改行無しの文字列の配列。.NETのSystem.IO.File.WriteAllText()風。"""
+    """ファイルの全行を書き込み。textは文字列。.NETのSystem.IO.File.WriteAllText()風。"""
     with pathlib.Path(file_path).open(mode, encoding=encoding) as f:
         f.write(text)
 
