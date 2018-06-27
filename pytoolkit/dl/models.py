@@ -119,6 +119,8 @@ class Model(object):
                 steps2 //= hvd_size  # Horovodのサンプルでは * 3 だけど早く進んで欲しいので省略
                 if steps2 <= 0:  # 安全装置
                     steps2 = 1
+        # 検証にはコストをかけすぎないようにしてみる
+        steps2 = max(steps2, (steps1 + 3) // 4) if steps2 is not None else None
 
         # callback
         cb = []

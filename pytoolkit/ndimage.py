@@ -28,10 +28,14 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
         flags = cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR
         img = cv2.imread(str(path_or_array), flags)
         if img is None:
-            if (pathlib.Path(path_or_array).suffix or '').lower() == '.gif':
+            suffix = (pathlib.Path(path_or_array).suffix or '').lower()
+            if suffix == '.gif':
                 gif = cv2.VideoCapture(str(path_or_array))
                 assert gif is not None, f'Load error: {path_or_array}'
                 _, img = gif.read()
+            elif suffix == '.npy':
+                img = np.load(str(path_or_array))
+                assert img.shape[-1] == (1 if grayscale else 3)
             assert img is not None, f'Load error: {path_or_array}'
         if grayscale:
             img = np.expand_dims(img, axis=-1)
