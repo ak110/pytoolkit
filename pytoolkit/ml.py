@@ -134,7 +134,7 @@ def split(X, y, split_seed, validation_split=None, cv_count=None, cv_index=None,
 
 
 def cv_indices(X, y, cv_count, cv_index, split_seed, stratify=None):
-    """cross validationのインデックスを返す。"""
+    """Cross validationのインデックスを返す。"""
     if stratify is None:
         stratify = isinstance(y, np.ndarray) and len(y.shape) == 1
     cv = sklearn.model_selection.StratifiedKFold if stratify else sklearn.model_selection.KFold

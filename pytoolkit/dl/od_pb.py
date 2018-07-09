@@ -12,7 +12,7 @@ _VAR_SIZE = 0.2  # SSD風適当スケーリング
 
 
 class PriorBoxes(object):
-    """Prior boxの集合を管理するクラス。 """
+    """Prior boxの集合を管理するクラス。"""
 
     def __init__(self, input_size, map_sizes, num_classes):
         # 入力画像のサイズ。(縦, 横)のタプル。
@@ -124,7 +124,7 @@ class PriorBoxes(object):
         self.pb_size_patterns = pb_size_patterns
 
     def _create_pb(self):
-        """prior boxのサイズなどを算出する。"""
+        """Prior boxのサイズなどを算出する。"""
         self.pb_grid = []
         self.pb_locs = []
         self.pb_info_indices = []

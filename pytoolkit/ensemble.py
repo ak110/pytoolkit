@@ -147,7 +147,8 @@ class KerasWeakModel(WeakModel):
         return [self.predict_fold(X, cv_index=cv_index) for cv_index in range(self.cv_count)]
 
     def session(self, train):
-        """`tk.dl.session()`を返す。(オプション変えるときはこれをオーバーライドする。)"""
+        """オプション変えるとき用。"""
+        utils.noqa(self)
         return dl.session(use_horovod=train)
 
     @abc.abstractmethod

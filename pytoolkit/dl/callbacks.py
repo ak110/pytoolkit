@@ -43,8 +43,8 @@ def learning_rate(reduce_epoch_rates=(0.5, 0.75), factor=0.1, logger_name=None):
     return _LearningRate(reduce_epoch_rates=reduce_epoch_rates, factor=factor, logger_name=logger_name)
 
 
-def cosine_annealing(factor=0.01, restart=0):
-    """Cosine Annealing.
+def cosine_annealing(factor=0.01):
+    """Cosine Annealing without restart。
 
     ■SGDR: Stochastic Gradient Descent with Warm Restarts
     https://arxiv.org/abs/1608.03983
@@ -52,41 +52,26 @@ def cosine_annealing(factor=0.01, restart=0):
     import keras
     import keras.backend as K
     assert factor < 1
-    assert restart >= 0
 
     class _CosineAnnealing(keras.callbacks.Callback):
 
-        def __init__(self, factor, restart):
+        def __init__(self, factor):
             self.factor = factor
-            self.restart = restart
             self.period = None
             self.start_lr = None
             super().__init__()
 
         def on_train_begin(self, logs=None):
-            epochs = self.params['epochs']
-            self.period = epochs // (self.restart + 1)
             self.start_lr = float(K.get_value(self.model.optimizer.lr))
-            assert self.period >= 2
 
         def on_epoch_begin(self, epoch, logs=None):
-            period = self.period
-            period_start = 0
-            period_end = period
-            while period_end <= epoch:
-                period_start = period_end
-                period_end += period
-            lr_min = self.start_lr * self.factor
             lr_max = self.start_lr
-            cur = epoch + 1 - period_start
-            #if hvd.initialized() and epoch < 5:
-            #    multiplier = 1 / hvd.get().size() * (epoch * (hvd.get().size() - 1) / 5 + 1)
-            #    lr = lr_max * multiplier
-            #else:
-            lr = lr_min + 0.5 * (lr_max - lr_min) * (1 + np.cos(np.pi * cur / period))
+            lr_min = self.start_lr * self.factor
+            r = (epoch + 1) / self.params['epochs']
+            lr = lr_min + 0.5 * (lr_max - lr_min) * (1 + np.cos(np.pi * r))
             K.set_value(self.model.optimizer.lr, float(lr))
 
-    return _CosineAnnealing(factor=factor, restart=restart)
+    return _CosineAnnealing(factor=factor)
 
 
 def learning_curve_plot(filename, metric='loss'):
