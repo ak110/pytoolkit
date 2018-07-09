@@ -31,32 +31,32 @@ class Builder(object):
 
     def conv1d(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """Conv1D+BN+Act。"""
-        import keras.layers
+        import keras
         return self._conv(1, keras.layers.Conv1D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
     def conv2d(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """Conv2D+BN+Act。"""
-        import keras.layers
+        import keras
         return self._conv(2, keras.layers.Conv2D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
     def conv3d(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """Conv3D+BN+Act。"""
-        import keras.layers
+        import keras
         return self._conv(3, keras.layers.Conv3D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
     def conv2dtr(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """Conv2DTranspose+BN+Act。"""
-        import keras.layers
+        import keras
         return self._conv(2, keras.layers.Conv2DTranspose, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
     def dwconv2d(self, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """DepthwiseConv2D+BN+Act。"""
-        import keras.layers
+        import keras
         return self._conv(2, keras.layers.DepthwiseConv2D, None, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
     def _conv(self, rank, conv, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs):
         """ConvND+BN+Act。"""
-        import keras.layers
+        import keras
         kwargs = copy.copy(kwargs)
         bn_kwargs = copy.copy(bn_kwargs) if bn_kwargs is not None else {}
         act_kwargs = copy.copy(act_kwargs) if act_kwargs is not None else {}
@@ -118,7 +118,7 @@ class Builder(object):
 
     def dense(self, units, **kwargs):
         """Dense。"""
-        import keras.layers
+        import keras
         return keras.layers.Dense(units, **self._params(self.dense_defaults, kwargs))
 
     @staticmethod

@@ -41,7 +41,6 @@ def nsgd():
                     for w in layer_or_weights_name.trainable_weights:
                         self.lr_multipliers[w.name] = mp
 
-        @keras.legacy.interfaces.legacy_get_updates_support
         def get_updates(self, loss, params):
             applied_lr_multipliers = 0
 

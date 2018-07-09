@@ -46,14 +46,11 @@ class Model(object):
         if sgd_lr is None:
             optimizer = keras.optimizers.get(optimizer)
         else:
-            if hvd.initialized():
-                sgd_lr *= hvd.get().size()
             lr = sgd_lr * self.batch_size
-            log.get(__name__).info(f'lr = {lr:.2e}')
-            if lr_multipliers is None:
-                optimizer = keras.optimizers.SGD(lr=lr, momentum=0.9, nesterov=True)
-            else:
-                optimizer = optimizers.nsgd()(lr=lr, lr_multipliers=lr_multipliers)
+            if hvd.initialized():
+                lr *= hvd.get().size()
+            log.get(__name__).info(f'initial lr = {lr:.2e}')
+            optimizer = optimizers.nsgd()(lr=lr, lr_multipliers=lr_multipliers)
 
         if hvd.initialized():
             optimizer = hvd.get().DistributedOptimizer(

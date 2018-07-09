@@ -387,7 +387,7 @@ def l2normalization():
             init_gamma = self.scale * np.ones(shape)
             self.gamma = self.add_weight(name='gamma',
                                          shape=shape,
-                                         initializer=keras.initializers.constant(init_gamma),
+                                         initializer=keras.initializers.Constant(init_gamma),
                                          trainable=True)
             return super().build(input_shape)
 
@@ -414,7 +414,7 @@ def weighted_mean():
         """入力の加重平均を取るレイヤー。"""
 
         def __init__(self,
-                     kernel_initializer=keras.initializers.constant(0.1),
+                     kernel_initializer=keras.initializers.Constant(0.1),
                      kernel_regularizer=None,
                      kernel_constraint='non_neg',
                      **kwargs):
