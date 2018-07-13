@@ -84,9 +84,6 @@ def listup_classification(dirpath, class_names=None):
     """画像分類でよくある、クラス名ディレクトリの列挙。クラス名の配列, X, yを返す。"""
     dirpath = pathlib.Path(dirpath)
 
-    def _is_valid_file(p):
-        return p.is_file() and p.name.lower() != 'thumbs.db'
-
     # クラス名
     if class_names is None:
         def _empty(it):
@@ -100,11 +97,26 @@ def listup_classification(dirpath, class_names=None):
     # 各クラスのデータを列挙
     X, y = [], []
     for class_id, class_name in enumerate(class_names):
-        t = [p for p in (dirpath / class_name).iterdir() if _is_valid_file(p)]
+        t = listup_files(dirpath / class_name)
         X.extend(t)
         y.extend([class_id] * len(t))
     assert len(X) == len(y)
     return class_names, np.array(X), np.array(y)
+
+
+def listup_files(dirpath, recurse=False):
+    """ファイルの列挙。"""
+    dirpath = pathlib.Path(dirpath)
+    if recurse:
+        it = dirpath.glob('**')
+    else:
+        it = dirpath.iterdir()
+    return [p for p in it if _is_valid_file(p)]
+
+
+def _is_valid_file(p):
+    """有効なファイルなのか否か。(だいぶ適当)"""
+    return p.is_file() and p.name.lower() != 'thumbs.db'
 
 
 def split(X, y, split_seed, validation_split=None, cv_count=None, cv_index=None, stratify=None):
