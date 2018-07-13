@@ -28,30 +28,6 @@ def write_all_lines(file_path, lines, mode='w', encoding='utf-8'):
         f.writelines([l + '\n' for l in lines])
 
 
-def read_all_text(file_path, mode='r', encoding='utf-8'):
-    """ファイルの全行を読み込み。戻り値は文字列。.NETのSystem.IO.File.ReadAllText()風。"""
-    with pathlib.Path(file_path).open(mode, encoding=encoding) as f:
-        return f.read()
-
-
-def read_all_bytes(file_path, mode='rb'):
-    """ファイルの全行を読み込み。戻り値はバイト列。.NETのSystem.IO.File.ReadAllBytes()風。"""
-    with pathlib.Path(file_path).open(mode) as f:
-        return f.read()
-
-
-def write_all_text(file_path, text, mode='w', encoding='utf-8'):
-    """ファイルの全行を書き込み。textは文字列。.NETのSystem.IO.File.WriteAllText()風。"""
-    with pathlib.Path(file_path).open(mode, encoding=encoding) as f:
-        f.write(text)
-
-
-def write_all_bytes(file_path, bytes_array, mode='wb'):
-    """ファイルの全行を書き込み。textは文字列。.NETのSystem.IO.File.WriteAllBytes()風。"""
-    with pathlib.Path(file_path).open(mode) as f:
-        f.write(bytes_array)
-
-
 def do_retry(func, count=10, sleep_seconds=1.0):
     """リトライ処理。"""
     retry = 0
