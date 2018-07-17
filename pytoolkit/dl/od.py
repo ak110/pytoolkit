@@ -236,6 +236,12 @@ class ObjectDetector(object):
         self.model.model.predict_on_batch(np.zeros((gpus,) + tuple(self.pb.input_size) + (3,), np.float32))
         logger.info('trainable params: %d', models.count_trainable_params(network))
 
+    def set_strict_nms(self, strict_nms: bool):
+        """予測用に読み込んだモデルのstrict_nmsを切り替える。"""
+        nms_all_threshold = 0.5 if strict_nms else None
+        self.model.model.get_layer(name='nms').nms_all_threshold = nms_all_threshold
+        self.model.model.predict_function = None  # monkey patch
+
     def predict(self, X, conf_threshold=0.01, verbose=1) -> [ml.ObjectsPrediction]:
         """予測。"""
         assert self.model is not None

@@ -34,7 +34,6 @@ def _main():
     if tk.dl.hvd.is_master():
         tk.log.init(args.result_dir / 'validate.log')
         with tk.dl.session():
-            _evaluate(args, X_val, y_val)
             _validate(args, X_val, y_val)
 
 
@@ -60,26 +59,21 @@ def _train(args, X_train, y_train, X_val, y_val):
 
 
 @tk.log.trace()
-def _evaluate(args, X_val, y_val):
+def _validate(args, X_val, y_val):
     od = tk.dl.od.ObjectDetector.load(args.result_dir / 'model.json')
     od.load_weights(args.result_dir / 'model.h5', batch_size=args.batch_size, strict_nms=True, use_multi_gpu=True)
-    pred = od.predict(X_val, conf_threshold=0.1)
+    pred_val = od.predict(X_val, conf_threshold=0.1)
     # 適合率・再現率などを算出・表示
-    precisions, recalls, fscores, supports = tk.ml.compute_scores(y_val, pred, iou_threshold=0.5)
+    precisions, recalls, fscores, supports = tk.ml.compute_scores(y_val, pred_val, iou_threshold=0.5)
     tk.ml.print_scores(precisions, recalls, fscores, supports, tk.data.voc.CLASS_NAMES)
     # 先頭部分のみ可視化
     save_dir = args.result_dir / '___check'
-    for x, p in zip(X_val[:64], pred[:64]):
+    for x, p in zip(X_val[:64], pred_val[:64]):
         img = p.plot(x, tk.data.voc.CLASS_NAMES)
         tk.ndimage.save(save_dir / (x.stem + '.jpg'), img)
-
-
-@tk.log.trace()
-def _validate(args, X_val, y_val):
-    od = tk.dl.od.ObjectDetector.load(args.result_dir / 'model.json')
-    od.load_weights(args.result_dir / 'model.h5', batch_size=args.batch_size, strict_nms=False, use_multi_gpu=True)
-    pred_val = od.predict(X_val)
     # mAPを算出・表示
+    od.set_strict_nms(False)
+    pred_val = od.predict(X_val)
     map1 = tk.ml.compute_map(y_val, pred_val, use_voc2007_metric=False)
     map2 = tk.ml.compute_map(y_val, pred_val, use_voc2007_metric=True)
     logger = tk.log.get(__name__)
