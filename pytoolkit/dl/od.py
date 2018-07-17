@@ -187,8 +187,7 @@ class ObjectDetector(object):
             self.model.load_weights(initial_weights, strict_warnings=False)
             logger.info(f'warm start: {initial_weights.name}')
         # 学習
-        mean_objects = np.mean([len(y.bboxes) for y in y_train])  # オブジェクト数の平均
-        sgd_lr = lr_scale * 0.5 / 256 / 6 / mean_objects  # lossが複雑なので微調整
+        sgd_lr = lr_scale * 0.5 / 256 / 6  # lossが複雑なので微調整
         self.model.compile(sgd_lr=sgd_lr, lr_multipliers=lr_multipliers, loss=self.pb.loss, metrics=self.pb.metrics)
         self.model.fit(X_train, y_train, validation_data=(X_val, y_val),
                        epochs=epochs, tsv_log_path=tsv_log_path,

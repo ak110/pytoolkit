@@ -315,40 +315,54 @@ class PriorBoxes(object):
         bb_centers = ml.bboxes_center(bboxes)
 
         pb_assigned_gt = -np.ones((len(self.pb_locs),), dtype=int)  # -1埋め
+        pb_assigned_iou = np.zeros((len(self.pb_locs),), dtype=float)
         pb_assignable = np.ones((len(self.pb_locs),), dtype=bool)
         pb_valids = np.ones((len(self.pb_locs),), dtype=bool)
 
         # 面積の昇順に並べ替え (おまじない: 小さいやつの方が難しいので優先的に割り当て)
         sorted_indices = ml.bboxes_area(bboxes).argsort()
-
+        # とりあえずSSD風にIoU >= 0.5に割り当て
         for gt_ix, bbox, bb_center in zip(sorted_indices, bboxes[sorted_indices], bb_centers[sorted_indices]):
-            # assignableな全prior boxとのIoUの算出
-            pb_mask = np.logical_and(self.pb_mask, pb_assignable)
+            # bboxの重心が含まれるprior boxにのみ割り当てる
+            pb_mask = math.in_range(bb_center, self.pb_locs[:, :2], self.pb_locs[:, 2:]).all(axis=-1)
+            pb_mask = np.logical_and(pb_mask, self.pb_mask)
             assert pb_mask.any(), f'Encode error: {bb_center}'
+            # IoUが0.5以上のものに割り当てる。1つも無ければ最大のものに。
             iou = ml.compute_iou(np.expand_dims(bbox, axis=0), self.pb_locs[pb_mask, :])[0]
-
-            # assign: bboxの重心が含まれるグリッドで形が最も合うもの1つにassignする
-            pb_mask2 = math.in_range(bb_center, self.pb_grid[:, :2], self.pb_grid[:, 2:]).all(axis=-1)
-            pb_mask2 = np.logical_and(pb_mask2, self.pb_mask)
-            assert pb_mask2.any(), f'Encode error: {bb_center}'
-            pb_mask2 = np.logical_and(pb_mask2, pb_assignable)  # 割り当て済みは除外
-            if pb_mask2.any():
-                sb_iou = ml.compute_size_based_iou(np.expand_dims(bbox, axis=0), self.pb_locs[pb_mask2])[0]
-                sb_iou_ix = sb_iou.argmax()
-                pb_ix = np.where(pb_mask2)[0][sb_iou_ix]
-                pb_assigned_gt[pb_ix] = gt_ix
-                pb_assignable[pb_ix] = False
+            iou_mask = iou >= 0.5
+            if iou_mask.any():
+                for pb_ix, pb_iou in zip(np.where(pb_mask)[0][iou_mask], iou[iou_mask]):
+                    # よりIoUが大きいものを優先して割り当て
+                    if pb_assignable[pb_ix] and pb_assigned_iou[pb_ix] < pb_iou:
+                        pb_assigned_gt[pb_ix] = gt_ix
+                        pb_assigned_iou[pb_ix] = pb_iou
             else:
-                # 対象が見つからなかった時のフォールバック: 単純にIoUが最大のものへ。
                 iou_ix = iou.argmax()
                 pb_ix = np.where(pb_mask)[0][iou_ix]
                 pb_assigned_gt[pb_ix] = gt_ix
+                pb_assigned_iou[pb_ix] = iou[iou_ix]
                 pb_assignable[pb_ix] = False  # 上書き禁止！
-
-            # IoUが0.5以上のprior boxは無視する
-            iou_ignore_mask = iou >= 0.5
+            # IoUが0.3～0.5のprior boxは無視する
+            iou_ignore_mask = np.logical_and(np.logical_not(iou_mask), iou >= 0.3)
             pb_ignore_mask = np.where(pb_mask)[0][iou_ignore_mask]
             pb_valids[pb_ignore_mask] = False
+
+        # 中心が一致している前提で最も一致するところに強制割り当て
+        pb_assignable = np.ones((len(self.pb_locs),), dtype=bool)
+        for gt_ix, (bbox, bb_center) in enumerate(zip(bboxes, bb_centers)):
+            # bboxの重心が含まれるグリッドのみ探す
+            pb_mask = math.in_range(bb_center, self.pb_grid[:, :2], self.pb_grid[:, 2:]).all(axis=-1)
+            pb_mask = np.logical_and(pb_mask, self.pb_mask)
+            assert pb_mask.any(), f'Encode error: {bb_center}'
+            pb_mask = np.logical_and(pb_mask, pb_assignable)  # 割り当て済みは除外
+            if not pb_mask.any():
+                continue  # 割り当て失敗
+            # 形が最も合うもの1つにassignする
+            sb_iou = ml.compute_size_based_iou(np.expand_dims(bbox, axis=0), self.pb_locs[pb_mask])[0]
+            sb_iou_ix = sb_iou.argmax()
+            pb_ix = np.where(pb_mask)[0][sb_iou_ix]
+            pb_assigned_gt[pb_ix] = gt_ix
+            pb_assignable[pb_ix] = False
 
         pb_indices = np.where(pb_assigned_gt >= 0)[0]
         assert len(pb_indices) >= 1  # 1個以上は必ず割り当てないと損失関数などが面倒になる
@@ -398,11 +412,15 @@ class PriorBoxes(object):
     def loss_obj(self, y_true, y_pred):
         """Objectness scoreのloss。(binary focal loss)"""
         import keras.backend as K
+        import tensorflow as tf
         gt_mask = y_true[:, :, 0]
         gt_obj, pred_obj = y_true[:, :, 1], y_pred[:, :, 1]
+        gt_obj_count = K.sum(gt_obj, axis=-1)  # 各batch毎のobj数。
+        with tf.control_dependencies([tf.assert_positive(gt_obj_count)]):  # obj_countが1以上であることの確認
+            gt_obj_count = tf.identity(gt_obj_count)
         pb_mask = np.expand_dims(self.pb_mask, axis=0)
         loss = losses.binary_focal_loss(gt_obj, pred_obj)
-        loss = K.sum(loss * gt_mask * pb_mask, axis=-1)
+        loss = K.sum(loss * gt_mask * pb_mask, axis=-1) / gt_obj_count  # normalized by the number of anchors assigned to a ground-truth box
         return loss
 
     @staticmethod
@@ -412,7 +430,7 @@ class PriorBoxes(object):
         gt_obj = y_true[:, :, 1]
         gt_classes, pred_classes = y_true[:, :, 2:-4], y_pred[:, :, 2:-4]
         loss = K.categorical_crossentropy(gt_classes, pred_classes)
-        loss = K.sum(loss * gt_obj, axis=-1)
+        loss = K.sum(loss * gt_obj, axis=-1) / K.sum(gt_obj, axis=-1)  # mean (box)
         return loss
 
     @staticmethod
@@ -422,5 +440,5 @@ class PriorBoxes(object):
         gt_obj = y_true[:, :, 1]
         gt_locs, pred_locs = y_true[:, :, -4:], y_pred[:, :, -4:]
         loss = losses.l1_smooth_loss(gt_locs, pred_locs)
-        loss = K.sum(loss * gt_obj, axis=-1)
+        loss = K.sum(loss * gt_obj, axis=-1) / K.sum(gt_obj, axis=-1)  # mean (box)
         return loss
