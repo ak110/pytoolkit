@@ -178,7 +178,7 @@ class ObjectDetector(object):
         # 重みの読み込み
         logger = log.get(__name__)
         if initial_weights == 'imagenet':
-            pass  # cold start
+            warm_start = False  # cold start
         else:
             if initial_weights == 'voc':
                 initial_weights = self._get_voc_weights()
@@ -186,9 +186,14 @@ class ObjectDetector(object):
                 initial_weights = pathlib.Path(initial_weights)
             self.model.load_weights(initial_weights, strict_warnings=False)
             logger.info(f'warm start: {initial_weights.name}')
+            warm_start = True
         # 学習
-        sgd_lr = lr_scale * 0.5 / 256 / 6  # lossが複雑なので微調整
-        self.model.compile(sgd_lr=sgd_lr, lr_multipliers=lr_multipliers, loss=self.pb.loss, metrics=self.pb.metrics)
+        if warm_start:
+            sgd_lr = lr_scale * 0.5 / 256 / 6 / 2  # lossが複雑なので微調整
+            self.model.compile(sgd_lr=sgd_lr, lr_multipliers=None, loss=self.pb.loss, metrics=self.pb.metrics)
+        else:
+            sgd_lr = lr_scale * 0.5 / 256 / 6  # lossが複雑なので微調整
+            self.model.compile(sgd_lr=sgd_lr, lr_multipliers=lr_multipliers, loss=self.pb.loss, metrics=self.pb.metrics)
         self.model.fit(X_train, y_train, validation_data=(X_val, y_val),
                        epochs=epochs, tsv_log_path=tsv_log_path,
                        cosine_annealing=True)
