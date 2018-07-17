@@ -365,9 +365,8 @@ class PriorBoxes(object):
             pb_assignable[pb_ix] = False
 
         pb_indices = np.where(pb_assigned_gt >= 0)[0]
-        assert len(pb_indices) >= 1  # 1個以上は必ず割り当てないと損失関数などが面倒になる
-
-        pb_valids[pb_indices] = True  # 割り当て済みのところは有効
+        if len(pb_indices) > 0:
+            pb_valids[pb_indices] = True  # 割り当て済みのところは有効
 
         return pb_indices, pb_assigned_gt[pb_indices], pb_valids
 
@@ -412,15 +411,11 @@ class PriorBoxes(object):
     def loss_obj(self, y_true, y_pred):
         """Objectness scoreのloss。(binary focal loss)"""
         import keras.backend as K
-        import tensorflow as tf
         gt_mask = y_true[:, :, 0]
         gt_obj, pred_obj = y_true[:, :, 1], y_pred[:, :, 1]
-        gt_obj_count = K.sum(gt_obj, axis=-1)  # 各batch毎のobj数。
-        with tf.control_dependencies([tf.assert_positive(gt_obj_count)]):  # obj_countが1以上であることの確認
-            gt_obj_count = tf.identity(gt_obj_count)
-        pb_mask = np.expand_dims(self.pb_mask, axis=0)
+        mask = gt_mask * np.expand_dims(self.pb_mask, axis=0)
         loss = losses.binary_focal_loss(gt_obj, pred_obj)
-        loss = K.sum(loss * gt_mask * pb_mask, axis=-1) / gt_obj_count  # normalized by the number of anchors assigned to a ground-truth box
+        loss = K.sum(loss * mask, axis=-1) / (K.sum(gt_obj, axis=-1) + K.epsilon())  # normalized by the number of anchors assigned to a ground-truth box
         return loss
 
     @staticmethod
@@ -430,7 +425,7 @@ class PriorBoxes(object):
         gt_obj = y_true[:, :, 1]
         gt_classes, pred_classes = y_true[:, :, 2:-4], y_pred[:, :, 2:-4]
         loss = K.categorical_crossentropy(gt_classes, pred_classes)
-        loss = K.sum(loss * gt_obj, axis=-1) / K.sum(gt_obj, axis=-1)  # mean (box)
+        loss = K.sum(loss * gt_obj, axis=-1) / (K.sum(gt_obj, axis=-1) + K.epsilon())  # mean (box)
         return loss
 
     @staticmethod
@@ -440,5 +435,5 @@ class PriorBoxes(object):
         gt_obj = y_true[:, :, 1]
         gt_locs, pred_locs = y_true[:, :, -4:], y_pred[:, :, -4:]
         loss = losses.l1_smooth_loss(gt_locs, pred_locs)
-        loss = K.sum(loss * gt_obj, axis=-1) / K.sum(gt_obj, axis=-1)  # mean (box)
+        loss = K.sum(loss * gt_obj, axis=-1) / (K.sum(gt_obj, axis=-1) + K.epsilon())  # mean (box)
         return loss
