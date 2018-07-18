@@ -13,7 +13,7 @@ from .. import jsonex, log, ml, utils
 # バージョン
 _JSON_VERSION = '0.0.2'
 # PASCAL VOC 07+12 trainvalで学習したときのmodel.json
-_VOC_JSON_DATA_320 = {
+_VOC_JSON_DATA = {
     "input_size": [320, 320],
     "map_sizes": [40, 20, 10],
     "num_classes": 20,
@@ -29,8 +29,6 @@ _VOC_JSON_DATA_320 = {
     ],
     "version": "0.0.2"
 }
-_VOC_JSON_DATA_640 = _VOC_JSON_DATA_320.copy()
-_VOC_JSON_DATA_640['input_size'] = [640, 640]
 # PASCAL VOC 07+12 trainvalで学習したときの重みファイル
 _VOC_WEIGHTS_320_NAME = 'pytoolkit_od_voc_320.h5'
 _VOC_WEIGHTS_320_URL = 'https://github.com/ak110/object_detector/releases/download/v0.0.2/model.320.h5'
@@ -90,7 +88,8 @@ class ObjectDetector(object):
 
         """
         assert input_size in ((320, 320), (640, 640))
-        data = _VOC_JSON_DATA_320 if input_size == (320, 320) else _VOC_JSON_DATA_640
+        data = _VOC_JSON_DATA.copy()
+        data['input_size'] = input_size
         od = ObjectDetector.load_from_dict(data)
         od.load_weights(weights='voc', batch_size=batch_size, keep_aspect=keep_aspect,
                         strict_nms=strict_nms, use_multi_gpu=use_multi_gpu)
@@ -245,7 +244,10 @@ class ObjectDetector(object):
         """予測用に読み込んだモデルのstrict_nmsを切り替える。"""
         nms_all_threshold = 0.5 if strict_nms else None
         self.model.model.get_layer(name='nms').nms_all_threshold = nms_all_threshold
-        self.model.model.predict_function = None  # monkey patch
+        # monkey patch
+        self.model.model.built = False
+        self.model.model.inputs = None
+        self.model.model.predict_function = None
 
     def predict(self, X, conf_threshold=0.01, verbose=1) -> [ml.ObjectsPrediction]:
         """予測。"""
