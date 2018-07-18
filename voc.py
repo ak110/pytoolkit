@@ -72,7 +72,7 @@ def _validate(args, X_val, y_val):
         img = p.plot(x, tk.data.voc.CLASS_NAMES)
         tk.ndimage.save(save_dir / (x.stem + '.jpg'), img)
     # mAPを算出・表示
-    od.set_strict_nms(False)
+    od.load_weights(args.result_dir / 'model.h5', batch_size=args.batch_size, strict_nms=False, use_multi_gpu=True)
     pred_val = od.predict(X_val)
     map1 = tk.ml.compute_map(y_val, pred_val, use_voc2007_metric=False)
     map2 = tk.ml.compute_map(y_val, pred_val, use_voc2007_metric=True)
