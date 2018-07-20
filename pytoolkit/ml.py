@@ -26,11 +26,13 @@ class ObjectsAnnotation(object):
         # 画像の縦幅(px)
         self.height = height
         # クラスIDの配列
-        self.classes = np.asarray(classes)
+        self.classes = np.asarray(classes, dtype=np.int32)
         # bounding box(x1, y1, x2, y2)の配列。(0～1)
-        self.bboxes = np.asarray(bboxes)
+        self.bboxes = np.asarray(bboxes, dtype=np.float32)
+        if self.num_objects == 0:
+            self.bboxes = self.bboxes.reshape((self.num_objects, 4))
         # difficultフラグの配列。(True or False)
-        self.difficults = np.asarray(difficults) if difficults is not None else np.zeros(len(classes))
+        self.difficults = np.asarray(difficults, dtype=np.bool) if difficults is not None else np.zeros(len(classes), dtype=np.bool)
         assert self.width >= 1
         assert self.height >= 1
         assert (self.bboxes >= 0).all()
