@@ -390,20 +390,20 @@ class PriorBoxes(object):
             gt_obj, pred_obj = y_true[:, :, 1], y_pred[:, :, 1]
             gt_bg = (1 - gt_obj) * gt_mask   # 背景
             acc = K.cast(K.equal(K.greater(gt_obj, 0.5), K.greater(pred_obj, 0.5)), K.floatx())
-            return K.sum(acc * gt_bg, axis=-1) / K.sum(gt_bg, axis=-1)
+            return K.sum(acc * gt_bg, axis=-1) / K.maximum(K.sum(gt_bg, axis=-1), 1)
 
         def rec_obj(y_true, y_pred):
             """物体の再現率。"""
             gt_obj, pred_obj = y_true[:, :, 1], y_pred[:, :, 1]
             acc = K.cast(K.equal(K.greater(gt_obj, 0.5), K.greater(pred_obj, 0.5)), K.floatx())
-            return K.sum(acc * gt_obj, axis=-1) / K.sum(gt_obj, axis=-1)
+            return K.sum(acc * gt_obj, axis=-1) / K.maximum(K.sum(gt_obj, axis=-1), 1)
 
         def acc_clf(y_true, y_pred):
             """分類の正解率。"""
             gt_obj = y_true[:, :, 1]
             gt_classes, pred_classes = y_true[:, :, 2:-4], y_pred[:, :, 2:-4]
             acc = K.cast(K.equal(K.argmax(gt_classes), K.argmax(pred_classes)), K.floatx())
-            return K.sum(acc * gt_obj, axis=-1) / K.sum(gt_obj, axis=-1)
+            return K.sum(acc * gt_obj, axis=-1) / K.maximum(K.sum(gt_obj, axis=-1), 1)
 
         return [self.loss_obj, self.loss_clf, self.loss_loc, rec_bg, rec_obj, acc_clf]
 
@@ -414,7 +414,7 @@ class PriorBoxes(object):
         gt_obj, pred_obj = y_true[:, :, 1], y_pred[:, :, 1]
         mask = gt_mask * np.expand_dims(self.pb_mask, axis=0)
         loss = losses.binary_focal_loss(gt_obj, pred_obj)
-        loss = K.sum(loss * mask, axis=-1) / (K.sum(gt_obj, axis=-1) + K.epsilon())  # normalized by the number of anchors assigned to a ground-truth box
+        loss = K.sum(loss * mask, axis=-1) / K.maximum(K.sum(gt_obj, axis=-1), 1)  # normalized by the number of anchors assigned to a ground-truth box
         return loss
 
     @staticmethod
@@ -424,7 +424,7 @@ class PriorBoxes(object):
         gt_obj = y_true[:, :, 1]
         gt_classes, pred_classes = y_true[:, :, 2:-4], y_pred[:, :, 2:-4]
         loss = K.categorical_crossentropy(gt_classes, pred_classes)
-        loss = K.sum(loss * gt_obj, axis=-1) / (K.sum(gt_obj, axis=-1) + K.epsilon())  # mean (box)
+        loss = K.sum(loss * gt_obj, axis=-1) / K.maximum(K.sum(gt_obj, axis=-1), 1)  # mean (box)
         return loss
 
     @staticmethod
@@ -434,5 +434,5 @@ class PriorBoxes(object):
         gt_obj = y_true[:, :, 1]
         gt_locs, pred_locs = y_true[:, :, -4:], y_pred[:, :, -4:]
         loss = losses.l1_smooth_loss(gt_locs, pred_locs)
-        loss = K.sum(loss * gt_obj, axis=-1) / (K.sum(gt_obj, axis=-1) + K.epsilon())  # mean (box)
+        loss = K.sum(loss * gt_obj, axis=-1) / K.maximum(K.sum(gt_obj, axis=-1), 1)  # mean (box)
         return loss
