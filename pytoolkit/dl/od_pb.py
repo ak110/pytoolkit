@@ -311,7 +311,6 @@ class PriorBoxes(object):
 
         戻り値は、prior boxのindexとbboxesのindexのタプルのリスト。
         """
-        assert len(bboxes) >= 1
         bb_centers = ml.bboxes_center(bboxes)
 
         pb_assigned_gt = -np.ones((len(self.pb_locs),), dtype=int)  # -1埋め
