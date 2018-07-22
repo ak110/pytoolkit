@@ -651,7 +651,7 @@ class RandomAlpha(generator.Operator):
                 ey = rand.randint(0, x.shape[0] - eh)
                 x_ref = x[ey:ey + eh, ex:ex + ew, :]
                 x_ref *= (1 - self.alpha)
-                x_ref += rand.randint(0, 256, size=3) * self.alpha
+                x_ref += rand.randint(0, 256, size=x.shape[-1]) * self.alpha
                 break
         return x, y, w
 
