@@ -69,13 +69,17 @@ def pad2d():
         def __init__(self, padding=(1, 1), mode='constant', constant_values=0, **kwargs):
             super().__init__(**kwargs)
 
-            assert isinstance(padding, tuple) and len(padding) == 2
             assert mode in ('constant', 'reflect', 'symmetric')
 
             if isinstance(padding, int):
                 padding = ((padding, padding), (padding, padding))
-            elif isinstance(padding[0], int):
-                padding = ((padding[0], padding[0]), (padding[1], padding[1]))
+            else:
+                assert isinstance(padding, tuple) and len(padding) == 2
+                if isinstance(padding[0], int):
+                    padding = ((padding[0], padding[0]), (padding[1], padding[1]))
+                else:
+                    assert isinstance(padding[0], tuple) and len(padding[0]) == 2
+                    assert isinstance(padding[1], tuple) and len(padding[1]) == 2
 
             self.padding = padding
             self.mode = mode
