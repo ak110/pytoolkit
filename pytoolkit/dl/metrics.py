@@ -1,7 +1,5 @@
 """Kerasのmetrics関連。"""
 
-import numpy as np
-
 
 def mean_iou(y_true, y_pred, threhsold=0.5):
     """mean IoU。"""

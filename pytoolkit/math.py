@@ -16,13 +16,13 @@ def in_range(x, a, b):
     return np.logical_and(a <= x, x < b)
 
 
-def print_histgram(a, bins=10, range=None, weights=None, ncols=72, name=None, print_fn=print):  # pylint: disable=W0622
+def print_histgram(a, bins=10, range=None, weights=None, with_stats=True, ncols=72, name=None, print_fn=print):  # pylint: disable=W0622
     """ヒストグラムを表示する。"""
-    for line in format_histgram(a, bins=bins, range=range, weights=weights, ncols=ncols, name=name):
+    for line in format_histgram(a, bins=bins, range=range, weights=weights, with_stats=with_stats, ncols=ncols, name=name):
         print_fn(line)
 
 
-def format_histgram(a, bins=10, range=None, weights=None, ncols=72, name=None) -> typing.Sequence[str]:  # pylint: disable=W0622
+def format_histgram(a, bins=10, range=None, weights=None, with_stats=True, ncols=72, name=None) -> typing.Sequence[str]:  # pylint: disable=W0622
     """ヒストグラムをテキストで返す。"""
     hist, bin_edges = np.histogram(a, bins=bins, range=range, weights=weights)
     hist = np.asarray(hist)
@@ -41,6 +41,9 @@ def format_histgram(a, bins=10, range=None, weights=None, ncols=72, name=None) -
         percent = format(sh * 100, f'{5 if has_100 else 4}.1f')
         bar_size = int(round(max_bar_size * nh))
         lines.append(f'{edges_text[i]}～{edges_text[i+1]} ({percent}%)  {"#" * bar_size}')
+    if with_stats:
+        lines.append(f'mean: {np.mean(a)}')
+        lines.append(f'std:  {np.std(a)}')
     return lines
 
 
