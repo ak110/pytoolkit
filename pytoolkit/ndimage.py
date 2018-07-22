@@ -20,7 +20,6 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
         # ndarrayならそのまま画像扱い
         img = np.copy(path_or_array)  # 念のためコピー
         assert len(img.shape) == 3
-        assert img.shape[-1] == (1 if grayscale else 3)
         return img.astype(np.float32)
 
     if isinstance(path_or_array, (str, pathlib.Path)):

@@ -86,7 +86,6 @@ class LoadImage(generator.Operator):
         assert rand is not None  # noqa
         x = ndimage.load(x, self.grayscale)
         assert len(x.shape) == 3
-        assert x.shape[-1] == (1 if self.grayscale else 3)
         return x, y, w
 
 
