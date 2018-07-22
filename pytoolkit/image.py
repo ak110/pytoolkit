@@ -374,14 +374,17 @@ class RandomColorAugmentors(RandomAugmentors):
 class RandomFlipLR(generator.Operator):
     """左右反転。(`tk.ml.ObjectsAnnotation`対応)"""
 
-    def __init__(self, probability=1):
+    def __init__(self, probability=1, with_output=False):
         assert 0 < probability <= 1
         self.probability = probability
+        self.with_output = with_output
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         if ctx.do_augmentation(rand, self.probability):
             x = ndimage.flip_lr(x)
-            if y is not None and isinstance(y, ml.ObjectsAnnotation):
+            if self.with_output:
+                y = ndimage.flip_lr(y)
+            elif y is not None and isinstance(y, ml.ObjectsAnnotation):
                 y.bboxes[:, [0, 2]] = 1 - y.bboxes[:, [2, 0]]
         return x, y, w
 
@@ -389,13 +392,16 @@ class RandomFlipLR(generator.Operator):
 class RandomFlipTB(generator.Operator):
     """上下反転。(`tk.ml.ObjectsAnnotation`対応)"""
 
-    def __init__(self, probability=1):
+    def __init__(self, probability=1, with_output=False):
         assert 0 < probability <= 1
         self.probability = probability
+        self.with_output = with_output
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         if ctx.do_augmentation(rand, self.probability):
             x = ndimage.flip_tb(x)
+            if self.with_output:
+                y = ndimage.flip_tb(y)
             if y is not None and isinstance(y, ml.ObjectsAnnotation):
                 y.bboxes[:, [1, 3]] = 1 - y.bboxes[:, [3, 1]]
         return x, y, w
@@ -404,31 +410,19 @@ class RandomFlipTB(generator.Operator):
 class RandomRotate90(generator.Operator):
     """90度/180度/270度回転。(`tk.ml.ObjectsAnnotation`対応)"""
 
-    def __init__(self, probability=1):
+    def __init__(self, probability=1, with_output=False):
         assert 0 < probability <= 1
         self.probability = probability
+        self.with_output = with_output
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         if ctx.do_augmentation(rand, self.probability):
             k = rand.randint(0, 4)
-
-            if k == 1:
-                x = np.swapaxes(x, 0, 1)[::-1, :, :]
-            elif k == 2:
-                x = x[::-1, ::-1, :]
-            elif k == 3:
-                x = np.swapaxes(x, 0, 1)[:, ::-1, :]
-
-            if y is not None and isinstance(y, ml.ObjectsAnnotation):
-                if k == 1:
-                    y.bboxes = y.bboxes[:, [1, 0, 3, 2]]
-                    y.bboxes[:, [1, 3]] = 1 - y.bboxes[:, [3, 1]]
-                elif k == 2:
-                    y.bboxes = 1 - y.bboxes[:, [2, 3, 0, 1]]
-                elif k == 3:
-                    y.bboxes = y.bboxes[:, [1, 0, 3, 2]]
-                    y.bboxes[:, [0, 2]] = 1 - y.bboxes[:, [2, 0]]
-
+            x = ndimage.rot90(x, k)
+            if self.with_output:
+                y = ndimage.rot90(y, k)
+            elif y is not None and isinstance(y, ml.ObjectsAnnotation):
+                y.rot90(k)
         return x, y, w
 
 

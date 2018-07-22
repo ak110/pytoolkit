@@ -60,6 +60,18 @@ class ObjectsAnnotation(object):
             bboxes[:, [0, 2]] *= self.width / self.height
         return bboxes
 
+    def rot90(self, k):
+        """90度回転。"""
+        assert 0 <= k <= 3
+        if k == 1:
+            self.bboxes = self.bboxes[:, [1, 0, 3, 2]]
+            self.bboxes[:, [1, 3]] = 1 - self.bboxes[:, [3, 1]]
+        elif k == 2:
+            self.bboxes = 1 - self.bboxes[:, [2, 3, 0, 1]]
+        elif k == 3:
+            self.bboxes = self.bboxes[:, [1, 0, 3, 2]]
+            self.bboxes[:, [0, 2]] = 1 - self.bboxes[:, [2, 0]]
+
 
 class ObjectsPrediction(object):
     """物体検出の予測結果を持つクラス。"""
