@@ -741,7 +741,7 @@ class RandomErasing(generator.Operator):
                 if (area_inter >= area_bb * 0.25).any():
                     continue
 
-            x[ey:ey + eh, ex:ex + ew, :] = rand.randint(0, 256, size=3)[np.newaxis, np.newaxis, :]
+            x[ey:ey + eh, ex:ex + ew, :] = rand.randint(0, 256, size=x.shape[-1])[np.newaxis, np.newaxis, :]
             break
 
         return x
