@@ -74,12 +74,13 @@ def pad2d():
             if isinstance(padding, int):
                 padding = ((padding, padding), (padding, padding))
             else:
-                assert isinstance(padding, tuple) and len(padding) == 2
+                assert len(padding) == 2
                 if isinstance(padding[0], int):
                     padding = ((padding[0], padding[0]), (padding[1], padding[1]))
                 else:
-                    assert isinstance(padding[0], tuple) and len(padding[0]) == 2
-                    assert isinstance(padding[1], tuple) and len(padding[1]) == 2
+                    assert len(padding[0]) == 2
+                    assert len(padding[1]) == 2
+                    padding = (tuple(padding[0]), tuple(padding[1]))
 
             self.padding = padding
             self.mode = mode
