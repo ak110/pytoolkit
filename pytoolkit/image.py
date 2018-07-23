@@ -110,7 +110,7 @@ class Resize(generator.Operator):
         assert rand is not None  # noqa
         assert self.padding is None or not isinstance(y, ml.ObjectsAnnotation)  # paddingありで物体検出はとりあえず未対応
         x = ndimage.resize(x, self.image_size[1], self.image_size[0], padding=self.padding)
-        if self.with_output:
+        if self.with_output and y is not None:
             y = ndimage.resize(y, self.image_size[1], self.image_size[0], padding=self.padding)
         return x, y, w
 
@@ -133,7 +133,7 @@ class RandomPadding(generator.Operator):
             padded_w = int(np.ceil(x.shape[1] * (1 + self.padding_rate)))
             padded_h = int(np.ceil(x.shape[0] * (1 + self.padding_rate)))
             x = ndimage.pad(x, padded_w, padded_h, 'edge')
-            if self.with_output:
+            if self.with_output and y is not None:
                 y = ndimage.pad(y, padded_w, padded_h, 'edge')
                 assert x.shape[1:3] == y.shape[1:3]
         return x, y, w
@@ -154,7 +154,7 @@ class RandomRotate(generator.Operator):
         if ctx.do_augmentation(rand, self.probability):
             degrees = rand.uniform(-self.degrees, self.degrees)
             x = ndimage.rotate(x, degrees, expand=self.expand)
-            if self.with_output:
+            if self.with_output and y is not None:
                 y = ndimage.rotate(y, degrees, expand=self.expand)
                 assert x.shape[1:3] == y.shape[1:3]
         return x, y, w
@@ -192,7 +192,7 @@ class RandomCrop(generator.Operator):
             crop_x = rand.randint(0, x.shape[1] - cropped_w + 1)
             crop_y = rand.randint(0, x.shape[0] - cropped_h + 1)
             x = ndimage.crop(x, crop_x, crop_y, cropped_w, cropped_h)
-            if self.with_output:
+            if self.with_output and y is not None:
                 y = ndimage.crop(y, crop_x, crop_y, cropped_w, cropped_h)
                 assert x.shape[1:3] == y.shape[1:3]
         return x, y, w
@@ -398,7 +398,7 @@ class RandomFlipLR(generator.Operator):
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         if ctx.do_augmentation(rand, self.probability):
             x = ndimage.flip_lr(x)
-            if self.with_output:
+            if self.with_output and y is not None:
                 y = ndimage.flip_lr(y)
             elif y is not None and isinstance(y, ml.ObjectsAnnotation):
                 y.bboxes[:, [0, 2]] = 1 - y.bboxes[:, [2, 0]]
@@ -416,7 +416,7 @@ class RandomFlipTB(generator.Operator):
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         if ctx.do_augmentation(rand, self.probability):
             x = ndimage.flip_tb(x)
-            if self.with_output:
+            if self.with_output and y is not None:
                 y = ndimage.flip_tb(y)
             if y is not None and isinstance(y, ml.ObjectsAnnotation):
                 y.bboxes[:, [1, 3]] = 1 - y.bboxes[:, [3, 1]]
@@ -435,7 +435,7 @@ class RandomRotate90(generator.Operator):
         if ctx.do_augmentation(rand, self.probability):
             k = rand.randint(0, 4)
             x = ndimage.rot90(x, k)
-            if self.with_output:
+            if self.with_output and y is not None:
                 y = ndimage.rot90(y, k)
             elif y is not None and isinstance(y, ml.ObjectsAnnotation):
                 y.rot90(k)
