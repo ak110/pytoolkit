@@ -6,6 +6,7 @@ import numpy as np
 def get_custom_objects():
     """独自オブジェクトのdictを返す。"""
     classes = [
+        preprocess(),
         channel_argmax(),
         channel_max(),
         pad2d(),
@@ -21,6 +22,32 @@ def get_custom_objects():
         nms(),
     ]
     return {c.__name__: c for c in classes}
+
+
+def preprocess():
+    """前処理レイヤー。"""
+    import keras
+    import keras.backend as K
+
+    class Preprocess(keras.layers.Layer):
+        """前処理レイヤー。"""
+
+        def __init__(self, mode, **kwargs):
+            super().__init__(**kwargs)
+            assert mode in ('caffe', 'tf', 'torch')
+            self.mode = mode
+
+        def call(self, inputs, **kwargs):
+            if self.mode == 'caffe':
+                return K.bias_add(inputs[..., ::-1], [103.939, 116.779, 123.68])
+            elif self.mode == 'tf':
+                return (inputs / 127.5) - 1
+            elif self.mode == 'torch':
+                return K.bias_add((inputs / 255.), [0.485, 0.456, 0.406]) / [0.229, 0.224, 0.225]
+            else:
+                assert False
+
+    return Preprocess
 
 
 def channel_argmax():

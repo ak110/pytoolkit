@@ -29,6 +29,15 @@ class Builder(object):
         self.bn_defaults['gamma_regularizer'] = reg
         self.bn_defaults['beta_regularizer'] = reg
 
+    def input_tensor(self, shape, name=None, dtype=None):
+        """Input。"""
+        import keras
+        return keras.layers.Input(shape, name=name, dtype=dtype)
+
+    def preprocess(self, mode='tf'):
+        """前処理。"""
+        return layers.preprocess()(mode=mode)
+
     def conv1d(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """Conv1D+BN+Act。"""
         import keras
