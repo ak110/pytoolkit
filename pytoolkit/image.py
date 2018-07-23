@@ -99,16 +99,19 @@ class Resize(generator.Operator):
 
     """
 
-    def __init__(self, image_size, padding=None):
+    def __init__(self, image_size, padding=None, with_output=False):
+        assert len(image_size) == 2
         self.image_size = image_size
         self.padding = padding
-        assert len(self.image_size) == 2
+        self.with_output = with_output
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         """処理。"""
         assert rand is not None  # noqa
         assert self.padding is None or not isinstance(y, ml.ObjectsAnnotation)  # paddingありで物体検出はとりあえず未対応
         x = ndimage.resize(x, self.image_size[1], self.image_size[0], padding=self.padding)
+        if self.with_output:
+            y = ndimage.resize(y, self.image_size[1], self.image_size[0], padding=self.padding)
         return x, y, w
 
 
