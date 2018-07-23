@@ -62,6 +62,11 @@ class GeneratorContext(object):
 class Operator(metaclass=abc.ABCMeta):
     """ImageDataGeneratorで行う操作の基底クラス。"""
 
+    @property
+    def name(self):
+        """名前。"""
+        return self.__class__.__name__
+
     @abc.abstractmethod
     def execute(self, x, y, w, rand, ctx: GeneratorContext):
         """処理。"""
@@ -78,8 +83,10 @@ class Generator(object):
         self.profile_data = {}
         self.operators = []
 
-    def add(self, operator: Operator):
+    def add(self, operator: Operator, input_index=None, output_index=None):
         """Operatorの追加。"""
+        if input_index is not None or output_index is not None:
+            operator = _TargetOperator(operator, input_index, output_index)
         self.operators.append(operator)
 
     def flow(self, X, y=None, weights=None, batch_size=32, shuffle=False, data_augmentation=False, random_state=None, balanced=False):
@@ -229,6 +236,37 @@ def _get_result(has_y, has_weights, rx, ry, rw, multiple_input, multiple_output)
         return _get(rx, multiple_input)
 
 
+class _TargetOperator(Operator):
+    """特定のindexのinput/outputのみを対象とするoperatorを作るラッパー。"""
+
+    def __init__(self, operator, input_index=None, output_index=None):
+        self.operator = operator
+        self.input_index = input_index
+        self.output_index = output_index
+
+    @property
+    def name(self):
+        """名前。"""
+        return self.operator.name
+
+    def execute(self, x, y, w, rand, ctx: GeneratorContext):
+        """処理。"""
+        x_ref = x if self.input_index is None else x[self.input_index]
+        y_ref = y if self.output_index is None else y[self.output_index]
+
+        x_ref, y_ref, w = self.operator.execute(x_ref, y_ref, w, rand, ctx)
+
+        if self.input_index is None:
+            x = x_ref
+        else:
+            x[self.input_index] = x_ref
+        if self.output_index is None:
+            y = y_ref
+        else:
+            y[self.output_index] = y_ref
+        return x, y, w
+
+
 class ProcessInput(Operator):
     """入力に対する任意の処理。
 
@@ -361,5 +399,11 @@ def mixup(gen1, gen2, alpha=0.2, beta=0.2, random_state=None):
         # 混ぜる
         m = random_state.beta(alpha, beta)
         assert 0 <= m <= 1
-        b = [x1 * m + x2 * (1 - m) for x1, x2 in zip(b1, b2)]
+        b = []
+        for x1, x2 in zip(b1, b2):
+            if isinstance(x1, list):
+                assert isinstance(x2, list)
+                b.append([t1 * m + t2 * (1 - m) for t1, t2 in zip(x1, x2)])
+            else:
+                b.append(x1 * m + x2 * (1 - m))
         yield b

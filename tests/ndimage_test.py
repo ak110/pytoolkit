@@ -31,7 +31,6 @@ def test_filters():
         (0, 'pad_one', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='one')),
         (0, 'pad_refl', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='reflect')),
         (0, 'pad_wrap', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='wrap')),
-        (0, 'pad_rand', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='rand', rand=np.random)),
         (0, 'rotate', lambda rgb: tk.ndimage.rotate(rgb, +15, expand=False)),
         (0, 'rotate', lambda rgb: tk.ndimage.rotate(rgb, -15, expand=False)),
         (0, 'rotate', lambda rgb: tk.ndimage.rotate(rgb, +15, expand=True)),

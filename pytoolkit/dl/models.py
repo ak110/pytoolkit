@@ -29,17 +29,17 @@ class Model(object):
     def freeze(self, predicate=lambda layer: True, skip_bn=False):
         """条件に一致するレイヤーをfreezeする。"""
         import keras
-        for layer in self.model.layers:
-            if skip_bn and isinstance(layer, keras.layers.BatchNormalization):
+        for l in self.model.layers:
+            if skip_bn and isinstance(l, keras.layers.BatchNormalization):
                 continue
-            if predicate(layer):
-                layer.trainable = False
+            if predicate(l):
+                l.trainable = False
 
     def unfreeze(self, predicate=lambda layer: True):
         """条件に一致するレイヤーをfreeze解除する。"""
-        for layer in self.model.layers:
-            if predicate(layer):
-                layer.trainable = True
+        for l in self.model.layers:
+            if predicate(l):
+                l.trainable = True
 
     @log.trace()
     def compile(self, optimizer=None, loss=None, metrics=None,

@@ -118,33 +118,42 @@ class RandomPadding(generator.Operator):
     この後のRandomCropを前提に、パディングするサイズは固定。
     """
 
-    def __init__(self, probability=1, padding_rate=0.125):
+    def __init__(self, probability=1, padding_rate=0.125, with_output=False):
         assert 0 < probability <= 1
         self.probability = probability
         self.padding_rate = padding_rate
+        self.with_output = with_output
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         assert not isinstance(y, ml.ObjectsAnnotation)  # 物体検出は今のところ未対応
         if ctx.do_augmentation(rand, self.probability):
             padded_w = int(np.ceil(x.shape[1] * (1 + self.padding_rate)))
             padded_h = int(np.ceil(x.shape[0] * (1 + self.padding_rate)))
-            x = ndimage.pad(x, padded_w, padded_h, 'edge', rand)
+            x = ndimage.pad(x, padded_w, padded_h, 'edge')
+            if self.with_output:
+                y = ndimage.pad(y, padded_w, padded_h, 'edge')
+                assert x.shape[1:3] == y.shape[1:3]
         return x, y, w
 
 
 class RandomRotate(generator.Operator):
     """回転。"""
 
-    def __init__(self, probability=1, degrees=15, expand=True):
+    def __init__(self, probability=1, degrees=15, expand=True, with_output=False):
         assert 0 < probability <= 1
         self.probability = probability
         self.degrees = degrees
         self.expand = expand
+        self.with_output = with_output
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         assert not isinstance(y, ml.ObjectsAnnotation)  # 物体検出は今のところ未対応
         if ctx.do_augmentation(rand, self.probability):
-            x = ndimage.rotate(x, rand.uniform(-self.degrees, self.degrees), expand=self.expand)
+            degrees = rand.uniform(-self.degrees, self.degrees)
+            x = ndimage.rotate(x, degrees, expand=self.expand)
+            if self.with_output:
+                y = ndimage.rotate(y, degrees, expand=self.expand)
+                assert x.shape[1:3] == y.shape[1:3]
         return x, y, w
 
 
@@ -157,12 +166,13 @@ class RandomCrop(generator.Operator):
     256px四方だと、32pxパディングで256px四方を切り抜く。
     """
 
-    def __init__(self, probability=1, crop_rate=0.5, aspect_prob=0.5, aspect_rations=(3 / 4, 4 / 3)):
+    def __init__(self, probability=1, crop_rate=0.5, aspect_prob=0.5, aspect_rations=(3 / 4, 4 / 3), with_output=False):
         assert 0 < probability <= 1
         self.probability = probability
         self.crop_rate = crop_rate
         self.aspect_prob = aspect_prob
         self.aspect_rations = aspect_rations
+        self.with_output = with_output
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         assert not isinstance(y, ml.ObjectsAnnotation)  # 物体検出は今のところ未対応
@@ -179,6 +189,9 @@ class RandomCrop(generator.Operator):
             crop_x = rand.randint(0, x.shape[1] - cropped_w + 1)
             crop_y = rand.randint(0, x.shape[0] - cropped_h + 1)
             x = ndimage.crop(x, crop_x, crop_y, cropped_w, cropped_h)
+            if self.with_output:
+                y = ndimage.crop(y, crop_x, crop_y, cropped_w, cropped_h)
+                assert x.shape[1:3] == y.shape[1:3]
         return x, y, w
 
 
@@ -278,7 +291,7 @@ class RandomZoom(generator.Operator):
             # パディング
             paste_lr = np.floor(paste_xy * self.output_size / padded_size).astype(int)
             paste_tb = self.output_size - (paste_lr + new_size)
-            rgb = ndimage.pad_ltrb(rgb, paste_lr[0], paste_lr[1], paste_tb[0], paste_tb[1], 'mean', rand)
+            rgb = ndimage.pad_ltrb(rgb, paste_lr[0], paste_lr[1], paste_tb[0], paste_tb[1], 'mean')
             assert all(rgb.shape[-2::-1] == self.output_size)
             break
         return rgb

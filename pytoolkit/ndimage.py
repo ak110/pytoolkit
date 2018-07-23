@@ -94,7 +94,7 @@ def rotate(rgb: np.ndarray, degrees: float, expand=True, interp='lanczos') -> np
     return rgb
 
 
-def pad(rgb: np.ndarray, width: int, height: int, padding='edge', rand=None) -> np.ndarray:
+def pad(rgb: np.ndarray, width: int, height: int, padding='edge') -> np.ndarray:
     """パディング。width/heightはpadding後のサイズ。(左右/上下均等、端数は右と下につける)"""
     assert width >= 0
     assert height >= 0
@@ -102,14 +102,14 @@ def pad(rgb: np.ndarray, width: int, height: int, padding='edge', rand=None) -> 
     y1 = max(0, (height - rgb.shape[0]) // 2)
     x2 = width - rgb.shape[1] - x1
     y2 = height - rgb.shape[0] - y1
-    rgb = pad_ltrb(rgb, x1, y1, x2, y2, padding, rand)
+    rgb = pad_ltrb(rgb, x1, y1, x2, y2, padding)
     assert rgb.shape[1] == width and rgb.shape[0] == height
     return rgb
 
 
-def pad_ltrb(rgb: np.ndarray, x1: int, y1: int, x2: int, y2: int, padding='edge', rand=None):
+def pad_ltrb(rgb: np.ndarray, x1: int, y1: int, x2: int, y2: int, padding='edge'):
     """パディング。x1/y1/x2/y2は左/上/右/下のパディング量。"""
-    assert padding in ('edge', 'zero', 'half', 'one', 'reflect', 'wrap', 'rand', 'mean')
+    assert padding in ('edge', 'zero', 'half', 'one', 'reflect', 'wrap', 'mean')
     kwargs = {}
     if padding == 'zero':
         mode = 'constant'
@@ -119,10 +119,6 @@ def pad_ltrb(rgb: np.ndarray, x1: int, y1: int, x2: int, y2: int, padding='edge'
     elif padding == 'one':
         mode = 'constant'
         kwargs['constant_values'] = (255.0,)
-    elif padding == 'rand':
-        assert rand is not None
-        mode = 'constant'
-        kwargs['constant_values'] = (rand.randint(0, 255),)
     elif padding == 'mean':
         mode = 'constant'
         kwargs['constant_values'] = (rgb.mean(),)
