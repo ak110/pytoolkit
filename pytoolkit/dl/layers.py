@@ -32,7 +32,7 @@ def preprocess():
     class Preprocess(keras.layers.Layer):
         """前処理レイヤー。"""
 
-        def __init__(self, mode, **kwargs):
+        def __init__(self, mode='tf', **kwargs):
             super().__init__(**kwargs)
             assert mode in ('caffe', 'tf', 'torch')
             self.mode = mode
@@ -46,6 +46,11 @@ def preprocess():
                 return K.bias_add((inputs / 255.), [0.485, 0.456, 0.406]) / [0.229, 0.224, 0.225]
             else:
                 assert False
+
+        def get_config(self):
+            config = {'mode': self.mode}
+            base_config = super().get_config()
+            return dict(list(base_config.items()) + list(config.items()))
 
     return Preprocess
 
