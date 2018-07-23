@@ -15,6 +15,7 @@ from . import log
 from . import math
 from . import ml
 from . import ndimage
+from . import regex
 from . import thread
 from . import video
 from . import web
