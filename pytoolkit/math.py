@@ -2,6 +2,7 @@
 import typing
 
 import numpy as np
+import scipy.stats
 
 
 def between(x, a, b):
@@ -68,3 +69,30 @@ def format_values(values: typing.Union[list, np.ndarray], padding_sign=True):
 
     formatted = [format(x, fmt) for x in values]
     return formatted
+
+
+def binorm_percent(p, positives, total):
+    """二項分布のp%信頼区間をパーセントの整数値で返す。
+
+    色々適当に丸めて、最大値は99。
+
+    - p: 有意水準(0.99など)
+    - positives: 正解数など
+    - total: 全件数
+    """
+    interval = binorm_interval(p, positives, total)
+    return int(np.floor(interval[0] * 100)), min(int(np.floor(interval[1] * 100)), 99)
+
+
+def binorm_interval(p, positives, total):
+    """二項分布のp%信頼区間を返す。
+
+    - p: 有意水準(0.99など)
+    - positives: 正解数など
+    - total: 全件数
+    """
+    assert 0 < p < 1
+    assert 0 <= positives <= total
+    interval = scipy.stats.binom.interval(p, total + 1, positives / (total + 1))
+    interval = np.array(interval) / (total + 1)
+    return interval

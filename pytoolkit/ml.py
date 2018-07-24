@@ -122,7 +122,7 @@ def listup_files(dirpath, recurse=False):
     """ファイルの列挙。"""
     dirpath = pathlib.Path(dirpath)
     if recurse:
-        it = dirpath.glob('**')
+        it = dirpath.rglob('*')
     else:
         it = dirpath.iterdir()
     return [p for p in it if _is_valid_file(p)]
