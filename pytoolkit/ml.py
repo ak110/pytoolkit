@@ -125,7 +125,7 @@ def listup_files(dirpath, recurse=False):
         it = dirpath.rglob('*')
     else:
         it = dirpath.iterdir()
-    return [p for p in it if _is_valid_file(p)]
+    return np.array([p for p in it if _is_valid_file(p)])
 
 
 def _is_valid_file(p):
