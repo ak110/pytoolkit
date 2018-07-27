@@ -7,7 +7,7 @@ import sklearn.metrics
 from . import losses
 from .. import log, math, ml, utils
 
-_VAR_LOC = 0.2  # SSD風(?)適当スケーリング
+_VAR_LOC = 0.1  # SSD風(?)適当スケーリング
 
 
 class PriorBoxes(object):
