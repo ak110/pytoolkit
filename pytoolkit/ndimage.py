@@ -19,6 +19,8 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
     if isinstance(path_or_array, np.ndarray):
         # ndarrayならそのまま画像扱い
         img = np.copy(path_or_array)  # 念のためコピー
+        if grayscale and len(img.shape) == 2:
+            img = np.expand_dims(img, axis=-1)
         assert len(img.shape) == 3
         return img.astype(np.float32)
 
