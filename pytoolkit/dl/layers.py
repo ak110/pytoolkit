@@ -39,11 +39,11 @@ def preprocess():
 
         def call(self, inputs, **kwargs):
             if self.mode == 'caffe':
-                return K.bias_add(inputs[..., ::-1], [103.939, 116.779, 123.68])
+                return K.bias_add(inputs[..., ::-1], K.constant(np.array([-103.939, -116.779, -123.68])))
             elif self.mode == 'tf':
                 return (inputs / 127.5) - 1
             elif self.mode == 'torch':
-                return K.bias_add((inputs / 255.), [0.485, 0.456, 0.406]) / [0.229, 0.224, 0.225]
+                return K.bias_add((inputs / 255.), K.constant(np.array([-0.485, -0.456, -0.406]))) / np.array([0.229, 0.224, 0.225])
             else:
                 assert False
 
