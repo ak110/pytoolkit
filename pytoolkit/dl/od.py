@@ -188,10 +188,10 @@ class ObjectDetector(object):
             warm_start = True
         # 学習
         if warm_start:
-            sgd_lr = lr_scale * 0.5 / 256 / 6 / 2  # lossが複雑なので微調整
+            sgd_lr = lr_scale * 0.5 / 256 / 3 / 2  # lossが複雑なので微調整
             self.model.compile(sgd_lr=sgd_lr, lr_multipliers=None, loss=self.pb.loss, metrics=self.pb.metrics)
         else:
-            sgd_lr = lr_scale * 0.5 / 256 / 6  # lossが複雑なので微調整
+            sgd_lr = lr_scale * 0.5 / 256 / 3  # lossが複雑なので微調整
             self.model.compile(sgd_lr=sgd_lr, lr_multipliers=lr_multipliers, loss=self.pb.loss, metrics=self.pb.metrics)
         self.model.fit(X_train, y_train, validation_data=(X_val, y_val),
                        epochs=epochs, tsv_log_path=tsv_log_path,
