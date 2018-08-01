@@ -401,7 +401,7 @@ class PriorBoxes(object):
         mask = gt_mask * np.expand_dims(self.pb_mask, axis=0)
         loss = losses.binary_focal_loss(gt_obj, pred_obj)
         loss = K.sum(loss * mask, axis=-1) / K.maximum(K.sum(gt_obj, axis=-1), 1)  # normalized by the number of anchors assigned to a ground-truth box
-        return loss
+        return loss * 3
 
     @staticmethod
     def loss_clf(y_true, y_pred):
