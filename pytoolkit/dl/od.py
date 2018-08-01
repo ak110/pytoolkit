@@ -95,29 +95,6 @@ class ObjectDetector(object):
                         strict_nms=strict_nms, use_multi_gpu=use_multi_gpu)
         return od
 
-    def pretrain(self, X_train: [pathlib.Path], X_val: [pathlib.Path], batch_size, epochs,
-                 plot_path=None, tsv_log_path=None):
-        """事前学習。
-
-        # 引数
-        - plot_path: ネットワークの図を出力するならそのパス。拡張子はpngやsvgなど。
-        - tsv_log_path: lossなどをtsvファイルに出力するならそのパス。
-        """
-        # モデルの作成
-        network, _ = od_net.create_network(pb=self.pb, mode='pretrain', strict_nms=None)
-        gen = od_gen.create_pretrain_generator(self.pb.input_size, od_net.get_preprocess_input())
-        self.model = models.Model(network, gen, batch_size)
-        self.model.compile(sgd_lr=0.5 / 256, loss='categorical_crossentropy', metrics=['acc'])
-        self.model.summary()
-        if plot_path:
-            self.model.plot(plot_path)
-        # 学習
-        y_train = np.zeros((len(X_train),))
-        y_val = np.zeros((len(X_val),))
-        self.model.fit(X_train, y_train, validation_data=(X_val, y_val),
-                       epochs=epochs, tsv_log_path=tsv_log_path,
-                       reduce_lr_epoch_rates=None)
-
     def fit(self, X_train: [pathlib.Path], y_train: [ml.ObjectsAnnotation],
             X_val: [pathlib.Path], y_val: [ml.ObjectsAnnotation],
             batch_size, epochs, lr_scale=1,
@@ -160,7 +137,8 @@ class ObjectDetector(object):
         # prior boxのチェック
         if hvd.is_master():
             self.pb.summary()
-            self.pb.check_prior_boxes(y_val)
+            if y_val is not None:
+                self.pb.check_prior_boxes(y_val)
         hvd.barrier()
         # モデルの作成
         network, lr_multipliers = od_net.create_network(pb=self.pb, mode='train', strict_nms=None)
@@ -218,11 +196,7 @@ class ObjectDetector(object):
             del self.model
         network, _ = od_net.create_network(pb=self.pb, mode='predict', strict_nms=strict_nms)
         pi = od_net.get_preprocess_input()
-        gen = od_gen.create_generator(self.pb.input_size, pi, encode_truth=None,
-                                      flip_h=False, flip_v=False, rotate90=False,
-                                      padding_rate=None, crop_rate=None, keep_aspect=keep_aspect,
-                                      aspect_prob=0, max_aspect_ratio=1,
-                                      min_object_px=0)
+        gen = od_gen.create_predict_generator(self.pb.input_size, pi, keep_aspect=keep_aspect)
         self.model = models.Model(network, gen, batch_size)
         logger = log.get(__name__)
         if weights == 'voc':
