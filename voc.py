@@ -53,7 +53,7 @@ def _train(args, X_train, y_train, X_val, y_val):
            batch_size=args.batch_size, epochs=args.epochs, initial_weights=weights, pb_size_pattern_count=args.pb_sizes,
            flip_h=True, flip_v=False, rotate90=False,
            plot_path=args.result_dir / 'model.svg',
-           tsv_log_path=args.result_dir / 'train.history.tsv')
+           tsv_log_path=args.result_dir / 'history.tsv')
     od.save(args.result_dir / 'model.json')
     od.save_weights(args.result_dir / 'model.h5')
 
@@ -62,7 +62,7 @@ def _train(args, X_train, y_train, X_val, y_val):
 def _validate(args, X_val, y_val):
     od = tk.dl.od.ObjectDetector.load(args.result_dir / 'model.json')
     od.load_weights(args.result_dir / 'model.h5', batch_size=args.batch_size, strict_nms=True, use_multi_gpu=True)
-    pred_val = od.predict(X_val, conf_threshold=0.1)
+    pred_val = od.predict(X_val, conf_threshold=0.25)
     # 適合率・再現率などを算出・表示
     precisions, recalls, fscores, supports = tk.ml.compute_scores(y_val, pred_val, iou_threshold=0.5)
     tk.ml.print_scores(precisions, recalls, fscores, supports, tk.data.voc.CLASS_NAMES)

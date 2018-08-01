@@ -8,9 +8,7 @@ from .. import image, log, applications
 
 def get_preprocess_input():
     """`preprocess_input`を返す。"""
-    # TODO: 今ある重みは image.preprocess_input_mean で学習してしまっている。いずれ差し替える。
-    return image.preprocess_input_mean
-    # return applications.darknet53.preprocess_input
+    return applications.darknet53.preprocess_input
 
 
 @log.trace()
