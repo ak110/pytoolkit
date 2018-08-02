@@ -219,7 +219,7 @@ class RandomZoom(generator.Operator):
     def __init__(self, probability=1, output_size=(300, 300),
                  padding_rate=16, crop_rate=0.1,
                  keep_aspect=False, aspect_prob=0.5, max_aspect_ratio=3 / 2,
-                 min_object_px=4):
+                 min_object_px=8):
         assert 0 < probability <= 1
         assert max_aspect_ratio >= 1
         assert padding_rate is None or padding_rate > 1

@@ -6,7 +6,7 @@ from .. import generator, image
 def create_generator(image_size, preprocess_input, encode_truth,
                      padding_rate=16, crop_rate=0.1, keep_aspect=False,
                      aspect_prob=0.5, max_aspect_ratio=3 / 2,
-                     min_object_px=4,
+                     min_object_px=8,
                      flip_h=True, flip_v=False, rotate90=False):
     """ImageDataGeneratorを作って返す。"""
     gen = image.ImageDataGenerator()

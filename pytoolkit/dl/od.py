@@ -101,7 +101,7 @@ class ObjectDetector(object):
             initial_weights='voc', pb_size_pattern_count=8,
             flip_h=True, flip_v=False, rotate90=False,
             padding_rate=16, crop_rate=0.1, keep_aspect=False,
-            aspect_prob=0.5, max_aspect_ratio=3 / 2, min_object_px=4,
+            aspect_prob=0.5, max_aspect_ratio=3 / 2, min_object_px=8,
             plot_path=None, tsv_log_path=None):
         """学習。
 
