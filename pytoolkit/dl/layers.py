@@ -293,6 +293,7 @@ def group_normalization():
 
         def build(self, input_shape):
             dim = input_shape[-1]
+            assert dim is None or dim % self.groups == 0
             shape = (dim,)
             if self.scale:
                 self.gamma = self.add_weight(shape=shape,

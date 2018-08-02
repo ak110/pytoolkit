@@ -349,9 +349,6 @@ class RandomZoom(generator.Operator):
                 rb = np.minimum(crop_box[np.newaxis, 2:], y.bboxes[:, 2:])
                 cropped_area = (rb - lt).prod(axis=-1) * (lt < rb).all(axis=-1)
                 bb_mask = np.logical_and(bb_mask, cropped_area >= bb_area * 0.3)
-                # bboxが一つも残らなければやり直し
-                if not bb_mask.any():
-                    continue
                 bboxes = np.copy(y.bboxes)
                 bboxes = (bboxes * np.tile(input_size, 2) - np.tile(crop_xy, 2)) / np.tile(cropped_wh, 2)
                 bboxes = np.clip(bboxes, 0, 1)

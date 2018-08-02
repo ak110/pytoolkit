@@ -7,8 +7,8 @@ import typing
 
 import numpy as np
 
-from . import hvd, models, od_gen, od_net, od_pb
-from .. import jsonex, log, ml, utils
+from . import hvd, models, od_net, od_pb
+from .. import generator, image, jsonex, log, ml, regex, utils
 
 # バージョン
 _JSON_VERSION = '0.0.2'
@@ -150,11 +150,21 @@ class ObjectDetector(object):
             pb=self.pb, mode='train', strict_nms=None,
             load_base_weights=initial_weights == 'imagenet')
         pi = od_net.get_preprocess_input()
-        gen = od_gen.create_generator(self.pb.input_size, pi, self.pb.encode_truth,
-                                      flip_h=flip_h, flip_v=flip_v, rotate90=rotate90,
-                                      padding_rate=padding_rate, crop_rate=crop_rate, keep_aspect=keep_aspect,
-                                      aspect_prob=aspect_prob, max_aspect_ratio=max_aspect_ratio,
-                                      min_object_px=min_object_px)
+        gen = image.ImageDataGenerator()
+        gen.add(image.RandomZoom(probability=1, output_size=self.pb.input_size, keep_aspect=keep_aspect,
+                                 padding_rate=padding_rate, crop_rate=crop_rate,
+                                 aspect_prob=aspect_prob, max_aspect_ratio=max_aspect_ratio,
+                                 min_object_px=min_object_px))
+        if flip_h:
+            gen.add(image.RandomFlipLR(probability=0.5))
+        if flip_v:
+            gen.add(image.RandomFlipTB(probability=0.5))
+        if rotate90:
+            gen.add(image.RandomRotate90(probability=1))
+        gen.add(image.RandomColorAugmentors())
+        gen.add(image.RandomErasing(probability=0.5))
+        gen.add(generator.ProcessInput(pi, batch_axis=True))
+        gen.add(generator.ProcessOutput(lambda y: self.pb.encode_truth([y])[0]))
         self.model = models.Model(network, gen, batch_size)
         if not quiet:
             self.model.summary()
@@ -164,7 +174,7 @@ class ObjectDetector(object):
         # 重みの読み込み
         logger = log.get(__name__)
         if initial_weights == 'imagenet':
-            warm_start = False  # cold start
+            pass  # cold start
         else:
             if initial_weights == 'voc':
                 initial_weights = self._get_voc_weights()
@@ -172,21 +182,16 @@ class ObjectDetector(object):
                 initial_weights = pathlib.Path(initial_weights)
 
             def _loadable_layer(layer_name):
-                if layer_name.startswith('pm-') and layer_name[-3:] in ('obj', 'clf', 'loc'):
+                if regex.is_match(layer_name, r'^pm-\d+_(obj|clf|loc)$'):
                     return False  # skip
                 return True
 
             self.model.load_weights(initial_weights, where_fn=_loadable_layer, strict_warnings=False)
             logger.info(f'warm start: {initial_weights.name}')
-            warm_start = True
 
         # 学習
-        if warm_start:
-            sgd_lr = lr_scale * 0.5 / 256  # lossが複雑なので微調整
-            self.model.compile(sgd_lr=sgd_lr, lr_multipliers=lr_multipliers, loss=self.pb.loss, metrics=self.pb.metrics)
-        else:
-            sgd_lr = lr_scale * 0.5 / 256 / 3  # lossが複雑なので微調整
-            self.model.compile(sgd_lr=sgd_lr, lr_multipliers=lr_multipliers, loss=self.pb.loss, metrics=self.pb.metrics)
+        sgd_lr = lr_scale * 0.5 / 256 / 10  # lossが複雑なので微調整
+        self.model.compile(sgd_lr=sgd_lr, lr_multipliers=lr_multipliers, loss=self.pb.loss, metrics=self.pb.metrics)
         self.model.fit(X_train, y_train, validation_data=(X_val, y_val),
                        epochs=epochs, verbose=verbose, tsv_log_path=tsv_log_path,
                        cosine_annealing=True)
@@ -212,7 +217,11 @@ class ObjectDetector(object):
             del self.model
         network, _ = od_net.create_network(pb=self.pb, mode='predict', strict_nms=strict_nms, load_base_weights=False)
         pi = od_net.get_preprocess_input()
-        gen = od_gen.create_predict_generator(self.pb.input_size, pi, keep_aspect=keep_aspect)
+        gen = image.ImageDataGenerator()
+        gen.add(image.RandomZoom(probability=1, output_size=self.pb.input_size, keep_aspect=keep_aspect,
+                                 padding_rate=None, crop_rate=None,
+                                 aspect_prob=0, max_aspect_ratio=1, min_object_px=0))
+        gen.add(generator.ProcessInput(pi, batch_axis=True))
         self.model = models.Model(network, gen, batch_size)
         logger = log.get(__name__)
         if weights == 'voc':

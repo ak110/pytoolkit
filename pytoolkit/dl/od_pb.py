@@ -7,7 +7,7 @@ import sklearn.metrics
 from . import losses
 from .. import log, math, ml, utils
 
-_VAR_LOC = 0.1  # SSD風(?)適当スケーリング
+_VAR_LOC = 0.10  # SSD風(?)適当スケーリング
 
 
 class PriorBoxes(object):
@@ -209,9 +209,9 @@ class PriorBoxes(object):
         # 数
         logger.info(f'prior box count: {len(self.pb_mask)} (valid={np.count_nonzero(self.pb_mask)})')
 
-    def encode_locs(self, bboxes, bb_ix, pb_ix):
+    def encode_locs(self, bbox, pb_ix):
         """座標を学習用に変換。"""
-        return (bboxes[bb_ix, :] - self.pb_locs[pb_ix, :]) / np.tile(self.pb_sizes[pb_ix, :], 2) / _VAR_LOC
+        return (bbox - self.pb_locs[pb_ix, :]) / np.tile(self.pb_sizes[pb_ix, :], 2) / _VAR_LOC
 
     def decode_locs(self, pred, xp=None):
         """encode_locsの逆変換。xpはnumpy or keras.backend。"""
@@ -240,7 +240,7 @@ class PriorBoxes(object):
             assigned_count_list.append(len(assigned_pb_list))
             # 初期の座標のずれ具合の集計
             for assigned_pb, assigned_gt in zip(assigned_pb_list, assigned_gt_list):
-                delta_locs.append(self.encode_locs(y.bboxes, assigned_gt, assigned_pb))
+                delta_locs.append(self.encode_locs(y.bboxes[assigned_gt, :], assigned_pb))
             # オブジェクトごとの集計
             for gt_ix, (class_id, difficult) in enumerate(zip(y.classes, y.difficults)):
                 assert 0 <= class_id < self.num_classes
@@ -298,17 +298,18 @@ class PriorBoxes(object):
 
     def encode_truth(self, y_gt: [ml.ObjectsAnnotation]):
         """学習用の`y_true`の作成。"""
-        # mask, objs, clfs, locs
-        y_true = np.zeros((len(y_gt), len(self.pb_locs), 1 + 1 + self.num_classes + 4), dtype=np.float32)
+        # mask, weights, objs, clfs, locs
+        y_true = np.zeros((len(y_gt), len(self.pb_locs), 1 + 1 + 1 + self.num_classes + 4), dtype=np.float32)
         for i, y in enumerate(y_gt):
             assert math.in_range(y.classes, 0, self.num_classes).all()
             assigned_pb_list, assigned_gt_list, pb_valids = self._assign_boxes(y.bboxes)
-            y_true[i, pb_valids, 0] = 1  # 正例 or 負例なら1。微妙なのは0。
+            y_true[i, pb_valids, 0] = 1 / max(1, len(assigned_pb_list))  # mask: 正例 or 負例なら>0。微妙なのは0。
             for pb_ix, gt_ix in zip(assigned_pb_list, assigned_gt_list):
-                y_true[i, pb_ix, 1] = 1  # 0:bg 1:obj
-                y_true[i, pb_ix, 2 + y.classes[gt_ix]] = 1
-                y_true[i, pb_ix, -4:] = self.encode_locs(y.bboxes, gt_ix, pb_ix)
-        assert (np.logical_and(y_true[:, :, 0], y_true[:, :, 1]) == y_true[:, :, 1]).all()  # objであるなら常に有効
+                y_true[i, pb_ix, 1] = 1 / len(assigned_pb_list)  # weights: assignした数の逆数
+                y_true[i, pb_ix, 2] = 1  # 0:bg 1:obj
+                y_true[i, pb_ix, 3 + y.classes[gt_ix]] = 1
+                y_true[i, pb_ix, -4:] = self.encode_locs(y.bboxes[gt_ix, :], pb_ix)
+        assert (np.logical_and(y_true[:, :, 0], y_true[:, :, 2]) == y_true[:, :, 2]).all()  # objであるなら常に有効
         return y_true
 
     def _assign_boxes(self, bboxes):
@@ -331,15 +332,16 @@ class PriorBoxes(object):
             assert pb_mask.any(), f'Encode error: {bb_center}'
             iou = ml.compute_iou(np.expand_dims(bbox, axis=0), self.pb_locs[pb_mask, :])[0]
 
-            # assign: bboxの重心が含まれるグリッドで形が最も合うもの1つにassignする
+            # assign: bboxの重心が含まれるグリッドの1つにassignする
             pb_mask2 = math.in_range(bb_center, self.pb_grid[:, :2], self.pb_grid[:, 2:]).all(axis=-1)
             pb_mask2 = np.logical_and(pb_mask2, self.pb_mask)
             assert pb_mask2.any(), f'Encode error: {bb_center}'
             pb_mask2 = np.logical_and(pb_mask2, pb_assignable)  # 割り当て済みは除外
             if pb_mask2.any():
-                sb_iou = ml.compute_size_based_iou(np.expand_dims(bbox, axis=0), self.pb_locs[pb_mask2])[0]
-                sb_iou_ix = sb_iou.argmax()
-                pb_ix = np.where(pb_mask2)[0][sb_iou_ix]
+                # 位置のずれが最も小さいところに割り当てる
+                delta_locs = np.sum(np.abs(self.encode_locs(bbox, pb_mask2)), axis=-1)
+                nearest_ix = delta_locs.argmin()
+                pb_ix = np.where(pb_mask2)[0][nearest_ix]
                 pb_assigned_gt[pb_ix] = gt_ix
                 pb_assignable[pb_ix] = False
             else:
@@ -378,21 +380,21 @@ class PriorBoxes(object):
         def rec_bg(y_true, y_pred):
             """背景の再現率。"""
             gt_mask = y_true[:, :, 0]
-            gt_obj, pred_obj = y_true[:, :, 1], y_pred[:, :, 1]
+            gt_obj, pred_obj = y_true[:, :, 2], y_pred[:, :, 2]
             gt_bg = (1 - gt_obj) * gt_mask   # 背景
-            acc = K.cast(K.equal(K.greater(gt_obj, 0.5), K.greater(pred_obj, 0.5)), K.floatx())
+            acc = K.cast(K.equal(K.round(gt_obj), K.round(pred_obj)), K.floatx())
             return K.sum(acc * gt_bg, axis=-1) / K.maximum(K.sum(gt_bg, axis=-1), 1)
 
         def rec_obj(y_true, y_pred):
             """物体の再現率。"""
-            gt_obj, pred_obj = y_true[:, :, 1], y_pred[:, :, 1]
-            acc = K.cast(K.equal(K.greater(gt_obj, 0.5), K.greater(pred_obj, 0.5)), K.floatx())
+            gt_obj, pred_obj = y_true[:, :, 2], y_pred[:, :, 2]
+            acc = K.cast(K.equal(K.round(gt_obj), K.round(pred_obj)), K.floatx())
             return K.sum(acc * gt_obj, axis=-1) / K.maximum(K.sum(gt_obj, axis=-1), 1)
 
         def acc_clf(y_true, y_pred):
             """分類の正解率。"""
-            gt_obj = y_true[:, :, 1]
-            gt_classes, pred_classes = y_true[:, :, 2:-4], y_pred[:, :, 2:-4]
+            gt_obj = y_true[:, :, 2]
+            gt_classes, pred_classes = y_true[:, :, 3:-4], y_pred[:, :, 3:-4]
             acc = K.cast(K.equal(K.argmax(gt_classes), K.argmax(pred_classes)), K.floatx())
             return K.sum(acc * gt_obj, axis=-1) / K.maximum(K.sum(gt_obj, axis=-1), 1)
 
@@ -402,28 +404,30 @@ class PriorBoxes(object):
         """Objectness scoreのloss。(binary focal loss)"""
         import keras.backend as K
         gt_mask = y_true[:, :, 0]
-        gt_obj, pred_obj = y_true[:, :, 1], y_pred[:, :, 1]
-        mask = gt_mask * np.expand_dims(self.pb_mask, axis=0)
+        gt_obj, pred_obj = y_true[:, :, 2], y_pred[:, :, 2]
+        mask = np.expand_dims(self.pb_mask, axis=0) * gt_mask
         loss = losses.binary_focal_loss(gt_obj, pred_obj)
-        loss = K.sum(loss * mask, axis=-1) / K.maximum(K.sum(gt_obj, axis=-1), 1)  # normalized by the number of anchors assigned to a ground-truth box
+        loss = K.sum(loss * mask, axis=-1)
         return loss * 3
 
     @staticmethod
     def loss_clf(y_true, y_pred):
         """クラス分類のloss。(categorical crossentropy)"""
+        import keras
         import keras.backend as K
-        gt_obj = y_true[:, :, 1]
-        gt_classes, pred_classes = y_true[:, :, 2:-4], y_pred[:, :, 2:-4]
-        loss = K.categorical_crossentropy(gt_classes, pred_classes)
-        loss = K.sum(loss * gt_obj, axis=-1) / K.maximum(K.sum(gt_obj, axis=-1), 1)  # mean (box)
+        gt_weights = y_true[:, :, 1]
+        gt_classes, pred_classes = y_true[:, :, 3:-4], y_pred[:, :, 3:-4]
+        loss = keras.losses.categorical_crossentropy(gt_classes, pred_classes)
+        loss = K.sum(loss * gt_weights, axis=-1)
         return loss
 
     @staticmethod
     def loss_loc(y_true, y_pred):
         """位置のloss。(l2 smooth loss)"""
+        import keras
         import keras.backend as K
-        gt_obj = y_true[:, :, 1]
+        gt_weights = y_true[:, :, 1]
         gt_locs, pred_locs = y_true[:, :, -4:], y_pred[:, :, -4:]
-        loss = losses.l1_smooth_loss(gt_locs, pred_locs)
-        loss = K.sum(loss * gt_obj, axis=-1) / K.maximum(K.sum(gt_obj, axis=-1), 1)  # mean (box)
-        return loss
+        loss = keras.losses.mean_squared_error(gt_locs, pred_locs)
+        loss = K.sum(loss * gt_weights, axis=-1)
+        return loss * 2

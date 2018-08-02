@@ -1,3 +1,3 @@
 #!/bin/bash
 set -eux
- python3 voc.py --skip-train $*
+python3 voc.py validate $*

@@ -9,14 +9,15 @@ import pytoolkit as tk
 def _main():
     tk.better_exceptions()
     parser = argparse.ArgumentParser()
+    parser.add_argument('mode', default='all', choices=('all', 'train', 'validate'), nargs='?')
     parser.add_argument('--vocdevkit-dir', default=pathlib.Path('data/VOCdevkit'), type=pathlib.Path)
     parser.add_argument('--result-dir', default=pathlib.Path('results_voc'), type=pathlib.Path)
     parser.add_argument('--input-size', default=(320, 320), type=int, nargs=2)
     parser.add_argument('--map-sizes', default=(40, 20, 10), type=int, nargs='+')
     parser.add_argument('--pb-sizes', default=8, type=int)
-    parser.add_argument('--batch-size', default=8, type=int)
+    parser.add_argument('--batch-size', default=16, type=int)
     parser.add_argument('--epochs', default=300, type=int)
-    parser.add_argument('--skip-train', action='store_true')
+    parser.add_argument('--base-model', default=None, type=pathlib.Path)
     args = parser.parse_args()
     args.result_dir.mkdir(parents=True, exist_ok=True)
 
@@ -25,32 +26,28 @@ def _main():
     X_val, y_val = tk.data.voc.load_07_test(args.vocdevkit_dir)
 
     # 学習(model.h5が存在しない場合のみ。学習後に消さずに再実行した場合は検証だけする。)
-    if not args.skip_train:
+    tk.dl.hvd.init()
+    if args.mode in ('train', 'all'):
         with tk.dl.session(use_horovod=True):
             tk.log.init(args.result_dir / 'train.log')
             _train(args, X_train, y_train, X_val, y_val)
 
     # 検証
-    if tk.dl.hvd.is_master():
-        tk.log.init(args.result_dir / 'validate.log')
-        with tk.dl.session():
-            _validate(args, X_val, y_val)
+    if args.mode in ('validate', 'all'):
+        if tk.dl.hvd.is_master():
+            tk.log.init(args.result_dir / 'validate.log')
+            with tk.dl.session():
+                _validate(args, X_val, y_val)
 
 
 @tk.log.trace()
 def _train(args, X_train, y_train, X_val, y_val):
-    # 重みがあれば読み込む
-    weights = 'imagenet'
-    for warm_path in (args.result_dir / 'model.base.h5', args.result_dir / 'pretrain.model.h5'):
-        if warm_path.is_file():
-            weights = warm_path
-            break
-
-    # 学習
     num_classes = len(tk.data.voc.CLASS_NAMES)
     od = tk.dl.od.ObjectDetector(args.input_size, args.map_sizes, num_classes)
     od.fit(X_train, y_train, X_val, y_val,
-           batch_size=args.batch_size, epochs=args.epochs, initial_weights=weights, pb_size_pattern_count=args.pb_sizes,
+           batch_size=args.batch_size, epochs=args.epochs,
+           initial_weights=args.base_model if args.base_model is not None else 'imagenet',
+           pb_size_pattern_count=args.pb_sizes,
            flip_h=True, flip_v=False, rotate90=False,
            plot_path=args.result_dir / 'model.svg',
            tsv_log_path=args.result_dir / 'history.tsv')
