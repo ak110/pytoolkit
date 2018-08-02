@@ -152,6 +152,7 @@ class ObjectDetector(object):
         self.model.summary()
         if plot_path:
             self.model.plot(plot_path)
+
         # 重みの読み込み
         logger = log.get(__name__)
         if initial_weights == 'imagenet':
@@ -161,13 +162,20 @@ class ObjectDetector(object):
                 initial_weights = self._get_voc_weights()
             else:
                 initial_weights = pathlib.Path(initial_weights)
-            self.model.load_weights(initial_weights, strict_warnings=False)
+
+            def _loadable_layer(layer_name):
+                if layer_name.startswith('pm-') and layer_name[-3:] in ('obj', 'clf', 'loc'):
+                    return False  # skip
+                return True
+
+            self.model.load_weights(initial_weights, where_fn=_loadable_layer, strict_warnings=False)
             logger.info(f'warm start: {initial_weights.name}')
             warm_start = True
+
         # 学習
         if warm_start:
-            sgd_lr = lr_scale * 0.5 / 256 / 3 / 2  # lossが複雑なので微調整
-            self.model.compile(sgd_lr=sgd_lr, lr_multipliers=None, loss=self.pb.loss, metrics=self.pb.metrics)
+            sgd_lr = lr_scale * 0.5 / 256 / 3  # lossが複雑なので微調整
+            self.model.compile(sgd_lr=sgd_lr, lr_multipliers=lr_multipliers, loss=self.pb.loss, metrics=self.pb.metrics)
         else:
             sgd_lr = lr_scale * 0.5 / 256 / 3  # lossが複雑なので微調整
             self.model.compile(sgd_lr=sgd_lr, lr_multipliers=lr_multipliers, loss=self.pb.loss, metrics=self.pb.metrics)
