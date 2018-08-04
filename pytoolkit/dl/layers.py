@@ -9,6 +9,7 @@ def get_custom_objects():
         preprocess(),
         channel_argmax(),
         channel_max(),
+        resize2d(),
         pad2d(),
         group_normalization(),
         destandarization(),
@@ -87,6 +88,48 @@ def channel_max():
             return input_shape[:-1]
 
     return ChannelMax
+
+
+def resize2d():
+    """リサイズ。
+
+    # 引数
+    - size: (new_height, new_width)
+    - interpolation: 'bilinear', 'nearest', 'bicubic', 'area'
+
+    """
+    import keras
+    import tensorflow as tf
+
+    class Resize2D(keras.layers.Layer):
+        """リサイズ。"""
+
+        def __init__(self, size, interpolation='bilinear', align_corners=False, **kwargs):
+            super().__init__(**kwargs)
+            assert interpolation in ('bilinear', 'nearest', 'bicubic', 'area')
+            self.size = tuple(size)
+            self.interpolation = interpolation
+            self.align_corners = align_corners
+
+        def call(self, inputs, **kwargs):
+            method = {
+                'bilinear': tf.image.ResizeMethod.BILINEAR,
+                'nearest': tf.image.ResizeMethod.NEAREST_NEIGHBOR,
+                'bicubic': tf.image.ResizeMethod.BICUBIC,
+                'area': tf.image.ResizeMethod.AREA,
+            }[self.interpolation]
+            return tf.image.resize_images(inputs, self.size, method, self.align_corners)
+
+        def compute_output_shape(self, input_shape):
+            assert len(input_shape) == 4
+            return (input_shape[0], self.size[0], self.size[1], input_shape[-1])
+
+        def get_config(self):
+            config = {'size': self.size, 'interpolation': self.interpolation, 'align_corners': self.align_corners}
+            base_config = super().get_config()
+            return dict(list(base_config.items()) + list(config.items()))
+
+    return Resize2D
 
 
 def pad2d():
