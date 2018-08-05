@@ -89,9 +89,9 @@ class ObjectsPrediction(object):
         """物体の数を返す。"""
         return len(self.classes)
 
-    def plot(self, img, class_names):
+    def plot(self, img, class_names, conf_threshold=0):
         """ワクを描画した画像を作って返す。"""
-        return plot_objects(img, self.classes, self.confs, self.bboxes, class_names)
+        return plot_objects(img, self.classes, self.confs, self.bboxes, class_names, conf_threshold)
 
 
 def listup_classification(dirpath, class_names=None):
@@ -293,7 +293,22 @@ def compute_ap(precision, recall, use_voc2007_metric=False):
     return ap
 
 
-def compute_scores(gt, pred, iou_threshold=0.5):
+def search_conf_threshold(gt, pred, iou_threshold=0.5):
+    """物体検出の正解と予測結果から、F1スコアが最大になる`conf_threshold`を返す。"""
+    conf_threshold_list = np.linspace(0.01, 0.99, 50)
+    scores = []
+    for conf_th in conf_threshold_list:
+        _, _, fscores, supports = compute_scores(gt, pred, conf_th, iou_threshold)
+        score = np.average(fscores, weights=supports)  # sklearnで言うaverage='weighted'
+        scores.append(score)
+    scores = np.array(scores)
+    max_scores = scores >= 1
+    if max_scores.any():  # 満点が1つ以上存在する場合、そのときの閾値の平均を返す(怪)
+        return np.mean(conf_threshold_list[max_scores])
+    return conf_threshold_list[scores.argmax()]
+
+
+def compute_scores(gt, pred, conf_threshold=0, iou_threshold=0.5):
     """物体検出の正解と予測結果から、適合率、再現率、F値、該当回数を算出して返す。"""
     assert len(gt) == len(pred)
     assert 0 < iou_threshold < 1
@@ -304,7 +319,8 @@ def compute_scores(gt, pred, iou_threshold=0.5):
     tn = np.zeros((num_classes,), dtype=int)  # true negative
 
     for y_true, y_pred in zip(gt, pred):
-        pred_enabled = np.ones((y_pred.num_objects,), dtype=bool)
+        # conf_threshold以上をいったんすべて対象とする
+        pred_enabled = y_pred.confs >= conf_threshold
         # 各正解が予測結果に含まれるか否か: true positive/negative
         for gt_class, gt_bbox, gt_difficult in zip(y_true.classes, y_true.bboxes, y_true.difficults):
             pred_mask = np.logical_and(pred_enabled, y_pred.classes == gt_class)
@@ -593,7 +609,7 @@ def plot_cm(cm, to_file='confusion_matrix.png', classes=None, normalize=True, ti
     fig.clf()
 
 
-def plot_objects(base_image, classes, confs, bboxes, class_names):
+def plot_objects(base_image, classes, confs, bboxes, class_names, conf_threshold=0):
     """画像＋オブジェクト([class_id + confidence + xmin/ymin/xmax/ymax]×n)を画像化する。
 
     # 引数
@@ -602,6 +618,7 @@ def plot_objects(base_image, classes, confs, bboxes, class_names):
     - confs: confidenceのリスト (None可)
     - bboxes: xmin/ymin/xmax/ymaxのリスト (それぞれ0.0 ～ 1.0)
     - class_names: クラスID→クラス名のリスト  (None可)
+    - conf_threshold: この値以上のオブジェクトのみ描画する
 
     """
     import cv2
@@ -618,6 +635,8 @@ def plot_objects(base_image, classes, confs, bboxes, class_names):
     colors = draw.get_colors(len(class_names) if class_names is not None else 1)
 
     for classid, conf, bbox in zip(classes, confs, bboxes):
+        if conf < conf_threshold:
+            continue  # skip
         xmin = int(round(bbox[0] * img.shape[1]))
         ymin = int(round(bbox[1] * img.shape[0]))
         xmax = int(round(bbox[2] * img.shape[1]))
