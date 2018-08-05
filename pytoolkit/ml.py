@@ -635,7 +635,7 @@ def plot_objects(base_image, classes, confs, bboxes, class_names, conf_threshold
     colors = draw.get_colors(len(class_names) if class_names is not None else 1)
 
     for classid, conf, bbox in zip(classes, confs, bboxes):
-        if conf < conf_threshold:
+        if conf is not None and conf < conf_threshold:
             continue  # skip
         xmin = int(round(bbox[0] * img.shape[1]))
         ymin = int(round(bbox[1] * img.shape[0]))
