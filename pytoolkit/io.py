@@ -64,6 +64,8 @@ def get_size(path):
     """ファイル・ディレクトリのサイズを返す。"""
     path = pathlib.Path(path)
     if path.is_dir():
-        return sum([p.stat().st_size for p in path.glob('**/*') if not p.is_dir()])
-    else:
+        return sum([p.stat().st_size for p in path.glob('**/*') if p.is_file()])
+    elif path.is_file():
         return path.stat().st_size
+    else:
+        return 0
