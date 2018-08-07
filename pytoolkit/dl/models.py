@@ -99,7 +99,7 @@ class Model(object):
             tsv_log_path=None,
             balanced=False, mixup=False,
             lr_list=None,
-            reduce_lr_epoch_rates=(0.5, 0.75),
+            reduce_lr_epoch_rates=None,
             reduce_lr_factor=0.1,
             cosine_annealing=False,
             lr_warmup=True):
@@ -110,8 +110,12 @@ class Model(object):
         - balanced: クラス間のバランスが均等になるようにオーバーサンプリングするか否か。
         - mixup: Data augmentationにmixupを使用するか否か。
         - lr_list: 各epochでの学習率の配列。
+        - reduce_lr_epoch_rates: 学習率を減らすepoch数の割合のタプル。(0.5, 0.75)ならepoch数が50%と75%のときに学習率をreduce_lr_factor倍にする。
+        - reduce_lr_factor: reduce_lr_epoch_ratesで学習率を減らす割合。
         - cosine_annealing: cosine annealingするならTrue。
         - lr_warmup: HorovodのLearningRateWarmupCallbackを使うか否か。
+
+        lr_list、reduce_lr、cosine_annealingの3つは排他。
 
         """
         import keras
