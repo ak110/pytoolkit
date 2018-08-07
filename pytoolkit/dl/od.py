@@ -141,7 +141,9 @@ class ObjectDetector(object):
                 self.pb.check_prior_boxes(y_val)
         hvd.barrier()
         # モデルの作成
-        network, lr_multipliers = od_net.create_network(pb=self.pb, mode='train', strict_nms=None)
+        network, lr_multipliers = od_net.create_network(
+            pb=self.pb, mode='train', strict_nms=None,
+            load_base_weights=initial_weights == 'imagenet')
         pi = od_net.get_preprocess_input()
         gen = od_gen.create_generator(self.pb.input_size, pi, self.pb.encode_truth,
                                       flip_h=flip_h, flip_v=flip_v, rotate90=rotate90,
@@ -202,7 +204,7 @@ class ObjectDetector(object):
         """
         if self.model is not None:
             del self.model
-        network, _ = od_net.create_network(pb=self.pb, mode='predict', strict_nms=strict_nms)
+        network, _ = od_net.create_network(pb=self.pb, mode='predict', strict_nms=strict_nms, load_base_weights=False)
         pi = od_net.get_preprocess_input()
         gen = od_gen.create_predict_generator(self.pb.input_size, pi, keep_aspect=keep_aspect)
         self.model = models.Model(network, gen, batch_size)

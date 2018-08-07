@@ -3,7 +3,7 @@
 import numpy as np
 
 from . import layers, losses, networks
-from .. import image, log, applications
+from .. import applications, log
 
 
 def get_preprocess_input():
@@ -12,14 +12,14 @@ def get_preprocess_input():
 
 
 @log.trace()
-def create_network(pb, mode, strict_nms=None):
+def create_network(pb, mode, strict_nms, load_base_weights):
     """学習とか予測とか用のネットワークを作って返す。"""
     assert mode in ('pretrain', 'train', 'predict')
     import keras
     keras.backend.reset_uids()  # darknet用。
     builder = networks.Builder()
     x = inputs = keras.layers.Input(pb.input_size + (3,))
-    x, ref, lr_multipliers = _create_basenet(builder, x, load_weights=mode != 'predict')
+    x, ref, lr_multipliers = _create_basenet(builder, x, load_base_weights=load_base_weights)
     if mode == 'pretrain':
         assert len(lr_multipliers) == 0
         x = keras.layers.GlobalAveragePooling2D()(x)
@@ -32,9 +32,9 @@ def create_network(pb, mode, strict_nms=None):
 
 
 @log.trace()
-def _create_basenet(builder, x, load_weights):
+def _create_basenet(builder, x, load_base_weights):
     """ベースネットワークの作成。"""
-    basenet = applications.darknet53.darknet53(input_tensor=x, weights='imagenet' if load_weights else None)
+    basenet = applications.darknet53.darknet53(input_tensor=x, weights='imagenet' if load_base_weights else None)
     ref_list = []
     ref_list.append(basenet.get_layer(name='add_1').output)  # 320→160
     ref_list.append(basenet.get_layer(name='add_3').output)  # 320→80
