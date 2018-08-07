@@ -97,6 +97,7 @@ class Model(object):
             max_queue_size=10, use_multiprocessing=False,
             initial_epoch=0,
             tsv_log_path=None,
+            tsv_log_append=False,
             balanced=False, mixup=False,
             lr_list=None,
             reduce_lr_epoch_rates=None,
@@ -160,7 +161,7 @@ class Model(object):
             if lr_warmup:
                 cb.append(hvd.get().callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1))
         if tsv_log_path is not None:
-            cb.append(callbacks.tsv_logger(tsv_log_path))
+            cb.append(callbacks.tsv_logger(tsv_log_path, append=tsv_log_append))
         cb.append(callbacks.epoch_logger())
         cb.append(keras.callbacks.TerminateOnNaN())
 
