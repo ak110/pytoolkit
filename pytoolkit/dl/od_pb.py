@@ -129,6 +129,7 @@ class PriorBoxes(object):
         self.pb_info_indices = []
         self.pb_centers = []
         self.pb_sizes = []
+        self.pb_mask = []
         self.pb_info = []
         for map_size in self.map_sizes:
             # feature mapの格子のサイズ
@@ -156,11 +157,16 @@ class PriorBoxes(object):
                 prior_boxes = np.copy(prior_boxes_center)
                 prior_boxes[:, :2] -= pb_size / 2
                 prior_boxes[:, 2:] += pb_size / 2 + (1 / np.array(self.input_size))
+                # はみ出ているprior boxの対処 (clipしたときの中心が元のグリッド内ならOK)
+                clipped = np.clip(prior_boxes, 0, 1)
+                clipped_center = (clipped[:, :2] + clipped[:, 2:]) / 2
+                mask = np.all(math.between(clipped_center, grid[:, :2], grid[:, 2:]), axis=-1)
                 # 追加
                 self.pb_grid.extend(grid)
                 self.pb_locs.extend(prior_boxes)
                 self.pb_centers.extend(prior_boxes_center[:, :2])
                 self.pb_sizes.extend([pb_size] * len(prior_boxes))
+                self.pb_mask.extend(mask)
                 self.pb_info_indices.extend([len(self.pb_info)] * len(prior_boxes))
                 self.pb_info.append({
                     'map_size': map_size,
@@ -173,8 +179,7 @@ class PriorBoxes(object):
         self.pb_info_indices = np.array(self.pb_info_indices)
         self.pb_centers = np.array(self.pb_centers)
         self.pb_sizes = np.array(self.pb_sizes)
-        # はみ出ているprior boxは使用しないようにする
-        self.pb_mask = math.between(self.pb_locs, -0.1, +1.1).all(axis=-1)
+        self.pb_mask = np.array(self.pb_mask)
         # 結果のチェック
         self._check_state()
 
