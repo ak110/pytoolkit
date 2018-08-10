@@ -35,7 +35,7 @@ def preprocess():
 
         def __init__(self, mode='tf', **kwargs):
             super().__init__(**kwargs)
-            assert mode in ('caffe', 'tf', 'torch')
+            assert mode in ('caffe', 'tf', 'torch', 'div255')
             self.mode = mode
 
         def call(self, inputs, **kwargs):
@@ -45,6 +45,8 @@ def preprocess():
                 return (inputs / 127.5) - 1
             elif self.mode == 'torch':
                 return K.bias_add((inputs / 255.), K.constant(np.array([-0.485, -0.456, -0.406]))) / np.array([0.229, 0.224, 0.225])
+            elif self.mode == 'div255':
+                return inputs / 255.
             else:
                 assert False
 
