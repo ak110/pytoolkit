@@ -12,15 +12,17 @@ def darknet53(include_top=False, input_shape=None, input_tensor=None, weights='i
     import keras
     from . import yolov3
 
-    if input_shape is not None:
+    if input_shape is None:
+        assert input_tensor is not None
+    else:
         assert input_tensor is None
         input_tensor = keras.layers.Input(input_shape)
     assert not include_top  # Trueは未対応
-    assert input_tensor is not None
     assert weights in (None, 'imagenet')
 
     x = yolov3.darknet_body(input_tensor)
-    model = keras.models.Model(input_tensor, x)
+    inputs = keras.engine.get_source_inputs(input_tensor)
+    model = keras.models.Model(inputs, x, name='darknet53')
 
     if weights == 'imagenet':
         weights_path = hvd.get_file(WEIGHTS_NAME, WEIGHTS_URL, file_hash=WEIGHTS_HASH, cache_subdir='models')
