@@ -525,7 +525,7 @@ def non_maximum_suppression(boxes, scores, top_k=200, iou_threshold=0.45):
     return sorted_indices[selected]
 
 
-def print_classification_metrics(y_true, proba_pred, average='macro', print_fn=None):
+def print_classification_metrics(y_true, proba_pred, average='micro', print_fn=None):
     """分類の指標色々を表示する。
 
     # 引数
@@ -560,8 +560,8 @@ def print_classification_metrics(y_true, proba_pred, average='macro', print_fn=N
         auc = sklearn.metrics.roc_auc_score(ohe_true, proba_pred, average=average)
         logloss = sklearn.metrics.log_loss(ohe_true, proba_pred)
         print_fn(f'Accuracy:  {acc:.3f}')
-        print_fn(f'F1-{average}:  {f1:.3f}')
-        print_fn(f'AUC-{average}: {auc:.3f}')
+        print_fn(f'F1-{average:5s}:  {f1:.3f}')
+        print_fn(f'AUC-{average:5s}: {auc:.3f}')
         print_fn(f'Logloss:   {logloss:.3f}')
 
 
