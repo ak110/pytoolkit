@@ -103,7 +103,7 @@ class ObjectDetector(object):
             padding_rate=16, crop_rate=0.1, keep_aspect=False,
             aspect_prob=0.5, max_aspect_ratio=3 / 2, min_object_px=8,
             plot_path=None, tsv_log_path=None,
-            verbose=1, pb_summary=True):
+            verbose=1, quiet=False):
         """学習。
 
         # 引数
@@ -124,6 +124,7 @@ class ObjectDetector(object):
         - min_object_px: paddingなどでどこまでオブジェクトが小さくなるのを許容するか。(ピクセル数)
         - plot_path: ネットワークの図を出力するならそのパス。拡張子はpngやsvgなど。
         - tsv_log_path: lossなどをtsvファイルに出力するならそのパス。
+        - quiet: prior boxやネットワークのsummaryを表示しないならTrue。
         """
         assert self.model is None
         assert lr_scale > 0
@@ -136,7 +137,7 @@ class ObjectDetector(object):
         pb_dict = hvd.bcast(pb_dict)
         self.pb.from_dict(pb_dict)
         # prior boxのチェック
-        if hvd.is_master() and pb_summary:
+        if hvd.is_master() and not quiet:
             self.pb.summary()
             if y_val is not None:
                 self.pb.check_prior_boxes(y_val)
@@ -152,7 +153,8 @@ class ObjectDetector(object):
                                       aspect_prob=aspect_prob, max_aspect_ratio=max_aspect_ratio,
                                       min_object_px=min_object_px)
         self.model = models.Model(network, gen, batch_size)
-        self.model.summary()
+        if not quiet:
+            self.model.summary()
         if plot_path:
             self.model.plot(plot_path)
 
