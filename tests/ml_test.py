@@ -148,13 +148,13 @@ def test_od_accuracy():
         tk.ml.ObjectsPrediction(
             classes=[1, 0], confs=[1, 1],
             bboxes=[[0.25, 0.25, 0.75, 0.75], [0.00, 0.00, 0.05, 0.05]]),
+        # conf低
+        tk.ml.ObjectsPrediction(
+            classes=[1, 0, 0], confs=[1, 0, 1],
+            bboxes=[[0.25, 0.25, 0.75, 0.75], [0.00, 0.00, 0.05, 0.05], [0.00, 0.00, 0.05, 0.05]]),
         # クラス違い
         tk.ml.ObjectsPrediction(
             classes=[1, 1], confs=[1, 1],
-            bboxes=[[0.25, 0.25, 0.75, 0.75], [0.00, 0.00, 0.05, 0.05]]),
-        # conf低
-        tk.ml.ObjectsPrediction(
-            classes=[1, 0], confs=[0, 0],
             bboxes=[[0.25, 0.25, 0.75, 0.75], [0.00, 0.00, 0.05, 0.05]]),
         # 重複
         tk.ml.ObjectsPrediction(
@@ -169,10 +169,10 @@ def test_od_accuracy():
             classes=[1, 0], confs=[1, 1],
             bboxes=[[0.25, 0.25, 0.75, 0.75], [0.90, 0.90, 0.95, 0.95]]),
     ])
-    is_match_expected = [True, False, False, False, False, False]
+    is_match_expected = [True, True, False, False, False, False]
     for yt, yp, m in zip(y_true, y_pred, is_match_expected):
         assert yp.is_match(yt.classes, yt.bboxes, conf_threshold=0.5) == m
-    assert tk.ml.od_accuracy(y_true, y_pred, conf_threshold=0.5) == pytest.approx(1 / 6)
+    assert tk.ml.od_accuracy(y_true, y_pred, conf_threshold=0.5) == pytest.approx(2 / 6)
 
 
 def test_od_confusion_matrix():

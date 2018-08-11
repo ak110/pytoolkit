@@ -111,7 +111,7 @@ class ObjectsPrediction(object):
             return False  # 1:1になっていない
 
         for gt_ix, gt_class in enumerate(classes):
-            if gt_class != self.classes[pred_gt == gt_ix][0]:
+            if gt_class != self.classes[mask][pred_gt == gt_ix][0]:
                 return False  # クラスが不一致
 
         return True  # OK
