@@ -388,7 +388,7 @@ def compute_scores(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=No
 def od_confusion_matrix(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=None):
     """物体検出用の混同行列を作る。
 
-    分類と異なり、未検出と誤検出があるのでその分列と行を1つずつ増やしたものを返す。
+    分類と異なり、検出漏れと誤検出があるのでその分列と行を1つずつ増やしたものを返す。
     difficultは扱いが難しいので無視。
     """
     assert len(gt) == len(pred)
@@ -421,6 +421,8 @@ def od_confusion_matrix(gt, pred, conf_threshold=0, iou_threshold=0.5, num_class
                     cm[gt_class, y_pred.classes[pred_ix]] += 1  # 誤検出(クラス違い)
                 # 一度カウントしたものは次から無視
                 pred_enabled[pred_ix] = False
+            if not found:
+                cm[gt_class, -1] += 1  # 検出漏れ
         # 余った予測結果：誤検出
         for pred_class in y_pred.classes[pred_enabled]:
             cm[-1, pred_class] += 1
