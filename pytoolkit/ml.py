@@ -93,6 +93,29 @@ class ObjectsPrediction(object):
         """ワクを描画した画像を作って返す。"""
         return plot_objects(img, self.classes, self.confs, self.bboxes, class_names, conf_threshold)
 
+    def is_match(self, classes, bboxes, conf_threshold=0, iou_threshold=0.5):
+        """classes/bboxesと過不足なく一致していたらTrueを返す。"""
+        assert bboxes.shape == (len(classes), 4)
+
+        mask = self.confs >= conf_threshold
+        if np.sum(mask) != len(classes):
+            return False  # 数が不一致
+
+        iou = compute_iou(bboxes, self.bboxes[mask])
+        iou_max = iou.max(axis=0)
+        if (iou_max < iou_threshold).any():
+            return False  # IoUが閾値未満
+
+        pred_gt = iou.argmax(axis=0)
+        if len(np.unique(pred_gt)) != len(classes):
+            return False  # 1:1になっていない
+
+        for gt_ix, gt_class in enumerate(classes):
+            if gt_class != self.classes[pred_gt == gt_ix][0]:
+                return False  # クラスが不一致
+
+        return True  # OK
+
 
 def listup_classification(dirpath, class_names=None):
     """画像分類でよくある、クラス名ディレクトリの列挙。クラス名の配列, X, yを返す。"""
@@ -308,11 +331,22 @@ def search_conf_threshold(gt, pred, iou_threshold=0.5):
     return conf_threshold_list[scores.argmax()]
 
 
-def compute_scores(gt, pred, conf_threshold=0, iou_threshold=0.5):
+def od_accuracy(gt, pred, conf_threshold=0, iou_threshold=0.5):
+    """物体検出で過不足なく検出できた時だけ正解扱いとした正解率を算出する。"""
+    assert len(gt) == len(pred)
+    assert 0 < iou_threshold < 1
+    assert 0 <= conf_threshold < 1
+    return np.mean([y_pred.is_match(y_true.classes, y_true.bboxes, conf_threshold, iou_threshold)
+                    for y_true, y_pred in zip(gt, pred)])
+
+
+def compute_scores(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=None):
     """物体検出の正解と予測結果から、適合率、再現率、F値、該当回数を算出して返す。"""
     assert len(gt) == len(pred)
     assert 0 < iou_threshold < 1
-    num_classes = len(np.unique(np.concatenate([y.classes for y in gt], axis=0)))
+    assert 0 <= conf_threshold < 1
+    if num_classes is None:
+        num_classes = len(np.unique(np.concatenate([y.classes for y in gt], axis=0)))
 
     tp = np.zeros((num_classes,), dtype=int)  # true positive
     fp = np.zeros((num_classes,), dtype=int)  # false positive
@@ -349,6 +383,49 @@ def compute_scores(gt, pred, conf_threshold=0, iou_threshold=0.5):
     recalls = tp.astype(float) / (supports + 1e-7)
     fscores = 2 / (1 / (precisions + 1e-7) + 1 / (recalls + 1e-7))
     return precisions, recalls, fscores, supports
+
+
+def od_confusion_matrix(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=None):
+    """物体検出用の混同行列を作る。
+
+    分類と異なり、未検出と誤検出があるのでその分列と行を1つずつ増やしたものを返す。
+    difficultは扱いが難しいので無視。
+    """
+    assert len(gt) == len(pred)
+    assert 0 < iou_threshold < 1
+    assert 0 <= conf_threshold < 1
+    if num_classes is None:
+        num_classes = len(np.unique(np.concatenate([y.classes for y in gt], axis=0)))
+
+    cm = np.zeros((num_classes + 1, num_classes + 1), dtype=int)
+
+    for y_true, y_pred in zip(gt, pred):
+        iou = compute_iou(y_true.bboxes, y_pred.bboxes)
+        pred_gt = iou.argmax(axis=0)  # 一番近いboxにマッチさせる (やや怪しい)
+        pred_iou_mask = iou.max(axis=0) >= iou_threshold
+        pred_enabled = y_pred.confs >= conf_threshold
+        # 正解毎にループ
+        for gt_ix, gt_class in enumerate(y_true.classes):
+            m = np.logical_and(pred_enabled, pred_iou_mask)
+            m = np.logical_and(m, pred_gt == gt_ix)
+            pred_targets = np.where(m)[0]
+            found = False
+            for pred_ix in pred_targets:
+                if gt_class == y_pred.classes[pred_ix]:
+                    if found:
+                        cm[-1, gt_class] += 1  # 誤検出(重複)
+                    else:
+                        found = True
+                        cm[gt_class, gt_class] += 1  # 検出成功
+                else:
+                    cm[gt_class, y_pred.classes[pred_ix]] += 1  # 誤検出(クラス違い)
+                # 一度カウントしたものは次から無視
+                pred_enabled[pred_ix] = False
+        # 余った予測結果：誤検出
+        for pred_class in y_pred.classes[pred_enabled]:
+            cm[-1, pred_class] += 1
+
+    return cm
 
 
 def print_scores(precisions, recalls, fscores, supports, class_names=None, print_fn=None):

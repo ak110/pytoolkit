@@ -122,7 +122,7 @@ class Model(object):
         import keras
 
         # generatorの用意
-        has_val = validation_data is not None
+        has_val = validation_data is not None and all(vd is not None for vd in validation_data)
         X_val, y_val = validation_data if has_val else (None, None)
         g1, steps1 = self.gen.flow(X_train, y_train, batch_size=self.batch_size, data_augmentation=True, shuffle=True, balanced=balanced)
         if mixup:

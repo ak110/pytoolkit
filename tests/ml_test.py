@@ -133,6 +133,84 @@ def test_non_maximum_suppression():
     assert idx.shape == (0,)
 
 
+def test_od_accuracy():
+    y_true = np.tile(np.array([
+        tk.ml.ObjectsAnnotation(
+            path='.', width=100, height=100,
+            classes=[0, 1],
+            bboxes=[
+                [0.00, 0.00, 0.05, 0.05],
+                [0.25, 0.25, 0.75, 0.75],
+            ]),
+    ]), 6)
+    y_pred = np.array([
+        # 一致
+        tk.ml.ObjectsPrediction(
+            classes=[1, 0], confs=[1, 1],
+            bboxes=[[0.25, 0.25, 0.75, 0.75], [0.00, 0.00, 0.05, 0.05]]),
+        # クラス違い
+        tk.ml.ObjectsPrediction(
+            classes=[1, 1], confs=[1, 1],
+            bboxes=[[0.25, 0.25, 0.75, 0.75], [0.00, 0.00, 0.05, 0.05]]),
+        # conf低
+        tk.ml.ObjectsPrediction(
+            classes=[1, 0], confs=[0, 0],
+            bboxes=[[0.25, 0.25, 0.75, 0.75], [0.00, 0.00, 0.05, 0.05]]),
+        # 重複
+        tk.ml.ObjectsPrediction(
+            classes=[1, 0, 0], confs=[1, 1, 1],
+            bboxes=[[0.25, 0.25, 0.75, 0.75], [0.00, 0.00, 0.05, 0.05], [0.00, 0.00, 0.05, 0.05]]),
+        # 不足
+        tk.ml.ObjectsPrediction(
+            classes=[1], confs=[1],
+            bboxes=[[0.25, 0.25, 0.75, 0.75]]),
+        # IoU低
+        tk.ml.ObjectsPrediction(
+            classes=[1, 0], confs=[1, 1],
+            bboxes=[[0.25, 0.25, 0.75, 0.75], [0.90, 0.90, 0.95, 0.95]]),
+    ])
+    is_match_expected = [True, False, False, False, False, False]
+    for yt, yp, m in zip(y_true, y_pred, is_match_expected):
+        assert yp.is_match(yt.classes, yt.bboxes, conf_threshold=0.5) == m
+    assert tk.ml.od_accuracy(y_true, y_pred, conf_threshold=0.5) == pytest.approx(1 / 6)
+
+
+def test_od_confusion_matrix():
+    y_true = np.array([])
+    y_pred = np.array([])
+    cm_actual = tk.ml.od_confusion_matrix(y_true, y_pred, num_classes=3)
+    assert (cm_actual == np.zeros((4, 4), dtype=int)).all()
+
+    y_true = np.array([
+        tk.ml.ObjectsAnnotation(
+            path='.', width=100, height=100,
+            classes=[1],
+            bboxes=[
+                [0.25, 0.25, 0.75, 0.75],
+            ])
+    ])
+    y_pred = np.array([
+        tk.ml.ObjectsPrediction(
+            classes=[0, 2, 1, 1, 2],
+            confs=[0, 1, 1, 1, 1],
+            bboxes=[
+                [0.25, 0.25, 0.75, 0.75],  # conf低
+                [0.25, 0.25, 0.75, 0.75],  # クラス違い
+                [0.25, 0.25, 0.75, 0.75],  # 検知
+                [0.25, 0.25, 0.75, 0.75],  # 重複
+                [0.95, 0.95, 0.99, 0.99],  # IoU低
+            ]),
+    ])
+    cm_actual = tk.ml.od_confusion_matrix(y_true, y_pred, conf_threshold=0.5, num_classes=3)
+    cm_expected = np.array([
+        [0, 0, 0, 0],
+        [0, 1, 1, 0],
+        [0, 0, 0, 0],
+        [0, 1, 1, 0],
+    ], dtype=int)
+    assert (cm_actual == cm_expected).all()
+
+
 def test_print_classification_metrics_multi():
     y_true = np.array([0, 1, 1, 1, 2])
     prob_pred = np.array([

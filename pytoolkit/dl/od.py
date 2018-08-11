@@ -102,7 +102,8 @@ class ObjectDetector(object):
             flip_h=True, flip_v=False, rotate90=False,
             padding_rate=16, crop_rate=0.1, keep_aspect=False,
             aspect_prob=0.5, max_aspect_ratio=3 / 2, min_object_px=8,
-            plot_path=None, tsv_log_path=None):
+            plot_path=None, tsv_log_path=None,
+            verbose=1, pb_summary=True):
         """学習。
 
         # 引数
@@ -135,7 +136,7 @@ class ObjectDetector(object):
         pb_dict = hvd.bcast(pb_dict)
         self.pb.from_dict(pb_dict)
         # prior boxのチェック
-        if hvd.is_master():
+        if hvd.is_master() and pb_summary:
             self.pb.summary()
             if y_val is not None:
                 self.pb.check_prior_boxes(y_val)
@@ -182,7 +183,7 @@ class ObjectDetector(object):
             sgd_lr = lr_scale * 0.5 / 256 / 3  # lossが複雑なので微調整
             self.model.compile(sgd_lr=sgd_lr, lr_multipliers=lr_multipliers, loss=self.pb.loss, metrics=self.pb.metrics)
         self.model.fit(X_train, y_train, validation_data=(X_val, y_val),
-                       epochs=epochs, tsv_log_path=tsv_log_path,
+                       epochs=epochs, verbose=verbose, tsv_log_path=tsv_log_path,
                        cosine_annealing=True)
 
     def save_weights(self, path: typing.Union[str, pathlib.Path]):
