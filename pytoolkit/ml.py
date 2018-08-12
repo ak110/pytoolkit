@@ -112,6 +112,8 @@ class ObjectsPrediction(object):
         mask = self.confs >= conf_threshold
         if np.sum(mask) != len(classes):
             return False  # 数が不一致
+        if len(classes) == 0:
+            return True  # OK
 
         iou = compute_iou(bboxes, self.bboxes[mask])
         iou_max = iou.max(axis=0)
