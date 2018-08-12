@@ -48,6 +48,11 @@ class ObjectsAnnotation(object):
         return len(self.classes)
 
     @property
+    def real_bboxes(self):
+        """実ピクセル数換算のbboxesを返す。"""
+        return np.round(self.bboxes * [self.width, self.height, self.width, self.height]).astype(np.int32)
+
+    @property
     def bboxes_ar_fixed(self):
         """縦横比を補正したbboxesを返す。(prior box算出など用)"""
         assert self.width > 0 and self.height > 0
@@ -71,6 +76,13 @@ class ObjectsAnnotation(object):
         elif k == 3:
             self.bboxes = self.bboxes[:, [1, 0, 3, 2]]
             self.bboxes[:, [0, 2]] = 1 - self.bboxes[:, [2, 0]]
+
+    def to_str(self, class_names):
+        """表示用の文字列化"""
+        a = [f'({x1}, {y1}) [{x2 - x1} x {y2 - y1}]: {class_names[c]}'
+             for (x1, y1, x2, y2), c
+             in sorted(zip(self.real_bboxes, self.classes), key=lambda x: _rbb_sortkey(x[0]))]
+        return '\n'.join(a)
 
 
 class ObjectsPrediction(object):
@@ -115,6 +127,18 @@ class ObjectsPrediction(object):
                 return False  # クラスが不一致
 
         return True  # OK
+
+    def get_real_bboxes(self, width, height):
+        """実ピクセル数換算のbboxesを返す。"""
+        return np.round(self.bboxes * [width, height, width, height]).astype(np.int32)
+
+    def to_str(self, width, height, class_names, conf_threshold=0):
+        """表示用の文字列化"""
+        a = [f'({x1}, {y1}) [{x2 - x1} x {y2 - y1}]: {class_names[c]}'
+             for (x1, y1, x2, y2), c, cf
+             in sorted(zip(self.get_real_bboxes(width, height), self.classes, self.confs), key=lambda x: _rbb_sortkey(x[0]))
+             if cf >= conf_threshold]
+        return '\n'.join(a)
 
 
 def listup_classification(dirpath, class_names=None):
@@ -731,3 +755,9 @@ def plot_objects(base_image, classes, confs, bboxes, class_names, conf_threshold
         cv2.putText(img, text, (xmin + 5, ymin), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 0), 1)
 
     return img
+
+
+def _rbb_sortkey(bb):
+    """real_bboxesのソートキーを作って返す。"""
+    x1, y1, x2, y2 = bb
+    return f'{y1:05d}-{x1:05d}-{y2:05d}-{x2:05d}'

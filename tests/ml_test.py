@@ -6,6 +6,20 @@ import pytest
 import pytoolkit as tk
 
 
+def test_to_str():
+    class_names = ['class00', 'class01', 'class02']
+    y = tk.ml.ObjectsAnnotation(
+        'path/to/dummy.jpg', 100, 100,
+        np.array([1, 2]),
+        np.array([[0.900, 0.900, 1.000, 1.000], [0.000, 0.000, 0.200, 0.200]]))
+    p = tk.ml.ObjectsPrediction(
+        np.array([1, 0, 2]),
+        np.array([0.8, 0.1, 0.8]),
+        np.array([[0.900, 0.900, 1.000, 1.000], [0, 0, 1, 1], [0.000, 0.000, 0.200, 0.200]]))
+    assert y.to_str(class_names) == '(0, 0) [20 x 20]: class02\n(90, 90) [10 x 10]: class01'
+    assert p.to_str(100, 100, class_names, 0.5) == '(0, 0) [20 x 20]: class02\n(90, 90) [10 x 10]: class01'
+
+
 def test_plot_objects():
     base_dir = pathlib.Path(__file__).resolve().parent
     data_dir = base_dir / 'data'
