@@ -31,3 +31,12 @@ def start_background_loop(fn, args=None, kwargs=None, interval=1):
     timer = threading.Timer(interval, _run)
     timer.start()
     atexit.register(_stop)
+
+
+def start_thread(fn, args=None, kwargs=None):
+    """作りっぱなしなスレッド。"""
+    args = args or []
+    kwargs = kwargs or {}
+    thread = threading.Thread(target=fn, args=args, kwargs=kwargs, daemon=False)
+    thread.start()
+    return thread
