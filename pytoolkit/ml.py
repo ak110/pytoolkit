@@ -65,6 +65,11 @@ class ObjectsAnnotation(object):
             bboxes[:, [0, 2]] *= self.width / self.height
         return bboxes
 
+    def plot(self, img, class_names, conf_threshold=0, max_long_side=None):
+        """ワクを描画した画像を作って返す。"""
+        return plot_objects(img, self.classes, None, self.bboxes, class_names,
+                            conf_threshold=conf_threshold, max_long_side=max_long_side)
+
     def rot90(self, k):
         """90度回転。"""
         assert 0 <= k <= 3
@@ -101,9 +106,10 @@ class ObjectsPrediction(object):
         """物体の数を返す。"""
         return len(self.classes)
 
-    def plot(self, img, class_names, conf_threshold=0):
+    def plot(self, img, class_names, conf_threshold=0, max_long_side=None):
         """ワクを描画した画像を作って返す。"""
-        return plot_objects(img, self.classes, self.confs, self.bboxes, class_names, conf_threshold)
+        return plot_objects(img, self.classes, self.confs, self.bboxes, class_names,
+                            conf_threshold=conf_threshold, max_long_side=max_long_side)
 
     def is_match(self, classes, bboxes, conf_threshold=0, iou_threshold=0.5):
         """classes/bboxesと過不足なく一致していたらTrueを返す。"""
@@ -714,11 +720,12 @@ def plot_cm(cm, to_file='confusion_matrix.png', classes=None, normalize=True, ti
     fig.clf()
 
 
-def plot_objects(base_image, classes, confs, bboxes, class_names, conf_threshold=0):
+def plot_objects(base_image, classes, confs, bboxes, class_names, conf_threshold=0, max_long_side=None):
     """画像＋オブジェクト([class_id + confidence + xmin/ymin/xmax/ymax]×n)を画像化する。
 
     # 引数
     - base_image: 元画像ファイルのパスまたはndarray
+    - max_long_side: 長辺の最大長(ピクセル数)。超えていたら縮小する。
     - classes: クラスIDのリスト
     - confs: confidenceのリスト (None可)
     - bboxes: xmin/ymin/xmax/ymaxのリスト (それぞれ0.0 ～ 1.0)
@@ -737,6 +744,8 @@ def plot_objects(base_image, classes, confs, bboxes, class_names, conf_threshold
         assert 0 <= np.max(classes) < len(class_names)
 
     img = ndimage.load(base_image, grayscale=False)
+    if max_long_side is not None and max(*img.shape[:2]) > max_long_side:
+        img = ndimage.resize_long_side(img, max_long_side)
     colors = draw.get_colors(len(class_names) if class_names is not None else 1)
 
     for classid, conf, bbox in zip(classes, confs, bboxes):
