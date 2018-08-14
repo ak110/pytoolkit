@@ -20,6 +20,7 @@ def get_custom_objects():
         serial_grid_pooling_2d(),
         parallel_grid_pooling_2d(),
         parallel_grid_gather(),
+        subpixel_conv2d(),
         nms(),
     ]
     return {c.__name__: c for c in classes}
@@ -642,6 +643,45 @@ def parallel_grid_gather():
             return dict(list(base_config.items()) + list(config.items()))
 
     return ParallelGridGather
+
+
+def subpixel_conv2d():
+    """Sub-Pixel Convolutional Layer。
+
+    ■ Real-Time Single Image and Video Super-Resolution Using an Efficient Sub-Pixel Convolutional Neural Network
+    https://arxiv.org/abs/1609.05158
+
+    """
+
+    import keras
+    import tensorflow as tf
+
+    class SubpixelConv2D(keras.layers.Layer):
+        """Sub-Pixel Convolutional Layer。
+
+        ■ Real-Time Single Image and Video Super-Resolution Using an Efficient Sub-Pixel Convolutional Neural Network
+        https://arxiv.org/abs/1609.05158
+
+        """
+
+        def __init__(self, scale, **kargs):
+            super().__init__(**kargs)
+            self.scale = scale
+
+        def compute_output_shape(self, input_shape):
+            assert len(input_shape) == 4
+            assert input_shape[-1] % (self.scale ** 2) == 0
+            return input_shape[0], input_shape[1] * self.scale, input_shape[2] * self.scale, input_shape[3] // (self.scale ** 2)
+
+        def call(self, inputs, **kwargs):
+            return tf.depth_to_space(inputs, self.scale)
+
+        def get_config(self):
+            config = {'scale': self.scale}
+            base_config = super().get_config()
+            return dict(list(base_config.items()) + list(config.items()))
+
+    return SubpixelConv2D
 
 
 def nms():
