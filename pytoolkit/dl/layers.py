@@ -50,6 +50,7 @@ def preprocess():
                 return inputs / 255.
             else:
                 assert False
+                return None
 
         def get_config(self):
             config = {'mode': self.mode}
