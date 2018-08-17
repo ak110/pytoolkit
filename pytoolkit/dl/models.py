@@ -334,14 +334,16 @@ def count_network_depth(model):
 
 
 @log.trace()
-def load_model(filepath, compile=True):  # pylint: disable=W0622
+def load_model(filepath, compile=True, custom_objects=None):  # pylint: disable=W0622
     """モデルの読み込み。
 
     `keras.models.load_model()` + `tk.dl.get_custom_objects()`
     """
     from . import dl
     import keras
-    return keras.models.load_model(filepath, custom_objects=dl.get_custom_objects(), compile=compile)
+    custom_objects = custom_objects or {}
+    custom_objects.update(dl.get_custom_objects())
+    return keras.models.load_model(filepath, custom_objects=custom_objects, compile=compile)
 
 
 @log.trace()
