@@ -154,9 +154,9 @@ class Model(object):
             cb.append(keras.callbacks.LearningRateScheduler(lambda epoch, lr: lr_list[epoch]))
         elif cosine_annealing:
             assert reduce_lr_epoch_rates is None
-            cb.append(callbacks.cosine_annealing())
+            cb.append(callbacks.cosine_annealing(epochs=epochs))
         elif reduce_lr_epoch_rates is not None and len(reduce_lr_epoch_rates) >= 1:
-            cb.append(callbacks.learning_rate(reduce_epoch_rates=reduce_lr_epoch_rates, factor=reduce_lr_factor))
+            cb.append(callbacks.learning_rate(reduce_epoch_rates=reduce_lr_epoch_rates, factor=reduce_lr_factor, epochs=epochs))
         if hvd.initialized() and hvd.get().size() > 1:
             cb.append(hvd.get().callbacks.BroadcastGlobalVariablesCallback(0))
             cb.append(hvd.get().callbacks.MetricAverageCallback())

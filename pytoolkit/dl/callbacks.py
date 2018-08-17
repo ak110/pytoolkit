@@ -10,22 +10,22 @@ from . import hvd
 from .. import draw, io, log
 
 
-def learning_rate(reduce_epoch_rates=(0.5, 0.75), factor=0.1, logger_name=None):
+def learning_rate(reduce_epoch_rates=(0.5, 0.75), factor=0.1, epochs=None):
     """よくある150epoch目と225epoch目に学習率を1/10するコールバックを作って返す。"""
     import keras
     import keras.backend as K
 
     class _LearningRate(keras.callbacks.Callback):
 
-        def __init__(self, reduce_epoch_rates, factor, logger_name):
+        def __init__(self, reduce_epoch_rates, factor, epochs):
             self.reduce_epoch_rates = reduce_epoch_rates
             self.factor = factor
-            self.logger_name = logger_name
+            self.epochs = epochs
             self.reduce_epochs = None
             super().__init__()
 
         def on_train_begin(self, logs=None):
-            epochs = self.params['epochs']
+            epochs = self.epochs or self.params['epochs']
             self.reduce_epochs = [min(max(int(epochs * r), 1), epochs) for r in self.reduce_epoch_rates]
             # 重複は禁止
             assert len(self.reduce_epochs) == len(np.unique(self.reduce_epochs)), f'reduce_epochsエラー: {self.reduce_epochs}'
@@ -37,13 +37,13 @@ def learning_rate(reduce_epoch_rates=(0.5, 0.75), factor=0.1, logger_name=None):
                 lr1 = K.get_value(self.model.optimizer.lr)
                 lr2 = lr1 * self.factor
                 K.set_value(self.model.optimizer.lr, lr2)
-                logger = log.get(self.logger_name or __name__)
+                logger = log.get(__name__)
                 logger.info(f'Epoch {epoch + 1}: Learning rate {lr1:.1e} -> {lr2:.1e}')
 
-    return _LearningRate(reduce_epoch_rates=reduce_epoch_rates, factor=factor, logger_name=logger_name)
+    return _LearningRate(reduce_epoch_rates=reduce_epoch_rates, factor=factor, epochs=epochs)
 
 
-def cosine_annealing(factor=0.01):
+def cosine_annealing(factor=0.01, epochs=None):
     """Cosine Annealing without restart。
 
     ■SGDR: Stochastic Gradient Descent with Warm Restarts
@@ -55,10 +55,11 @@ def cosine_annealing(factor=0.01):
 
     class _CosineAnnealing(keras.callbacks.Callback):
 
-        def __init__(self, factor):
+        def __init__(self, factor, epochs):
             self.factor = factor
             self.period = None
             self.start_lr = None
+            self.epochs = None
             super().__init__()
 
         def on_train_begin(self, logs=None):
@@ -67,11 +68,11 @@ def cosine_annealing(factor=0.01):
         def on_epoch_begin(self, epoch, logs=None):
             lr_max = self.start_lr
             lr_min = self.start_lr * self.factor
-            r = (epoch + 1) / self.params['epochs']
+            r = (epoch + 1) / (self.epochs or self.params['epochs'])
             lr = lr_min + 0.5 * (lr_max - lr_min) * (1 + np.cos(np.pi * r))
             K.set_value(self.model.optimizer.lr, float(lr))
 
-    return _CosineAnnealing(factor=factor)
+    return _CosineAnnealing(factor=factor, epochs=epochs)
 
 
 def learning_curve_plot(filename, metric='loss'):
@@ -178,6 +179,7 @@ def tsv_logger(filename, append=False):
 
         def on_train_end(self, logs=None):
             self.log_file.close()
+            self.append = True  # 同じインスタンスの再利用時は自動的に追記にする
 
     return _TSVLogger(filename=filename, append=append, enabled=enabled)
 
