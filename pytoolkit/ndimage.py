@@ -156,9 +156,9 @@ def resize_long_side(rgb: np.ndarray, long_side: int, interp='lanczos') -> np.nd
     """長辺の長さを指定したアスペクト比維持のリサイズ。"""
     height, width = rgb.shape[:2]
     if width >= height:  # 横長
-        return resize(rgb, long_side, height * long_side / width, interp=interp)
+        return resize(rgb, long_side, height * long_side // width, interp=interp)
     else:  # 縦長
-        return resize(rgb, width * long_side / height, long_side, interp=interp)
+        return resize(rgb, width * long_side // height, long_side, interp=interp)
 
 
 def resize(rgb: np.ndarray, width: int, height: int, padding=None, interp='lanczos') -> np.ndarray:
