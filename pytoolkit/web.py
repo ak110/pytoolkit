@@ -39,7 +39,7 @@ def register_csrf_token(app, session_key='_csrf_token', form_key='nonce', func_n
 
     def _csrf_protect():
         if flask.request.method == 'POST':
-            token = flask.session.pop(session_key, None)
+            token = flask.session.get(session_key, None)
             if not token or token != flask.request.form.get(form_key):
                 flask.abort(403)
 
