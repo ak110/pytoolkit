@@ -121,8 +121,9 @@ class RandomPadding(generator.Operator):
     この後のRandomCropを前提に、パディングするサイズは固定。
     """
 
-    def __init__(self, probability=1, padding_rate=0.125, with_output=False):
+    def __init__(self, mode='edge', probability=1, padding_rate=0.125, with_output=False):
         assert 0 < probability <= 1
+        self.mode = mode
         self.probability = probability
         self.padding_rate = padding_rate
         self.with_output = with_output
@@ -132,9 +133,9 @@ class RandomPadding(generator.Operator):
         if ctx.do_augmentation(rand, self.probability):
             padded_w = int(np.ceil(x.shape[1] * (1 + self.padding_rate)))
             padded_h = int(np.ceil(x.shape[0] * (1 + self.padding_rate)))
-            x = ndimage.pad(x, padded_w, padded_h, 'edge')
+            x = ndimage.pad(x, padded_w, padded_h, self.mode)
             if self.with_output and y is not None:
-                y = ndimage.pad(y, padded_w, padded_h, 'edge')
+                y = ndimage.pad(y, padded_w, padded_h, self.mode)
                 assert x.shape[1:3] == y.shape[1:3]
         return x, y, w
 
