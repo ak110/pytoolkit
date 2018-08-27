@@ -60,7 +60,7 @@ def _run(args):
         model = keras.models.Model(inputs=inp, outputs=x)
 
     gen = tk.image.ImageDataGenerator()
-    gen.add(tk.image.RandomPadding(probability=1))
+    gen.add(tk.image.Padding(probability=1))
     gen.add(tk.image.RandomRotate(probability=0.25))
     gen.add(tk.image.RandomCrop(probability=1))
     gen.add(tk.image.Resize(input_shape[:2]))

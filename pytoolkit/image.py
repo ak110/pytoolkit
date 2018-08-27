@@ -19,7 +19,7 @@ class ImageDataGenerator(generator.Generator):
     ```
     gen = tk.image.ImageDataGenerator()
     gen.add(tk.image.Resize((300, 300)))
-    gen.add(tk.image.RandomPadding(probability=1))
+    gen.add(tk.image.Padding(probability=1))
     gen.add(tk.image.RandomRotate(probability=0.25))
     gen.add(tk.image.RandomCrop(probability=1))
     gen.add(tk.image.Resize((300, 300)))
@@ -115,10 +115,10 @@ class Resize(generator.Operator):
         return x, y, w
 
 
-class RandomPadding(generator.Operator):
+class Padding(generator.Operator):
     """パディング。
 
-    この後のRandomCropを前提に、パディングするサイズは固定。
+    この後のRandomCropなどを前提に、上下左右に固定サイズでパディング。
     """
 
     def __init__(self, mode='edge', probability=1, padding_rate=0.125, with_output=False):
@@ -133,6 +133,28 @@ class RandomPadding(generator.Operator):
         if ctx.do_augmentation(rand, self.probability):
             padded_w = int(np.ceil(x.shape[1] * (1 + self.padding_rate)))
             padded_h = int(np.ceil(x.shape[0] * (1 + self.padding_rate)))
+            x = ndimage.pad(x, padded_w, padded_h, self.mode)
+            if self.with_output and y is not None:
+                y = ndimage.pad(y, padded_w, padded_h, self.mode)
+                assert x.shape[1:3] == y.shape[1:3]
+        return x, y, w
+
+
+class RandomPadding(generator.Operator):
+    """ランダムなパディング。"""
+
+    def __init__(self, mode='edge', probability=1, padding_rate=0.25, with_output=False):
+        assert 0 < probability <= 1
+        self.mode = mode
+        self.probability = probability
+        self.padding_rate = padding_rate
+        self.with_output = with_output
+
+    def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
+        assert not isinstance(y, ml.ObjectsAnnotation)  # 物体検出は今のところ未対応
+        if ctx.do_augmentation(rand, self.probability):
+            padded_w = int(np.ceil(x.shape[1] * (1 + rand.rand() * self.padding_rate)))
+            padded_h = int(np.ceil(x.shape[0] * (1 + rand.rand() * self.padding_rate)))
             x = ndimage.pad(x, padded_w, padded_h, self.mode)
             if self.with_output and y is not None:
                 y = ndimage.pad(y, padded_w, padded_h, self.mode)

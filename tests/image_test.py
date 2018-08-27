@@ -11,8 +11,7 @@ data_dir = base_dir / 'data'
 
 def _gen():
     gen = tk.image.ImageDataGenerator()
-    gen.add(tk.image.RandomAlpha(probability=0.5))
-    gen.add(tk.image.RandomPadding(probability=1))
+    gen.add(tk.image.Padding(probability=1))
     gen.add(tk.image.RandomRotate(probability=0.5))
     gen.add(tk.image.RandomCrop(probability=1))
     gen.add(tk.image.Resize((64, 64)))
