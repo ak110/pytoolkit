@@ -63,6 +63,11 @@ class Builder(object):
         import keras
         return self._conv(2, keras.layers.DepthwiseConv2D, None, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
+    def sepconv2d(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
+        """SeparableConv2D+BN+Act。"""
+        import keras
+        return self._conv(2, keras.layers.SeparableConv2D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+
     def _conv(self, rank, conv, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs):
         """ConvND+BN+Act。"""
         import keras
@@ -87,6 +92,9 @@ class Builder(object):
         if conv == keras.layers.DepthwiseConv2D:
             kwargs = {k.replace('kernel_', 'depthwise_'): v for k, v in kwargs.items()}
             args = args[1:]
+        elif conv == keras.layers.SeparableConv2D:
+            kwargs = {k.replace('kernel_', 'depthwise_'): v for k, v in kwargs.items()}
+            kwargs.update({k.replace('depthwise_', 'pointwise_'): v for k, v in kwargs.items() if k.startswith('depthwise_')})  # とりあえずdw/pwで同じにしとく
 
         if not kwargs['use_bias']:
             assert 'bias_initializer' not in kwargs

@@ -11,6 +11,7 @@ def get_custom_objects():
         channel_max(),
         resize2d(),
         pad2d(),
+        pad_channel_2d(),
         group_normalization(),
         destandarization(),
         stocastic_add(),
@@ -186,6 +187,44 @@ def pad2d():
             return dict(list(base_config.items()) + list(config.items()))
 
     return Pad2D
+
+
+def pad_channel_2d():
+    """チャンネルに対して`tf.pad`するレイヤー。"""
+    import keras
+    import keras.backend as K
+    import tensorflow as tf
+
+    class PadChannel2D(keras.layers.Layer):
+        """`tf.pad`するレイヤー。"""
+
+        def __init__(self, filters, mode='constant', constant_values=0, **kwargs):
+            assert mode in ('constant', 'reflect', 'symmetric')
+            super().__init__(**kwargs)
+            self.filters = filters
+            self.mode = mode
+            self.constant_values = constant_values
+
+        def compute_output_shape(self, input_shape):
+            assert len(input_shape) == 4
+            input_shape = list(input_shape)
+            input_shape[3] += self.filters
+            return tuple(input_shape)
+
+        def call(self, inputs, **kwargs):
+            padding = K.constant(((0, 0), (0, 0), (0, 0), (0, self.filters)), dtype='int32')
+            return tf.pad(inputs, padding, mode=self.mode, constant_values=self.constant_values, name=self.name)
+
+        def get_config(self):
+            config = {
+                'filters': self.filters,
+                'mode': self.mode,
+                'constant_values': self.constant_values,
+            }
+            base_config = super().get_config()
+            return dict(list(base_config.items()) + list(config.items()))
+
+    return PadChannel2D
 
 
 def group_normalization():
