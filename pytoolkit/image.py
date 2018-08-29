@@ -136,7 +136,7 @@ class Padding(generator.Operator):
             x = ndimage.pad(x, padded_w, padded_h, self.mode)
             if self.with_output and y is not None:
                 y = ndimage.pad(y, padded_w, padded_h, self.mode)
-                assert x.shape[1:3] == y.shape[1:3]
+                assert x.shape[:2] == y.shape[:2]
         return x, y, w
 
 
@@ -158,7 +158,7 @@ class RandomPadding(generator.Operator):
             x = ndimage.pad(x, padded_w, padded_h, self.mode)
             if self.with_output and y is not None:
                 y = ndimage.pad(y, padded_w, padded_h, self.mode)
-                assert x.shape[1:3] == y.shape[1:3]
+                assert x.shape[:2] == y.shape[:2]
         return x, y, w
 
 
@@ -179,7 +179,7 @@ class RandomRotate(generator.Operator):
             x = ndimage.rotate(x, degrees, expand=self.expand)
             if self.with_output and y is not None:
                 y = ndimage.rotate(y, degrees, expand=self.expand)
-                assert x.shape[1:3] == y.shape[1:3]
+                assert x.shape[:2] == y.shape[:2]
         return x, y, w
 
 
@@ -217,7 +217,7 @@ class RandomCrop(generator.Operator):
             x = ndimage.crop(x, crop_x, crop_y, cropped_w, cropped_h)
             if self.with_output and y is not None:
                 y = ndimage.crop(y, crop_x, crop_y, cropped_w, cropped_h)
-                assert x.shape[1:3] == y.shape[1:3]
+                assert x.shape[:2] == y.shape[:2]
         return x, y, w
 
 
