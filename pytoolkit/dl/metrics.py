@@ -1,6 +1,15 @@
 """Kerasのmetrics関連。"""
 
 
+def binary_accuracy(y_true, y_pred):
+    """Soft-targetとかでも一応それっぽい値を返すbinary accuracy。"""
+    import keras.backend as K
+    return K.mean(K.equal(K.round(y_true), K.round(y_pred)), axis=-1)
+
+
+binary_accuracy.__name__ = 'acc'  # 長いので名前変えちゃう
+
+
 def mean_iou(y_true, y_pred, threhsold=0.5):
     """mean IoU。"""
     import keras.backend as K
