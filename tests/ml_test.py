@@ -218,9 +218,9 @@ def test_od_confusion_matrix():
     cm_actual = tk.ml.od_confusion_matrix(y_true, y_pred, conf_threshold=0.5, num_classes=3)
     cm_expected = np.array([
         [0, 0, 0, 0],
-        [0, 1, 1, 0],
+        [0, 1, 0, 0],
         [0, 0, 0, 0],
-        [0, 1, 1, 0],
+        [0, 1, 2, 0],
     ], dtype=int)
     assert (cm_actual == cm_expected).all()
 
