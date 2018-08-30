@@ -72,19 +72,20 @@ def format_values(values: typing.Union[list, np.ndarray], padding_sign=True):
 
 
 def binorm_percent(p, positives, total):
-    """二項分布のp%信頼区間をパーセントの整数値で返す。
+    """二項分布のp%信頼区間をパーセントの整数値で返す。(「x±y%」形式)
 
-    色々適当に丸めて、最大値は99にした値。
+    色々適当に丸めてるので注意。
 
     - p: 有意水準(0.99など)
     - positives: 正解数など
     - total: 全件数
     """
     interval = binorm_interval(p, positives, total)
-    lower = int(np.floor(interval[0] * 100))
-    lower = max(lower, 0 if positives == 0 else 1)  # 正答0件のときのみ0%を許可
-    upper = min(int(np.floor(interval[1] * 100)), 99)  # 常に100%を不許可
-    return lower, upper
+    lower = interval[0] * 100
+    upper = interval[1] * 100
+    center = 100 * positives / total
+    width = max(upper - center, center - lower)
+    return int(np.floor(center)), int(np.ceil(width))
 
 
 def binorm_interval(p, positives, total):
