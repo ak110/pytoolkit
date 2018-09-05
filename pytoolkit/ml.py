@@ -203,12 +203,12 @@ def split(X, y, split_seed, validation_split=None, cv_count=None, cv_index=None,
         assert cv_count is None
         assert cv_index is None
         X_train, X_val, y_train, y_val = sklearn.model_selection.train_test_split(
-            X, y, test_size=validation_split, shuffle=True, random_state=split_seed, stratify=stratify)
+            X, y, test_size=validation_split, shuffle=True, random_state=split_seed, stratify=y if stratify else None)
     else:
         # cross validation
         assert cv_count is not None
         assert cv_index in range(cv_count)
-        train_indices, val_indices = cv_indices(stratify, y, cv_count, split_seed, X, cv_index)
+        train_indices, val_indices = cv_indices(X, y, cv_count, cv_index, split_seed, stratify)
         X_train, y_train = X[train_indices], y[train_indices]
         X_val, y_val = X[val_indices], y[val_indices]
     return (X_train, y_train), (X_val, y_val)
