@@ -1,6 +1,6 @@
 """Kerasのモデル関連。"""
 
-from . import callbacks, hvd, optimizers
+from . import callbacks, dl, hvd, optimizers
 from .. import draw, generator, log, utils
 
 
@@ -10,9 +10,21 @@ class Model(object):
     def __init__(self, model, gen: generator.Generator, batch_size, postprocess=None):
         import keras
         self.model: keras.models.Model = model
+        self.parent_model: keras.models.Model = model
         self.gen = gen
         self.batch_size = batch_size
         self.postprocess = postprocess
+
+    @classmethod
+    def load(cls, filepath, gen: generator.Generator, batch_size, postprocess=None,
+             compile=False, custom_objects=None, multi_gpu=False, gpus=None):   # pylint: disable=W0622
+        """モデルの読み込み。ついでにマルチGPU可も出来る。"""
+        with dl.device(cpu=multi_gpu, gpu=not multi_gpu):
+            network = load_model(filepath, compile=compile, custom_objects=custom_objects)
+        model = cls(network, gen, batch_size, postprocess)
+        if multi_gpu:
+            model.set_multi_gpu_model(gpus=gpus)
+        return model
 
     def load_weights(self, filepath, where_fn=None, strict_warnings=True):
         """重みの読み込み。
@@ -20,11 +32,11 @@ class Model(object):
         model.load_weights()は重みの形が違うと読み込めないが、
         警告を出しつつ読むようにしたもの。
         """
-        load_weights(self.model, filepath, where_fn, strict_warnings)
+        load_weights(self.parent_model, filepath, where_fn, strict_warnings)
 
     def set_multi_gpu_model(self, gpus=None):
         """マルチGPU化。"""
-        self.model, self.batch_size = multi_gpu_model(self.model, self.batch_size, gpus)
+        self.model, self.batch_size = multi_gpu_model(self.parent_model, self.batch_size, gpus)
 
     def freeze(self, predicate=lambda layer: True, skip_bn=False):
         """条件に一致するレイヤーをfreezeする。"""
@@ -211,7 +223,7 @@ class Model(object):
     def save(self, filepath, overwrite=True, include_optimizer=True):
         """pathlib対応＆hvd.is_master()な時のみなsave。"""
         if hvd.is_master():
-            self.model.save(str(filepath), overwrite=overwrite, include_optimizer=include_optimizer)
+            self.parent_model.save(str(filepath), overwrite=overwrite, include_optimizer=include_optimizer)
 
     @log.trace()
     def plot(self, to_file='model.png', show_shapes=False, show_layer_names=True, rankdir='TB'):
@@ -219,7 +231,7 @@ class Model(object):
         if hvd.is_master():
             import keras
             try:
-                keras.utils.plot_model(self.model, to_file=str(to_file),
+                keras.utils.plot_model(self.parent_model, to_file=str(to_file),
                                        show_shapes=show_shapes, show_layer_names=show_layer_names,
                                        rankdir=rankdir)
             except BaseException:
