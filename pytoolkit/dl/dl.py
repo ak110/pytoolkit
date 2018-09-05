@@ -59,8 +59,6 @@ def session(config=None, gpu_options=None, use_horovod=False):
             return self
 
         def __exit__(self, *exc_info):
-            if self.use_horovod and hvd.initialized():
-                hvd.barrier()  # 念のためタイミングを合わせる。
             if K.backend() == 'tensorflow':
                 K.clear_session()
 
