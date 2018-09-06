@@ -658,7 +658,7 @@ def print_classification_metrics(y_true, proba_pred, average='micro', print_fn=N
     true_type = sklearn.utils.multiclass.type_of_target(y_true)
     pred_type = sklearn.utils.multiclass.type_of_target(proba_pred)
     if true_type == 'binary':  # binary
-        assert pred_type in ('continuous', 'continuous-multioutput')
+        assert pred_type in ('binary', 'continuous', 'continuous-multioutput')
         if pred_type == 'continuous-multioutput':
             assert proba_pred.shape == (len(proba_pred), 2), f'Shape error: {proba_pred.shape}'
             proba_pred = proba_pred[:, 1]
