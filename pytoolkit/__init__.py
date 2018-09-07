@@ -2,6 +2,7 @@
 
 from .utils import *
 from . import applications
+from . import cache
 from . import data
 from . import dl
 from . import db
