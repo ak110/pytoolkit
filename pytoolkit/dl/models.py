@@ -19,6 +19,12 @@ class Model(object):
     def load(cls, filepath, gen: generator.Generator, batch_size, postprocess=None,
              compile=False, custom_objects=None, multi_gpu=False, gpus=None):   # pylint: disable=W0622
         """モデルの読み込み。ついでにマルチGPU可も出来る。"""
+        if multi_gpu:
+            if gpus is None:
+                gpus = utils.get_gpu_count()
+                log.get(__name__).info(f'gpu count = {gpus}')
+            if gpus <= 1:  # GPUが1個しか無ければマルチGPUできない
+                multi_gpu = False
         with dl.device(cpu=multi_gpu, gpu=not multi_gpu):
             network = load_model(filepath, compile=compile, custom_objects=custom_objects)
         model = cls(network, gen, batch_size, postprocess)
