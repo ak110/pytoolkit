@@ -73,21 +73,8 @@ class Operator(metaclass=abc.ABCMeta):
         return x, y, w
 
 
-class Generator(object):
-    """`fit_generator`などに渡すgeneratorを作るためのベースクラス。"""
-
-    def __init__(self, multiple_input=False, multiple_output=False, profile=False):
-        self.multiple_input = multiple_input
-        self.multiple_output = multiple_output
-        self.profile = profile
-        self.profile_data = {}
-        self.operators = []
-
-    def add(self, operator: Operator, input_index=None, output_index=None):
-        """Operatorの追加。"""
-        if input_index is not None or output_index is not None:
-            operator = _TargetOperator(operator, input_index, output_index)
-        self.operators.append(operator)
+class SimpleGenerator(object):
+    """`fit_generator`などに渡すgeneratorを作るためのクラス。特にデータを変換しないシンプル版。"""
 
     def flow(self, X, y=None, weights=None, batch_size=32, shuffle=False, data_augmentation=False, random_state=None, balanced=False):
         """`fit_generator`などに渡すgeneratorと、1epochあたりのステップ数を返す。
@@ -101,14 +88,16 @@ class Generator(object):
         return self._generator(ctx), ctx.steps_per_epoch
 
     def _generator(self, ctx):
-        """generator。"""
-        cpu_count = os.cpu_count()
-        worker_count = min(ctx.batch_size, cpu_count * 3)
-        with joblib.Parallel(n_jobs=worker_count, backend='threading') as parallel:
-            for indices, seeds in self._flow_batch(ctx):
-                batch = [joblib.delayed(self._work, check_pickle=False)(ix, seed, ctx) for ix, seed in zip(indices, seeds)]
-                rx, ry, rw = zip(*parallel(batch))
-                yield _get_result(ctx.y is not None, ctx.weights is not None, rx, ry, rw, self.multiple_input, self.multiple_output)
+        """`fit_generator`などに渡すgenerator。"""
+        for indices, _ in self._flow_batch(ctx):
+            rx, ry, rw = _pick_next(indices, ctx.X, ctx.y, ctx.weights)
+            if ctx.weights is not None:
+                assert ctx.y is not None
+                yield rx, ry, rw
+            elif ctx.y is not None:
+                yield rx, ry
+            else:
+                yield rx
 
     def _flow_batch(self, ctx):
         """データのindexとseedをバッチサイズずつ列挙し続けるgenerator。"""
@@ -138,12 +127,40 @@ class Generator(object):
                     seeds = []
         else:
             # シャッフル無し: 1epoch分でぴったり終わるようにする (predict_generatorとか用)
-            steps = self.steps_per_epoch(ctx.data_count, ctx.batch_size)
+            steps = ctx.steps_per_epoch
             indices = np.arange(ctx.data_count)
             while True:
                 seeds = ctx.random_state.randint(0, 2 ** 31, size=(len(indices),))
                 for batch_indices in np.array_split(indices, steps):
                     yield batch_indices, seeds[batch_indices]
+
+
+class Generator(SimpleGenerator):
+    """`fit_generator`などに渡すgeneratorを作るためのクラス。"""
+
+    def __init__(self, multiple_input=False, multiple_output=False, profile=False):
+        self.multiple_input = multiple_input
+        self.multiple_output = multiple_output
+        self.profile = profile
+        self.profile_data = {}
+        self.operators = []
+        super().__init__()
+
+    def add(self, operator: Operator, input_index=None, output_index=None):
+        """Operatorの追加。"""
+        if input_index is not None or output_index is not None:
+            operator = _TargetOperator(operator, input_index, output_index)
+        self.operators.append(operator)
+
+    def _generator(self, ctx):
+        """`fit_generator`などに渡すgenerator。"""
+        cpu_count = os.cpu_count()
+        worker_count = min(ctx.batch_size, cpu_count * 3)
+        with joblib.Parallel(n_jobs=worker_count, backend='threading') as parallel:
+            for indices, seeds in self._flow_batch(ctx):
+                batch = [joblib.delayed(self._work, check_pickle=False)(ix, seed, ctx) for ix, seed in zip(indices, seeds)]
+                rx, ry, rw = zip(*parallel(batch))
+                yield _get_result(ctx.y is not None, ctx.weights is not None, rx, ry, rw, self.multiple_input, self.multiple_output)
 
     def _work(self, ix, seed, ctx: GeneratorContext):
         """1件1件の処理。"""
@@ -185,11 +202,6 @@ class Generator(object):
                 x_, y_, w_ = op.execute(x_, y_, w_, rand, ctx)
         return x_, y_, w_
 
-    @staticmethod
-    def steps_per_epoch(data_count, batch_size):
-        """1epochが何ステップかを算出して返す"""
-        return (data_count + batch_size - 1) // batch_size
-
     def summary_profile(self, print_fn=print):
         """プロファイル結果のサマリ表示。"""
         assert self.profile
@@ -228,7 +240,7 @@ def _get_result(has_y, has_weights, rx, ry, rw, multiple_input, multiple_output)
         return np.asarray(arr)
 
     if has_y and has_weights:
-        return _get(rx, multiple_input), _get(ry, multiple_output), np.array(rw)
+        return _get(rx, multiple_input), _get(ry, multiple_output), np.asarray(rw)
     elif has_y:
         return _get(rx, multiple_input), _get(ry, multiple_output)
     else:
