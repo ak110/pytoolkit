@@ -142,6 +142,9 @@ class ObjectDetector(object):
             if y_val is not None:
                 self.pb.check_prior_boxes(y_val)
         hvd.barrier()
+        # データに合わせたパラメータの調整
+        rbb = np.concatenate([y.real_bboxes for y in y_train])
+        min_object_px = min(min_object_px, np.min(rbb[:, 2:] - rbb[:, :2]))
         # モデルの作成
         network, lr_multipliers = od_net.create_network(
             pb=self.pb, mode='train', strict_nms=None,
