@@ -409,7 +409,7 @@ def mixup(gen1, gen2, alpha=0.2, beta=0.2, random_state=None):
         assert len(b2) in (2, 3)
         assert len(b1) == len(b2)
         # 混ぜる
-        m = random_state.beta(alpha, beta)
+        m = np.float32(random_state.beta(alpha, beta))
         assert 0 <= m <= 1
         b = []
         for x1, x2 in zip(b1, b2):
