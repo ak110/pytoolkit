@@ -162,22 +162,46 @@ class Builder(object):
         seq.append(self.conv2d(filters, use_act=False, name=f'{name}_conv2' if name else None))
         return Sequence(seq, keras.layers.Add(name=f'{name}_add' if name else None))
 
+    def scse_block(self, filters, name=None):
+        """Concurrent Spatial and Channel Squeeze & Excitation block
+
+        https://arxiv.org/abs/1803.02579
+        """
+        import keras
+        sse = self.sse_block(name=f'{name}_sse' if name else None)
+        cse = self.se_block(filters, name=f'{name}_cse' if name else None)
+        return Sequence([sse, cse], keras.layers.Add(name=f'{name}_add' if name else None), mode='parallel')
+
+    def sse_block(self, name=None):
+        """Channel Squeeze and Spatial Excitation block
+
+        https://arxiv.org/abs/1803.02579
+        """
+        import keras
+        reg = keras.regularizers.l2(1e-4)
+        seq = [
+            keras.layers.Conv2D(1, 1, activation='sigmoid', kernel_regularizer=reg,
+                                name=f'{name}_sq' if name else None),
+        ]
+        return Sequence(seq, keras.layers.Multiply(name=f'{name}_sr' if name else None))
+
     def se_block(self, filters, ratio=16, name=None):
-        """Squeeze-and-Excitation block
+        """Squeeze-and-Excitation block (Spatial Squeeze and Channel Excitation block)
 
         https://arxiv.org/abs/1709.01507
+        https://arxiv.org/abs/1803.02579
         """
         import keras
         reg = keras.regularizers.l2(1e-4)
         seq = [
             keras.layers.GlobalAveragePooling2D(name=f'{name}_p' if name else None),
-            self.dense(filters // ratio, use_bias=False, activation='relu', kernel_regularizer=reg,
-                       name=f'{name}_sq' if name else None),
-            self.dense(filters, use_bias=False, activation='sigmoid', kernel_regularizer=reg,
-                       name=f'{name}_ex' if name else None),
+            keras.layers.Dense(filters // ratio, activation='relu', kernel_regularizer=reg,
+                               name=f'{name}_sq' if name else None),
+            keras.layers.Dense(filters, activation='sigmoid', kernel_regularizer=reg,
+                               name=f'{name}_ex' if name else None),
             keras.layers.Reshape((1, 1, filters), name=f'{name}_r' if name else None),
         ]
-        return Sequence(seq, keras.layers.Multiply(name=f'{name}_s' if name else None))
+        return Sequence(seq, keras.layers.Multiply(name=f'{name}_cr' if name else None))
 
 
 class Sequence(object):
@@ -189,16 +213,22 @@ class Sequence(object):
 
     """
 
-    def __init__(self, seq, merge_layer=None):
+    def __init__(self, seq, merge_layer=None, mode='serial'):
+        assert mode in ('serial', 'parallel')
         self.seq = seq
         self.merge_layer = merge_layer
+        self.mode = mode
 
     def __call__(self, x):
         x_in = x
-        for layer in self.seq:
-            x = layer(x)
-        if self.merge_layer is not None:
-            x = self.merge_layer([x_in, x])
+        if self.mode == 'serial':
+            for layer in self.seq:
+                x = layer(x)
+            if self.merge_layer is not None:
+                x = self.merge_layer([x_in, x])
+        else:
+            assert self.merge_layer is not None
+            x = self.merge_layer([layer(x_in) for layer in self.seq])
         return x
 
     @property

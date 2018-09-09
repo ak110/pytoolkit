@@ -38,7 +38,7 @@ class GeneratorContext(object):
         """クラスIDの配列を返す。"""
         y_type = sklearn.utils.multiclass.type_of_target(self.y)
         if y_type == 'continuous':
-            return (self.y >= 0.5).astype(np.int32)  # binary
+            return np.round(self.y).astype(np.int32)  # binary
         elif y_type == 'continuous-multioutput':
             return self.y.argmax(axis=-1)  # multiclass
         elif y_type in ('binary', 'multiclass'):
