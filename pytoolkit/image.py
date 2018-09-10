@@ -153,9 +153,11 @@ class RandomPadding(generator.Operator):
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         assert not isinstance(y, ml.ObjectsAnnotation)  # 物体検出は今のところ未対応
         if ctx.do_augmentation(rand, self.probability):
-            padded_w = int(np.ceil(x.shape[1] * (1 + rand.rand() * self.padding_rate)))
-            padded_h = int(np.ceil(x.shape[0] * (1 + rand.rand() * self.padding_rate)))
-            x = ndimage.pad(x, padded_w, padded_h, self.mode)
+            pw = int(np.ceil(x.shape[1] * rand.rand() * self.padding_rate))
+            ph = int(np.ceil(x.shape[0] * rand.rand() * self.padding_rate))
+            px = rand.randint(0, pw + 1)
+            py = rand.randint(0, ph + 1)
+            x = ndimage.pad_ltrb(x, px, py, pw - px, ph - py, self.mode)
             if self.with_output and y is not None:
                 y = ndimage.pad(y, padded_w, padded_h, self.mode)
                 assert x.shape[:2] == y.shape[:2]

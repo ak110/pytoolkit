@@ -111,6 +111,7 @@ def pad(rgb: np.ndarray, width: int, height: int, padding='edge') -> np.ndarray:
 
 def pad_ltrb(rgb: np.ndarray, x1: int, y1: int, x2: int, y2: int, padding='edge'):
     """パディング。x1/y1/x2/y2は左/上/右/下のパディング量。"""
+    assert x1 >= 0 and y1 >= 0 and x2 >= 0 and y2 >= 0
     assert padding in ('edge', 'zero', 'half', 'one', 'reflect', 'wrap', 'mean')
     kwargs = {}
     if padding == 'zero':
