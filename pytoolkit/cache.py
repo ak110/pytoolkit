@@ -6,6 +6,8 @@ import pathlib
 
 import sklearn.externals.joblib as joblib
 
+from .dl import hvd
+
 
 def memorize(cache_dir, compress=0):
     """関数の戻り値をファイルにキャッシュするデコレーター。"""
@@ -19,9 +21,13 @@ def memorize(cache_dir, compress=0):
             if cache_path.is_file():
                 return joblib.load(cache_path)
             # 無ければ実処理
-            result = func(*args, **kwargs)
-            cache_path.parent.mkdir(parents=True, exist_ok=True)
-            joblib.dump(result, cache_path, compress=compress)
+            if hvd.is_local_master():
+                result = func(*args, **kwargs)
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                joblib.dump(result, cache_path, compress=compress)
+            hvd.barrier()
+            if not hvd.is_local_master():
+                result = joblib.load(cache_path)
             return result
 
         return _decorated_func
