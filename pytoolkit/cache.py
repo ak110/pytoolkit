@@ -7,7 +7,7 @@ import pathlib
 import sklearn.externals.joblib as joblib
 
 
-def memorize(cache_dir):
+def memorize(cache_dir, compress=0):
     """関数の戻り値をファイルにキャッシュするデコレーター。"""
     cache_dir = pathlib.Path(cache_dir)
 
@@ -21,7 +21,7 @@ def memorize(cache_dir):
             # 無ければ実処理
             result = func(*args, **kwargs)
             cache_path.parent.mkdir(parents=True, exist_ok=True)
-            joblib.dump(result, cache_path)
+            joblib.dump(result, cache_path, compress=compress)
             return result
 
         return _decorated_func
