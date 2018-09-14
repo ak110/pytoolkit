@@ -150,7 +150,7 @@ class Builder(object):
         import keras.backend as K
         return K.int_shape(x)
 
-    def res_block(self, filters, pre_bn=False, dropout=None, name=None):
+    def res_block(self, filters, pre_bn=False, dropout=None, se_block=False, name=None):
         """普通の(?)Residual Block。((3, 3) × 2)"""
         import keras
         seq = []
@@ -160,6 +160,8 @@ class Builder(object):
         if dropout:
             seq.append(keras.layers.Dropout(dropout, name=f'{name}_drop' if name else None))
         seq.append(self.conv2d(filters, use_act=False, name=f'{name}_conv2' if name else None))
+        if se_block:
+            seq.append(self.se_block(filters, name=f'{name}_se' if name else None))
         return Sequence(seq, keras.layers.Add(name=f'{name}_add' if name else None))
 
     def scse_block(self, filters, name=None):
