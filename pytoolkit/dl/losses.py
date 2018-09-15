@@ -58,6 +58,14 @@ def categorical_focal_loss(y_true, y_pred, alpha=0.25, gamma=2.0):
     return K.sum(K.pow(1 - y_pred, gamma) * y_true * K.log(y_pred) * class_weights, axis=-1)
 
 
+def lovasz_hinge(y_true, y_pred):
+    """Binary Lovasz hinge loss。"""
+    import keras.backend as K
+    from .lovasz_softmax import lovasz_losses_tf
+    logit = K.log(y_pred / (1 - y_pred + K.epsilon()))
+    return lovasz_losses_tf.lovasz_hinge(logit, y_true)
+
+
 def od_bias_initializer(nb_classes, pi=0.01):
     """Object Detectionの最後のクラス分類のbias_initializer。
 
