@@ -167,20 +167,21 @@ class RandomPadding(generator.Operator):
 class RandomRotate(generator.Operator):
     """回転。"""
 
-    def __init__(self, probability=1, degrees=15, expand=True, with_output=False):
+    def __init__(self, probability=1, degrees=15, expand=True, border_mode='edge', with_output=False):
         assert 0 < probability <= 1
         self.probability = probability
         self.degrees = degrees
         self.expand = expand
+        self.border_mode = border_mode
         self.with_output = with_output
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         assert not isinstance(y, ml.ObjectsAnnotation)  # 物体検出は今のところ未対応
         if ctx.do_augmentation(rand, self.probability):
             degrees = rand.uniform(-self.degrees, self.degrees)
-            x = ndimage.rotate(x, degrees, expand=self.expand)
+            x = ndimage.rotate(x, degrees, expand=self.expand, border_mode=self.border_mode)
             if self.with_output and y is not None:
-                y = ndimage.rotate(y, degrees, expand=self.expand)
+                y = ndimage.rotate(y, degrees, expand=self.expand, border_mode=self.border_mode)
                 assert x.shape[:2] == y.shape[:2]
         return x, y, w
 
