@@ -7,7 +7,7 @@ WEIGHTS_URL = 'https://github.com/ak110/object_detector/releases/download/v0.0.1
 WEIGHTS_HASH = '1a3857c961bcb77cd25ebbe0fcb346d4'
 
 
-def darknet53(include_top=False, input_shape=None, input_tensor=None, weights='imagenet'):
+def darknet53(include_top=False, input_shape=None, input_tensor=None, weights='imagenet', for_small=False):
     """Darknet53。"""
     import keras
     from . import yolov3
@@ -20,7 +20,7 @@ def darknet53(include_top=False, input_shape=None, input_tensor=None, weights='i
     assert not include_top  # Trueは未対応
     assert weights in (None, 'imagenet')
 
-    x = yolov3.darknet_body(input_tensor)
+    x = yolov3.darknet_body(input_tensor, for_small=for_small)
     inputs = keras.engine.get_source_inputs(input_tensor)
     model = keras.models.Model(inputs, x, name='darknet53')
 

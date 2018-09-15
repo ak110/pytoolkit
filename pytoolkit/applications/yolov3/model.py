@@ -36,11 +36,14 @@ def DarknetConv2D_BN_Leaky(*args, **kwargs):
         LeakyReLU(alpha=0.1))
 
 
-def resblock_body(x, num_filters, num_blocks):
+def resblock_body(x, num_filters, num_blocks, downsampling=True):
     '''A series of resblocks starting with a downsampling Convolution2D'''
     # Darknet uses left and top padding instead of 'same' mode
-    x = ZeroPadding2D(((1, 0), (1, 0)))(x)
-    x = DarknetConv2D_BN_Leaky(num_filters, (3, 3), strides=(2, 2))(x)
+    if downsampling:
+        x = ZeroPadding2D(((1, 0), (1, 0)))(x)
+        x = DarknetConv2D_BN_Leaky(num_filters, (3, 3), strides=(2, 2))(x)
+    else:
+        x = DarknetConv2D_BN_Leaky(num_filters, (3, 3))(x)
     for _ in range(num_blocks):
         y = compose(
             DarknetConv2D_BN_Leaky(num_filters // 2, (1, 1)),
@@ -49,10 +52,10 @@ def resblock_body(x, num_filters, num_blocks):
     return x
 
 
-def darknet_body(x):
+def darknet_body(x, for_small=False):
     '''Darknent body having 52 Convolution2D layers'''
     x = DarknetConv2D_BN_Leaky(32, (3, 3))(x)
-    x = resblock_body(x, 64, 1)
+    x = resblock_body(x, 64, 1, downsampling=not for_small)
     x = resblock_body(x, 128, 2)
     x = resblock_body(x, 256, 8)
     x = resblock_body(x, 512, 8)
