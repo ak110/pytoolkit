@@ -7,6 +7,7 @@ importしただけではkerasがimportされないように作っている。
 """
 
 from . import callbacks
+from . import backend
 from .dl import *
 from . import hvd
 from . import layers

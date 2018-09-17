@@ -2,6 +2,8 @@
 
 import numpy as np
 
+from . import backend
+
 
 def balanced_binary_crossentropy(y_true, y_pred, alpha=0.5):
     """αによるクラス間のバランス補正ありのbinary_crossentropy。
@@ -62,7 +64,7 @@ def lovasz_hinge(y_true, y_pred):
     """Binary Lovasz hinge loss。"""
     import keras.backend as K
     from .lovasz_softmax import lovasz_losses_tf
-    logit = K.log(y_pred / (1 - y_pred + K.epsilon()))
+    logit = backend.logit(y_pred)
     return lovasz_losses_tf.lovasz_hinge(logit, y_true)
 
 
