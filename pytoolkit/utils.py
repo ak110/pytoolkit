@@ -50,7 +50,10 @@ def get_gpu_count():
         if gpus == '-1':
             return 0
         return len(np.unique(gpus.split(',')))
-    return len(nvidia_smi('--list-gpus').strip().split('\n'))
+    try:
+        return len(nvidia_smi('--list-gpus').strip().split('\n'))
+    except FileNotFoundError:
+        return 0
 
 
 def create_gpu_pool(n_gpus=None, processes_per_gpu=1, initializer=None, initargs=None):
