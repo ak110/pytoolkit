@@ -687,6 +687,20 @@ def print_classification_metrics(y_true, proba_pred, average='micro', print_fn=N
         print_fn(f'Logloss:   {logloss:.3f}')
 
 
+def print_regression_metrics(y_true, y_pred, print_fn=None):
+    """回帰の指標色々を表示する。"""
+    print_fn = print_fn or log.get(__name__).info
+    y_mean = np.tile(np.mean(y_pred), len(y_true))
+    r2 = sklearn.metrics.r2_score(y_true, y_pred)
+    rmse = np.sqrt(sklearn.metrics.mean_squared_error(y_true, y_pred))
+    rmseb = np.sqrt(sklearn.metrics.mean_squared_error(y_true, y_mean))
+    mae = sklearn.metrics.mean_absolute_error(y_true, y_pred)
+    maeb = sklearn.metrics.mean_absolute_error(y_true, y_mean)
+    print_fn(f'R^2:  {r2:.3f}')
+    print_fn(f'RMSE: {rmse:.3f} (base: {rmseb:.3f})')
+    print_fn(f'MAE:  {mae:.3f} (base: {maeb:.3f})')
+
+
 def plot_cm(cm, to_file='confusion_matrix.png', classes=None, normalize=True, title='Confusion matrix'):
     """Confusion matrixを画像化する。
 
