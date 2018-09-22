@@ -18,24 +18,24 @@ _VOC_JSON_DATA = {
     "map_sizes": [40, 20, 10],
     "num_classes": 20,
     "pb_size_patterns": [
-        [1.2137997150421143, 1.6073973178863525],
-        [2.3104209899902344, 3.817656993865967],
-        [3.239943265914917, 7.371336936950684],
-        [5.479208946228027, 4.491170406341553],
-        [4.76220703125, 11.572043418884277],
-        [10.89842414855957, 5.794517517089844],
-        [7.733386993408203, 8.85787582397461],
-        [4.474754333496094, 16.686479568481445]
+        [1.2133152484893799, 1.6041910648345947],
+        [2.301241874694824, 3.812246322631836],
+        [3.2387468814849854, 7.3555989265441895],
+        [5.467498779296875, 4.480413436889648],
+        [4.758797645568848, 11.54628849029541],
+        [10.89200496673584, 5.788760185241699],
+        [7.736226558685303, 8.850168228149414],
+        [4.47715950012207, 16.65940284729004]
     ],
     "version": "0.0.2"
 }
 # PASCAL VOC 07+12 trainvalで学習したときの重みファイル
 _VOC_WEIGHTS_320_NAME = 'pytoolkit_od_voc_320.h5'
-_VOC_WEIGHTS_320_URL = 'https://github.com/ak110/object_detector/releases/download/v0.0.2/model.320.h5'
-_VOC_WEIGHTS_320_MD5 = 'a76081cb833dd301a381166ee14d574f'
+_VOC_WEIGHTS_320_URL = 'https://github.com/ak110/object_detector/releases/download/v1.0.0/pytoolkit_od_voc_320.h5'
+_VOC_WEIGHTS_320_MD5 = '2551e33a9ea8c29543a0fcc066d69a70'
 _VOC_WEIGHTS_640_NAME = 'pytoolkit_od_voc_640.h5'
-_VOC_WEIGHTS_640_URL = 'https://github.com/ak110/object_detector/releases/download/v0.0.2/model.640.h5'
-_VOC_WEIGHTS_640_MD5 = '2b6f424938267634d5a34b43afb54a1b'
+_VOC_WEIGHTS_640_URL = 'https://github.com/ak110/object_detector/releases/download/v1.0.0/pytoolkit_od_voc_640.h5'
+_VOC_WEIGHTS_640_MD5 = '6a230e7b046bbf3de9d9ed9d22cec7af'
 
 
 class ObjectDetector(object):
@@ -87,6 +87,7 @@ class ObjectDetector(object):
         - use_multi_gpu: 予測をマルチGPUで行うならTrue。
 
         """
+        input_size = tuple(input_size)
         assert input_size in ((320, 320), (640, 640))
         data = _VOC_JSON_DATA.copy()
         data['input_size'] = input_size
