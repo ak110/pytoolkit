@@ -62,10 +62,16 @@ def categorical_focal_loss(y_true, y_pred, alpha=0.25, gamma=2.0):
 
 def lovasz_hinge(y_true, y_pred):
     """Binary Lovasz hinge loss。"""
-    import keras.backend as K
     from .lovasz_softmax import lovasz_losses_tf
     logit = backend.logit(y_pred)
     return lovasz_losses_tf.lovasz_hinge(logit, y_true)
+
+
+def lovasz_hinge_elup1(y_true, y_pred):
+    """Binary Lovasz hinge loss。(elu+1)"""
+    from .lovasz_softmax import lovasz_losses_tf
+    logit = backend.logit(y_pred)
+    return lovasz_losses_tf.lovasz_hinge(logit, y_true, elup1=True)
 
 
 def od_bias_initializer(nb_classes, pi=0.01):
