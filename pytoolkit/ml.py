@@ -148,6 +148,18 @@ class ObjectsPrediction(object):
              if cf >= conf_threshold]
         return '\n'.join(a)
 
+    def crop(self, img, conf_threshold=0):
+        """Bounding boxで切り出した画像を返す。"""
+        img = ndimage.load(img, grayscale=False)
+        height, width = img.shape[:2]
+        return [
+            ndimage.crop(img, x1, y1, x2 - x1, y2 - y1)
+            for (x1, y1, x2, y2), cf
+            in zip(self.get_real_bboxes(width, height), self.confs)
+            if cf >= conf_threshold
+        ]
+
+
 
 def listup_classification(dirpath, class_names=None):
     """画像分類でよくある、クラス名ディレクトリの列挙。クラス名の配列, X, yを返す。"""

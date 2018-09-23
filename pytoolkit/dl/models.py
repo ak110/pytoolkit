@@ -1,4 +1,6 @@
 """Kerasのモデル関連。"""
+import pathlib
+import typing
 
 from . import callbacks, dl, hvd, optimizers
 from .. import draw, generator, log, utils
@@ -226,7 +228,7 @@ class Model(object):
                                              use_multiprocessing=use_multiprocessing)
 
     @log.trace()
-    def save(self, filepath, overwrite=True, include_optimizer=True):
+    def save(self, filepath: typing.Union[str, pathlib.Path], overwrite=True, include_optimizer=True):
         """pathlib対応＆hvd.is_master()な時のみなsave。"""
         if hvd.is_master():
             self.parent_model.save(str(filepath), overwrite=overwrite, include_optimizer=include_optimizer)

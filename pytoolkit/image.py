@@ -26,7 +26,7 @@ class ImageDataGenerator(generator.Generator):
     gen.add(tk.image.RandomFlipLR(probability=0.5))
     gen.add(tk.image.RandomColorAugmentors())
     gen.add(tk.image.RandomErasing(probability=0.5))
-    gen.add(tk.generator.ProcessInput(tk.image.preprocess_input_abs1))
+    gen.add(tk.image.Preprocess(mode='tf'))
     gen.add(tk.generator.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
     ```
 
@@ -159,7 +159,7 @@ class RandomPadding(generator.Operator):
             py = rand.randint(0, ph + 1)
             x = ndimage.pad_ltrb(x, px, py, pw - px, ph - py, self.mode)
             if self.with_output and y is not None:
-                y = ndimage.pad(y, padded_w, padded_h, self.mode)
+                y = ndimage.pad_ltrb(y, px, py, pw - px, ph - py, self.mode)
                 assert x.shape[:2] == y.shape[:2]
         return x, y, w
 
@@ -895,4 +895,32 @@ class RotationsLearning(generator.Operator):
         x = ndimage.rot90(x, k)
         y = np.zeros((4,))
         y[k] = 1
+        return x, y, w
+
+
+class Preprocess(generator.Operator):
+    """画像データの前処理。
+
+    # 引数
+
+    - mode: 'none', 'caffe', 'tf', 'torch', 'div255'
+    """
+
+    def __init__(self, mode='tf'):
+        assert mode in ('none', 'caffe', 'tf', 'torch', 'div255')
+        self.mode = mode
+
+    def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
+        """処理。"""
+        assert rand is not None  # noqa
+        if self.mode == 'none':
+            pass
+        elif self.mode == 'caffe':
+            x = x[..., ::-1] + np.array([-103.939, -116.779, -123.68])
+        elif self.mode == 'tf':
+            x = (x / 127.5) - 1
+        elif self.mode == 'torch':
+            x = ((x / 255.) + np.array([-0.485, -0.456, -0.406])) / np.array([0.229, 0.224, 0.225])
+        elif self.mode == 'div255':
+            x = x / 255.
         return x, y, w

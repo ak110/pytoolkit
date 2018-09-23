@@ -32,7 +32,7 @@ def _main():
     gen.add(tk.image.RandomRotate90(probability=1))
     gen.add(tk.image.RandomColorAugmentors())
     gen.add(tk.image.RandomErasing(probability=0.5))
-    gen.add(tk.generator.ProcessInput(lambda x: x))
+    gen.add(tk.image.Preprocess(mode='none'))
     gen.add(tk.generator.ProcessOutput(tk.ml.to_categorical(10), batch_axis=True))
 
     X = np.array([data_dir / '9ab919332a1dceff9a252b43c0fb34a0_m.jpg'] * 16)
