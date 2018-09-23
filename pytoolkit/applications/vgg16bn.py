@@ -1,7 +1,5 @@
 """VGG16にBNを加えたもの。"""
 
-from ..dl import hvd
-
 
 def vgg16bn(include_top=False, input_shape=None, input_tensor=None, weights='imagenet'):
     """VGG16にBNを加えたもの。"""
@@ -61,4 +59,5 @@ def vgg16bn(include_top=False, input_shape=None, input_tensor=None, weights='ima
 
 def preprocess_input(x):
     """前処理。"""
-    return x / 255
+    import keras
+    return keras.applications.vgg16.preprocess_input(x)
