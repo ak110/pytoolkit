@@ -200,7 +200,7 @@ class ObjectDetector(object):
     def save_weights(self, path: typing.Union[str, pathlib.Path]):
         """重みの保存。(学習後用)"""
         assert self.model is not None
-        self.model.save(path)
+        self.model.save(path, include_optimizer=False)
 
     def load_weights(self, weights: typing.Union[str, pathlib.Path], batch_size,
                      keep_aspect=False, strict_nms=True, use_multi_gpu=True):
