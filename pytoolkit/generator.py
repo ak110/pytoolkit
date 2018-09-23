@@ -264,7 +264,10 @@ class _TargetOperator(Operator):
     def execute(self, x, y, w, rand, ctx: GeneratorContext):
         """処理。"""
         x_ref = x if self.input_index is None else x[self.input_index]
-        y_ref = y if self.output_index is None else y[self.output_index]
+        if y is None:
+            y_ref = None
+        else:
+            y_ref = y if self.output_index is None else y[self.output_index]
 
         x_ref, y_ref, w = self.operator.execute(x_ref, y_ref, w, rand, ctx)
 
@@ -274,7 +277,7 @@ class _TargetOperator(Operator):
             x[self.input_index] = x_ref
         if self.output_index is None:
             y = y_ref
-        else:
+        elif y is not None:
             y[self.output_index] = y_ref
         return x, y, w
 
