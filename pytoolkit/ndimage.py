@@ -16,45 +16,52 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
     やや余計なお世話だけど今後のためにfloat32に変換して返す。
     """
     import cv2
+
+    # ndarrayならそのまま画像扱い
     if isinstance(path_or_array, np.ndarray):
-        # ndarrayならそのまま画像扱い
         img = np.copy(path_or_array)  # 念のためコピー
-        if grayscale and len(img.shape) == 2:
-            img = np.expand_dims(img, axis=-1)
-        assert len(img.shape) == 3
-        return img.astype(np.float32)
-
-    if isinstance(path_or_array, (str, pathlib.Path)):
-        # ファイルパスならOpenCVで読み込み (Pillowより早いので)
-        flags = cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR
-        img = cv2.imread(str(path_or_array), flags)
-        if img is None:
-            suffix = (pathlib.Path(path_or_array).suffix or '').lower()
-            if suffix == '.gif':
-                gif = cv2.VideoCapture(str(path_or_array))
-                assert gif is not None, f'Load error: {path_or_array}'
-                _, img = gif.read()
-            elif suffix == '.npy':
-                img = np.load(str(path_or_array))
-                assert img.shape[-1] == (1 if grayscale else 3)
-            assert img is not None, f'Load error: {path_or_array}'
-        if grayscale:
-            img = np.expand_dims(img, axis=-1)
+    else:
+        suffix = pathlib.Path(path_or_array).suffix.lower() if isinstance(path_or_array, (str, pathlib.Path)) else None
+        # .npyなら読み込んでそのまま画像扱い
+        if suffix == '.npy':
+            img = np.load(str(path_or_array))
         else:
-            img = img[:, :, ::-1]
-        return img.astype(np.float32)
+            # OpenCVで読み込む
+            flags = cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR
+            img = opencv_imread(path_or_array, flags)
+            if not grayscale:
+                img = img[:, :, ::-1]  # BGR to RGB
 
-    # file-like objectならPillowで読み込み (OpenCVは未対応なので)
-    import PIL.Image
-    with PIL.Image.open(path_or_array) as pil:
-        target_mode = 'L' if grayscale else 'RGB'
-        if pil.mode != target_mode:
-            pil = pil.convert(target_mode)
-        img = np.asarray(pil)
-        return img.astype(np.float32)
+    if img is None:
+        raise ValueError(f'Image load failed: {path_or_array}')
+
+    if grayscale and len(img.shape) == 2:
+        img = np.expand_dims(img, axis=-1)
+    assert len(img.shape) == 3
+    return img.astype(np.float32)
 
 
-def save(path: typing.Union[str, pathlib.Path], img: np.ndarray) -> None:
+def opencv_imread(file, flags=None):
+    """日本語パス対応＆動画対応のOpenCVによる画像読み込み。"""
+    import cv2
+    if flags is None:
+        flags = cv2.IMREAD_COLOR
+    try:
+        # 日本語パスやfile-like object対応のためまずnumpyで読む
+        file = str(file) if isinstance(file, pathlib.Path) else file
+        arr = np.fromfile(file, np.uint8)
+        # OpenCVでデコード
+        img = cv2.imdecode(arr, flags)
+        if img is None:
+            # 読めなかった場合は動画として試してみる。(GIFファイル用。先頭フレームを取得。)
+            video = cv2.VideoCapture(arr)
+            _, img = video.read()
+        return img
+    except BaseException:
+        return None
+
+
+def save(path: typing.Union[str, pathlib.Path], img: np.ndarray):
     """画像の保存。
 
     やや余計なお世話だけど0～255にクリッピング(飽和)してから保存。
@@ -68,6 +75,21 @@ def save(path: typing.Union[str, pathlib.Path], img: np.ndarray) -> None:
     path = pathlib.Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     cv2.imwrite(str(path), img)
+
+
+def opencv_imwrite(path, img, params=None):
+    """日本語パス対応のOpenCVによる画像保存。"""
+    import cv2
+    try:
+        path = pathlib.Path(path)
+        result, arr = cv2.imencode(path.suffix, img, params)
+        if not result:
+            return False
+        with path.open('wb') as f:
+            arr.tofile(f)
+        return True
+    except BaseException:
+        return False
 
 
 def rotate(rgb: np.ndarray, degrees: float, expand=True, interp='lanczos', border_mode='edge') -> np.ndarray:
