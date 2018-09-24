@@ -12,6 +12,7 @@ def get_custom_objects():
         resize2d(),
         pad2d(),
         pad_channel_2d(),
+        channel_pair_2d(),
         group_normalization(),
         destandarization(),
         stocastic_add(),
@@ -225,6 +226,24 @@ def pad_channel_2d():
             return dict(list(base_config.items()) + list(config.items()))
 
     return PadChannel2D
+
+
+def channel_pair_2d():
+    """チャンネル同士の2個の組み合わせの積。"""
+    import keras
+    import keras.backend as K
+
+    class ChannelPair2D(keras.layers.Layer):
+        """チャンネル同士の2個の組み合わせの積。"""
+
+        def call(self, inputs, **kwargs):
+            ch = K.int_shape(inputs)[-1]
+            return K.concatenate([inputs[..., i:i + 1] * inputs[..., i + 1:] for i in range(ch - 1)], axis=-1)
+
+        def compute_output_shape(self, input_shape):
+            return input_shape[:-1] + ((input_shape[-1] * (input_shape[-1] - 1) // 2),)
+
+    return ChannelPair2D
 
 
 def group_normalization():
