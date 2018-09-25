@@ -28,9 +28,15 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
         else:
             # OpenCVで読み込む
             flags = cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR
-            img = opencv_imread(path_or_array, flags)
-            if not grayscale:
-                img = img[:, :, ::-1]  # BGR to RGB
+            img = opencv_imread_rgb(path_or_array, flags)
+            # 読めなければ更にPILへフォールバック (一応念のため。。)
+            if img is None:
+                import PIL.Image
+                with PIL.Image.open(path_or_array) as pil_img:
+                    target_mode = 'L' if grayscale else 'RGB'
+                    if pil_img.mode != target_mode:
+                        pil_img = pil_img.convert(target_mode)
+                    img = np.asarray(pil_img)
 
     if img is None:
         raise ValueError(f'Image load failed: {path_or_array}')
@@ -41,7 +47,7 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
     return img.astype(np.float32)
 
 
-def opencv_imread(file, flags=None):
+def opencv_imread_rgb(file, flags=None):
     """日本語パス対応＆動画対応のOpenCVによる画像読み込み。"""
     import cv2
     if flags is None:
@@ -54,8 +60,11 @@ def opencv_imread(file, flags=None):
         img = cv2.imdecode(arr, flags)
         if img is None:
             # 読めなかった場合は動画として試してみる。(GIFファイル用。先頭フレームを取得。)
-            video = cv2.VideoCapture(arr)
+            video = cv2.VideoCapture(file)
             _, img = video.read()
+        # BGR to RGB
+        if img.shape[-1] == 3:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         return img
     except BaseException:
         return None
@@ -66,25 +75,25 @@ def save(path: typing.Union[str, pathlib.Path], img: np.ndarray):
 
     やや余計なお世話だけど0～255にクリッピング(飽和)してから保存。
     """
-    import cv2
     img = np.clip(img, 0, 255).astype(np.uint8)
     if img.shape[-1] == 1:
         img = np.squeeze(img, axis=-1)
-    else:
-        img = img[:, :, ::-1]
-    path = pathlib.Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    cv2.imwrite(str(path), img)
+    opencv_imwrite_rgb(path, img)
 
 
-def opencv_imwrite(path, img, params=None):
+def opencv_imwrite_rgb(path, img, params=None):
     """日本語パス対応のOpenCVによる画像保存。"""
     import cv2
     try:
+        # RGB to BGR
+        if len(img.shape) == 3 and img.shape[-1] == 3:
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        # 保存
         path = pathlib.Path(path)
         result, arr = cv2.imencode(path.suffix, img, params)
         if not result:
             return False
+        path.parent.mkdir(parents=True, exist_ok=True)
         with path.open('wb') as f:
             arr.tofile(f)
         return True

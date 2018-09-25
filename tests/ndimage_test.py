@@ -18,6 +18,13 @@ def test_saveload_grayscale(tmpdir):
     tk.ndimage.save(str(tmpdir.join('output.png')), img)
 
 
+def test_saveload_gif(tmpdir):
+    img = tk.ndimage.load(_BASE_DIR / 'data' / 'Lenna.gif')
+    assert img is not None
+    tk.ndimage.save(str(tmpdir.join('output.bmp')), img)
+    assert (tk.ndimage.load(str(tmpdir.join('output.bmp'))) == img).all()
+
+
 def test_filters():
     """画像の変換のテスト。目視したいので結果を`../___check/ndimage/`に保存しちゃう。"""
     save_dir = _BASE_DIR.parent / '___check' / 'ndimage'
