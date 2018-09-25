@@ -62,7 +62,7 @@ class Model(object):
                 l.trainable = True
 
     @log.trace()
-    def compile(self, optimizer=None, loss=None, metrics=None,
+    def compile(self, optimizer=None, loss=None, metrics=None, loss_weights=None,
                 sample_weight_mode=None, weighted_metrics=None, target_tensors=None,
                 device_dense='', device_sparse='',
                 sgd_lr=None, lr_multipliers=None):
@@ -91,14 +91,15 @@ class Model(object):
             optimizer = hvd.get().DistributedOptimizer(
                 optimizer, device_dense=device_dense, device_sparse=device_sparse)
 
-        self.model.compile(optimizer, loss, metrics=metrics,
+        self.model.compile(optimizer, loss, metrics=metrics, loss_weights=loss_weights,
                            sample_weight_mode=sample_weight_mode,
                            weighted_metrics=weighted_metrics,
                            target_tensors=target_tensors)
 
     def recompile(self):
         """オプションを変えずに再コンパイル。"""
-        self.model.compile(self.model.optimizer, self.model.loss, self.model.metrics,
+        self.model.compile(self.model.optimizer, self.model.loss,
+                           metrics=self.model.metrics, loss_weights=self.model.loss_weights,
                            sample_weight_mode=self.model.sample_weight_mode,
                            weighted_metrics=self.model.weighted_metrics)
 
