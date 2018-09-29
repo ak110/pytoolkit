@@ -65,7 +65,7 @@ class Model(object):
     def compile(self, optimizer=None, loss=None, metrics=None, loss_weights=None,
                 sample_weight_mode=None, weighted_metrics=None, target_tensors=None,
                 device_dense='', device_sparse='',
-                sgd_lr=None, lr_multipliers=None):
+                sgd_lr=None, clipnorm=0, clipvalue=0, lr_multipliers=None):
         """コンパイル。
 
         sgd_lrを指定するとSGD+Nesterov momentumでoptimizerを作る。
@@ -79,13 +79,15 @@ class Model(object):
             assert sgd_lr is not None
 
         if sgd_lr is None:
+            assert clipnorm == 0
+            assert clipvalue == 0
             optimizer = keras.optimizers.get(optimizer)
         else:
             lr = sgd_lr * self.batch_size
             if hvd.initialized():
                 lr *= hvd.get().size()
             log.get(__name__).info(f'initial lr = {lr:.2e}')
-            optimizer = optimizers.nsgd()(lr=lr, lr_multipliers=lr_multipliers)
+            optimizer = optimizers.nsgd()(lr=lr, lr_multipliers=lr_multipliers, clipnorm=clipnorm, clipvalue=clipvalue)
 
         if hvd.initialized():
             optimizer = hvd.get().DistributedOptimizer(
