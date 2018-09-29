@@ -406,7 +406,7 @@ class PriorBoxes(object):
         gt_mask = y_true[:, :, 0]
         gt_obj, pred_obj = y_true[:, :, 2], y_pred[:, :, 2]
         mask = np.expand_dims(self.pb_mask, axis=0) * gt_mask
-        loss = losses.binary_focal_loss(gt_obj, pred_obj)
+        loss = losses.binary_focal_loss()(gt_obj, pred_obj)
         loss = K.sum(loss * mask, axis=-1)
         return loss * 3
 
