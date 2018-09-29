@@ -4,10 +4,7 @@ import numpy as np
 
 
 def logit(x):
-    """ロジット関数。シグモイド関数の逆関数。
-
-    普通にやると `log(x / (1 - x))` だが、ゼロ除算とlog(0)を避けるためにちょっと面倒な実装に。
-    """
+    """ロジット関数。シグモイド関数の逆関数。"""
     import keras.backend as K
-    odds = x / K.maximum(1 - x, K.epsilon())
-    return K.log(K.maximum(odds, K.epsilon()))
+    x = K.clip(x, K.epsilon(), 1 - K.epsilon())
+    return K.log(x / (1 - x))
