@@ -25,7 +25,7 @@ def lovasz_grad(gt_sorted):
 # --------------------------- BINARY LOSSES ---------------------------
 
 
-def lovasz_hinge(logits, labels, per_image=True, ignore=None, elup1=False):
+def lovasz_hinge(logits, labels, per_image=True, ignore=None, hinge_func='relu'):
     """Binary Lovasz hinge loss
 
     logits: [B, H, W] Variable, logits at each pixel (between -\infty and +\infty)
@@ -38,15 +38,15 @@ def lovasz_hinge(logits, labels, per_image=True, ignore=None, elup1=False):
             log, lab = log_lab
             log, lab = tf.expand_dims(log, 0), tf.expand_dims(lab, 0)
             log, lab = flatten_binary_scores(log, lab, ignore)
-            return lovasz_hinge_flat(log, lab, elup1=elup1)
+            return lovasz_hinge_flat(log, lab, hinge_func=hinge_func)
         losses = tf.map_fn(treat_image, (logits, labels), dtype=tf.float32)
         loss = tf.reduce_mean(losses)
     else:
-        loss = lovasz_hinge_flat(*flatten_binary_scores(logits, labels, ignore), elup1=elup1)
+        loss = lovasz_hinge_flat(*flatten_binary_scores(logits, labels, ignore), hinge_func=hinge_func)
     return loss
 
 
-def lovasz_hinge_flat(logits, labels, elup1):
+def lovasz_hinge_flat(logits, labels, hinge_func):
     """Binary Lovasz hinge loss
 
     logits: [P] Variable, logits at each prediction (between -\infty and +\infty)
@@ -61,10 +61,14 @@ def lovasz_hinge_flat(logits, labels, elup1):
         errors_sorted, perm = tf.nn.top_k(errors, k=tf.shape(errors)[0], name="descending_sort")
         gt_sorted = tf.gather(labelsf, perm)
         grad = lovasz_grad(gt_sorted)
-        if elup1:
-            a = tf.nn.elu(errors_sorted) + 1
-        else:
+        if hinge_func == 'relu':
             a = tf.nn.relu(errors_sorted)
+        elif hinge_func == 'elu+1':
+            a = tf.nn.elu(errors_sorted) + 1
+        elif hinge_func == 'swish':
+            a = tf.nn.swish(errors_sorted)
+        else:
+            assert False
         loss = tf.tensordot(a, tf.stop_gradient(grad), 1, name="loss_non_void")
         return loss
 

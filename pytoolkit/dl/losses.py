@@ -71,7 +71,14 @@ def lovasz_hinge_elup1(y_true, y_pred):
     """Binary Lovasz hinge loss。(elu+1)"""
     from .lovasz_softmax import lovasz_losses_tf
     logit = backend.logit(y_pred)
-    return lovasz_losses_tf.lovasz_hinge(logit, y_true, elup1=True)
+    return lovasz_losses_tf.lovasz_hinge(logit, y_true, hinge_func='elu+1')
+
+
+def lovasz_hinge_swish(y_true, y_pred):
+    """Binary Lovasz hinge loss。(elu+1)"""
+    from .lovasz_softmax import lovasz_losses_tf
+    logit = backend.logit(y_pred)
+    return lovasz_losses_tf.lovasz_hinge(logit, y_true, hinge_func='swish')
 
 
 def od_bias_initializer(nb_classes, pi=0.01):
