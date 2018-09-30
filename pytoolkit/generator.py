@@ -157,8 +157,9 @@ class Generator(SimpleGenerator):
         cpu_count = os.cpu_count()
         worker_count = min(ctx.batch_size, cpu_count * 3)
         with joblib.Parallel(n_jobs=worker_count, backend='threading') as parallel:
+            _work = joblib.delayed(self._work, check_pickle=False)
             for indices, seeds in self._flow_batch(ctx):
-                batch = [joblib.delayed(self._work)(ix, seed, ctx) for ix, seed in zip(indices, seeds)]
+                batch = [_work(ix, seed, ctx) for ix, seed in zip(indices, seeds)]
                 rx, ry, rw = zip(*parallel(batch))
                 yield _get_result(ctx.y is not None, ctx.weights is not None, rx, ry, rw, self.multiple_input, self.multiple_output)
 

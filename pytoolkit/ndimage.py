@@ -40,10 +40,15 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
 
     if img is None:
         raise ValueError(f'Image load failed: {path_or_array}')
+    if grayscale:
+        if len(img.shape) == 2:
+            img = np.expand_dims(img, axis=-1)
+    else:
+        if img.shape[-1] != 3:
+            raise ValueError(f'Image load failed: {path_or_array}')
+    if len(img.shape) != 3:
+        raise ValueError(f'Image load failed: {path_or_array}')
 
-    if grayscale and len(img.shape) == 2:
-        img = np.expand_dims(img, axis=-1)
-    assert len(img.shape) == 3
     return img.astype(np.float32)
 
 
