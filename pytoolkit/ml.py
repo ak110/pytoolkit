@@ -183,14 +183,17 @@ def listup_classification(dirpath, class_names=None, use_tqdm=True, check_image=
         class_names = list(sorted([p.name for p in dirpath.iterdir() if _is_valid_classdir(p)]))
 
     # 各クラスのデータを列挙
-    X, y = [], []
+    X, y, errors = [], [], []
     for class_id, class_name in enumerate(utils.tqdm(class_names, desc='listup', disable=not use_tqdm)):
         class_dir = dirpath / class_name
         if class_dir.is_dir():
-            t = listup_files(class_dir, recurse=False, use_tqdm=False, check_image=check_image)
+            t, err = _listup_files(class_dir, recurse=False, use_tqdm=False, check_image=check_image)
             X.extend(t)
             y.extend([class_id] * len(t))
+            errors.extend(err)
     assert len(X) == len(y)
+    for e in errors:
+        print(e)
     return class_names, np.array(X), np.array(y)
 
 
@@ -203,6 +206,16 @@ def listup_files(dirpath, recurse=False, use_tqdm=True, check_image=False):
     - check_image: 画像として読み込みチェックを行い、読み込み可能なファイルのみ返すか否か (遅いので注意)
 
     """
+    result, errors = _listup_files(dirpath, recurse, use_tqdm, check_image)
+    for e in errors:
+        print(e)
+    return np.array(result)
+
+
+def _listup_files(dirpath, recurse, use_tqdm, check_image):
+    """ファイルの列挙。"""
+    errors = []
+
     dirpath = pathlib.Path(dirpath)
     if recurse:
         it = dirpath.rglob('*')
@@ -217,11 +230,15 @@ def listup_files(dirpath, recurse=False, use_tqdm=True, check_image=False):
         if check_image:
             try:
                 ndimage.load(p)
-            except:
+            except BaseException:
+                errors.append(f'Load error: {p}')
                 return False
         return True
 
-    return np.array([p for p in utils.tqdm(list(it), desc='listup', disable=not use_tqdm) if _is_valid_file(p)])
+    result = [p for p
+              in utils.tqdm(list(it), desc='listup', disable=not use_tqdm)
+              if _is_valid_file(p)]
+    return result, errors
 
 
 def split(X, y, split_seed, validation_split=None, cv_count=None, cv_index=None, stratify=None):
@@ -683,51 +700,59 @@ def print_classification_metrics(y_true, proba_pred, average='micro', print_fn=N
     - average: 'micro' ならF値などをサンプルごとに計算。'macro'ならクラスごとの重み無し平均。
 
     """
-    print_fn = print_fn or log.get(__name__).info
-    true_type = sklearn.utils.multiclass.type_of_target(y_true)
-    pred_type = sklearn.utils.multiclass.type_of_target(proba_pred)
-    if true_type == 'binary':  # binary
-        assert pred_type in ('binary', 'continuous', 'continuous-multioutput')
-        if pred_type == 'continuous-multioutput':
-            assert proba_pred.shape == (len(proba_pred), 2), f'Shape error: {proba_pred.shape}'
-            proba_pred = proba_pred[:, 1]
-        y_pred = (np.asarray(proba_pred) >= 0.5).astype(np.int32)
-        acc = sklearn.metrics.accuracy_score(y_true, y_pred)
-        f1 = sklearn.metrics.f1_score(y_true, y_pred)
-        auc = sklearn.metrics.roc_auc_score(y_true, proba_pred)
-        logloss = sklearn.metrics.log_loss(y_true, proba_pred)
-        print_fn(f'Accuracy: {acc:.3f}')
-        print_fn(f'F1-score: {f1:.3f}')
-        print_fn(f'AUC:      {auc:.3f}')
-        print_fn(f'Logloss:  {logloss:.3f}')
-    else:  # multiclass
-        assert true_type == 'multiclass'
-        assert pred_type == 'continuous-multioutput'
-        num_classes = len(np.unique(y_true))
-        ohe_true = to_categorical(num_classes)(np.asarray(y_true))
-        y_pred = np.argmax(proba_pred, axis=-1)
-        acc = sklearn.metrics.accuracy_score(y_true, y_pred)
-        f1 = sklearn.metrics.f1_score(y_true, y_pred, average=average)
-        auc = sklearn.metrics.roc_auc_score(ohe_true, proba_pred, average=average)
-        logloss = sklearn.metrics.log_loss(ohe_true, proba_pred)
-        print_fn(f'Accuracy:  {acc:.3f}')
-        print_fn(f'F1-{average:5s}:  {f1:.3f}')
-        print_fn(f'AUC-{average:5s}: {auc:.3f}')
-        print_fn(f'Logloss:   {logloss:.3f}')
+    try:
+        print_fn = print_fn or log.get(__name__).info
+        true_type = sklearn.utils.multiclass.type_of_target(y_true)
+        pred_type = sklearn.utils.multiclass.type_of_target(proba_pred)
+        if true_type == 'binary':  # binary
+            assert pred_type in ('binary', 'continuous', 'continuous-multioutput')
+            if pred_type == 'continuous-multioutput':
+                assert proba_pred.shape == (len(proba_pred), 2), f'Shape error: {proba_pred.shape}'
+                proba_pred = proba_pred[:, 1]
+            y_pred = (np.asarray(proba_pred) >= 0.5).astype(np.int32)
+            acc = sklearn.metrics.accuracy_score(y_true, y_pred)
+            f1 = sklearn.metrics.f1_score(y_true, y_pred)
+            auc = sklearn.metrics.roc_auc_score(y_true, proba_pred)
+            logloss = sklearn.metrics.log_loss(y_true, proba_pred)
+            print_fn(f'Accuracy: {acc:.3f}')
+            print_fn(f'F1-score: {f1:.3f}')
+            print_fn(f'AUC:      {auc:.3f}')
+            print_fn(f'Logloss:  {logloss:.3f}')
+        else:  # multiclass
+            assert true_type == 'multiclass'
+            assert pred_type == 'continuous-multioutput'
+            num_classes = len(np.unique(y_true))
+            ohe_true = to_categorical(num_classes)(np.asarray(y_true))
+            y_pred = np.argmax(proba_pred, axis=-1)
+            acc = sklearn.metrics.accuracy_score(y_true, y_pred)
+            f1 = sklearn.metrics.f1_score(y_true, y_pred, average=average)
+            auc = sklearn.metrics.roc_auc_score(ohe_true, proba_pred, average=average)
+            logloss = sklearn.metrics.log_loss(ohe_true, proba_pred)
+            print_fn(f'Accuracy:  {acc:.3f}')
+            print_fn(f'F1-{average:5s}:  {f1:.3f}')
+            print_fn(f'AUC-{average:5s}: {auc:.3f}')
+            print_fn(f'Logloss:   {logloss:.3f}')
+    except BaseException:
+        logger = log.get(__name__)
+        logger.warning('Error: print_classification_metrics', exc_info=True)
 
 
 def print_regression_metrics(y_true, y_pred, print_fn=None):
     """回帰の指標色々を表示する。"""
-    print_fn = print_fn or log.get(__name__).info
-    y_mean = np.tile(np.mean(y_pred), len(y_true))
-    r2 = sklearn.metrics.r2_score(y_true, y_pred)
-    rmse = np.sqrt(sklearn.metrics.mean_squared_error(y_true, y_pred))
-    rmseb = np.sqrt(sklearn.metrics.mean_squared_error(y_true, y_mean))
-    mae = sklearn.metrics.mean_absolute_error(y_true, y_pred)
-    maeb = sklearn.metrics.mean_absolute_error(y_true, y_mean)
-    print_fn(f'R^2:  {r2:.3f}')
-    print_fn(f'RMSE: {rmse:.3f} (base: {rmseb:.3f})')
-    print_fn(f'MAE:  {mae:.3f} (base: {maeb:.3f})')
+    try:
+        print_fn = print_fn or log.get(__name__).info
+        y_mean = np.tile(np.mean(y_pred), len(y_true))
+        r2 = sklearn.metrics.r2_score(y_true, y_pred)
+        rmse = np.sqrt(sklearn.metrics.mean_squared_error(y_true, y_pred))
+        rmseb = np.sqrt(sklearn.metrics.mean_squared_error(y_true, y_mean))
+        mae = sklearn.metrics.mean_absolute_error(y_true, y_pred)
+        maeb = sklearn.metrics.mean_absolute_error(y_true, y_mean)
+        print_fn(f'R^2:  {r2:.3f}')
+        print_fn(f'RMSE: {rmse:.3f} (base: {rmseb:.3f})')
+        print_fn(f'MAE:  {mae:.3f} (base: {maeb:.3f})')
+    except BaseException:
+        logger = log.get(__name__)
+        logger.warning('Error: print_regression_metrics', exc_info=True)
 
 
 def plot_cm(cm, to_file='confusion_matrix.png', classes=None, normalize=True, title='Confusion matrix'):
