@@ -10,7 +10,7 @@ import sklearn.metrics
 import sklearn.model_selection
 import sklearn.utils
 
-from . import draw, log, ndimage
+from . import draw, log, ndimage, utils
 
 
 class ObjectsAnnotation(object):
@@ -160,44 +160,68 @@ class ObjectsPrediction(object):
         ]
 
 
+def listup_classification(dirpath, class_names=None, use_tqdm=True, check_image=False):
+    """画像分類でよくある、クラス名ディレクトリの列挙。クラス名の配列, X, yを返す。
 
-def listup_classification(dirpath, class_names=None):
-    """画像分類でよくある、クラス名ディレクトリの列挙。クラス名の配列, X, yを返す。"""
+    # 引数
+    - class_names: クラス名の配列
+    - use_tqdm: tqdmを使用するか否か
+    - check_image: 画像として読み込みチェックを行い、読み込み可能なファイルのみ返すか否か (遅いので注意)
+
+    """
     dirpath = pathlib.Path(dirpath)
 
     # クラス名
     if class_names is None:
-        def _empty(it):
-            for p in it:
-                if _is_valid_file(p):
-                    return False
+        def _is_valid_classdir(p):
+            if not p.is_dir():
+                return False
+            if p.name.lower() in ('.svn', '.git'):  # 気休め程度に無視パターン
+                return False
             return True
 
-        class_names = list(sorted([p.name for p in dirpath.iterdir() if p.is_dir() and not _empty(p.iterdir())]))
+        class_names = list(sorted([p.name for p in dirpath.iterdir() if _is_valid_classdir(p)]))
 
     # 各クラスのデータを列挙
     X, y = [], []
-    for class_id, class_name in enumerate(class_names):
-        t = listup_files(dirpath / class_name)
-        X.extend(t)
-        y.extend([class_id] * len(t))
+    for class_id, class_name in enumerate(utils.tqdm(class_names, desc='listup', disable=not use_tqdm)):
+        class_dir = dirpath / class_name
+        if class_dir.is_dir():
+            t = listup_files(class_dir, recurse=False, use_tqdm=False, check_image=check_image)
+            X.extend(t)
+            y.extend([class_id] * len(t))
     assert len(X) == len(y)
     return class_names, np.array(X), np.array(y)
 
 
-def listup_files(dirpath, recurse=False):
-    """ファイルの列挙。"""
+def listup_files(dirpath, recurse=False, use_tqdm=True, check_image=False):
+    """ファイルの列挙。
+
+    # 引数
+    - recurse: 再帰的に配下もリストアップするか否か
+    - use_tqdm: tqdmを使用するか否か
+    - check_image: 画像として読み込みチェックを行い、読み込み可能なファイルのみ返すか否か (遅いので注意)
+
+    """
     dirpath = pathlib.Path(dirpath)
     if recurse:
         it = dirpath.rglob('*')
     else:
         it = dirpath.iterdir()
-    return np.array([p for p in it if _is_valid_file(p)])
 
+    def _is_valid_file(p):
+        if not p.is_file():
+            return False
+        if p.name.lower() == 'thumbs.db':
+            return False
+        if check_image:
+            try:
+                ndimage.load(p)
+            except:
+                return False
+        return True
 
-def _is_valid_file(p):
-    """有効なファイルなのか否か。(だいぶ適当)"""
-    return p.is_file() and p.name.lower() != 'thumbs.db'
+    return np.array([p for p in utils.tqdm(list(it), desc='listup', disable=not use_tqdm) if _is_valid_file(p)])
 
 
 def split(X, y, split_seed, validation_split=None, cv_count=None, cv_index=None, stratify=None):
@@ -236,22 +260,15 @@ def cv_indices(X, y, cv_count, cv_index, split_seed, stratify=None):
     return train_indices, val_indices
 
 
-class _ToCategorical(object):
-    """クラスラベルのone-hot encoding化を行うクラス。"""
-
-    def __init__(self, nb_classes):
-        self.nb_classes = nb_classes
-
-    def __call__(self, y):
+def to_categorical(num_classes):
+    """クラスラベルのone-hot encoding化を行う関数を返す。"""
+    def _to_categorical(y):
         assert len(y.shape) == 1
-        cat = np.zeros((len(y), self.nb_classes), dtype=np.float32)
+        cat = np.zeros((len(y), num_classes), dtype=np.float32)
         cat[np.arange(len(y)), y] = 1
         return cat
 
-
-def to_categorical(nb_classes):
-    """クラスラベルのone-hot encoding化を行う関数を返す。"""
-    return _ToCategorical(nb_classes)
+    return _to_categorical
 
 
 def compute_map(gt, pred, iou_threshold=0.5, use_voc2007_metric=False):
