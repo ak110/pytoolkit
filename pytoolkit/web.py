@@ -4,6 +4,9 @@ import datetime
 import functools
 import pathlib
 import secrets
+import urllib.parse
+
+from . import log
 
 
 def generate_secret_key(cache_path):
@@ -89,6 +92,19 @@ def data_url(data: bytes, mime_type: str) -> str:
     """
     b64 = base64.b64encode(data).decode('ascii')
     return f'data:{mime_type};base64,{b64}'
+
+
+def get_safe_url(target, host_url, default_url):
+    """ログイン時のリダイレクトとして安全なURLを返す。"""
+    if target is None or target == '':
+        return default_url
+    ref_url = urllib.parse.urlparse(host_url)
+    test_url = urllib.parse.urlparse(urllib.parse.urljoin(host_url, target))
+    if test_url.scheme not in ('http', 'https') or ref_url.netloc != test_url.netloc:
+        logger = log.get(__name__)
+        logger.warning(f'Invalid next url: {target}')
+        return default_url
+    return test_url.path
 
 
 class Paginator(object):
