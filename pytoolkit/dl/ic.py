@@ -12,15 +12,18 @@ class ImageClassifier(models.Model):
     """画像分類モデル。"""
 
     @classmethod
-    def create(cls, class_names, network_type, input_size, batch_size, rotation_type):
+    def create(cls, class_names, network_type, input_size, batch_size, rotation_type, freeze_type):
         """学習用インスタンスの作成。"""
         assert len(class_names) >= 2
-        assert network_type in ('resnet50', 'xception', 'nasnet_large')
+        assert network_type in ('vgg16bn', 'resnet50', 'xception', 'nasnet_large')
         assert batch_size >= 1
         assert rotation_type in ('none', 'mirror', 'rotation', 'all')
-        network, preprocess_mode = _create_network(len(class_names), network_type, (input_size, input_size))
+        assert freeze_type in ('none', 'without_bn', 'all')
+        network, preprocess_mode = _create_network(len(class_names), network_type, (input_size, input_size), freeze_type)
         gen = _create_generator(len(class_names), (input_size, input_size), preprocess_mode, rotation_type)
-        return cls(class_names, network_type, preprocess_mode, input_size, rotation_type, network, gen, batch_size)
+        model = cls(class_names, network_type, preprocess_mode, input_size, rotation_type, network, gen, batch_size)
+        model.compile(sgd_lr=0.1 / 128, loss='categorical_crossentropy', metrics=['acc'])
+        return model
 
     @classmethod
     def load(cls, filepath: typing.Union[str, pathlib.Path], batch_size):  # pylint: disable=W0221
@@ -67,10 +70,10 @@ class ImageClassifier(models.Model):
         super().save(filepath, overwrite=overwrite, include_optimizer=include_optimizer)
 
 
-def _create_network(num_classes, network_type, image_size):
+def _create_network(num_classes, network_type, image_size, freeze_type):
     """ネットワークを作って返す。"""
     import keras
-    if network_type == 'vgg':
+    if network_type == 'vgg16bn':
         base_model = applications.vgg16bn.vgg16bn(include_top=False, input_shape=(None, None, 3))
         preprocess_mode = 'caffe'
     elif network_type == 'resnet50':
@@ -84,8 +87,22 @@ def _create_network(num_classes, network_type, image_size):
         preprocess_mode = 'tf'
     else:
         raise ValueError(f'Invalid network type: {network_type}')
+
+    if freeze_type == 'without_bn':
+        for layer in base_model.layers:
+            if not isinstance(layer, keras.layers.BatchNormalization):
+                layer.trainable = False
+    elif freeze_type == 'all':
+        for layer in base_model.layers:
+            layer.trainable = False
+
     x = base_model.outputs[0]
     x = keras.layers.GlobalAveragePooling2D()(x)
+    if freeze_type == 'all':
+        x = keras.layers.Dense(2048, activation='relu',
+                               kernel_initializer='he_uniform',
+                               kernel_regularizer=keras.regularizers.l2(1e-4),
+                               name=f'pred_{num_classes}_pre')(x)
     x = keras.layers.Dense(num_classes, activation='softmax',
                            kernel_initializer='zeros',
                            kernel_regularizer=keras.regularizers.l2(1e-4),

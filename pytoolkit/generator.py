@@ -8,6 +8,8 @@ import numpy as np
 import sklearn.externals.joblib as joblib
 import sklearn.utils
 
+from . import utils
+
 
 class GeneratorContext(object):
     """Generatorの中で使う情報をまとめて持ち歩くためのクラス。"""
@@ -157,7 +159,7 @@ class Generator(SimpleGenerator):
         cpu_count = os.cpu_count()
         worker_count = min(ctx.batch_size, cpu_count * 3)
         with joblib.Parallel(n_jobs=worker_count, backend='threading') as parallel:
-            _work = joblib.delayed(self._work, check_pickle=False)
+            _work = utils.delayed(self._work)
             for indices, seeds in self._flow_batch(ctx):
                 batch = [_work(ix, seed, ctx) for ix, seed in zip(indices, seeds)]
                 rx, ry, rw = zip(*parallel(batch))

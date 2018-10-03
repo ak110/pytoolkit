@@ -1,6 +1,7 @@
 """各種ユーティリティ"""
-import logging
+import distutils.version
 import functools
+import logging
 import multiprocessing as mp
 import os
 import subprocess
@@ -109,6 +110,15 @@ def tqdm(iterable=None, desc=None, total=None, leave=True, **kwargs):
     """`tqdm`の簡単なラッパー。"""
     from tqdm import tqdm as t
     return t(iterable, desc, total, leave, ascii=True, ncols=100, **kwargs)
+
+
+def delayed(fn):
+    """joblib.delayedのDeprecationWarning対策。"""
+    import sklearn.externals.joblib as joblib
+    if distutils.version.LooseVersion(joblib.__version__) >= distutils.version.LooseVersion('0.12'):
+        return joblib.delayed(fn)
+    else:
+        return joblib.delayed(fn, check_pickle=False)
 
 
 def better_exceptions():
