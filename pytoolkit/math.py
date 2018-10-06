@@ -85,7 +85,7 @@ def binorm_percent(p, positives, total):
     upper = interval[1] * 100
     center = 100 * positives / total
     width = max(upper - center, center - lower)
-    return int(np.floor(center)), int(np.ceil(width))
+    return int(np.floor(np.nan_to_num(center))), int(np.ceil(np.nan_to_num(width)))
 
 
 def binorm_interval(p, positives, total):

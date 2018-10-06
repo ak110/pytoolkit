@@ -424,7 +424,7 @@ def compute_scores(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=No
     assert 0 < iou_threshold < 1
     assert 0 <= conf_threshold < 1
     if num_classes is None:
-        num_classes = len(np.unique(np.concatenate([y.classes for y in gt], axis=0)))
+        num_classes = np.max([y.classes for y in gt]) + 1
 
     tp = np.zeros((num_classes,), dtype=int)  # true positive
     fp = np.zeros((num_classes,), dtype=int)  # false positive
@@ -473,7 +473,7 @@ def od_confusion_matrix(gt, pred, conf_threshold=0, iou_threshold=0.5, num_class
     assert 0 < iou_threshold < 1
     assert 0 <= conf_threshold < 1
     if num_classes is None:
-        num_classes = len(np.unique(np.concatenate([y.classes for y in gt], axis=0)))
+        num_classes = np.max([y.classes for y in gt]) + 1
 
     cm = np.zeros((num_classes + 1, num_classes + 1), dtype=int)
 
@@ -721,7 +721,7 @@ def print_classification_metrics(y_true, proba_pred, average='micro', print_fn=N
         else:  # multiclass
             assert true_type == 'multiclass'
             assert pred_type == 'continuous-multioutput'
-            num_classes = len(np.unique(y_true))
+            num_classes = np.max(y_true) + 1
             ohe_true = to_categorical(num_classes)(np.asarray(y_true))
             y_pred = np.argmax(proba_pred, axis=-1)
             acc = sklearn.metrics.accuracy_score(y_true, y_pred)
