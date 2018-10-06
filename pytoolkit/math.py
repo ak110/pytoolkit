@@ -80,6 +80,8 @@ def binorm_percent(p, positives, total):
     - positives: 正解数など
     - total: 全件数
     """
+    if total <= 0:
+        return 0, 100
     interval = binorm_interval(p, positives, total)
     lower = interval[0] * 100
     upper = interval[1] * 100
