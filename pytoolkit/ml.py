@@ -830,10 +830,10 @@ def plot_objects(base_image, classes, confs, bboxes, class_names, conf_threshold
     for classid, conf, bbox in zip(classes, confs, bboxes):
         if conf is not None and conf < conf_threshold:
             continue  # skip
-        xmin = int(round(bbox[0] * img.shape[1]))
-        ymin = int(round(bbox[1] * img.shape[0]))
-        xmax = int(round(bbox[2] * img.shape[1]))
-        ymax = int(round(bbox[3] * img.shape[0]))
+        xmin = max(int(round(bbox[0] * img.shape[1])), 0)
+        ymin = max(int(round(bbox[1] * img.shape[0])), 0)
+        xmax = min(int(round(bbox[2] * img.shape[1])), img.shape[1])
+        ymax = min(int(round(bbox[3] * img.shape[0])), img.shape[0])
         label = class_names[classid] if class_names is not None else f'class{classid:02d}'
         color = colors[classid % len(colors)][-2::-1]  # RGBA → BGR
         text = label if conf is None else f'{conf:0.2f}, {label}'
@@ -841,8 +841,8 @@ def plot_objects(base_image, classes, confs, bboxes, class_names, conf_threshold
         cv2.rectangle(img, (xmin, ymin), (xmax, ymax), color, thickness=2)
 
         tw = 6 * len(text)
-        cv2.rectangle(img, (xmin - 1, ymin - 10), (xmin + tw + 15, ymin + 5), color, -1)
-        cv2.putText(img, text, (xmin + 5, ymin), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 0), 1)
+        cv2.rectangle(img, (xmin - 1, ymin), (xmin + tw + 15, ymin + 15), color, -1)
+        cv2.putText(img, text, (xmin + 5, ymin + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 0), 1)
 
     return img
 
