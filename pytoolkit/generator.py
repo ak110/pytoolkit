@@ -95,11 +95,11 @@ class SimpleGenerator(object):
             rx, ry, rw = data_utils.get(ctx.X), data_utils.get(ctx.y, indices), data_utils.get(ctx.weights, indices)
             if ctx.weights is not None:
                 assert ctx.y is not None
-                yield rx, ry, rw
+                yield np.asarray(rx), np.asarray(ry), np.asarray(rw)
             elif ctx.y is not None:
-                yield rx, ry
+                yield np.asarray(rx), np.asarray(ry)
             else:
-                yield rx
+                yield np.asarray(rx)
 
     def _flow_batch(self, ctx):
         """データのindexとseedをバッチサイズずつ列挙し続けるgenerator。"""
