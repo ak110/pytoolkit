@@ -8,7 +8,7 @@ import numpy as np
 import sklearn.externals.joblib as joblib
 import sklearn.utils
 
-from . import utils
+from . import data_utils, utils
 
 
 class GeneratorContext(object):
@@ -23,9 +23,9 @@ class GeneratorContext(object):
         self.data_augmentation = data_augmentation
         self.random_state = sklearn.utils.check_random_state(random_state)
         self.balanced = balanced
-        self.data_count = len(X[0]) if isinstance(X, list) else len(X)
+        self.data_count = data_utils.get_length(X)
         if y is not None:
-            assert (len(y[0]) if isinstance(y, list) else len(y)) == self.data_count
+            assert data_utils.get_length(y) == self.data_count
         if weights is not None:
             assert len(weights) == self.data_count
         if balanced:
@@ -92,7 +92,7 @@ class SimpleGenerator(object):
     def _generator(self, ctx):
         """`fit_generator`などに渡すgenerator。"""
         for indices, _ in self._flow_batch(ctx):
-            rx, ry, rw = _pick_next(indices, ctx.X, ctx.y, ctx.weights)
+            rx, ry, rw = data_utils.get(ctx.X), data_utils.get(ctx.y, indices), data_utils.get(ctx.weights, indices)
             if ctx.weights is not None:
                 assert ctx.y is not None
                 yield rx, ry, rw
@@ -167,7 +167,7 @@ class Generator(SimpleGenerator):
 
     def _work(self, ix, seed, ctx: GeneratorContext):
         """1件1件の処理。"""
-        x_, y_, w_ = _pick_next(ix, ctx.X, ctx.y, ctx.weights)
+        x_, y_, w_ = data_utils.get(ctx.X, ix), data_utils.get(ctx.y, ix), data_utils.get(ctx.weights, ix)
         rand = np.random.RandomState(seed)
         result_x, result_y, result_w = self._transform(x_, y_, w_, rand, ctx)
         assert result_x is not None
@@ -221,18 +221,6 @@ def _flow_instance(data_count, shuffle, random_state):
             random_state.shuffle(indices)
         seeds = random_state.randint(0, 2 ** 31, size=(len(indices),))
         yield from zip(indices, seeds)
-
-
-def _pick_next(ix, X, y, weights):
-    """X, y, weightsからix番目の値を取り出す。"""
-    def _pick(arr, ix):
-        if arr is None:
-            return None
-        if isinstance(arr, list):
-            return [x[ix] for x in arr]
-        return arr[ix]
-
-    return _pick(X, ix), _pick(y, ix), _pick(weights, ix)
 
 
 def _get_result(has_y, has_weights, rx, ry, rw, multiple_input, multiple_output):
@@ -367,6 +355,26 @@ class CustomAugmentation(Operator):
     def execute(self, x, y, w, rand, ctx: GeneratorContext):
         if ctx.do_augmentation(rand, self.probability):
             x, y, w = self.process(x, y, w, rand, ctx)
+        return x, y, w
+
+
+class RandomPickData(Operator):
+    """pseudo-labelingなど用に、x, yがNoneだったときにx_src, y_srcからランダムに1件取得する処理。"""
+
+    def __init__(self, x_src, y_src):
+        self.x_src = x_src
+        self.y_src = y_src
+        self.length = data_utils.get_length(x_src)
+        assert self.length == data_utils.get_length(y_src)
+
+    def execute(self, x, y, w, rand, ctx: GeneratorContext):
+        if data_utils.is_none(x):
+            assert data_utils.is_none(y)
+            i = rand.randint(0, self.length)
+            x = data_utils.get(self.x_src, i)
+            y = data_utils.get(self.y_src, i) if y is not None else None
+        else:
+            assert y is None or not data_utils.is_none(y)
         return x, y, w
 
 

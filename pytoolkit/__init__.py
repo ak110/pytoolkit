@@ -4,6 +4,7 @@ from .utils import *
 from . import applications
 from . import cache
 from . import data
+from . import data_utils
 from . import dl
 from . import db
 from . import draw

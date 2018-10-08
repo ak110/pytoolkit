@@ -21,6 +21,7 @@
 - horovod
 - keras
 - matplotlib
+- mpi4py
 - opencv-python
 - pandas
 - sqlalchemy
