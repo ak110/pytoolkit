@@ -27,10 +27,9 @@ def test_generator():
 def test_random_pick_data():
     generator = tk.generator.Generator(multiple_output=True)
     generator.add(tk.generator.RandomPickData(np.array([3]), [np.array([4]), np.array([5])]))
-    g, steps = generator.flow(np.array([1, None, 2]), batch_size=1, shuffle=False)
-    assert steps == 3
+    g, steps = generator.flow(np.array([1, 2]), batch_size=1, shuffle=False)
+    assert steps == 2
     assert next(g) == (1,)
-    assert next(g) == (3,)
     assert next(g) == (2,)
     g, steps = generator.flow(np.array([1, None, 2]), [np.array([1, None, 2]), np.array([1, None, 2])], batch_size=1, shuffle=False)
     assert steps == 3
