@@ -92,7 +92,7 @@ class SimpleGenerator(object):
     def _generator(self, ctx):
         """`fit_generator`などに渡すgenerator。"""
         for indices, _ in self._flow_batch(ctx):
-            rx, ry, rw = data_utils.get(ctx.X), data_utils.get(ctx.y, indices), data_utils.get(ctx.weights, indices)
+            rx, ry, rw = data_utils.get(ctx.X, indices), data_utils.get(ctx.y, indices), data_utils.get(ctx.weights, indices)
             if ctx.weights is not None:
                 assert ctx.y is not None
                 yield np.asarray(rx), np.asarray(ry), np.asarray(rw)
@@ -171,8 +171,8 @@ class Generator(SimpleGenerator):
         rand = np.random.RandomState(seed)
         result_x, result_y, result_w = self._transform(x_, y_, w_, rand, ctx)
         assert result_x is not None
-        assert (result_y is None) == (y_ is None)
-        assert (result_w is None) == (w_ is None)
+        assert (result_y is None) == (ctx.y is None)
+        assert (result_w is None) == (ctx.weights is None)
         return result_x, result_y, result_w
 
     def transform(self, x_, y_=None, w_=None, rand=None, data_augmentation=None):
@@ -372,9 +372,7 @@ class RandomPickData(Operator):
             assert data_utils.is_none(y)
             i = rand.randint(0, self.length)
             x = data_utils.get(self.x_src, i)
-            y = data_utils.get(self.y_src, i) if y is not None else None
-        else:
-            assert y is None or not data_utils.is_none(y)
+            y = data_utils.get(self.y_src, i)
         return x, y, w
 
 
