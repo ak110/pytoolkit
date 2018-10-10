@@ -6,9 +6,8 @@ def parse_keras_output(output_text: str):
     """Kerasのコンソール出力からlossなどを見つけてDataFrameに入れて返す。結果は(列名, DataFrame)の配列。"""
     import pandas as pd
     try:
-        pat = re.compile(r'- (\w+): ([-+\.e\d]+)')
+        pat = re.compile(r'- (\w+): ([-+\.e\d]+|nan|-?inf)')
         data = {}
-        columns = []  # キー(出てきた順)
         for line in output_text.split('\n'):
             if '- ETA:' in line:
                 continue
@@ -18,10 +17,14 @@ def parse_keras_output(output_text: str):
                 value = float(m.group(2))
                 if key not in data:
                     data[key] = []
-                    columns.append(key)
                 data[key].append(value)
 
-        if len(columns) == 0:
+        max_length = max([len(v) for v in data.values()])
+        for k, v in list(data.items()):
+            if len(v) != max_length:
+                data.pop(k)
+
+        if len(data) == 0:
             return []
 
         df = pd.DataFrame.from_dict(data)
