@@ -366,7 +366,7 @@ def load_model(filepath, compile=True, custom_objects=None):  # pylint: disable=
     import keras
     custom_objects = custom_objects or {}
     custom_objects.update(dl.get_custom_objects())
-    return keras.models.load_model(filepath, custom_objects=custom_objects, compile=compile)
+    return keras.models.load_model(str(filepath), custom_objects=custom_objects, compile=compile)
 
 
 @log.trace()
