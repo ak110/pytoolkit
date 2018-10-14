@@ -113,6 +113,7 @@ class ObjectDetector:
                            'imagenet'ならバックボーンのみ。
                            'voc'ならPASCAL VOC 07+12 trainvalで学習済みのもの。
                            ファイルパスならそれを読む。
+                           Noneなら何も読まない。
         - pb_size_pattern_count: Prior boxのサイズ・アスペクト比のパターンの種類数。
         - flip_h: Data augmentationで水平flipを行うか否か。
         - flip_v: Data augmentationで垂直flipを行うか否か。
@@ -174,7 +175,7 @@ class ObjectDetector:
 
         # 重みの読み込み
         logger = log.get(__name__)
-        if initial_weights == 'imagenet':
+        if initial_weights is None or initial_weights == 'imagenet':
             pass  # cold start
         else:
             if initial_weights == 'voc':

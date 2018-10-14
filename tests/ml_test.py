@@ -22,18 +22,20 @@ def test_to_str():
 
 def test_plot_objects():
     base_dir = pathlib.Path(__file__).resolve().parent
-    data_dir = base_dir / 'data'
-    xml_path = data_dir / 'VOC2007_000001.xml'
-    img_path = data_dir / 'VOC2007_000001.jpg'
-    ann = tk.data.voc.load_annotation(data_dir, xml_path)
+    data_dir = base_dir / 'data' / 'od'
+    xml_path = data_dir / 'Annotations' / '無題.xml'
+    img_path = data_dir / 'JPEGImages' / '無題.png'
+    class_name_to_id = {'～': 0, '〇': 1}
+    class_id_to_name = {v: k for k, v in class_name_to_id.items()}
+    ann = tk.data.voc.load_annotation(data_dir, xml_path, class_name_to_id)
 
     img = tk.ml.plot_objects(img_path, ann.classes, None, ann.bboxes, None)
     tk.ndimage.save(base_dir.parent / '___check' / 'plot_objects1.png', img)
 
-    img = tk.ml.plot_objects(img_path, ann.classes, None, ann.bboxes, tk.data.voc.CLASS_NAMES)
+    img = tk.ml.plot_objects(img_path, ann.classes, None, ann.bboxes, class_id_to_name)
     tk.ndimage.save(base_dir.parent / '___check' / 'plot_objects2.png', img)
 
-    img = tk.ml.plot_objects(img_path, ann.classes, np.array([0.5, 0.5]), ann.bboxes, tk.data.voc.CLASS_NAMES)
+    img = tk.ml.plot_objects(img_path, ann.classes, np.array([0.5]), ann.bboxes, class_id_to_name)
     tk.ndimage.save(base_dir.parent / '___check' / 'plot_objects3.png', img)
 
 

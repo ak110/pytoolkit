@@ -94,17 +94,18 @@ def load_set(vocdevkit_dir, year, set_name, class_name_to_id=None, without_diffi
                             names, class_name_to_id, without_difficult)
 
 
-def load_annotations(vocdevkit_dir, annotations_dir, names, class_name_to_id=None, without_difficult=False):
+def load_annotations(vocdevkit_dir, annotations_dir, names=None, class_name_to_id=None, without_difficult=False):
     """VOC2007などのアノテーションデータの読み込み。
-
-    namesは「画像ファイル名拡張子なし」のリスト。
 
     # 戻り値
     - X: 画像ファイルのパスのndarray
     - y: `tk.ml.ObjectsAnnotation`のndarray
+    - names: 「画像ファイル名拡張子なし」のリスト。またはNone。
 
     """
     d = pathlib.Path(annotations_dir)
+    if names is None:
+        names = [p.stem for p in d.glob('*.xml')]
     y = [load_annotation(vocdevkit_dir, d / (name + '.xml'), class_name_to_id, without_difficult)
          for name in names]
     return np.array([t.path for t in y]), np.array(y)

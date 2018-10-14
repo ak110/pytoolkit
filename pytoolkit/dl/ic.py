@@ -12,14 +12,15 @@ class ImageClassifier(models.Model):
     """画像分類モデル。"""
 
     @classmethod
-    def create(cls, class_names, network_type, input_size, batch_size, rotation_type, freeze_type):
+    def create(cls, class_names, network_type='nasnet_large', input_size=256, batch_size=16, rotation_type='all', freeze_type='none', weights='imagenet'):
         """学習用インスタンスの作成。"""
         assert len(class_names) >= 2
         assert network_type in ('vgg16bn', 'resnet50', 'xception', 'nasnet_large')
         assert batch_size >= 1
         assert rotation_type in ('none', 'mirror', 'rotation', 'all')
         assert freeze_type in ('none', 'without_bn', 'all')
-        network, preprocess_mode = _create_network(len(class_names), network_type, (input_size, input_size), freeze_type)
+        assert weights in (None, 'imagenet')
+        network, preprocess_mode = _create_network(len(class_names), network_type, (input_size, input_size), freeze_type, weights)
         gen = _create_generator(len(class_names), (input_size, input_size), preprocess_mode, rotation_type)
         model = cls(class_names, network_type, preprocess_mode, input_size, rotation_type, network, gen, batch_size)
         model.compile(sgd_lr=0.1 / 128, loss='categorical_crossentropy', metrics=['acc'])
@@ -70,20 +71,20 @@ class ImageClassifier(models.Model):
         super().save(filepath, overwrite=overwrite, include_optimizer=include_optimizer)
 
 
-def _create_network(num_classes, network_type, image_size, freeze_type):
+def _create_network(num_classes, network_type, image_size, freeze_type, weights):
     """ネットワークを作って返す。"""
     import keras
     if network_type == 'vgg16bn':
-        base_model = applications.vgg16bn.vgg16bn(include_top=False, input_shape=(None, None, 3))
+        base_model = applications.vgg16bn.vgg16bn(include_top=False, input_shape=(None, None, 3), weights=weights)
         preprocess_mode = 'caffe'
     elif network_type == 'resnet50':
-        base_model = keras.applications.ResNet50(include_top=False, input_shape=(None, None, 3))
+        base_model = keras.applications.ResNet50(include_top=False, input_shape=(None, None, 3), weights=weights)
         preprocess_mode = 'caffe'
     elif network_type == 'xception':
-        base_model = keras.applications.Xception(include_top=False, input_shape=(None, None, 3))
+        base_model = keras.applications.Xception(include_top=False, input_shape=(None, None, 3), weights=weights)
         preprocess_mode = 'tf'
     elif network_type == 'nasnet_large':
-        base_model = keras.applications.NASNetLarge(include_top=False, input_shape=image_size + (3,))
+        base_model = keras.applications.NASNetLarge(include_top=False, input_shape=image_size + (3,), weights=weights)
         preprocess_mode = 'tf'
     else:
         raise ValueError(f'Invalid network type: {network_type}')
