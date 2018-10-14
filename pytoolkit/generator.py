@@ -11,7 +11,7 @@ import sklearn.utils
 from . import data_utils, utils
 
 
-class GeneratorContext(object):
+class GeneratorContext:
     """Generatorの中で使う情報をまとめて持ち歩くためのクラス。"""
 
     def __init__(self, X, y, weights, batch_size, shuffle, data_augmentation, random_state, balanced):
@@ -75,7 +75,7 @@ class Operator(metaclass=abc.ABCMeta):
         return x, y, w
 
 
-class SimpleGenerator(object):
+class SimpleGenerator:
     """`fit_generator`などに渡すgeneratorを作るためのクラス。特にデータを変換しないシンプル版。"""
 
     def flow(self, X, y=None, weights=None, batch_size=32, shuffle=False, data_augmentation=False, random_state=None, balanced=False):

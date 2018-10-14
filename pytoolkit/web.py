@@ -107,7 +107,7 @@ def get_safe_url(target, host_url, default_url):
     return test_url.path
 
 
-class Paginator(object):
+class Paginator:
     """ページング用簡易ヘルパ
 
     flask-paginateとかもあるがflask依存も面倒なので自作してしまった。

@@ -31,7 +31,7 @@ def session(config=None, gpu_options=None, use_horovod=False):
     """
     import keras.backend as K
 
-    class _Scope(object):  # pylint: disable=R0903
+    class _Scope:  # pylint: disable=R0903
 
         def __init__(self, config=None, gpu_options=None, use_horovod=False):
             self.config = config or {}

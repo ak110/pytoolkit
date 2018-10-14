@@ -6,7 +6,7 @@ from . import callbacks, dl, hvd, optimizers
 from .. import draw, generator, log, utils
 
 
-class Model(object):
+class Model:
     """`keras.models.Model` + `tk.dl.generators.Generator`の薄いラッパー。"""
 
     def __init__(self, model, gen: generator.Generator, batch_size, postprocess=None):

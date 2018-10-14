@@ -4,7 +4,7 @@ import copy
 from . import layers
 
 
-class Builder(object):
+class Builder:
     """Kerasでネットワークを作るときのヘルパークラス。"""
 
     def __init__(self, default_l2=1e-5):
@@ -206,7 +206,7 @@ class Builder(object):
         return Sequence(seq, keras.layers.Multiply(name=f'{name}_cr' if name else None))
 
 
-class Sequence(object):
+class Sequence:
     """複数のレイヤーの塊。kerasのlayer風にcall出来るもの。(プロパティなどは必要に応じて実装予定。。)
 
     # 引数

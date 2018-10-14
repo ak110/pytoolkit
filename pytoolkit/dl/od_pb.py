@@ -10,7 +10,7 @@ from .. import log, math, ml, utils
 _VAR_LOC = 0.10  # SSD風(?)適当スケーリング
 
 
-class PriorBoxes(object):
+class PriorBoxes:
     """Prior boxの集合を管理するクラス。"""
 
     def __init__(self, input_size, map_sizes, num_classes):

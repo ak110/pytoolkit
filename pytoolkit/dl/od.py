@@ -38,7 +38,7 @@ _VOC_WEIGHTS_640_URL = 'https://github.com/ak110/object_detector/releases/downlo
 _VOC_WEIGHTS_640_MD5 = '6a230e7b046bbf3de9d9ed9d22cec7af'
 
 
-class ObjectDetector(object):
+class ObjectDetector:
     """モデル。
 
     候補として最初に準備するboxの集合を持つ。

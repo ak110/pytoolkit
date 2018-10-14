@@ -13,7 +13,7 @@ import sklearn.utils
 from . import draw, log, ndimage, utils
 
 
-class ObjectsAnnotation(object):
+class ObjectsAnnotation:
     """物体検出のアノテーションデータを持つためのクラス。"""
 
     def __init__(self, path, width, height, classes, bboxes, difficults=None):
@@ -90,7 +90,7 @@ class ObjectsAnnotation(object):
         return '\n'.join(a)
 
 
-class ObjectsPrediction(object):
+class ObjectsPrediction:
     """物体検出の予測結果を持つクラス。"""
 
     def __init__(self, classes, confs, bboxes):
