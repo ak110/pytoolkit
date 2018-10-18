@@ -11,7 +11,7 @@ def test_ic(tmpdir):
     data_dir = base_dir.parent / 'tests' / 'data' / 'ic'
     class_names, X, y = tk.ml.listup_classification(data_dir, check_image=True)
 
-    model = tk.dl.ic.ImageClassifier.create(class_names, 'vgg16bn')
+    model = tk.dl.ic.ImageClassifier.create(class_names, 'vgg16bn', weights=None)
     model.fit(X, y, validation_data=(X, y),
               epochs=1,
               tsv_log_path=models_dir / 'history.tsv',
