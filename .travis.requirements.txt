@@ -1,13 +1,12 @@
 # Travis CI用 requirements
 Pillow
-graphviz
 h5py
 keras
 matplotlib
 numpy
 opencv-python
 pandas
-pydot_ng
+pydot
 pytest
 scikit-learn
 scipy

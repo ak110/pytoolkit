@@ -24,8 +24,10 @@
 - mpi4py
 - opencv-python
 - pandas
+- pydot
 - sqlalchemy
 - tensorflow-gpu
+- tqdm
 
 ## matplotlibの「Invalid DISPLAY variable」対策
 

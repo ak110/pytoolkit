@@ -236,10 +236,11 @@ class ObjectDetector:
         if use_multi_gpu:
             gpus = utils.get_gpu_count()
             self.model.set_multi_gpu_model(gpus)
+            pred_size = max(1, gpus)
         else:
-            gpus = 1
+            pred_size = 1
         # 1回予測して計算グラフを構築
-        self.model.model.predict_on_batch(np.zeros((gpus,) + tuple(self.pb.input_size) + (3,), np.float32))
+        self.model.model.predict_on_batch(np.zeros((pred_size,) + tuple(self.pb.input_size) + (3,), np.float32))
         logger.info('trainable params: %d', models.count_trainable_params(network))
 
     def predict(self, X, conf_threshold=0.01, verbose=1) -> [ml.ObjectsPrediction]:

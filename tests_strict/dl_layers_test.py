@@ -17,41 +17,42 @@ def test_depth_to_space():
         [[14], [24], [34], [44]],
     ]], dtype=np.float32)
 
-    x = inputs = keras.layers.Input(shape=(2, 2, 4))
-    x = tk.dl.layers.subpixel_conv2d()(scale=2)(x)
-    model = keras.models.Model(inputs, x)
-
-    assert model.predict(X) == pytest.approx(y)
+    with tk.dl.session():
+        x = inputs = keras.layers.Input(shape=(2, 2, 4))
+        x = tk.dl.layers.subpixel_conv2d()(scale=2)(x)
+        model = keras.models.Model(inputs, x)
+        assert model.predict(X) == pytest.approx(y)
 
 
 def test_coord_channel_2d():
-    x = inputs = keras.layers.Input(shape=(4, 4, 1))
-    x = tk.dl.layers.coord_channel_2d()()(x)
-    model = keras.models.Model(inputs, x)
-    assert model.output_shape == (None, 4, 4, 3)
-    assert model.predict(np.zeros((1, 4, 4, 1))) == pytest.approx(np.array([[
-        [
-            [0, 0.00, 0.00],
-            [0, 0.25, 0.00],
-            [0, 0.50, 0.00],
-            [0, 0.75, 0.00],
-        ],
-        [
-            [0, 0.00, 0.25],
-            [0, 0.25, 0.25],
-            [0, 0.50, 0.25],
-            [0, 0.75, 0.25],
-        ],
-        [
-            [0, 0.00, 0.50],
-            [0, 0.25, 0.50],
-            [0, 0.50, 0.50],
-            [0, 0.75, 0.50],
-        ],
-        [
-            [0, 0.00, 0.75],
-            [0, 0.25, 0.75],
-            [0, 0.50, 0.75],
-            [0, 0.75, 0.75],
-        ],
-    ]]))
+    with tk.dl.session():
+        x = inputs = keras.layers.Input(shape=(4, 4, 1))
+        x = tk.dl.layers.coord_channel_2d()()(x)
+        model = keras.models.Model(inputs, x)
+        assert model.output_shape == (None, 4, 4, 3)
+        assert model.predict(np.zeros((1, 4, 4, 1))) == pytest.approx(np.array([[
+            [
+                [0, 0.00, 0.00],
+                [0, 0.25, 0.00],
+                [0, 0.50, 0.00],
+                [0, 0.75, 0.00],
+            ],
+            [
+                [0, 0.00, 0.25],
+                [0, 0.25, 0.25],
+                [0, 0.50, 0.25],
+                [0, 0.75, 0.25],
+            ],
+            [
+                [0, 0.00, 0.50],
+                [0, 0.25, 0.50],
+                [0, 0.50, 0.50],
+                [0, 0.75, 0.50],
+            ],
+            [
+                [0, 0.00, 0.75],
+                [0, 0.25, 0.75],
+                [0, 0.50, 0.75],
+                [0, 0.75, 0.75],
+            ],
+        ]]))
