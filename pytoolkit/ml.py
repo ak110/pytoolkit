@@ -478,40 +478,43 @@ def od_confusion_matrix(gt, pred, conf_threshold=0, iou_threshold=0.5, num_class
     cm = np.zeros((num_classes + 1, num_classes + 1), dtype=int)
 
     for y_true, y_pred in zip(gt, pred):
-        iou = compute_iou(y_true.bboxes, y_pred.bboxes)
-        pred_gt = iou.argmax(axis=0)  # 一番近いboxにマッチさせる (やや怪しい)
-        pred_iou_mask = iou.max(axis=0) >= iou_threshold
-        pred_enabled = y_pred.confs >= conf_threshold
-        # 正解毎にループ
-        for gt_ix, gt_class in enumerate(y_true.classes):
-            m = np.logical_and(pred_enabled, pred_iou_mask)  # まだ使用済みでなく、IoUが大きく、
-            m = np.logical_and(m, pred_gt == gt_ix)  # IoUの対象がgt_ixなものが対象
-            pred_targets = y_pred.confs.argsort()[::-1][m]  # 対象のindexを確信度順で
-            found = False
-            # クラスもあってる検出
-            for pred_ix in pred_targets:
-                pc = y_pred.classes[pred_ix]
-                if gt_class == pc:
-                    if found:
-                        cm[-1, pc] += 1  # 誤検出(重複)
-                    else:
-                        found = True
-                        cm[gt_class, pc] += 1  # 検出成功
+        if y_true.num_objects <= 0:
+            pred_enabled = np.ones((y_pred.num_objects,), dtype=bool)
+        else:
+            iou = compute_iou(y_true.bboxes, y_pred.bboxes)
+            pred_gt = iou.argmax(axis=0)  # 一番近いboxにマッチさせる (やや怪しい)
+            pred_iou_mask = iou.max(axis=0) >= iou_threshold
+            pred_enabled = y_pred.confs >= conf_threshold
+            # 正解毎にループ
+            for gt_ix, gt_class in enumerate(y_true.classes):
+                m = np.logical_and(pred_enabled, pred_iou_mask)  # まだ使用済みでなく、IoUが大きく、
+                m = np.logical_and(m, pred_gt == gt_ix)  # IoUの対象がgt_ixなものが対象
+                pred_targets = y_pred.confs.argsort()[::-1][m]  # 対象のindexを確信度順で
+                found = False
+                # クラスもあってる検出
+                for pred_ix in pred_targets:
+                    pc = y_pred.classes[pred_ix]
+                    if gt_class == pc:
+                        if found:
+                            cm[-1, pc] += 1  # 誤検出(重複)
+                        else:
+                            found = True
+                            cm[gt_class, pc] += 1  # 検出成功
+                        # 一度カウントしたものは次から無視
+                        pred_enabled[pred_ix] = False
+                # クラス違い
+                for pred_ix in pred_targets:
+                    pc = y_pred.classes[pred_ix]
+                    if pred_enabled[pred_ix] and gt_class != pc:
+                        if found:
+                            cm[-1, pc] += 1  # 誤検出(重複&クラス違い)
+                        else:
+                            found = True   # ここでFound=Trueは微妙だが、gt_classの数が合わなくなるので1個だけにする。。
+                            cm[gt_class, pc] += 1  # 誤検出(クラス違い)
                     # 一度カウントしたものは次から無視
                     pred_enabled[pred_ix] = False
-            # クラス違い
-            for pred_ix in pred_targets:
-                pc = y_pred.classes[pred_ix]
-                if pred_enabled[pred_ix] and gt_class != pc:
-                    if found:
-                        cm[-1, pc] += 1  # 誤検出(重複&クラス違い)
-                    else:
-                        found = True   # ここでFound=Trueは微妙だが、gt_classの数が合わなくなるので1個だけにする。。
-                        cm[gt_class, pc] += 1  # 誤検出(クラス違い)
-                # 一度カウントしたものは次から無視
-                pred_enabled[pred_ix] = False
-            if not found:
-                cm[gt_class, -1] += 1  # 検出漏れ
+                if not found:
+                    cm[gt_class, -1] += 1  # 検出漏れ
         # 余った予測結果：誤検出
         for pred_class in y_pred.classes[pred_enabled]:
             cm[-1, pred_class] += 1
