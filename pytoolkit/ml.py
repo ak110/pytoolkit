@@ -424,7 +424,7 @@ def compute_scores(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=No
     assert 0 < iou_threshold < 1
     assert 0 <= conf_threshold < 1
     if num_classes is None:
-        num_classes = np.max([y.classes for y in gt]) + 1
+        num_classes = np.max(np.concatenate([y.classes for y in gt])) + 1
 
     tp = np.zeros((num_classes,), dtype=int)  # true positive
     fp = np.zeros((num_classes,), dtype=int)  # false positive
@@ -473,7 +473,7 @@ def od_confusion_matrix(gt, pred, conf_threshold=0, iou_threshold=0.5, num_class
     assert 0 < iou_threshold < 1
     assert 0 <= conf_threshold < 1
     if num_classes is None:
-        num_classes = np.max([y.classes for y in gt]) + 1
+        num_classes = np.max(np.concatenate([y.classes for y in gt])) + 1
 
     cm = np.zeros((num_classes + 1, num_classes + 1), dtype=int)
 
