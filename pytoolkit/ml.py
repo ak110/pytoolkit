@@ -478,13 +478,11 @@ def od_confusion_matrix(gt, pred, conf_threshold=0, iou_threshold=0.5, num_class
     cm = np.zeros((num_classes + 1, num_classes + 1), dtype=int)
 
     for y_true, y_pred in zip(gt, pred):
-        if y_true.num_objects <= 0:
-            pred_enabled = np.ones((y_pred.num_objects,), dtype=bool)
-        else:
+        pred_enabled = y_pred.confs >= conf_threshold
+        if y_true.num_objects > 0:
             iou = compute_iou(y_true.bboxes, y_pred.bboxes)
             pred_gt = iou.argmax(axis=0)  # 一番近いboxにマッチさせる (やや怪しい)
             pred_iou_mask = iou.max(axis=0) >= iou_threshold
-            pred_enabled = y_pred.confs >= conf_threshold
             # 正解毎にループ
             for gt_ix, gt_class in enumerate(y_true.classes):
                 m = np.logical_and(pred_enabled, pred_iou_mask)  # まだ使用済みでなく、IoUが大きく、
