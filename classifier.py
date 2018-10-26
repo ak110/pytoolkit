@@ -71,7 +71,7 @@ def _run(args):
     gen.add(tk.generator.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
 
     model = tk.dl.models.Model(model, gen, args.batch_size)
-    model.compile(sgd_lr=0.5 / 256, loss='categorical_crossentropy', metrics=['acc'])
+    model.compile(sgd_lr=1e-3, loss='categorical_crossentropy', metrics=['acc'])
     model.summary()
 
     model.fit(X_train, y_train, validation_data=(X_val, y_val),
