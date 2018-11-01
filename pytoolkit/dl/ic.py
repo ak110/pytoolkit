@@ -39,6 +39,7 @@ class ImageClassifier(models.Model):
         network_type = metadata.get('network_type', None)
         preprocess_mode = metadata['preprocess_mode']
         input_size = int(metadata.get('input_size', 256))
+        rotation_type = metadata.get('rotation_type', 'none')
         gen = _create_generator(len(class_names), (input_size, input_size), preprocess_mode)
         # モデルの読み込み
         network = models.load_model(filepath, compile=False)
