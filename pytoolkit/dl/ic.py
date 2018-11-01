@@ -12,7 +12,9 @@ class ImageClassifier(models.Model):
     """画像分類モデル。"""
 
     @classmethod
-    def create(cls, class_names, network_type='nasnet_large', input_size=256, batch_size=16, rotation_type='all', freeze_type='none', weights='imagenet'):
+    def create(cls, class_names, network_type='nasnet_large', input_size=256, batch_size=16,
+               rotation_type='all', color_jitters=True, random_erasing=True,
+               freeze_type='none', weights='imagenet'):
         """学習用インスタンスの作成。"""
         assert len(class_names) >= 2
         assert network_type in ('vgg16bn', 'resnet50', 'xception', 'nasnet_large')
@@ -21,7 +23,8 @@ class ImageClassifier(models.Model):
         assert freeze_type in ('none', 'without_bn', 'all')
         assert weights in (None, 'imagenet')
         network, preprocess_mode = _create_network(len(class_names), network_type, (input_size, input_size), freeze_type, weights)
-        gen = _create_generator(len(class_names), (input_size, input_size), preprocess_mode, rotation_type)
+        gen = _create_generator(len(class_names), (input_size, input_size), preprocess_mode,
+                                rotation_type=rotation_type, color_jitters=color_jitters, random_erasing=random_erasing)
         model = cls(class_names, network_type, preprocess_mode, input_size, rotation_type, network, gen, batch_size)
         model.compile(sgd_lr=0.1 / 128, loss='categorical_crossentropy', metrics=['acc'])
         return model
@@ -36,8 +39,7 @@ class ImageClassifier(models.Model):
         network_type = metadata.get('network_type', None)
         preprocess_mode = metadata['preprocess_mode']
         input_size = int(metadata.get('input_size', 256))
-        rotation_type = metadata.get('rotation_type', 'none')
-        gen = _create_generator(len(class_names), (input_size, input_size), preprocess_mode, rotation_type)
+        gen = _create_generator(len(class_names), (input_size, input_size), preprocess_mode)
         # モデルの読み込み
         network = models.load_model(filepath, compile=False)
         # 1回予測して計算グラフを構築
@@ -112,7 +114,7 @@ def _create_network(num_classes, network_type, image_size, freeze_type, weights)
     return model, preprocess_mode
 
 
-def _create_generator(num_classes, image_size, preprocess_mode, rotation_type):
+def _create_generator(num_classes, image_size, preprocess_mode, rotation_type='none', color_jitters=False, random_erasing=False):
     """Generatorを作って返す。"""
     gen = image.ImageDataGenerator()
     gen.add(image.Resize(image_size))
@@ -125,8 +127,10 @@ def _create_generator(num_classes, image_size, preprocess_mode, rotation_type):
     gen.add(image.Resize(image_size))
     if rotation_type in ('mirror', 'all'):
         gen.add(image.RandomFlipLR(probability=0.5))
-    gen.add(image.RandomColorAugmentors())
-    gen.add(image.RandomErasing(probability=0.5))
+    if color_jitters:
+        gen.add(image.RandomColorAugmentors())
+    if random_erasing:
+        gen.add(image.RandomErasing(probability=0.5))
     gen.add(image.Preprocess(mode=preprocess_mode))
     gen.add(generator.ProcessOutput(ml.to_categorical(num_classes), batch_axis=True))
     return gen
