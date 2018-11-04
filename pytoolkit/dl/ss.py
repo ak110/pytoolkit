@@ -12,7 +12,7 @@ class SemanticSegmentor(models.Model):
     """セマンティックセグメンテーション。"""
 
     @classmethod
-    def create(cls, class_colors=None, void_color=None, input_size=320, batch_size=16,
+    def create(cls, class_colors=None, void_color=None, input_size=256, batch_size=16,
                rotation_type='all', color_jitters=True, random_erasing=True,
                weights='imagenet'):
         """学習用インスタンスの作成。

@@ -14,7 +14,7 @@ def _main():
     parser.add_argument('mode', default='all', choices=('all', 'train', 'validate'), nargs='?')
     parser.add_argument('--vocdevkit-dir', default=pathlib.Path('data/VOCdevkit'), type=pathlib.Path)
     parser.add_argument('--result-dir', default=pathlib.Path('results_ss_voc'), type=pathlib.Path)
-    parser.add_argument('--input-size', default=320, type=int, nargs=2)
+    parser.add_argument('--input-size', default=256, type=int)
     parser.add_argument('--batch-size', default=16, type=int)
     parser.add_argument('--epochs', default=300, type=int)
     args = parser.parse_args()
