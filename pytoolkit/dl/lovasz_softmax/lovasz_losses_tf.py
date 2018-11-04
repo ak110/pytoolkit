@@ -5,7 +5,6 @@ Maxim Berman 2018 ESAT-PSI KU Leuven (MIT License)
 
 from __future__ import division, print_function
 
-import numpy as np
 import tensorflow as tf
 
 
@@ -28,7 +27,7 @@ def lovasz_grad(gt_sorted):
 def lovasz_hinge(logits, labels, per_image=True, ignore=None, hinge_func='relu'):
     """Binary Lovasz hinge loss
 
-    logits: [B, H, W] Variable, logits at each pixel (between -\infty and +\infty)
+    logits: [B, H, W] Variable, logits at each pixel (between -∞ and +∞)
     labels: [B, H, W] Tensor, binary ground truth masks (0 or 1)
     per_image: compute the loss per image instead of per batch
     ignore: void class id
@@ -49,7 +48,7 @@ def lovasz_hinge(logits, labels, per_image=True, ignore=None, hinge_func='relu')
 def lovasz_hinge_flat(logits, labels, hinge_func):
     """Binary Lovasz hinge loss
 
-    logits: [P] Variable, logits at each prediction (between -\infty and +\infty)
+    logits: [P] Variable, logits at each prediction (between -∞ and +∞)
     labels: [P] Tensor, binary ground truth labels (0 or 1)
     ignore: label to ignore
     """

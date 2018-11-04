@@ -17,6 +17,12 @@ def in_range(x, a, b):
     return np.logical_and(a <= x, x < b)
 
 
+def softmax(a, axis=-1):
+    """ソフトマックス関数。"""
+    e = np.exp(a - np.max(a, axis=axis, keepdims=True))
+    return e / np.sum(e, axis=axis, keepdims=True)
+
+
 def print_histgram(a, bins=10, range=None, weights=None, with_stats=True, ncols=72, name=None, print_fn=print):  # pylint: disable=W0622
     """ヒストグラムを表示する。"""
     for line in format_histgram(a, bins=bins, range=range, weights=weights, with_stats=with_stats, ncols=ncols, name=name):

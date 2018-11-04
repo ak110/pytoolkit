@@ -78,11 +78,13 @@ def lovasz_hinge_elup1(y_true, y_pred):
     return lovasz_losses_tf.lovasz_hinge(logit, y_true, hinge_func='elu+1')
 
 
-def lovasz_hinge_swish(y_true, y_pred):
-    """Binary Lovasz hinge loss。(elu+1)"""
-    from .lovasz_softmax import lovasz_losses_tf
-    logit = backend.logit(y_pred)
-    return lovasz_losses_tf.lovasz_hinge(logit, y_true, hinge_func='swish')
+def make_lovasz_softmax(ignore=None):
+    """Lovasz softmax loss。"""
+    def _lovasz_softmax(y_true, y_pred):
+        import keras.backend as K
+        from .lovasz_softmax import lovasz_losses_tf
+        return lovasz_losses_tf.lovasz_softmax(y_pred, K.argmax(y_true, axis=-1), ignore=ignore)
+    return _lovasz_softmax
 
 
 def od_bias_initializer(nb_classes, pi=0.01):

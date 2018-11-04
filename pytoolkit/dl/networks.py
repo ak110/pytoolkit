@@ -169,6 +169,7 @@ class Builder:
 
         https://arxiv.org/abs/1803.02579
         """
+        assert filters > 0
         import keras
         sse = self.sse_block(name=f'{name}_sse' if name else None)
         cse = self.se_block(filters, name=f'{name}_cse' if name else None)
@@ -193,11 +194,12 @@ class Builder:
         https://arxiv.org/abs/1709.01507
         https://arxiv.org/abs/1803.02579
         """
+        assert filters > 0
         import keras
         reg = keras.regularizers.l2(1e-4)
         seq = [
             keras.layers.GlobalAveragePooling2D(name=f'{name}_p' if name else None),
-            keras.layers.Dense(filters // ratio, activation='relu', kernel_regularizer=reg,
+            keras.layers.Dense(max(filters // ratio, 4), activation='relu', kernel_regularizer=reg,
                                name=f'{name}_sq' if name else None),
             keras.layers.Dense(filters, activation='sigmoid', kernel_regularizer=reg,
                                name=f'{name}_ex' if name else None),

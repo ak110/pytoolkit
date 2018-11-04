@@ -20,7 +20,7 @@ def test_ic(tmpdir):
         model.save(models_dir / 'model.h5', include_optimizer=False)
 
     with tk.dl.session():
-        model = tk.dl.ic.ImageClassifier.load(models_dir / 'model.h5', 1)
+        model = tk.dl.ic.ImageClassifier.load(models_dir / 'model.h5')
         assert class_names == model.class_names
         pred = model.predict(X)
         assert len(pred) == len(y)

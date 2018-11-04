@@ -25,7 +25,7 @@ def _main():
     X_train, y_train = tk.data.voc.load_0712_trainval(args.vocdevkit_dir)
     X_val, y_val = tk.data.voc.load_07_test(args.vocdevkit_dir)
 
-    # 学習(model.h5が存在しない場合のみ。学習後に消さずに再実行した場合は検証だけする。)
+    # 学習
     tk.dl.hvd.init()
     if args.mode in ('train', 'all'):
         with tk.dl.session(use_horovod=True):
@@ -46,7 +46,7 @@ def _train(args, X_train, y_train, X_val, y_val):
     od = tk.dl.od.ObjectDetector(args.input_size, args.map_sizes, num_classes)
     od.fit(X_train, y_train, X_val, y_val,
            batch_size=args.batch_size, epochs=args.epochs,
-           initial_weights=args.base_model if args.base_model is not None else 'imagenet',
+           initial_weights='imagenet' if args.base_model is None else args.base_model,
            pb_size_pattern_count=args.pb_sizes,
            flip_h=True, flip_v=False, rotate90=False,
            plot_path=args.result_dir / 'model.svg',

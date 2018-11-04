@@ -89,6 +89,26 @@ class LoadImage(generator.Operator):
         return x, y, w
 
 
+class LoadOutputImage(generator.Operator):
+    """画像の読み込み。
+
+    # 引数
+
+    - grayscale: グレースケールで読み込むならTrue、RGBならFalse
+    """
+
+    def __init__(self, grayscale):
+        self.grayscale = grayscale
+
+    def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
+        """処理。"""
+        assert rand is not None  # noqa
+        if y is not None:
+            y = ndimage.load(y, self.grayscale)
+            assert len(y.shape) == 3
+        return x, y, w
+
+
 class Resize(generator.Operator):
     """画像のリサイズ。
 

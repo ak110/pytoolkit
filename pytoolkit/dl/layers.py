@@ -237,7 +237,6 @@ def coord_channel_2d():
     """
     import keras
     import keras.backend as K
-    import tensorflow as tf
 
     class CoordChannel2D(keras.layers.Layer):
         """CoordConvなレイヤー。
@@ -787,7 +786,9 @@ def subpixel_conv2d():
         def compute_output_shape(self, input_shape):
             assert len(input_shape) == 4
             assert input_shape[-1] % (self.scale ** 2) == 0
-            return input_shape[0], input_shape[1] * self.scale, input_shape[2] * self.scale, input_shape[3] // (self.scale ** 2)
+            h = None if input_shape[1] is None else input_shape[1] * self.scale
+            w = None if input_shape[0] is None else input_shape[2] * self.scale
+            return input_shape[0], h, w, input_shape[3] // (self.scale ** 2)
 
         def call(self, inputs, **kwargs):
             return tf.depth_to_space(inputs, self.scale)

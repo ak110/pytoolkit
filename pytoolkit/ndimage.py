@@ -16,9 +16,10 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
     やや余計なお世話だけど今後のためにfloat32に変換して返す。
     """
     import cv2
+    assert path_or_array is not None
 
-    # ndarrayならそのまま画像扱い
     if isinstance(path_or_array, np.ndarray):
+        # ndarrayならそのまま画像扱い
         img = np.copy(path_or_array)  # 念のためコピー
     else:
         suffix = pathlib.Path(path_or_array).suffix.lower() if isinstance(path_or_array, (str, pathlib.Path)) else None
@@ -45,9 +46,9 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
             img = np.expand_dims(img, axis=-1)
     else:
         if img.shape[-1] != 3:
-            raise ValueError(f'Image load failed: {path_or_array}')
+            raise ValueError(f'Image load failed: shape={path_or_array.shape}')
     if len(img.shape) != 3:
-        raise ValueError(f'Image load failed: {path_or_array}')
+        raise ValueError(f'Image load failed: shape={path_or_array}')
 
     return img.astype(np.float32)
 
@@ -230,9 +231,13 @@ def resize(rgb: np.ndarray, width: int, height: int, padding=None, interp='lancz
         }[interp]
     else:  # 縮小
         cv2_interp = cv2.INTER_NEAREST if interp == 'nearest' else cv2.INTER_AREA
-    rgb = cv2.resize(rgb, (width, height), interpolation=cv2_interp)
-    if len(rgb.shape) == 2:
-        rgb = np.expand_dims(rgb, axis=-1)
+    if rgb.shape[-1] in (1, 3, 4):
+        rgb = cv2.resize(rgb, (width, height), interpolation=cv2_interp)
+        if len(rgb.shape) == 2:
+            rgb = np.expand_dims(rgb, axis=-1)
+    else:
+        resized_list = [cv2.resize(rgb[:, :, ch], (width, height), interpolation=cv2_interp) for ch in range(rgb.shape[-1])]
+        rgb = np.swapaxes(np.array(resized_list), 0, 2)
     return rgb
 
 

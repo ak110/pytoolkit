@@ -30,7 +30,7 @@ class ImageClassifier(models.Model):
         return model
 
     @classmethod
-    def load(cls, filepath: typing.Union[str, pathlib.Path], batch_size):  # pylint: disable=W0221
+    def load(cls, filepath: typing.Union[str, pathlib.Path], batch_size=16):  # pylint: disable=W0221
         """予測用インスタンスの作成。"""
         filepath = pathlib.Path(filepath)
         # メタデータの読み込み
