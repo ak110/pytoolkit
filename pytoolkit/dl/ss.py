@@ -31,7 +31,8 @@ class SemanticSegmentor(models.Model):
         x = inputs[0]
         x = x_in = builder.preprocess('div255')(x)
         # encoder
-        base_network = applications.darknet53.darknet53(include_top=False, input_tensor=x, weights=weights)
+        base_network = applications.darknet53.darknet53(
+            include_top=False, input_tensor=x, weights=weights)
         lr_multipliers = {l: 0.1 for l in base_network.layers}
         down_list = [x_in]  # stage 0: 1/1
         down_list.append(base_network.get_layer(name='add_1').output)  # stage 1: 1/2
@@ -46,7 +47,6 @@ class SemanticSegmentor(models.Model):
         x = builder.dense(512)(x)
         x = keras.layers.Reshape((1, 1, 512))(x)
         # decoder
-        up_list = []
         for stage, (d, filters) in list(enumerate(zip(down_list, [16, 32, 64, 128, 256, 512])))[::-1]:
             if stage != len(down_list) - 1:
                 x = layers.subpixel_conv2d()(scale=2)(x)
@@ -57,22 +57,6 @@ class SemanticSegmentor(models.Model):
             x = builder.res_block(filters)(x)
             x = builder.res_block(filters)(x)
             x = builder.bn_act()(x)
-            up_list.append(builder.conv2d(32, 1)(x))
-        # hypercolumn
-        x = keras.layers.concatenate([
-            keras.layers.UpSampling2D(32, interpolation='bilinear')(up_list[0]),
-            keras.layers.UpSampling2D(16, interpolation='bilinear')(up_list[1]),
-            keras.layers.UpSampling2D(8, interpolation='bilinear')(up_list[2]),
-            keras.layers.UpSampling2D(4, interpolation='bilinear')(up_list[3]),
-            keras.layers.UpSampling2D(2, interpolation='bilinear')(up_list[4]),
-            up_list[5],
-        ])
-        # refinement
-        x = builder.conv2d(64, use_act=False)(x)
-        x = builder.res_block(64)(x)
-        x = builder.res_block(64)(x)
-        x = builder.res_block(64)(x)
-        x = builder.bn_act()(x)
         # output
         if num_classes == 2:
             x = builder.conv2d(1, use_bias=True, use_bn=False, activation='sigmoid')(x)
@@ -85,7 +69,9 @@ class SemanticSegmentor(models.Model):
         network = keras.models.Model(inputs, x)
         gen = _create_generator(class_colors, void_color, (input_size, input_size), rotation_type=rotation_type,
                                 color_jitters=color_jitters, random_erasing=random_erasing)
-        model = cls(network, gen, batch_size, class_colors=class_colors, rotation_type=rotation_type)
+        model = cls(network, gen, batch_size,
+                    class_colors=class_colors, void_color=void_color,
+                    input_size=input_size, rotation_type=rotation_type)
         model.compile(sgd_lr=0.1 / 128, loss=loss, metrics=[metrics.binary_accuracy],
                       lr_multipliers=lr_multipliers, clipnorm=10.0)
         if weights in (None, 'imagenet'):
@@ -113,14 +99,16 @@ class SemanticSegmentor(models.Model):
         logger = log.get(__name__)
         logger.info('trainable params: %d', models.count_trainable_params(network))
         return cls(network, gen, batch_size,
-                   class_colors=class_colors, void_color=void_color, rotation_type=rotation_type)
+                   class_colors=class_colors, void_color=void_color,
+                   input_size=input_size, rotation_type=rotation_type)
 
     def __init__(self, network, gen, batch_size, postprocess=None,
-                 class_colors=None, void_color=None, rotation_type=None):
+                 class_colors=None, void_color=None, input_size=None, rotation_type=None):
         super().__init__(network, gen, batch_size, postprocess=postprocess)
         self.class_colors = class_colors
-        self.rotation_type = rotation_type
         self.void_color = void_color
+        self.input_size = input_size
+        self.rotation_type = rotation_type
 
     def save(self, filepath: typing.Union[str, pathlib.Path], overwrite=True, include_optimizer=True):
         """保存。"""

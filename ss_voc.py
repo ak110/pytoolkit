@@ -69,21 +69,21 @@ def _train(args, X_train, y_train, X_val, y_val):
         (0, 64, 128),  # tv/monitor
     ]
     void_color = (224, 224, 192)
-    ss = tk.dl.ss.SemanticSegmentor.create(
+    model = tk.dl.ss.SemanticSegmentor.create(
         class_colors, void_color, args.input_size,
         batch_size=args.batch_size, rotation_type='mirror')
-    ss.fit(X_train, y_train, validation_data=(X_val, y_val),
-           epochs=args.epochs,
-           tsv_log_path=args.result_dir / 'history.tsv',
-           mixup=True, cosine_annealing=True)
-    ss.save(args.result_dir / 'model.h5')
+    model.fit(X_train, y_train, validation_data=(X_val, y_val),
+              epochs=args.epochs,
+              tsv_log_path=args.result_dir / 'history.tsv',
+              mixup=True, cosine_annealing=True)
+    model.save(args.result_dir / 'model.h5')
 
 
 @tk.log.trace()
 def _validate(args, X_val, y_val):
-    ss = tk.dl.ss.SemanticSegmentor.load(args.result_dir / 'model.h5')
-    pred_val = ss.predict(X_val)
-    ious, miou = ss.compute_mean_iou(y_val, pred_val)
+    model = tk.dl.ss.SemanticSegmentor.load(args.result_dir / 'model.h5')
+    pred_val = model.predict(X_val)
+    ious, miou = model.compute_mean_iou(y_val, pred_val)
     logger = tk.log.get(__name__)
     logger.info(f'mIoU={miou:.3f}')
     class_names = class_names = ('bg', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse', 'motorbike', 'person', 'potted plant', 'sheep', 'sofa', 'train', 'tv/monitor')
