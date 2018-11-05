@@ -87,6 +87,17 @@ def make_lovasz_softmax(ignore=None):
     return _lovasz_softmax
 
 
+def make_mixed_lovasz_softmax(ignore=None):
+    """Lovasz softmax loss + CE。"""
+    def _lovasz_softmax(y_true, y_pred):
+        import keras.backend as K
+        from .lovasz_softmax import lovasz_losses_tf
+        loss1 = lovasz_losses_tf.lovasz_softmax(y_pred, K.argmax(y_true, axis=-1), ignore=ignore)
+        loss2 = K.categorical_crossentropy(y_true, y_pred)
+        return loss1 * 0.9 + loss2 * 0.1
+    return _lovasz_softmax
+
+
 def od_bias_initializer(nb_classes, pi=0.01):
     """Object Detectionの最後のクラス分類のbias_initializer。
 

@@ -65,7 +65,7 @@ class SemanticSegmentor(models.Model):
             assert void_color is None
         else:
             x = builder.conv2d(num_classes, use_bias=True, use_bn=False, activation='softmax')(x)
-            loss = losses.make_lovasz_softmax(ignore=num_classes)
+            loss = losses.make_mixed_lovasz_softmax(ignore=num_classes)
             mets = ['acc']
 
         network = keras.models.Model(inputs, x)
