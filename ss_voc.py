@@ -85,8 +85,9 @@ def _validate(args, X_val, y_val):
     pred_val = model.predict(X_val, verbose=1)
     # 描画
     plot_step = len(X_val) // 32
-    for x, p in zip(X_val[::plot_step], tk.tqdm(pred_val[::plot_step], desc='plot')):
-        model.plot(args.result_dir / 'pred_val' / f'{x.stem}.png', x, p)
+    for x, p in tk.tqdm(list(zip(X_val[::plot_step], pred_val[::plot_step])), desc='plot'):
+        model.plot(args.result_dir / 'pred_val' / f'{x.stem}.soft.png', x, p, mode='soft')
+        model.plot(args.result_dir / 'pred_val' / f'{x.stem}.hard.png', x, p, mode='hard')
     # 評価(mean IoU)
     ious, miou = model.compute_mean_iou(y_val, pred_val)
     logger = tk.log.get(__name__)

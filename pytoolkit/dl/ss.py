@@ -133,7 +133,7 @@ class SemanticSegmentor(models.Model):
         i2o = make_image_to_onehot(self.class_colors, self.void_color)
         inters = np.zeros((num_classes,))
         unions = np.zeros((num_classes,))
-        for yt_path, yp in zip(y_true, utils.tqdm(y_pred, desc='compute_mean_iou')):
+        for yt_path, yp in utils.tqdm(list(zip(y_true, y_pred)), desc='compute_mean_iou'):
             # 答えを読み込む＆予測結果をリサイズしてクラス化
             if self.class_colors is None:
                 yt = i2o(ndimage.load(yt_path)).round()
@@ -151,13 +151,23 @@ class SemanticSegmentor(models.Model):
         ious = inters / np.maximum(unions, 1)
         return ious, np.mean(ious)
 
-    def plot(self, filepath, x, pred):
+    def plot(self, filepath, x, pred, mode='soft'):
         """予測結果を画像化して保存。"""
+        assert mode in ('soft', 'hard')
         img = ndimage.load(x)
         pred = ndimage.resize(pred, img.shape[1], img.shape[0])
-        if self.class_colors is not None:
-            colors_table = np.reshape(self.class_colors, (1, 1, len(self.class_colors), 3))
-            pred = np.sum(np.expand_dims(pred, axis=-1) * colors_table, axis=-2)
+        if self.class_colors is None:
+            if mode == 'soft':
+                pass
+            else:
+                pred = pred.round()
+        else:
+            if mode == 'soft':
+                colors_table = np.reshape(self.class_colors, (1, 1, len(self.class_colors), 3))
+                pred = np.sum(np.expand_dims(pred, axis=-1) * colors_table, axis=-2)
+            else:
+                colors_table = np.array(self.class_colors)
+                pred = colors_table[pred.argmax(axis=-1)]
         ndimage.save(filepath, pred)
 
 
