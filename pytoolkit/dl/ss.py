@@ -5,7 +5,7 @@ import typing
 import numpy as np
 
 from . import hvd, layers, losses, metrics, models, networks
-from .. import applications, generator, image, jsonex, log, math, ndimage
+from .. import applications, generator, image, jsonex, log, math, ndimage, utils
 
 
 class SemanticSegmentor(models.Model):
@@ -61,10 +61,12 @@ class SemanticSegmentor(models.Model):
         if num_classes == 2:
             x = builder.conv2d(1, use_bias=True, use_bn=False, activation='sigmoid')(x)
             loss = losses.lovasz_hinge_elup1
+            mets = [metrics.binary_accuracy]
             assert void_color is None
         else:
             x = builder.conv2d(num_classes, use_bias=True, use_bn=False, activation='softmax')(x)
             loss = losses.make_lovasz_softmax(ignore=num_classes)
+            mets = ['acc']
 
         network = keras.models.Model(inputs, x)
         gen = _create_generator(class_colors, void_color, (input_size, input_size), rotation_type=rotation_type,
@@ -72,7 +74,7 @@ class SemanticSegmentor(models.Model):
         model = cls(network, gen, batch_size,
                     class_colors=class_colors, void_color=void_color,
                     input_size=input_size, rotation_type=rotation_type)
-        model.compile(sgd_lr=0.1 / 128, loss=loss, metrics=[metrics.binary_accuracy],
+        model.compile(sgd_lr=0.1 / 128, loss=loss, metrics=mets,
                       lr_multipliers=lr_multipliers, clipnorm=10.0)
         if weights in (None, 'imagenet'):
             pass  # cold start
@@ -98,9 +100,10 @@ class SemanticSegmentor(models.Model):
         network.predict_on_batch(np.zeros((1, input_size, input_size, 3)))
         logger = log.get(__name__)
         logger.info('trainable params: %d', models.count_trainable_params(network))
-        return cls(network, gen, batch_size,
-                   class_colors=class_colors, void_color=void_color,
-                   input_size=input_size, rotation_type=rotation_type)
+        model = cls(network, gen, batch_size,
+                    class_colors=class_colors, void_color=void_color,
+                    input_size=input_size, rotation_type=rotation_type)
+        return model
 
     def __init__(self, network, gen, batch_size, postprocess=None,
                  class_colors=None, void_color=None, input_size=None, rotation_type=None):
@@ -130,26 +133,32 @@ class SemanticSegmentor(models.Model):
         i2o = make_image_to_onehot(self.class_colors, self.void_color)
         inters = np.zeros((num_classes,))
         unions = np.zeros((num_classes,))
-        for yt_path, yp in zip(y_true, y_pred):
+        for yt_path, yp in zip(y_true, utils.tqdm(y_pred, desc='compute_mean_iou')):
             # 答えを読み込む＆予測結果をリサイズしてクラス化
             if self.class_colors is None:
                 yt = i2o(ndimage.load(yt_path)).round()
                 yp = ndimage.resize(yp, yt.shape[1], yt.shape[0]).round()
             else:
                 yt = i2o(ndimage.load(yt_path))
-                mask = np.ravel(yt.sum(axis=-1) > 0.5)
-                yt = yt.argmax(axis=-1)
-                yp = ndimage.resize(yp, yt.shape[1], yt.shape[0]).argmax(axis=-1)
-                # void_color部分は無視
-                yt = np.ravel(yt)[mask]
-                yp = np.ravel(yp)[mask]
+                mask = np.ravel(yt.sum(axis=-1)) > 0.5  # void_color部分は無視
+                yp = np.ravel(ndimage.resize(yp, yt.shape[1], yt.shape[0]).argmax(axis=-1))[mask]
+                yt = np.ravel(yt.argmax(axis=-1))[mask]
             # クラスごとに集計
             for c in range(num_classes):
-                tt, tp = yt == c, yp == c
-                inters[c] += np.sum(np.logical_and(tt, tp))
-                unions[c] += np.sum(np.logical_or(tt, tp))
-        ious = inters / (unions + 1e-7)
+                ct, cp = yt == c, yp == c
+                inters[c] += np.sum(np.logical_and(ct, cp))
+                unions[c] += np.sum(np.logical_or(ct, cp))
+        ious = inters / np.maximum(unions, 1)
         return ious, np.mean(ious)
+
+    def plot(self, filepath, x, pred):
+        """予測結果を画像化して保存。"""
+        img = ndimage.load(x)
+        pred = ndimage.resize(pred, img.shape[1], img.shape[0])
+        if self.class_colors is not None:
+            colors_table = np.reshape(self.class_colors, (1, 1, len(self.class_colors), 3))
+            pred = np.sum(np.expand_dims(pred, axis=-1) * colors_table, axis=-2)
+        ndimage.save(filepath, pred)
 
 
 def _create_generator(class_colors, void_color, image_size,

@@ -82,7 +82,12 @@ def _train(args, X_train, y_train, X_val, y_val):
 @tk.log.trace()
 def _validate(args, X_val, y_val):
     model = tk.dl.ss.SemanticSegmentor.load(args.result_dir / 'model.h5')
-    pred_val = model.predict(X_val)
+    pred_val = model.predict(X_val, verbose=1)
+    # 描画
+    plot_step = len(X_val) // 32
+    for x, p in zip(X_val[::plot_step], tk.tqdm(pred_val[::plot_step], desc='plot')):
+        model.plot(args.result_dir / 'pred_val' / f'{x.stem}.jpg', x, p)
+    # 評価(mean IoU)
     ious, miou = model.compute_mean_iou(y_val, pred_val)
     logger = tk.log.get(__name__)
     logger.info(f'mIoU={miou:.3f}')
