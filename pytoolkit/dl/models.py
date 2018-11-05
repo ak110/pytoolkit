@@ -64,7 +64,6 @@ class Model:
     @log.trace()
     def compile(self, optimizer=None, loss=None, metrics=None, loss_weights=None,
                 sample_weight_mode=None, weighted_metrics=None, target_tensors=None,
-                device_dense='', device_sparse='',
                 sgd_lr=None, clipnorm=0, clipvalue=0, lr_multipliers=None):
         """コンパイル。
 
@@ -90,8 +89,7 @@ class Model:
             optimizer = optimizers.nsgd()(lr=lr, lr_multipliers=lr_multipliers, clipnorm=clipnorm, clipvalue=clipvalue)
 
         if hvd.initialized():
-            optimizer = hvd.get().DistributedOptimizer(
-                optimizer, device_dense=device_dense, device_sparse=device_sparse)
+            optimizer = hvd.get().DistributedOptimizer(optimizer, compression=hvd.get().Compression.fp16)
 
         self.model.compile(optimizer, loss, metrics=metrics, loss_weights=loss_weights,
                            sample_weight_mode=sample_weight_mode,
