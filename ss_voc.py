@@ -75,7 +75,7 @@ def _train(args, X_train, y_train, X_val, y_val):
     model.fit(X_train, y_train, validation_data=(X_val, y_val),
               epochs=args.epochs,
               tsv_log_path=args.result_dir / 'history.tsv',
-              mixup=True, cosine_annealing=True)
+              mixup=False, cosine_annealing=True)
     model.save(args.result_dir / 'model.h5')
 
 
