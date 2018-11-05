@@ -237,7 +237,7 @@ def resize(rgb: np.ndarray, width: int, height: int, padding=None, interp='lancz
             rgb = np.expand_dims(rgb, axis=-1)
     else:
         resized_list = [cv2.resize(rgb[:, :, ch], (width, height), interpolation=cv2_interp) for ch in range(rgb.shape[-1])]
-        rgb = np.swapaxes(np.array(resized_list), 0, 2)
+        rgb = np.transpose(resized_list, (1, 2, 0))
     return rgb
 
 
