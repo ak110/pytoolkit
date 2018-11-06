@@ -47,6 +47,7 @@ class SemanticSegmentor(models.Model):
         x = builder.dense(512)(x)
         x = keras.layers.Reshape((1, 1, 512))(x)
         # decoder
+        up_list = []
         for stage, (d, filters) in list(enumerate(zip(down_list, [16, 32, 64, 128, 256, 512])))[::-1]:
             if stage != len(down_list) - 1:
                 x = layers.subpixel_conv2d()(scale=2)(x)
@@ -57,6 +58,20 @@ class SemanticSegmentor(models.Model):
             x = builder.res_block(filters)(x)
             x = builder.res_block(filters)(x)
             x = builder.bn_act()(x)
+            up_list.append(builder.conv2d(32, 1, use_act=False)(x))
+        # Hypercolumn
+        x = keras.layers.add([
+            keras.layers.UpSampling2D(32, interpolation='bilinear')(up_list[0]),
+            keras.layers.UpSampling2D(16, interpolation='bilinear')(up_list[1]),
+            keras.layers.UpSampling2D(8, interpolation='bilinear')(up_list[2]),
+            keras.layers.UpSampling2D(4, interpolation='bilinear')(up_list[3]),
+            keras.layers.UpSampling2D(2, interpolation='bilinear')(up_list[4]),
+            up_list[5],
+        ])
+        # Refinement
+        x = builder.res_block(32)(x)
+        x = builder.res_block(32)(x)
+        x = builder.bn_act()(x)
         # output
         if num_classes == 2:
             x = builder.conv2d(1, use_bias=True, use_bn=False, activation='sigmoid')(x)
@@ -74,7 +89,7 @@ class SemanticSegmentor(models.Model):
         model = cls(network, gen, batch_size,
                     class_colors=class_colors, void_color=void_color,
                     input_size=input_size, rotation_type=rotation_type)
-        model.compile(sgd_lr=0.5 / 256, loss=loss, metrics=mets,
+        model.compile(sgd_lr=1e-3, loss=loss, metrics=mets,
                       lr_multipliers=lr_multipliers, clipnorm=10.0)
         if weights in (None, 'imagenet'):
             pass  # cold start
@@ -203,9 +218,9 @@ class SemanticSegmentor(models.Model):
             yp = yp.round().astype(np.uint8)
         else:
             yt = i2o(yt)
-            mask = np.ravel(yt.sum(axis=-1)) > 0.5  # void_color部分は無視
-            yp = np.ravel(yp.argmax(axis=-1))[mask]
-            yt = np.ravel(yt.argmax(axis=-1))[mask]
+            mask = yt.sum(axis=-1) > 0.5  # void_color部分(all 0)は無視
+            yp = yp.argmax(axis=-1)[mask]
+            yt = yt.argmax(axis=-1)[mask]
         return yt, yp
 
     def get_mask(self, x_or_y, pred):
