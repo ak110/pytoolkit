@@ -57,9 +57,8 @@ def cosine_annealing(factor=0.01, epochs=None):
 
         def __init__(self, factor, epochs):
             self.factor = factor
-            self.period = None
+            self.epochs = epochs
             self.start_lr = None
-            self.epochs = None
             super().__init__()
 
         def on_train_begin(self, logs=None):
@@ -173,8 +172,8 @@ def tsv_logger(filename, append=False):
                 return f'{value:.4f}'
 
             metrics = [_format_metric(logs, k) for k in self.params['metrics']]
-            self.log_writer.writerow([epoch + 1, format(logs['lr'], '.1e')] + metrics +
-                                     [str(int(np.ceil(elapsed_time)))])
+            row = [epoch + 1, format(logs['lr'], '.1e')] + metrics + [str(int(np.ceil(elapsed_time)))]
+            self.log_writer.writerow(row)
             self.log_file.flush()
 
         def on_train_end(self, logs=None):

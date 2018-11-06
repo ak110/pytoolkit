@@ -1,7 +1,5 @@
 """keras.backendやtensorflowの基礎的な関数など。"""
 
-import numpy as np
-
 
 def logit(x):
     """ロジット関数。シグモイド関数の逆関数。"""

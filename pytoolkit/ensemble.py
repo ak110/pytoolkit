@@ -165,4 +165,3 @@ class KerasWeakModel(WeakModel):
         """1-fold分の予測。テストデータの場合はcv_index=-1。"""
         utils.noqa(X)
         utils.noqa(cv_index)
-        return None

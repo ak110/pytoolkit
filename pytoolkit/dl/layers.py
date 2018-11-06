@@ -767,7 +767,6 @@ def subpixel_conv2d():
     https://arxiv.org/abs/1609.05158
 
     """
-
     import keras
     import tensorflow as tf
 

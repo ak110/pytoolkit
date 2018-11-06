@@ -11,7 +11,7 @@ binary_accuracy.__name__ = 'acc'  # 長いので名前変えちゃう
 
 
 def mean_iou(y_true, y_pred, threhsold=0.5):
-    """mean IoU。"""
+    """Mean IoU。"""
     import keras.backend as K
     import tensorflow as tf
     y_pred_mask = tf.to_int32(y_pred >= threhsold)

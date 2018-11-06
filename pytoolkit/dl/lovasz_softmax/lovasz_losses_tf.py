@@ -1,5 +1,5 @@
-"""
-Lovasz-Softmax and Jaccard hinge loss in Tensorflow
+"""Lovasz-Softmax and Jaccard hinge loss in Tensorflow
+
 Maxim Berman 2018 ESAT-PSI KU Leuven (MIT License)
 """
 
@@ -52,7 +52,6 @@ def lovasz_hinge_flat(logits, labels, hinge_func):
     labels: [P] Tensor, binary ground truth labels (0 or 1)
     ignore: label to ignore
     """
-
     def compute_loss():
         labelsf = tf.cast(labels, logits.dtype)
         signs = 2. * labelsf - 1.
