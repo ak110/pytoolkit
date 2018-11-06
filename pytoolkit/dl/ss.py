@@ -65,7 +65,7 @@ class SemanticSegmentor(models.Model):
             assert void_color is None
         else:
             x = builder.conv2d(num_classes, use_bias=True, use_bn=False, activation='softmax')(x)
-            loss = losses.make_mixed_lovasz_softmax(ignore=num_classes)
+            loss = 'categorical_crossentropy'
             mets = ['acc']
 
         network = keras.models.Model(inputs, x)
@@ -74,7 +74,7 @@ class SemanticSegmentor(models.Model):
         model = cls(network, gen, batch_size,
                     class_colors=class_colors, void_color=void_color,
                     input_size=input_size, rotation_type=rotation_type)
-        model.compile(sgd_lr=0.1 / 128, loss=loss, metrics=mets,
+        model.compile(sgd_lr=0.5 / 256, loss=loss, metrics=mets,
                       lr_multipliers=lr_multipliers, clipnorm=10.0)
         if weights in (None, 'imagenet'):
             pass  # cold start
