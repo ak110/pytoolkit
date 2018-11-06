@@ -180,8 +180,7 @@ class SemanticSegmentor(models.Model):
     def plot_mask(self, x, pred, color_mode='soft'):
         """予測結果を画像化して返す。"""
         assert color_mode in ('soft', 'hard')
-        img = ndimage.load(x)
-        pred = ndimage.resize(pred, img.shape[1], img.shape[0])
+        _, pred = self.get_mask(x, pred)
         if self.class_colors is None:
             if color_mode == 'soft':
                 pass
@@ -211,7 +210,7 @@ class SemanticSegmentor(models.Model):
 
     def get_mask(self, x_or_y, pred):
         """予測結果を入力のサイズに合わせて返す。"""
-        img = ndimage.load(x_or_y)
+        img = ndimage.load(x_or_y, grayscale=self.class_colors is None)
         pred = ndimage.resize(pred, img.shape[1], img.shape[0])
         return img, pred
 
