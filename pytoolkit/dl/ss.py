@@ -128,47 +128,92 @@ class SemanticSegmentor(models.Model):
         super().save(filepath, overwrite=overwrite, include_optimizer=include_optimizer)
 
     def compute_mean_iou(self, y_true, y_pred):
-        """クラス毎のIoUを算出する。"""
-        num_classes = y_pred.shape[-1]
+        """クラス毎のIoUとその平均(mean IoU)を算出する。
+
+        # 戻り値
+        - ious: クラスごとのIoU
+        - miou: iousの平均 (ただし2クラスの場合は0:背景、1:物体と見なして物体のIoU)
+
+        """
+        if self.class_colors is None:
+            num_classes = 2
+        else:
+            num_classes = y_pred.shape[-1]
         i2o = make_image_to_onehot(self.class_colors, self.void_color)
         inters = np.zeros((num_classes,))
         unions = np.zeros((num_classes,))
-        for yt_path, yp in utils.tqdm(list(zip(y_true, y_pred)), desc='compute_mean_iou'):
-            # 答えを読み込む＆予測結果をリサイズしてクラス化
-            if self.class_colors is None:
-                yt = i2o(ndimage.load(yt_path)).round()
-                yp = ndimage.resize(yp, yt.shape[1], yt.shape[0]).round()
-            else:
-                yt = i2o(ndimage.load(yt_path))
-                mask = np.ravel(yt.sum(axis=-1)) > 0.5  # void_color部分は無視
-                yp = np.ravel(ndimage.resize(yp, yt.shape[1], yt.shape[0]).argmax(axis=-1))[mask]
-                yt = np.ravel(yt.argmax(axis=-1))[mask]
+        for yt_path, yp in utils.tqdm(list(zip(y_true, y_pred)), desc='mIoU'):
+            yt, yp = self.get_mask_for_evaluation(yt_path, yp, i2o)
             # クラスごとに集計
             for c in range(num_classes):
                 ct, cp = yt == c, yp == c
                 inters[c] += np.sum(np.logical_and(ct, cp))
                 unions[c] += np.sum(np.logical_or(ct, cp))
         ious = inters / np.maximum(unions, 1)
-        return ious, np.mean(ious)
+        if self.class_colors is None:
+            return ious, ious[1]
+        else:
+            return ious, np.mean(ious)
 
-    def plot(self, filepath, x, pred, mode='soft'):
-        """予測結果を画像化して保存。"""
-        assert mode in ('soft', 'hard')
+    def compute_mean_iou_per_image(self, y_true, y_pred):
+        """画像ごとのmean IoUを算出する。"""
+        i2o = make_image_to_onehot(self.class_colors, self.void_color)
+        mious = np.empty((len(y_true),))
+        for i, (yt_path, yp) in utils.tqdm(list(enumerate(zip(y_true, y_pred))), desc='mIoU/image'):
+            yt, yp = self.get_mask_for_evaluation(yt_path, yp, i2o)
+            if self.class_colors is None:
+                ct, cp = yt == 1, yp == 1
+                inter = np.sum(np.logical_and(ct, cp))
+                union = np.sum(np.logical_or(ct, cp))
+                mious[i] = inter / union  # IoU (class 1)
+            else:
+                iou_list = []
+                for c in range(len(self.class_colors)):
+                    ct, cp = yt == c, yp == c
+                    union = np.sum(np.logical_or(ct, cp))
+                    if union > 0:
+                        inter = np.sum(np.logical_and(ct, cp))
+                        iou_list.append(inter / union)
+                mious[i] = np.mean(iou_list)  # mean IoU
+        return mious
+
+    def plot_mask(self, x, pred, color_mode='soft'):
+        """予測結果を画像化して返す。"""
+        assert color_mode in ('soft', 'hard')
         img = ndimage.load(x)
         pred = ndimage.resize(pred, img.shape[1], img.shape[0])
         if self.class_colors is None:
-            if mode == 'soft':
+            if color_mode == 'soft':
                 pass
             else:
                 pred = pred.round()
         else:
-            if mode == 'soft':
+            if color_mode == 'soft':
                 colors_table = np.reshape(self.class_colors, (1, 1, len(self.class_colors), 3))
                 pred = np.sum(np.expand_dims(pred, axis=-1) * colors_table, axis=-2)
             else:
                 colors_table = np.array(self.class_colors)
                 pred = colors_table[pred.argmax(axis=-1)]
-        ndimage.save(filepath, pred)
+        return pred
+
+    def get_mask_for_evaluation(self, y, pred, i2o):
+        """答えと予測結果のマスクを評価用に色々整えて返す。"""
+        yt, yp = self.get_mask(y, pred)
+        if self.class_colors is None:
+            yt = i2o(yt).round().astype(np.uint8)
+            yp = yp.round().astype(np.uint8)
+        else:
+            yt = i2o(yt)
+            mask = np.ravel(yt.sum(axis=-1)) > 0.5  # void_color部分は無視
+            yp = np.ravel(yp.argmax(axis=-1))[mask]
+            yt = np.ravel(yt.argmax(axis=-1))[mask]
+        return yt, yp
+
+    def get_mask(self, x_or_y, pred):
+        """予測結果を入力のサイズに合わせて返す。"""
+        img = ndimage.load(x_or_y)
+        pred = ndimage.resize(pred, img.shape[1], img.shape[0])
+        return img, pred
 
 
 def _create_generator(class_colors, void_color, image_size,
