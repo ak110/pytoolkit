@@ -183,9 +183,9 @@ class SemanticSegmentor(models.Model):
         _, pred = self.get_mask(x, pred)
         if self.class_colors is None:
             if color_mode == 'soft':
-                pass
+                pred *= 255
             else:
-                pred = pred.round()
+                pred = pred.round() * 255
         else:
             if color_mode == 'soft':
                 colors_table = np.reshape(self.class_colors, (1, 1, len(self.class_colors), 3))
