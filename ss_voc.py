@@ -30,8 +30,8 @@ def _main():
     y_val = np.array([args.vocdevkit_dir / 'VOC2012' / 'SegmentationClass' / f'{n}.png' for n in val_names])
     # バイナリマスク化 (メモリ上でやっちゃう)
     if args.binary:
-        y_train = np.array([(tk.ndimage.load(y, grayscale=True) <= 1).astype(np.uint8) for y in y_train], dtype=object)
-        y_val = np.array([(tk.ndimage.load(y, grayscale=True) <= 1).astype(np.uint8) for y in y_val], dtype=object)
+        y_train = np.array([(tk.ndimage.load(y, grayscale=True) >= 1).astype(np.uint8) for y in y_train], dtype=object)
+        y_val = np.array([(tk.ndimage.load(y, grayscale=True) >= 1).astype(np.uint8) for y in y_val], dtype=object)
 
     # 学習
     tk.dl.hvd.init()
