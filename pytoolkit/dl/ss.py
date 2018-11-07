@@ -52,7 +52,6 @@ class SemanticSegmentor(models.Model):
             if stage != len(down_list) - 1:
                 x = layers.subpixel_conv2d()(scale=2)(x)
                 x = builder.conv2d(filters, 1, use_act=False)(x)
-            d = builder.scse_block(builder.shape(d)[-1])(d)
             d = builder.conv2d(filters, 1, use_act=False)(d)
             x = keras.layers.add([x, d])
             x = builder.res_block(filters)(x)
