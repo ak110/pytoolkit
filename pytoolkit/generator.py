@@ -30,6 +30,7 @@ class GeneratorContext:
             assert len(weights) == self.data_count
         if balanced:
             assert shuffle, 'balancedはshuffle=Trueのときのみ有効'
+        assert self.data_count > 0
 
     def do_augmentation(self, rand, probability=1):
         """DataAugmentationを確率的にやるときの判定。"""

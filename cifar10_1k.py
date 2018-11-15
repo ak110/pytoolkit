@@ -85,7 +85,8 @@ def _extract(X, y, num_classes):
 
     index_list = []
     for c in range(num_classes):
-        index_list.extend(np.where(y == num_per_class)[0][:num_per_class])
+        index_list.extend(np.where(y == c)[0][:num_per_class])
+    assert len(index_list) == num_data
 
     return X[index_list], y[index_list]
 

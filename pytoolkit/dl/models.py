@@ -115,7 +115,7 @@ class Model:
             epochs=1, verbose=1,
             validation_data: tuple = None,
             class_weight=None,
-            max_queue_size=10, use_multiprocessing=False,
+            max_queue_size=10, workers=1, use_multiprocessing=False,
             initial_epoch=0,
             tsv_log_path=None,
             tsv_log_append=False,
@@ -197,6 +197,7 @@ class Model:
             validation_steps=steps2,
             class_weight=class_weight,
             max_queue_size=max_queue_size,
+            workers=workers,
             use_multiprocessing=use_multiprocessing,
             shuffle=False,
             initial_epoch=initial_epoch)
