@@ -11,8 +11,7 @@ import pytoolkit as tk
 def _main():
     tk.better_exceptions()
     parser = argparse.ArgumentParser()
-    parser.add_argument('--result-dir', default=pathlib.Path('results_classifier'), type=pathlib.Path)
-    parser.add_argument('--dataset', default='cifar100', choices=('cifar10', 'cifar100'))
+    parser.add_argument('--result-dir', default=pathlib.Path('results_cifar100'), type=pathlib.Path)
     parser.add_argument('--epochs', default=300, type=int)
     parser.add_argument('--batch-size', default=64, type=int)
     args = parser.parse_args()
@@ -26,12 +25,7 @@ def _main():
 def _run(args):
     import keras
 
-    if args.dataset == 'cifar10':
-        (X_train, y_train), (X_val, y_val) = keras.datasets.cifar10.load_data()
-    elif args.dataset == 'cifar100':
-        (X_train, y_train), (X_val, y_val) = keras.datasets.cifar100.load_data()
-    else:
-        assert False
+    (X_train, y_train), (X_val, y_val) = keras.datasets.cifar100.load_data()
     y_train = np.squeeze(y_train)
     y_val = np.squeeze(y_val)
     input_shape = X_train.shape[1:]
