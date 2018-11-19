@@ -13,7 +13,7 @@ def _main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--result-dir', default=pathlib.Path('results_cifar10_1k'), type=pathlib.Path)
     parser.add_argument('--epochs', default=1800, type=int)
-    parser.add_argument('--batch-size', default=64, type=int)
+    parser.add_argument('--batch-size', default=16, type=int)
     args = parser.parse_args()
     args.result_dir.mkdir(parents=True, exist_ok=True)
     with tk.dl.session(use_horovod=True):
@@ -36,9 +36,11 @@ def _run(args):
         builder = tk.dl.networks.Builder()
         x = inp = keras.layers.Input(input_shape)
         x = builder.conv2d(128, use_act=False, name=f'start')(x)
-        for stage, filters in enumerate([128, 256, 512]):
+        for stage, filters in enumerate([128, 256, 384]):
             name1 = f'stage{stage + 1}'
-            x = builder.conv2d(filters, strides=1 if stage == 0 else 2, use_act=False, name=f'{name1}_ds')(x)
+            if stage > 0:
+                x = builder.conv2d(filters, 1, use_act=False, name=f'{name1}_pre')(x)
+                x = tk.dl.layers.parallel_grid_pooling_2d()(name=f'{name1}_ds')(x)
             for block in range(8):
                 name2 = f'stage{stage + 1}_block{block + 1}'
                 sc = x
@@ -52,6 +54,7 @@ def _run(args):
         x = keras.layers.Dropout(0.5, name='dropout')(x)
         x = keras.layers.GlobalAveragePooling2D(name='pooling')(x)
         x = builder.dense(num_classes, activation='softmax', name='predictions')(x)
+        x = tk.dl.layers.parallel_grid_gather()(4 * 4)(x)
         model = keras.models.Model(inputs=inp, outputs=x)
 
     gen = tk.image.ImageDataGenerator()
@@ -69,7 +72,7 @@ def _run(args):
     model.compile(sgd_lr=1e-3, loss='categorical_crossentropy', metrics=['acc'])
     model.summary()
 
-    model.fit(X_train, y_train, validation_data=(X_val, y_val),
+    model.fit(X_train, y_train, # validation_data=(X_val, y_val),
               epochs=args.epochs, tsv_log_path=args.result_dir / 'history.tsv',
               mixup=True, cosine_annealing=True)
     model.save(args.result_dir / 'model.h5')
