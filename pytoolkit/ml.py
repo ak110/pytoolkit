@@ -14,24 +14,30 @@ from . import draw, log, ndimage, utils
 
 
 class ObjectsAnnotation:
-    """物体検出のアノテーションデータを持つためのクラス。"""
+    """物体検出のアノテーションデータを持つためのクラス。
+
+    # プロパティ
+    - path: 画像ファイルのパス
+    - width: 画像の横幅(px)
+    - height: 画像の縦幅(px)
+    - classes: クラスIDのndarray。値は[0, num_classes)の整数。shapeは(物体数,)
+    - bboxes: bounding box(x1, y1, x2, y2)のndarray。値は[0, 1]。shapeは(物体数, 4)
+    - difficults: difficultフラグ(PASCAL VOCデータセット等で使用)のndarray。値はTrue or False。shapeは(物体数,)
+    - num_objects: 物体数
+    - real_bboxes: [0, 1]ではなくピクセル数単位に変換したbboxes
+
+    """
 
     def __init__(self, path, width, height, classes, bboxes, difficults=None):
         assert len(classes) == len(bboxes)
         assert difficults is None or len(classes) == len(difficults)
-        # 画像ファイルのフルパス
         self.path = pathlib.Path(path)
-        # 画像の横幅(px)
         self.width = width
-        # 画像の縦幅(px)
         self.height = height
-        # クラスIDの配列
         self.classes = np.asarray(classes, dtype=np.int32)
-        # bounding box(x1, y1, x2, y2)の配列。(0～1)
         self.bboxes = np.asarray(bboxes, dtype=np.float32)
         if self.num_objects == 0:
             self.bboxes = self.bboxes.reshape((self.num_objects, 4))
-        # difficultフラグの配列。(True or False)
         self.difficults = np.asarray(difficults, dtype=np.bool) if difficults is not None else np.zeros(len(classes), dtype=np.bool)
         assert self.width >= 1
         assert self.height >= 1
@@ -91,7 +97,15 @@ class ObjectsAnnotation:
 
 
 class ObjectsPrediction:
-    """物体検出の予測結果を持つクラス。"""
+    """物体検出の予測結果を持つクラス。
+
+    # プロパティ
+    - classes: クラスIDのndarray。値は[0, num_classes)の整数。shapeは(物体数,)
+    - confs: 確信度のndarray。値は[0, 1]。shapeは(物体数,)
+    - bboxes: bounding box(x1, y1, x2, y2)のndarray。値は[0, 1]。shapeは(物体数, 4)
+    - num_objects: 物体数
+
+    """
 
     def __init__(self, classes, confs, bboxes):
         self.classes = np.asarray(classes)
