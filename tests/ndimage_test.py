@@ -1,6 +1,7 @@
 import pathlib
 
 import numpy as np
+import pytest
 
 import pytoolkit as tk
 
@@ -23,6 +24,11 @@ def test_saveload_gif(tmpdir):
     assert img is not None
     tk.ndimage.save(str(tmpdir.join('output.bmp')), img)
     assert (tk.ndimage.load(str(tmpdir.join('output.bmp'))) == img).all()
+
+
+def test_load_text_failed():
+    with pytest.raises(BaseException):
+        tk.ndimage.load(_BASE_DIR / 'data' / 'text.txt')
 
 
 def test_filters():
