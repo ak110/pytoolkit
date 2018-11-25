@@ -7,7 +7,7 @@ numpy
 opencv-python
 pandas
 pydot
-pytest
+pytest==3.9.3
 scikit-learn
 scipy
 sqlalchemy
