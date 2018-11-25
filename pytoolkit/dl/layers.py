@@ -17,6 +17,7 @@ def get_custom_objects():
         group_normalization(),
         destandarization(),
         stocastic_add(),
+        mix_feat(),
         normal_noise(),
         l2normalization(),
         weighted_mean(),
@@ -529,6 +530,43 @@ def stocastic_add():
 
     return StocasticAdd
 
+
+def mix_feat():
+    """MixFeat <https://openreview.net/forum?id=HygT9oRqFX>"""
+    import keras
+    import keras.backend as K
+    import tensorflow as tf
+
+    class MixFeat(keras.layers.Layer):
+        """MixFeat <https://openreview.net/forum?id=HygT9oRqFX>"""
+
+        def __init__(self, sigma=0.2, **kargs):
+            self.sigma = sigma
+            super().__init__(**kargs)
+
+        def call(self, inputs, training=None):  # pylint: disable=arguments-differ
+            def _passthru():
+                return inputs
+
+            def _mix_feat():
+                shape = K.shape(inputs)
+                indices = K.arange(start=0, stop=shape[0])
+                indices = tf.random_shuffle(indices)
+                r = K.random_normal(shape, 0, self.sigma)
+                theta = K.random_uniform(shape, -np.pi, +np.pi)
+                a = r * K.cos(theta)
+                b = r * K.sign(theta)
+                return inputs * (1 + a) + K.gather(inputs, indices) * b
+
+            return K.in_train_phase(_mix_feat, _passthru, training=training)
+
+        def get_config(self):
+            config = {'sigma': self.sigma, }
+            base_config = super().get_config()
+            return dict(list(base_config.items()) + list(config.items()))
+
+
+    return MixFeat
 
 def normal_noise():
     """平均0、分散1のノイズをドロップアウト風に適用する。"""
