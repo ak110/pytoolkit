@@ -58,7 +58,7 @@ def test_coord_channel_2d():
         ]]))
 
 
-def test_mix_feat():
+def test_mixfeat():
     X = np.array([
         [1, 2],
         [3, 4],
@@ -67,7 +67,7 @@ def test_mix_feat():
 
     with tk.dl.session():
         x = inputs = keras.layers.Input(shape=(2,))
-        x = tk.dl.layers.mix_feat()()(x)
+        x = tk.dl.layers.mixfeat()()(x)
         model = keras.models.Model(inputs, x)
         assert model.predict(X) == pytest.approx(X)
         model.compile('sgd', loss='mse')
