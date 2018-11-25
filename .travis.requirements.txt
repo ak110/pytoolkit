@@ -1,4 +1,4 @@
-# Travis CI用 requirements
+# Travis CI用 requirements。
 Pillow
 h5py
 keras
@@ -11,5 +11,5 @@ pytest
 scikit-learn
 scipy
 sqlalchemy
-tensorflow
+tensorflow==1.10.0
 tqdm
