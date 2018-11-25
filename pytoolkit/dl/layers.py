@@ -17,7 +17,7 @@ def get_custom_objects():
         group_normalization(),
         destandarization(),
         stocastic_add(),
-        mix_feat(),
+        mixfeat(),
         normal_noise(),
         l2normalization(),
         weighted_mean(),
@@ -531,7 +531,7 @@ def stocastic_add():
     return StocasticAdd
 
 
-def mix_feat():
+def mixfeat():
     """MixFeat <https://openreview.net/forum?id=HygT9oRqFX>"""
     import keras
     import keras.backend as K
@@ -548,20 +548,31 @@ def mix_feat():
             def _passthru():
                 return inputs
 
-            def _mix_feat():
-                shape = K.shape(inputs)
-                indices = K.arange(start=0, stop=shape[0])
-                indices = tf.random_shuffle(indices)
-                r = K.random_normal(shape, 0, self.sigma)
-                theta = K.random_uniform(shape, -np.pi, +np.pi)
-                a = r * K.cos(theta)
-                b = r * K.sign(theta)
-                return inputs * (1 + a) + K.gather(inputs, indices) * b
+            def _mixfeat():
+                @tf.custom_gradient
+                def _forward(x):
+                    shape = K.shape(x)
+                    indices = K.arange(start=0, stop=shape[0])
+                    indices = tf.random_shuffle(indices)
+                    rs = K.concatenate([K.constant([1], dtype='int32'), shape[1:]])
+                    r = K.random_normal(rs, 0, self.sigma)
+                    theta = K.random_uniform(rs, -np.pi, +np.pi)
+                    a = 1 + K.stop_gradient(r * K.cos(theta))
+                    b = K.stop_gradient(r * K.sign(theta))
+                    y = x * a + K.gather(x, indices) * b
 
-            return K.in_train_phase(_mix_feat, _passthru, training=training)
+                    def _backword(dx):
+                        inv = tf.invert_permutation(indices)
+                        return dx * a + K.gather(dx, inv) * b
+
+                    return y, _backword
+
+                return _forward(inputs)
+
+            return K.in_train_phase(_mixfeat, _passthru, training=training)
 
         def get_config(self):
-            config = {'sigma': self.sigma, }
+            config = {'sigma': self.sigma}
             base_config = super().get_config()
             return dict(list(base_config.items()) + list(config.items()))
 

@@ -15,6 +15,7 @@ class Builder:
         self.act_defaults = {'activation': 'elu'}
         self.bn_class = keras.layers.BatchNormalization
         self.act_class = keras.layers.Activation
+        self.use_mixfeat = False
         if default_l2:
             self.set_default_l2(default_l2)
 
@@ -113,6 +114,8 @@ class Builder:
                 assert False  # 未対応
             kwargs['padding'] = 'valid'
         seq.append(conv(*args, **kwargs))
+        if self.use_mixfeat:
+            seq.append(layers.mixfeat()(name=f'{name}_mf' if name is not None else None))
         if use_bn:
             seq.append(self.bn(name=f'{name}_bn' if name is not None else None, **bn_kwargs))
         if use_act:
