@@ -555,15 +555,15 @@ def mixfeat():
                     indices = K.arange(start=0, stop=shape[0])
                     indices = tf.random_shuffle(indices)
                     rs = K.concatenate([K.constant([1], dtype='int32'), shape[1:]])
-                    r = K.random_normal(rs, 0, self.sigma)
-                    theta = K.random_uniform(rs, -np.pi, +np.pi)
-                    a = 1 + K.stop_gradient(r * K.cos(theta))
-                    b = K.stop_gradient(r * K.sign(theta))
-                    y = x * a + K.gather(x, indices) * b
+                    r = K.random_normal(rs, 0, self.sigma, dtype='float16')
+                    theta = K.random_uniform(rs, -np.pi, +np.pi, dtype='float16')
+                    a = 1 + r * K.cos(theta)
+                    b = r * K.sin(theta)
+                    y = x * K.cast(a, K.floatx()) + K.gather(x, indices) * K.cast(b, K.floatx())
 
                     def _backword(dx):
                         inv = tf.invert_permutation(indices)
-                        return dx * a + K.gather(dx, inv) * b
+                        return dx * K.cast(a, K.floatx()) + K.gather(dx, inv) * K.cast(b, K.floatx())
 
                     return y, _backword
 
