@@ -12,7 +12,7 @@ def test_ic(tmpdir):
     class_names, X, y = tk.ml.listup_classification(data_dir, check_image=True)
 
     with tk.dl.session():
-        model = tk.dl.ic.ImageClassifier.create(class_names, 'vgg16bn', weights=None)
+        model = tk.dl.ic.ImageClassifier.create(class_names, 'vgg16bn', input_size=64, weights=None)
         model.fit(X, y, validation_data=(X, y),
                   epochs=1,
                   tsv_log_path=models_dir / 'history.tsv',
