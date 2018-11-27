@@ -17,7 +17,7 @@ class ImageClassifier(models.Model):
                freeze_type='none', weights='imagenet'):
         """学習用インスタンスの作成。"""
         assert len(class_names) >= 2
-        assert network_type in ('vgg16bn', 'resnet50', 'xception', 'nasnet_large')
+        assert network_type in ('vgg16bn', 'resnet50', 'xception', 'darknet53', 'nasnet_large')
         assert batch_size >= 1
         assert rotation_type in ('none', 'mirror', 'rotation', 'all')
         assert freeze_type in ('none', 'without_bn', 'all')
@@ -86,6 +86,9 @@ def _create_network(num_classes, network_type, image_size, freeze_type, weights)
     elif network_type == 'xception':
         base_model = keras.applications.Xception(include_top=False, input_shape=(None, None, 3), weights=weights)
         preprocess_mode = 'tf'
+    elif network_type == 'darknet53':
+        base_model = applications.darknet53.darknet53(include_top=False, input_shape=(None, None, 3), weights=weights)
+        preprocess_mode = 'div255'
     elif network_type == 'nasnet_large':
         base_model = keras.applications.NASNetLarge(include_top=False, input_shape=image_size + (3,), weights=weights)
         preprocess_mode = 'tf'
