@@ -41,7 +41,7 @@ def create_network(pb, mode, strict_nms, load_base_weights):
         x = builder.conv2d(256, 1, name='tail_sq')(x)
     assert builder.shape(x)[-1] == 256
 
-    # downsampling
+    # 追加のdownsampling
     down_count = 0
     while True:
         down_count += 1
