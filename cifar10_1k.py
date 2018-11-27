@@ -12,7 +12,7 @@ def _main():
     tk.better_exceptions()
     parser = argparse.ArgumentParser()
     parser.add_argument('--result-dir', default=pathlib.Path('results_cifar10_1k'), type=pathlib.Path)
-    parser.add_argument('--epochs', default=1800, type=int)
+    parser.add_argument('--epochs', default=3000, type=int)
     parser.add_argument('--batch-size', default=16, type=int)
     args = parser.parse_args()
     args.result_dir.mkdir(parents=True, exist_ok=True)
@@ -34,6 +34,7 @@ def _run(args):
 
     with tk.log.trace_scope('create network'):
         builder = tk.dl.networks.Builder()
+        builder.use_mixfeat = True
         x = inp = keras.layers.Input(input_shape)
         x = builder.conv2d(128, use_act=False, name=f'start')(x)
         for stage, filters in enumerate([128, 256, 384]):
