@@ -767,9 +767,7 @@ def parallel_grid_pooling_2d():
             return inputs
 
         def get_config(self):
-            config = {
-                'pool_size': self.pool_size,
-            }
+            config = {'pool_size': self.pool_size}
             base_config = super().get_config()
             return dict(list(base_config.items()) + list(config.items()))
 
@@ -800,9 +798,7 @@ def parallel_grid_gather():
             return inputs
 
         def get_config(self):
-            config = {
-                'r': self.r,
-            }
+            config = {'r': self.r}
             base_config = super().get_config()
             return dict(list(base_config.items()) + list(config.items()))
 

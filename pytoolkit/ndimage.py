@@ -55,6 +55,7 @@ def save(path: typing.Union[str, pathlib.Path], img: np.ndarray):
     """
     assert len(img.shape) == 3 and img.shape[-1] in (1, 3, 4)
     import PIL.Image
+    path = pathlib.Path(path)
     img = np.clip(img, 0, 255).astype(np.uint8)
     if img.shape[-1] == 1:
         pil_img = PIL.Image.fromarray(np.squeeze(img, axis=-1), 'L')
@@ -64,6 +65,7 @@ def save(path: typing.Union[str, pathlib.Path], img: np.ndarray):
         pil_img = PIL.Image.fromarray(img, 'RGBA')
     else:
         raise RuntimeError(f'Unknown format: shape={img.shape}')
+    path.parent.mkdir(parents=True, exist_ok=True)
     pil_img.save(path)
 
 
