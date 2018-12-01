@@ -20,3 +20,4 @@ from . import od
 from . import optimizers
 from . import ss
 from . import utils
+from . import vis
