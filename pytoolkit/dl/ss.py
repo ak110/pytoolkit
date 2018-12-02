@@ -74,7 +74,7 @@ class SemanticSegmentor(models.Model):
         # output
         if num_classes == 2:
             x = builder.conv2d(1, use_bias=True, use_bn=False, activation='sigmoid')(x)
-            loss = losses.lovasz_hinge_elup1
+            loss = losses.symmetric_lovasz_hinge_elup1
             mets = [metrics.binary_accuracy]
             assert void_color is None
         else:

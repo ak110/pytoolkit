@@ -78,6 +78,15 @@ def lovasz_hinge_elup1(y_true, y_pred):
     return lovasz_losses_tf.lovasz_hinge(logit, y_true, hinge_func='elu+1')
 
 
+def symmetric_lovasz_hinge_elup1(y_true, y_pred):
+    """Binary Lovasz hinge lossの0, 1対称版。(elu+1)"""
+    from .lovasz_softmax import lovasz_losses_tf
+    logit = backend.logit(y_pred)
+    loss1 = lovasz_losses_tf.lovasz_hinge(logit, y_true, hinge_func='elu+1')
+    loss2 = lovasz_losses_tf.lovasz_hinge(-logit, 1 - y_true, hinge_func='elu+1')
+    return (loss1 + loss2) / 2
+
+
 def make_lovasz_softmax(ignore=None):
     """Lovasz softmax loss。"""
     def _lovasz_softmax(y_true, y_pred):
