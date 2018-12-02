@@ -29,19 +29,19 @@ def _main():
     if args.mode in ('train', 'all'):
         with tk.dl.session(use_horovod=True):
             tk.log.init(args.result_dir / 'train.log')
-            _train(args, X_train, y_train, X_val, y_val)
+            _train(args, X_train, y_train, X_val, y_val, class_names)
 
     # 検証
     if args.mode in ('validate', 'all'):
         if tk.dl.hvd.is_master():
             tk.log.init(args.result_dir / 'validate.log')
             with tk.dl.session():
-                _validate(args, X_val, y_val)
+                _validate(args, X_val, y_val, class_names)
 
 
 @tk.log.trace()
-def _train(args, X_train, y_train, X_val, y_val):
-    num_classes = len(tk.data.voc.CLASS_NAMES)
+def _train(args, X_train, y_train, X_val, y_val, class_names):
+    num_classes = len(class_names)
     od = tk.dl.od.ObjectDetector(args.input_size, args.map_sizes, num_classes)
     od.fit(X_train, y_train, X_val, y_val,
            batch_size=args.batch_size, epochs=args.epochs,
@@ -55,17 +55,17 @@ def _train(args, X_train, y_train, X_val, y_val):
 
 
 @tk.log.trace()
-def _validate(args, X_val, y_val):
+def _validate(args, X_val, y_val, class_names):
     od = tk.dl.od.ObjectDetector.load(args.result_dir / 'model.json')
     od.load_weights(args.result_dir / 'model.h5', batch_size=args.batch_size, strict_nms=True, use_multi_gpu=True)
     pred_val = od.predict(X_val, conf_threshold=0.25)
     # 適合率・再現率などを算出・表示
     precisions, recalls, fscores, supports = tk.ml.compute_scores(y_val, pred_val, iou_threshold=0.5)
-    tk.ml.print_scores(precisions, recalls, fscores, supports, tk.data.voc.CLASS_NAMES)
+    tk.ml.print_scores(precisions, recalls, fscores, supports, class_names)
     # 先頭部分のみ可視化
     save_dir = args.result_dir / '___check'
     for x, p in zip(X_val[:64], pred_val[:64]):
-        img = p.plot(x, tk.data.voc.CLASS_NAMES)
+        img = p.plot(x, class_names)
         tk.ndimage.save(save_dir / (x.stem + '.jpg'), img)
     # mAPを算出・表示
     od.load_weights(args.result_dir / 'model.h5', batch_size=args.batch_size, strict_nms=False, use_multi_gpu=True)
