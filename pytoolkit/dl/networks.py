@@ -134,7 +134,11 @@ class Builder:
 
     def act(self, **kwargs):
         """Activation。"""
-        return self.act_class(**self._params(self.act_defaults, kwargs))
+        params = self._params(self.act_defaults, kwargs)
+        if params.get('activation') == 'drop_activation':
+            params.pop('activation')
+            return layers.drop_activation()(**params)
+        return self.act_class(**params)
 
     def dense(self, units, **kwargs):
         """Dense。"""

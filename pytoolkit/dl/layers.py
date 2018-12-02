@@ -18,6 +18,7 @@ def get_custom_objects():
         destandarization(),
         stocastic_add(),
         mixfeat(),
+        drop_activation(),
         normal_noise(),
         l2normalization(),
         weighted_mean(),
@@ -578,6 +579,39 @@ def mixfeat():
     return MixFeat
 
 
+def drop_activation():
+    """Drop-Activation <https://arxiv.org/abs/1811.05850>"""
+    import keras
+    import keras.backend as K
+    import tensorflow as tf
+
+    class DropActivation(keras.layers.Layer):
+        """Drop-Activation <https://arxiv.org/abs/1811.05850>"""
+
+        def __init__(self, keep_rate=0.95, **kargs):
+            assert 0 <= keep_rate < 1
+            self.keep_rate = keep_rate
+            super().__init__(**kargs)
+
+        def call(self, inputs, training=None):  # pylint: disable=arguments-differ
+            def _train():
+                shape = K.shape(inputs)
+                r = K.random_uniform(shape=(shape[0],))
+                return tf.where(r <= self.keep_rate, K.relu(inputs), inputs)
+
+            def _test():
+                return K.relu(inputs, alpha=1 - self.keep_rate)
+
+            return K.in_train_phase(_train, _test, training=training)
+
+        def get_config(self):
+            config = {'keep_rate': self.keep_rate}
+            base_config = super().get_config()
+            return dict(list(base_config.items()) + list(config.items()))
+
+    return DropActivation
+
+
 def normal_noise():
     """平均0、分散1のノイズをドロップアウト風に適用する。"""
     import keras
@@ -607,7 +641,7 @@ def normal_noise():
             return K.in_train_phase(_erase_random, _passthru, training=training)
 
         def get_config(self):
-            config = {'noise_rate': self.noise_rate, }
+            config = {'noise_rate': self.noise_rate}
             base_config = super().get_config()
             return dict(list(base_config.items()) + list(config.items()))
 
