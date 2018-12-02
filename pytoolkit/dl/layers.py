@@ -21,7 +21,6 @@ def get_custom_objects():
         normal_noise(),
         l2normalization(),
         weighted_mean(),
-        serial_grid_pooling_2d(),
         parallel_grid_pooling_2d(),
         parallel_grid_gather(),
         subpixel_conv2d(),
@@ -576,8 +575,8 @@ def mixfeat():
             base_config = super().get_config()
             return dict(list(base_config.items()) + list(config.items()))
 
-
     return MixFeat
+
 
 def normal_noise():
     """平均0、分散1のノイズをドロップアウト風に適用する。"""
@@ -703,32 +702,6 @@ def weighted_mean():
     return WeightedMean
 
 
-def serial_grid_pooling_2d():
-    """物体検出とか向けに適当に考えてみたpoolingレイヤー。"""
-    import keras
-    import keras.backend as K
-
-    class SerialGridPooling2D(keras.layers.Layer):
-        """物体検出とか向けに適当に考えてみたpoolingレイヤー。"""
-
-        def compute_output_shape(self, input_shape):
-            assert len(input_shape) == 4
-            assert input_shape[1] % 2 == 0  # パディングはとりあえず未対応
-            assert input_shape[2] % 2 == 0  # パディングはとりあえず未対応
-            b, h, w, c = input_shape
-            return b, h // 2, w // 2, c * 2
-
-        def call(self, inputs, **kwargs):
-            shape = K.shape(inputs)
-            b, h, w, c = shape[0], shape[1], shape[2], shape[3]
-            inputs = K.reshape(inputs, (b, h // 2, 2, w // 2, 2, c))
-            filter1 = inputs[:, :, 1, :, 0, :] - inputs[:, :, 0, :, 0, :] + inputs[:, :, 1, :, 1, :] - inputs[:, :, 0, :, 1, :]
-            filter2 = inputs[:, :, 0, :, 1, :] - inputs[:, :, 0, :, 0, :] + inputs[:, :, 1, :, 1, :] - inputs[:, :, 1, :, 0, :]
-            return K.concatenate([filter1, filter2], axis=-1)
-
-    return SerialGridPooling2D
-
-
 def parallel_grid_pooling_2d():
     """Parallel Grid Poolingレイヤー。
 
@@ -740,7 +713,6 @@ def parallel_grid_pooling_2d():
 
     """
     import keras
-    import keras.backend as K
     import tensorflow as tf
 
     class ParallelGridPooling2D(keras.layers.Layer):
@@ -748,7 +720,11 @@ def parallel_grid_pooling_2d():
 
         def __init__(self, pool_size=(2, 2), **kargs):
             super().__init__(**kargs)
-            self.pool_size = keras.utils.conv_utils.normalize_tuple(pool_size, 2, 'pool_size')
+            if isinstance(pool_size, int):
+                self.pool_size = (pool_size, pool_size)
+            else:
+                self.pool_size = pool_size
+            assert len(self.pool_size) == 2
 
         def compute_output_shape(self, input_shape):
             assert len(input_shape) == 4
@@ -758,12 +734,13 @@ def parallel_grid_pooling_2d():
             return b, h // self.pool_size[0], w // self.pool_size[1], c
 
         def call(self, inputs, **kwargs):
-            shape = K.shape(inputs)
+            shape = keras.backend.shape(inputs)
+            int_shape = keras.backend.int_shape(inputs)
             rh, rw = self.pool_size
-            b, h, w, c = shape[0], shape[1], shape[2], shape[3]
-            inputs = K.reshape(inputs, (b, h // rh, rh, w // rw, rw, c))
+            b, h, w, c = shape[0], shape[1], shape[2], int_shape[3]
+            inputs = keras.backend.reshape(inputs, (b, h // rh, rh, w // rw, rw, c))
             inputs = tf.transpose(inputs, perm=(2, 4, 0, 1, 3, 5))
-            inputs = K.reshape(inputs, (rh * rw * b, h // rh, w // rw, c))
+            inputs = keras.backend.reshape(inputs, (rh * rw * b, h // rh, w // rw, c))
             return inputs
 
         def get_config(self):
@@ -777,7 +754,6 @@ def parallel_grid_pooling_2d():
 def parallel_grid_gather():
     """ParallelGridPoolingでparallelにしたのを戻すレイヤー。"""
     import keras
-    import keras.backend as K
 
     class ParallelGridGather(keras.layers.Layer):
         """ParallelGridPoolingでparallelにしたのを戻すレイヤー。"""
@@ -790,11 +766,11 @@ def parallel_grid_gather():
             return input_shape
 
         def call(self, inputs, **kwargs):
-            shape = K.shape(inputs)
+            shape = keras.backend.shape(inputs)
             b = shape[0]
-            gather_shape = K.concatenate([[self.r, b // self.r], shape[1:]], axis=0)
-            inputs = K.reshape(inputs, gather_shape)
-            inputs = K.mean(inputs, axis=0)
+            gather_shape = keras.backend.concatenate([[self.r, b // self.r], shape[1:]], axis=0)
+            inputs = keras.backend.reshape(inputs, gather_shape)
+            inputs = keras.backend.mean(inputs, axis=0)
             return inputs
 
         def get_config(self):
