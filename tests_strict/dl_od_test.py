@@ -15,7 +15,7 @@ def test_od(tmpdir):
     X = np.array([data_dir / 'JPEGImages' / (p.stem + '.png') for p in X])  # TODO: VoTT対応
 
     with tk.dl.session():
-        od = tk.dl.od.ObjectDetector((128, 128), [16, 8], 2)
+        od = tk.dl.od.ObjectDetector((128, 128), [8], 2)
         od.fit(X, y, X, y,
                batch_size=3, epochs=1,
                initial_weights=None,

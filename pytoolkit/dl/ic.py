@@ -14,7 +14,7 @@ class ImageClassifier(models.Model):
     @classmethod
     def create(cls, class_names, network_type='nasnet_large', input_size=256, batch_size=16,
                rotation_type='all', color_jitters=True, random_erasing=True,
-               freeze_type='none', weights='imagenet'):
+               freeze_type='none', additional_stages=0, weights='imagenet'):
         """学習用インスタンスの作成。"""
         assert len(class_names) >= 2
         assert network_type in ('vgg16bn', 'resnet50', 'xception', 'darknet53', 'nasnet_large')
@@ -22,7 +22,7 @@ class ImageClassifier(models.Model):
         assert rotation_type in ('none', 'mirror', 'rotation', 'all')
         assert freeze_type in ('none', 'without_bn', 'all')
         assert weights in (None, 'imagenet')
-        network, preprocess_mode = _create_network(len(class_names), network_type, (input_size, input_size), freeze_type, weights)
+        network, preprocess_mode = _create_network(len(class_names), network_type, (input_size, input_size), freeze_type, additional_stages, weights)
         gen = _create_generator(len(class_names), (input_size, input_size), preprocess_mode,
                                 rotation_type=rotation_type, color_jitters=color_jitters, random_erasing=random_erasing)
         model = cls(class_names, network_type, preprocess_mode, input_size, rotation_type, network, gen, batch_size)
@@ -74,7 +74,7 @@ class ImageClassifier(models.Model):
         super().save(filepath, overwrite=overwrite, include_optimizer=include_optimizer)
 
 
-def _create_network(num_classes, network_type, image_size, freeze_type, weights):
+def _create_network(num_classes, network_type, image_size, freeze_type, additional_stages, weights):
     """ネットワークを作って返す。"""
     import keras
     if network_type == 'vgg16bn':
@@ -104,8 +104,39 @@ def _create_network(num_classes, network_type, image_size, freeze_type, weights)
             layer.trainable = False
 
     x = base_model.outputs[0]
+    if additional_stages > 0:
+        x = keras.layers.Conv2D(256, 1, padding='same', use_bias=False,
+                                kernel_initializer='he_uniform',
+                                kernel_regularizer=keras.regularizers.l2(1e-4))(x)
+        x = keras.layers.BatchNormalization(gamma_regularizer=keras.regularizers.l2(1e-4),
+                                            beta_regularizer=keras.regularizers.l2(1e-4))(x)
+        x = keras.layers.Activation('relu')(x)
+    for _ in range(additional_stages):
+        x = keras.layers.Conv2D(256, 2, strides=2, padding='same', use_bias=False,
+                                kernel_initializer='he_uniform',
+                                kernel_regularizer=keras.regularizers.l2(1e-4))(x)
+        x = keras.layers.BatchNormalization(gamma_regularizer=keras.regularizers.l2(1e-4),
+                                            beta_regularizer=keras.regularizers.l2(1e-4))(x)
+        for _ in range(3):
+            shortcut = x
+            x = keras.layers.Conv2D(256, 3, padding='same', use_bias=False,
+                                    kernel_initializer='he_uniform',
+                                    kernel_regularizer=keras.regularizers.l2(1e-4))(x)
+            x = keras.layers.BatchNormalization(gamma_regularizer=keras.regularizers.l2(1e-4),
+                                                beta_regularizer=keras.regularizers.l2(1e-4))(x)
+            x = keras.layers.Activation('relu')(x)
+            x = keras.layers.Conv2D(256, 3, padding='same', use_bias=False,
+                                    kernel_initializer='he_uniform',
+                                    kernel_regularizer=keras.regularizers.l2(1e-4))(x)
+            x = keras.layers.BatchNormalization(gamma_regularizer=keras.regularizers.l2(1e-4),
+                                                beta_regularizer=keras.regularizers.l2(1e-4))(x)
+            x = keras.layers.add([shortcut, x])
+        x = keras.layers.BatchNormalization(gamma_regularizer=keras.regularizers.l2(1e-4),
+                                            beta_regularizer=keras.regularizers.l2(1e-4))(x)
+        x = keras.layers.Activation('relu')(x)
+
     x = keras.layers.GlobalAveragePooling2D()(x)
-    if freeze_type == 'all':
+    if freeze_type == 'all' and additional_stages <= 0:
         x = keras.layers.Dense(2048, activation='relu',
                                kernel_initializer='he_uniform',
                                kernel_regularizer=keras.regularizers.l2(1e-4),
