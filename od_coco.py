@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""実験用コード：PASCAL VOC 07+12で物体検出の学習。"""
+"""実験用コード：MS COCOで物体検出の学習。"""
 import argparse
 import pathlib
 
@@ -10,7 +10,7 @@ def _main():
     tk.better_exceptions()
     parser = argparse.ArgumentParser()
     parser.add_argument('mode', default='all', choices=('all', 'train', 'validate'), nargs='?')
-    parser.add_argument('--vocdevkit-dir', default=pathlib.Path('data/VOCdevkit'), type=pathlib.Path)
+    parser.add_argument('--coco-dir', default=pathlib.Path('data/coco'), type=pathlib.Path)
     parser.add_argument('--result-dir', default=pathlib.Path('results_voc'), type=pathlib.Path)
     parser.add_argument('--input-size', default=(320, 320), type=int, nargs=2)
     parser.add_argument('--map-sizes', default=(40, 20, 10), type=int, nargs='+')
@@ -22,7 +22,7 @@ def _main():
     args.result_dir.mkdir(parents=True, exist_ok=True)
 
     # データの読み込み
-    (X_train, y_train), (X_val, y_val), class_names = tk.data.voc.load_od(args.vocdevkit_dir)
+    (X_train, y_train), (X_val, y_val), class_names = tk.data.coco.load_od(args.coco_dir)
 
     # 学習
     tk.dl.hvd.init()

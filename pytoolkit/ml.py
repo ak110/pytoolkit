@@ -71,6 +71,23 @@ class ObjectsAnnotation:
             bboxes[:, [0, 2]] *= self.width / self.height
         return bboxes
 
+    def __repr__(self):
+        """文字列化。"""
+        return f'{type(self).__module__}.{type(self).__name__}(' \
+            f'path={repr(self.path)},' \
+            f' width={repr(self.width)},' \
+            f' height={repr(self.height)},' \
+            f' classes={repr(self.classes)},' \
+            f' bboxes={repr(self.bboxes)},' \
+            f' difficults={repr(self.difficults)})'
+
+    def to_str(self, class_names):
+        """表示用の文字列化"""
+        a = [f'({x1}, {y1}) [{x2 - x1} x {y2 - y1}]: {class_names[c]}'
+             for (x1, y1, x2, y2), c
+             in sorted(zip(self.real_bboxes, self.classes), key=lambda x: _rbb_sortkey(x[0]))]
+        return '\n'.join(a)
+
     def plot(self, img, class_names, conf_threshold=0, max_long_side=None):
         """ワクを描画した画像を作って返す。"""
         return plot_objects(img, self.classes, None, self.bboxes, class_names,
@@ -87,13 +104,6 @@ class ObjectsAnnotation:
         elif k == 3:
             self.bboxes = self.bboxes[:, [1, 0, 3, 2]]
             self.bboxes[:, [0, 2]] = 1 - self.bboxes[:, [2, 0]]
-
-    def to_str(self, class_names):
-        """表示用の文字列化"""
-        a = [f'({x1}, {y1}) [{x2 - x1} x {y2 - y1}]: {class_names[c]}'
-             for (x1, y1, x2, y2), c
-             in sorted(zip(self.real_bboxes, self.classes), key=lambda x: _rbb_sortkey(x[0]))]
-        return '\n'.join(a)
 
 
 class ObjectsPrediction:
@@ -119,6 +129,21 @@ class ObjectsPrediction:
     def num_objects(self):
         """物体の数を返す。"""
         return len(self.classes)
+
+    def __repr__(self):
+        """文字列化。"""
+        return f'{type(self).__module__}.{type(self).__name__}(' \
+            f'classes={repr(self.classes)},' \
+            f' confs={repr(self.confs)},' \
+            f' bboxes={repr(self.bboxes)})'
+
+    def to_str(self, width, height, class_names, conf_threshold=0):
+        """表示用の文字列化"""
+        a = [f'({x1}, {y1}) [{x2 - x1} x {y2 - y1}]: {class_names[c]}'
+             for (x1, y1, x2, y2), c, cf
+             in sorted(zip(self.get_real_bboxes(width, height), self.classes, self.confs), key=lambda x: _rbb_sortkey(x[0]))
+             if cf >= conf_threshold]
+        return '\n'.join(a)
 
     def plot(self, img, class_names, conf_threshold=0, max_long_side=None):
         """ワクを描画した画像を作って返す。"""
@@ -153,14 +178,6 @@ class ObjectsPrediction:
     def get_real_bboxes(self, width, height):
         """実ピクセル数換算のbboxesを返す。"""
         return np.round(self.bboxes * [width, height, width, height]).astype(np.int32)
-
-    def to_str(self, width, height, class_names, conf_threshold=0):
-        """表示用の文字列化"""
-        a = [f'({x1}, {y1}) [{x2 - x1} x {y2 - y1}]: {class_names[c]}'
-             for (x1, y1, x2, y2), c, cf
-             in sorted(zip(self.get_real_bboxes(width, height), self.classes, self.confs), key=lambda x: _rbb_sortkey(x[0]))
-             if cf >= conf_threshold]
-        return '\n'.join(a)
 
     def crop(self, img, conf_threshold=0):
         """Bounding boxで切り出した画像を返す。"""

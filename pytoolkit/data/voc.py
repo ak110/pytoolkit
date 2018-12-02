@@ -42,6 +42,22 @@ CLASS_NAMES = [
 CLASS_NAMES_TO_ID = {class_name: i for i, class_name in enumerate(CLASS_NAMES)}
 
 
+def load_od(vocdevkit_dir):
+    """物体検出のデータを読み込む。
+
+    # 引数
+    - vocdevkit_dir: VOCdevkitディレクトリのパス
+
+    # 戻り値
+    - (X_train, y_train)
+    - (X_val, y_val)
+    - class_names
+    """
+    X_train, y_train = load_0712_trainval(vocdevkit_dir)
+    X_val, y_val = load_07_test(vocdevkit_dir)
+    return (X_train, y_train), (X_val, y_val), CLASS_NAMES
+
+
 def load_0712_trainval(vocdevkit_dir, class_name_to_id=None):
     """PASCAL VOCデータセットの、07+12 trainvalの読み込み。
 
