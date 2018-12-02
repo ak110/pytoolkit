@@ -286,3 +286,57 @@ def freeze_bn(freeze_epoch_rate: float, logger_name=None):
                 weighted_metrics=self.model.weighted_metrics)
 
     return _FreezeBNCallback(freeze_epoch_rate=freeze_epoch_rate, logger_name=logger_name)
+
+
+def unfreeze(epoch_rate: float):
+    """指定epoch目で全レイヤーをfreeze解除する。
+
+    # 引数
+    - epoch_rate: 発動するepoch数の割合を指定。
+
+    # 使用例
+
+    ```
+    callbacks.append(tk.dl.callbacks.unfreeze(0.1))
+    ```
+
+    """
+    import keras
+
+    class _UnfreezeCallback(keras.callbacks.Callback):
+
+        def __init__(self, epoch_rate, logger_name):
+            self.epoch_rate = epoch_rate
+            self.target_epoch = 0
+            super().__init__()
+
+        def on_train_begin(self, logs=None):
+            assert 0 < self.epoch_rate <= 1
+            self.target_epoch = int(self.params['epochs'] * self.epoch_rate)
+
+        def on_epoch_begin(self, epoch, logs=None):
+            if self.target_epoch == epoch + 1:
+                unfreeze_count = self._unfreeze_layers(self.model)
+                if unfreeze_count > 0:
+                    self._recompile()
+                logger = log.get(__name__)
+                logger.info(f'Epoch {epoch + 1}: Unfreezed layers: {unfreeze_count})')
+
+        def _unfreeze_layers(self, container):
+            count = 0
+            for layer in container.layers:
+                if not layer.trainable:
+                    layer.trainable = True
+                    count += 1
+            return count
+
+        def _recompile(self):
+            self.model.compile(
+                optimizer=self.model.optimizer,
+                loss=self.model.loss,
+                metrics=self.model.metrics,
+                loss_weights=self.model.loss_weights,
+                sample_weight_mode=self.model.sample_weight_mode,
+                weighted_metrics=self.model.weighted_metrics)
+
+    return _UnfreezeCallback(epoch_rate=epoch_rate)
