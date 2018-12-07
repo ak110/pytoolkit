@@ -754,10 +754,11 @@ def print_classification_metrics(y_true, proba_pred, average='micro', print_fn=N
             assert true_type == 'multiclass'
             assert pred_type == 'continuous-multioutput'
             num_classes = np.max(y_true) + 1
+            labels = list(range(num_classes))
             ohe_true = to_categorical(num_classes)(np.asarray(y_true))
             y_pred = np.argmax(proba_pred, axis=-1)
             acc = sklearn.metrics.accuracy_score(y_true, y_pred)
-            f1 = sklearn.metrics.f1_score(y_true, y_pred, average=average)
+            f1 = sklearn.metrics.f1_score(y_true, y_pred, labels=labels, average=average)
             auc = sklearn.metrics.roc_auc_score(ohe_true, proba_pred, average=average)
             logloss = sklearn.metrics.log_loss(ohe_true, proba_pred)
             print_fn(f'Accuracy:  {acc:.3f}')
