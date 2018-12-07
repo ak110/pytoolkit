@@ -20,7 +20,7 @@ def test_ss_multi(tmpdir):
 
     with tk.dl.session():
         model = tk.dl.ss.SemanticSegmentor.create(
-            class_colors, void_color, input_size=64, weights=None)
+            class_colors, void_color, input_size=32, weights=None)
         model.fit(X, y, validation_data=(X, y),
                   epochs=1,
                   tsv_log_path=models_dir / 'history.tsv',
