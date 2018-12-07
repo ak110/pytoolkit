@@ -18,6 +18,7 @@ def test_ic(tmpdir):
                   tsv_log_path=models_dir / 'history.tsv',
                   mixup=True, cosine_annealing=True)
         model.save(models_dir / 'model.h5', include_optimizer=False)
+        del model
 
     with tk.dl.session():
         model = tk.dl.ic.ImageClassifier.load(models_dir / 'model.h5')

@@ -183,8 +183,8 @@ def tsv_logger(filename, append=False):
     return _TSVLogger(filename=filename, append=append, enabled=enabled)
 
 
-def epoch_logger(logger_name=None):
-    """`logging.getLogger(logger_name)`にDEBUGログを色々出力するcallback。Horovod使用時はrank() == 0のみ有効。"""
+def epoch_logger():
+    """DEBUGログを色々出力するcallback。Horovod使用時はrank() == 0のみ有効。"""
     import keras
     import keras.backend as K
 
@@ -192,10 +192,9 @@ def epoch_logger(logger_name=None):
 
     class _EpochLogger(keras.callbacks.Callback):
 
-        def __init__(self, logger_name, enabled):
-            self.logger_name = logger_name
+        def __init__(self, enabled):
             self.enabled = enabled
-            self.logger = log.get(self.logger_name or __name__)
+            self.logger = log.get(__name__)
             self.epoch_start_time = None
             super().__init__()
 
@@ -210,11 +209,11 @@ def epoch_logger(logger_name=None):
                 self.logger.debug('Epoch %3d: lr=%.1e %s time=%d',
                                   epoch + 1, lr, metrics, int(np.ceil(elapsed_time)))
 
-    return _EpochLogger(logger_name=logger_name, enabled=enabled)
+    return _EpochLogger(enabled=enabled)
 
 
-def freeze_bn(freeze_epoch_rate: float, logger_name=None):
-    """指定epoch目でBNを全部freezeする。
+def freeze_bn(freeze_epochs: int):
+    """最後の指定epoch目でBNを全部freezeする。
 
     SENetの論文の最後の方にしれっと書いてあったので真似てみた。
 
@@ -222,8 +221,7 @@ def freeze_bn(freeze_epoch_rate: float, logger_name=None):
     https://arxiv.org/abs/1709.01507
 
     # 引数
-    - freeze_epoch_rate: 発動するepoch数の割合を指定。
-    - logger_name: ログ出力先
+    - freeze_epochs: BNをfreezeした状態で学習するepoch数。freeze_epochs=5なら最後の5epochをfreeze。
 
     # 使用例
 
@@ -236,45 +234,28 @@ def freeze_bn(freeze_epoch_rate: float, logger_name=None):
 
     class _FreezeBNCallback(keras.callbacks.Callback):
 
-        def __init__(self, freeze_epoch_rate, logger_name):
-            self.freeze_epoch_rate = freeze_epoch_rate
-            self.logger_name = logger_name
-            self.freeze_epoch = 0
-            self.freezed_layers = []
+        def __init__(self, freeze_epochs):
+            self.freeze_epochs = freeze_epochs
             super().__init__()
 
-        def on_train_begin(self, logs=None):
-            assert 0 < self.freeze_epoch_rate <= 1
-            self.freeze_epoch = int(self.params['epochs'] * self.freeze_epoch_rate)
-
         def on_epoch_begin(self, epoch, logs=None):
-            if self.freeze_epoch == epoch + 1:
-                self._freeze_layers(self.model)
-                if len(self.freezed_layers) > 0:
+            if epoch + 1 == self.params['epochs'] - self.freeze_epochs:
+                freezed_count = self._freeze_layers(self.model)
+                if freezed_count > 0:
                     self._recompile()
-                logger = log.get(self.logger_name or __name__)
-                logger.info(f'Epoch {epoch + 1}: Freeze BNs (layers = {len(self.freezed_layers)})')
+                logger = log.get(__name__)
+                logger.info(f'Epoch {epoch + 1}: {freezed_count} BNs was frozen.')
 
         def _freeze_layers(self, container):
+            freezed_count = 0
             for layer in container.layers:
                 if isinstance(layer, keras.layers.BatchNormalization):
                     if layer.trainable:
                         layer.trainable = False
-                        self.freezed_layers.append(layer)
+                        freezed_count += 1
                 elif hasattr(layer, 'layers'):
-                    self._freeze_layers(layer)
-
-        def on_train_end(self, logs=None):
-            unfreezed = 0
-            for layer in self.freezed_layers:
-                if not layer.trainable:
-                    layer.trainable = True
-                    unfreezed += 1
-            self.freezed_layers = []
-            if unfreezed > 0:
-                self._recompile()
-            logger = log.get(self.logger_name or __name__)
-            logger.info(f'Epoch {self.params["epochs"]}: Unfreeze BNs (layers = {unfreezed})')
+                    freezed_count += self._freeze_layers(layer)
+            return freezed_count
 
         def _recompile(self):
             self.model.compile(
@@ -285,7 +266,7 @@ def freeze_bn(freeze_epoch_rate: float, logger_name=None):
                 sample_weight_mode=self.model.sample_weight_mode,
                 weighted_metrics=self.model.weighted_metrics)
 
-    return _FreezeBNCallback(freeze_epoch_rate=freeze_epoch_rate, logger_name=logger_name)
+    return _FreezeBNCallback(freeze_epochs=freeze_epochs)
 
 
 def unfreeze(epoch_rate: float):

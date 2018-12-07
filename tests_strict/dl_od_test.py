@@ -25,6 +25,7 @@ def test_od(tmpdir):
                tsv_log_path=result_dir / 'history.tsv')
         od.save(result_dir / 'model.json')
         od.save_weights(result_dir / 'model.h5')
+        del od
 
     with tk.dl.session():
         od = tk.dl.od.ObjectDetector.load(result_dir / 'model.json')
