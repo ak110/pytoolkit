@@ -30,15 +30,16 @@ def write_all_lines(file_path, lines, mode='w', encoding='utf-8'):
 
 def do_retry(func, count=10, sleep_seconds=1.0):
     """リトライ処理。"""
-    retry = 0
-    while True:
-        try:
-            return func()
-        except BaseException:
-            if retry >= count:
-                raise
-            retry += 1
-            time.sleep(sleep_seconds)
+    try:
+        return func()
+    except BaseException:
+        for _ in range(count - 1):
+            try:
+                time.sleep(sleep_seconds)
+                return func()
+            except BaseException:
+                pass
+        raise
 
 
 def get_all_files(dir_path):
