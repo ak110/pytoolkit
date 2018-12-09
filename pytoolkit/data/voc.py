@@ -160,3 +160,36 @@ def load_annotation(vocdevkit_dir, xml_path, class_name_to_id=None, without_diff
         bboxes=bboxes,
         difficults=difficults)
     return annotation
+
+
+def evaluate(y_true, y_pred):
+    """PASCAL VOC向けのスコア算出。
+
+    ChainerCVを利用。
+    https://chainercv.readthedocs.io/en/stable/reference/evaluations.html?highlight=eval_detection_coco#eval-detection-voc
+
+    # 戻り値
+    - dict
+      - 'mAP': 普通っぽい(?)metric。
+      - 'mAP_VOC': PASCAL VOC 2007版metric。11点での平均。
+
+    """
+    import chainercv
+    gt_classes_list = np.array([y.classes for y in y_true])
+    gt_bboxes_list = np.array([y.real_bboxes for y in y_true])
+    gt_difficults_list = np.array([y.difficults for y in y_true])
+    pred_classes_list = np.array([p.classes for p in y_pred])
+    pred_confs_list = np.array([p.confs for p in y_pred])
+    pred_bboxes_list = np.array([p.get_real_bboxes(y.width, y.height) for (p, y) in zip(y_pred, y_true)])
+    scores1 = chainercv.evaluations.eval_detection_voc(
+        pred_bboxes_list, pred_classes_list, pred_confs_list,
+        gt_bboxes_list, gt_classes_list, gt_difficults_list,
+        use_07_metric=False)
+    scores2 = chainercv.evaluations.eval_detection_voc(
+        pred_bboxes_list, pred_classes_list, pred_confs_list,
+        gt_bboxes_list, gt_classes_list, gt_difficults_list,
+        use_07_metric=True)
+    return {
+        'mAP': scores1,
+        'mAP_VOC': scores2,
+    }

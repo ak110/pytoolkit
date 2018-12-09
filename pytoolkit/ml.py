@@ -25,10 +25,13 @@ class ObjectsAnnotation:
     - difficults: difficultフラグ(PASCAL VOCデータセット等で使用)のndarray。値はTrue or False。shapeは(物体数,)
     - num_objects: 物体数
     - real_bboxes: [0, 1]ではなくピクセル数単位に変換したbboxes
+    - difficults: 難しいものか否か (PASCAL VOC用)
+    - areas: 面積 (MS COCO用)
+    - crowdeds: クラウドソーシングでアノテーションされたか否か (MS COCO用)
 
     """
 
-    def __init__(self, path, width, height, classes, bboxes, difficults=None):
+    def __init__(self, path, width, height, classes, bboxes, difficults=None, areas=None, crowdeds=None):
         assert len(classes) == len(bboxes)
         assert difficults is None or len(classes) == len(difficults)
         self.path = pathlib.Path(path)
@@ -39,6 +42,8 @@ class ObjectsAnnotation:
         if self.num_objects == 0:
             self.bboxes = self.bboxes.reshape((self.num_objects, 4))
         self.difficults = np.asarray(difficults, dtype=np.bool) if difficults is not None else np.zeros(len(classes), dtype=np.bool)
+        self.areas = np.asarray(areas, dtype=np.float32) if areas is not None else None
+        self.crowdeds = np.asarray(crowdeds, dtype=np.bool) if crowdeds is not None else None
         assert self.width >= 1
         assert self.height >= 1
         assert (self.bboxes >= 0).all()
@@ -47,6 +52,8 @@ class ObjectsAnnotation:
         assert self.classes.shape == (self.num_objects,)
         assert self.bboxes.shape == (self.num_objects, 4)
         assert self.difficults.shape == (self.num_objects,)
+        assert self.areas is None or self.areas.shape == (self.num_objects,)
+        assert self.crowdeds is None or self.crowdeds.shape == (self.num_objects,)
 
     @property
     def num_objects(self):
@@ -317,112 +324,6 @@ def to_categorical(num_classes):
         return cat
 
     return _to_categorical
-
-
-def compute_map(gt, pred, iou_threshold=0.5, use_voc2007_metric=False):
-    """`mAP`の算出。
-
-    # 引数
-    - gt_classes_list: 正解のbounding box毎のクラス。shape=(画像数, bbox数)
-    - gt_bboxes_list: 正解のbounding boxの座標(x1,y1,x2,y2。0～1)。shape=(画像数, bbox数, 4)
-    - gt_difficults_list: 正解のbounding boxにdifficultフラグがついているか否か。shape=(画像数, bbox数)
-    - pred_classes_list: 予測結果のbounding box毎のクラス。shape=(画像数, bbox数)
-    - pred_confs_list: 予測結果のbounding box毎のconfidence。shape=(画像数, bbox数)
-    - pred_bboxes_list: 予測結果のbounding boxの座標(x1,y1,x2,y2。0～1)。shape=(画像数, bbox数, 4)
-
-    """
-    assert len(gt) == len(pred)
-    gt_classes_list = np.array([y.classes for y in gt])
-    gt_bboxes_list = np.array([y.bboxes for y in gt])
-    gt_difficults_list = np.array([y.difficults for y in gt])
-    pred_classes_list = np.array([p.classes for p in pred])
-    pred_confs_list = np.array([p.confs for p in pred])
-    pred_bboxes_list = np.array([p.bboxes for p in pred])
-
-    npos_dict = collections.defaultdict(int)
-    scores = collections.defaultdict(list)
-    matches = collections.defaultdict(list)
-
-    for gt_classes, gt_bboxes, gt_difficults, pred_classes, pred_confs, pred_bboxes in zip(
-            gt_classes_list, gt_bboxes_list, gt_difficults_list, pred_classes_list, pred_confs_list, pred_bboxes_list):
-
-        for class_id in np.unique(np.concatenate([gt_classes, pred_classes])):
-            pred_mask = pred_classes == class_id
-            pred_confs_class = pred_confs[pred_mask]
-            pred_bboxes_class = pred_bboxes[pred_mask]
-            order = pred_confs_class.argsort()[::-1]
-            pred_confs_class = pred_confs_class[order]
-            pred_bboxes_class = pred_bboxes_class[order]
-
-            gt_mask = gt_classes == class_id
-            gt_bboxes_class = gt_bboxes[gt_mask]
-            gt_difficults_class = gt_difficults[gt_mask]
-
-            npos_dict[class_id] += np.logical_not(gt_difficults_class).sum()
-            scores[class_id].extend(pred_confs_class)
-
-            if len(pred_bboxes_class) == 0:
-                continue
-            if len(gt_bboxes_class) == 0:
-                matches[class_id].extend([0] * len(pred_bboxes_class))
-                continue
-
-            iou = compute_iou(pred_bboxes_class, gt_bboxes_class)
-            gt_indices = iou.argmax(axis=1)
-            gt_indices[iou.max(axis=1) < iou_threshold] = -1  # 不一致
-
-            detected = np.zeros(len(gt_bboxes_class), dtype=bool)
-            for gt_i in gt_indices:
-                if gt_i >= 0:
-                    if gt_difficults_class[gt_i]:
-                        matches[class_id].append(-1)  # skip
-                    else:
-                        matches[class_id].append(0 if detected[gt_i] else 1)
-                        detected[gt_i] = True  # 2回目以降は不一致扱い
-                else:
-                    matches[class_id].append(0)  # 不一致
-
-    precision = []
-    recall = []
-    for class_id, npos in npos_dict.items():
-        order = np.array(scores[class_id]).argsort()[::-1]
-        matches_class = np.array(matches[class_id])[order]
-
-        tp = np.cumsum(matches_class == 1)
-        fp = np.cumsum(matches_class == 0)
-        tpfp = fp + tp
-        tpfp = np.where(tpfp == 0, [np.nan] * len(tpfp), tpfp)  # 警告対策 (0ならnanにする)
-
-        precision.append(tp / tpfp)
-        recall.append(None if npos == 0 else tp / npos)
-
-    ap = [compute_ap(prec, rec, use_voc2007_metric) for prec, rec in zip(precision, recall)]
-    return np.nanmean(ap)
-
-
-def compute_ap(precision, recall, use_voc2007_metric=False):
-    """Average precisionの算出。"""
-    if precision is None or recall is None:
-        return np.nan
-    if use_voc2007_metric:
-        ap = 0.
-        for t in np.arange(0., 1.1, 0.1):
-            if np.sum(recall >= t) == 0:
-                p = 0
-            else:
-                p = np.max(np.nan_to_num(precision)[recall >= t])
-            ap += p
-        ap /= 11
-    else:
-        mrec = np.concatenate(([0.], recall, [1.]))
-        mpre = np.concatenate(([0.], precision, [0.]))
-
-        mpre = np.maximum.accumulate(mpre[::-1])[::-1]  # pylint: disable=no-member
-
-        i = np.where(mrec[1:] != mrec[:-1])[0]
-
-        ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
-    return ap
 
 
 def search_conf_threshold(gt, pred, iou_threshold=0.5):

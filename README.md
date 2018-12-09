@@ -14,9 +14,11 @@
 - scikit-learn
 - scipy
 
-## 動的な依存ライブラリ
+## 使うときに動的にimportしている依存ライブラリ
 
 - Pillow
+- chainercv
+- better_exceptions
 - h5py
 - horovod
 - keras
@@ -28,7 +30,3 @@
 - sqlalchemy
 - tensorflow-gpu
 - tqdm
-
-## matplotlibの「Invalid DISPLAY variable」対策
-
-必要に応じて環境変数 `MPLBACKEND` を `Agg` とかにしておく前提とする。ソースコード上では対策しない。

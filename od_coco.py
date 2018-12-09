@@ -70,10 +70,10 @@ def _validate(args, X_val, y_val, class_names):
     # mAPを算出・表示
     od.load_weights(args.result_dir / 'model.h5', batch_size=args.batch_size, strict_nms=False, use_multi_gpu=True)
     pred_val = od.predict(X_val)
-    map1 = tk.ml.compute_map(y_val, pred_val, use_voc2007_metric=False)
-    map2 = tk.ml.compute_map(y_val, pred_val, use_voc2007_metric=True)
+    scores = tk.data.coco.evaluate(y_val, pred_val)
     logger = tk.log.get(__name__)
-    logger.info(f'mAP={map1:.3f} mAP(VOC2007)={map2:.3f}')
+    for k in sorted(scores):
+        logger.info(f'{k}: {scores[k]}')
 
 
 if __name__ == '__main__':

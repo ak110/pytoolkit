@@ -39,42 +39,6 @@ def test_plot_objects():
     tk.ndimage.save(base_dir.parent / '___check' / 'plot_objects3.png', img)
 
 
-def test_compute_map():
-    gt = [
-        tk.ml.ObjectsAnnotation(
-            'path/to/dummy.jpg', 2000, 2000,
-            np.array([1, 2]),
-            np.array([
-                [0.000, 0.000, 0.200, 0.200],
-                [0.900, 0.900, 1.000, 1.000],
-            ]),
-            np.array([False, False]))
-    ]
-    preds = [
-        tk.ml.ObjectsPrediction(
-            np.array([9, 9, 3, 3, 3, 3]),
-            np.array([1, 1, 1, 1, 1, 1]),
-            np.array([
-                [0.901, 0.901, 1.000, 1.000],
-                [0.001, 0.001, 0.199, 0.199],
-                [0.333, 0.333, 0.334, 0.334],  # error
-                [0.333, 0.333, 0.334, 0.334],  # error
-                [0.333, 0.333, 0.334, 0.334],  # error
-                [0.333, 0.333, 0.334, 0.334],  # error
-            ])),
-    ]
-    assert tk.ml.compute_map(gt, preds) == 0
-
-    preds[0].classes = np.array([9, 1, 3, 3, 3, 3])
-    assert tk.ml.compute_map(gt, preds) == 0.5
-
-    preds[0].classes = np.array([2, 9, 3, 3, 3, 3])
-    assert tk.ml.compute_map(gt, preds) == 0.5
-
-    preds[0].classes = np.array([2, 1, 3, 3, 3, 3])
-    assert tk.ml.compute_map(gt, preds) == 1
-
-
 def test_iou():
     bboxes_a = np.array([
         [0, 0, 200, 200],
