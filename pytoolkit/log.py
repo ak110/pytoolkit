@@ -17,7 +17,8 @@ def init(output_path, append=False, rotate=False, max_bytes=1048576, backup_coun
          stream_fmt='[%(levelname)-5s] %(message)s',
          file_level=logging.DEBUG,
          file_fmt='[%(levelname)-5s] %(message)s <%(name)s:%(filename)s:%(lineno)d>',
-         matplotlib_level=logging.WARNING):
+         matplotlib_level=logging.WARNING,
+         pil_level=logging.INFO):
     """ルートロガーの初期化。"""
     from .dl import hvd
     logger = get(None)
@@ -29,6 +30,8 @@ def init(output_path, append=False, rotate=False, max_bytes=1048576, backup_coun
                                        level=file_level, fmt=file_fmt))
     if matplotlib_level is not None:
         get('matplotlib').setLevel(matplotlib_level)
+    if pil_level is not None:
+        get('PIL').setLevel(pil_level)
 
 
 def get(name):
