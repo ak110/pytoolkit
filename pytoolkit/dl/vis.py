@@ -29,13 +29,14 @@ class GradCamVisualizer:
         self.get_mask_func = keras.backend.function(
             model.inputs + [keras.backend.learning_phase()], [mask])
 
-    def draw(self, source_image, model_inputs, alpha=0.25):
+    def draw(self, source_image, model_inputs, alpha=0.25, interpolation='nearest'):
         """ヒートマップ画像を作成して返す。
 
         # 引数
         - source_image: 元画像 (RGB。shape=(height, width, 3))
         - model_inputs: モデルの入力1件分。(例えば普通の画像分類ならshape=(1, height, width, 3))
         - alpha: ヒートマップの不透明度
+        - interpolation: マスクの拡大方法 (nearest, bilinear, bicubic, lanczos)
         # 戻り値
         - 画像 (RGB。shape=(height, width, 3))
 
@@ -43,8 +44,15 @@ class GradCamVisualizer:
         import cv2
         assert source_image.shape[2:] == (3,)
         assert 0 < alpha < 1
+        cv2_interp = {
+            'nearest': cv2.INTER_NEAREST,
+            'bilinear': cv2.INTER_LINEAR,
+            'bicubic': cv2.INTER_CUBIC,
+            'lanczos': cv2.INTER_LANCZOS4,
+        }[interpolation]
+
         mask = self.get_mask(model_inputs)
-        mask = cv2.resize(mask, (source_image.shape[1], source_image.shape[0]), interpolation=cv2.INTER_NEAREST)
+        mask = cv2.resize(mask, (source_image.shape[1], source_image.shape[0]), interpolation=cv2_interp)
         mask = np.uint8(256 * mask)  # [0-255]
 
         heatmap = cv2.applyColorMap(mask, cv2.COLORMAP_JET)
