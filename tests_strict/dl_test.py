@@ -9,14 +9,14 @@ def test_xor():
     y = np.array([0, 1, 1, 0], dtype=np.int32)
 
     with tk.dl.session():
-        import keras
+        import tensorflow as tf
 
         builder = tk.dl.networks.Builder()
-        inp = x = keras.layers.Input(shape=(2,))
+        inp = x = tf.keras.layers.Input(shape=(2,))
         x = builder.dense(16, use_bias=False)(x)
         x = builder.bn_act()(x)
         x = builder.dense(1, activation='sigmoid')(x)
-        network = keras.models.Model(inputs=inp, outputs=x)
+        network = tf.keras.models.Model(inputs=inp, outputs=x)
         gen = tk.generator.Generator()
         model = tk.dl.models.Model(network, gen, batch_size=32)
         model.compile('adam', 'binary_crossentropy', ['acc'])

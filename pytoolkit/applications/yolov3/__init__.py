@@ -3,7 +3,7 @@
 
 元ソースはこちら。
 
-https://github.com/qqwweee/keras-yolo3
+https://github.com/qqwweee/tf.keras-yolo3
 
 """
 

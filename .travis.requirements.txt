@@ -1,7 +1,6 @@
 # Travis CI用 requirements。
 Pillow
 h5py
-keras
 matplotlib
 numpy
 opencv-python

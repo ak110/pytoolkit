@@ -23,9 +23,9 @@ def _main():
 
 @tk.log.trace()
 def _run(args):
-    import keras
+    import tensorflow as tf
 
-    (X_train, y_train), (X_val, y_val) = keras.datasets.cifar100.load_data()
+    (X_train, y_train), (X_val, y_val) = tf.keras.datasets.cifar100.load_data()
     y_train = np.squeeze(y_train)
     y_val = np.squeeze(y_val)
     input_shape = X_train.shape[1:]
@@ -33,7 +33,7 @@ def _run(args):
 
     with tk.log.trace_scope('create network'):
         builder = tk.dl.networks.Builder()
-        x = inp = keras.layers.Input(input_shape)
+        x = inp = tf.keras.layers.Input(input_shape)
         x = builder.conv2d(128, use_act=False, name=f'start')(x)
         for stage, filters in enumerate([128, 256, 512]):
             name1 = f'stage{stage + 1}'
@@ -44,14 +44,14 @@ def _run(args):
                 x = builder.conv2d(filters // 4, name=f'{name2}_c1')(x)
                 for d in range(7):
                     t = builder.conv2d(filters // 4, name=f'{name2}_d{d}')(x)
-                    x = keras.layers.concatenate([x, t], name=f'{name2}_d{d}_cat')
+                    x = tf.keras.layers.concatenate([x, t], name=f'{name2}_d{d}_cat')
                 x = builder.conv2d(filters, 1, use_act=False, name=f'{name2}_c2')(x)
-                x = keras.layers.add([sc, x], name=f'{name2}_add')
+                x = tf.keras.layers.add([sc, x], name=f'{name2}_add')
             x = builder.bn_act(name=f'{name1}')(x)
-        x = keras.layers.Dropout(0.5, name='dropout')(x)
-        x = keras.layers.GlobalAveragePooling2D(name='pooling')(x)
+        x = tf.keras.layers.Dropout(0.5, name='dropout')(x)
+        x = tf.keras.layers.GlobalAveragePooling2D(name='pooling')(x)
         x = builder.dense(num_classes, activation='softmax', name='predictions')(x)
-        model = keras.models.Model(inputs=inp, outputs=x)
+        model = tf.keras.models.Model(inputs=inp, outputs=x)
 
     gen = tk.image.ImageDataGenerator()
     gen.add(tk.image.Padding(probability=1))

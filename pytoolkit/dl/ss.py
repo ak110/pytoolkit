@@ -25,7 +25,7 @@ class SemanticSegmentor(models.Model):
         assert class_colors is None or len(class_colors) >= 3
         num_classes = 2 if class_colors is None else len(class_colors)
 
-        import keras
+        import tensorflow as tf
         builder = networks.Builder()
         inputs = [builder.input_tensor((None, None, 3))]
         x = inputs[0]
@@ -42,55 +42,50 @@ class SemanticSegmentor(models.Model):
         down_list.append(base_network.get_layer(name='add_23').output)  # stage 5: 1/32
         x = base_network.outputs[0]
         additional_stage = input_size // (32 * 8)
-        for _ in range(additional_stage):
-            x = builder.conv2d(256, 2, strides=2, use_act=False)(x)
-            x = builder.res_block(256)(x)
-            x = builder.res_block(256)(x)
-            x = builder.bn_act()(x)
+        for stage in range(additional_stage):
+            x = builder.conv2d(256, 2, strides=2, use_act=False, name=f'down{stage}_conv')(x)
+            x = builder.res_block(256, name=f'down{stage}_b1')(x)
+            x = builder.res_block(256, name=f'down{stage}_b2')(x)
+            x = builder.bn_act(name=f'down{stage}')(x)
             down_list.append(x)
-        x = keras.layers.GlobalAveragePooling2D()(x)
-        x = builder.dense(128)(x)
-        x = builder.act()(x)
-        x = builder.dense(256)(x)
-        x = keras.layers.Reshape((1, 1, 256))(x)
+        x = tf.keras.layers.GlobalAveragePooling2D(name='center_pool')(x)
+        x = builder.dense(128, name='center_dense1')(x)
+        x = builder.act(name='center_act')(x)
+        x = builder.dense(256, name='center_dense2')(x)
+        x = tf.keras.layers.Reshape((1, 1, 256), name='center_reshape')(x)
         # decoder
         up_list = []
         for stage, d in list(enumerate(down_list))[::-1]:
             filters = min(16 * 2 ** stage, 256)
             if stage != len(down_list) - 1:
-                x = layers.subpixel_conv2d()(scale=2)(x)
-                x = builder.conv2d(filters, 1, use_act=False)(x)
-            d = builder.conv2d(filters, 1, use_act=False)(d)
-            x = keras.layers.add([x, d])
-            x = builder.res_block(filters)(x)
-            x = builder.res_block(filters)(x)
-            x = builder.bn_act()(x)
-            up_list.append(builder.conv2d(32, 1, use_act=False)(x))
+                x = layers.subpixel_conv2d()(name=f'up{stage}_us')(x)
+                x = builder.conv2d(filters, 1, use_act=False, name=f'up{stage}_ex')(x)
+            d = builder.conv2d(filters, 1, use_act=False, name=f'up{stage}_lt')(d)
+            x = tf.keras.layers.add([x, d], name=f'up{stage}_add')
+            x = builder.res_block(filters, name=f'up{stage}_b1')(x)
+            x = builder.res_block(filters, name=f'up{stage}_b2')(x)
+            x = builder.bn_act(name=f'up{stage}')(x)
+            up_list.append(builder.conv2d(32, 1, use_act=False, name=f'up{stage}_sq')(x))
         # Hypercolumn
-        x = keras.layers.add([
-            layers.resize2d()(scale=32)(up_list[0]),
-            layers.resize2d()(scale=16)(up_list[1]),
-            layers.resize2d()(scale=8)(up_list[2]),
-            layers.resize2d()(scale=4)(up_list[3]),
-            layers.resize2d()(scale=2)(up_list[4]),
-            up_list[5],
-        ])
+        x = tf.keras.layers.add([
+            layers.resize2d()(scale=2 ** (len(up_list) - i - 1), name=f'hc_resize{i}')(u)
+            for i, u in enumerate(up_list)])
         # Refinement
-        x = builder.res_block(32)(x)
-        x = builder.res_block(32)(x)
-        x = builder.bn_act()(x)
+        x = builder.res_block(32, name='refine_b1')(x)
+        x = builder.res_block(32, name='refine_b2')(x)
+        x = builder.bn_act(name='refine')(x)
         # output
         if num_classes == 2:
-            x = builder.conv2d(1, use_bias=True, use_bn=False, activation='sigmoid')(x)
+            x = builder.conv2d(1, use_bias=True, use_bn=False, activation='sigmoid', name='predictions')(x)
             loss = losses.symmetric_lovasz_hinge_elup1
             mets = [metrics.binary_accuracy]
             assert void_color is None
         else:
-            x = builder.conv2d(num_classes, use_bias=True, use_bn=False, activation='softmax')(x)
+            x = builder.conv2d(num_classes, use_bias=True, use_bn=False, activation='softmax', name='predictions')(x)
             loss = 'categorical_crossentropy'
             mets = ['acc']
 
-        network = keras.models.Model(inputs, x)
+        network = tf.keras.models.Model(inputs, x)
         gen = _create_generator(class_colors, void_color, (input_size, input_size), rotation_type=rotation_type,
                                 color_jitters=color_jitters, random_erasing=random_erasing)
         model = cls(network, gen, batch_size,

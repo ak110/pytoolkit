@@ -12,10 +12,9 @@ def get_custom_objects():
 
 def nsgd():
     """重み別に学習率の係数を設定できるSGD+Nesterov momentum Optimizer。"""
-    import keras
-    import keras.backend as K
+    import tensorflow as tf
 
-    class NSGD(keras.optimizers.SGD):
+    class NSGD(tf.keras.optimizers.SGD):
         """重み別に学習率の係数を設定できるSGD+Nesterov momentum Optimizer。
 
         lr_multipliersは、Layerをキーとし、学習率の係数を値としたdict。
@@ -50,11 +49,11 @@ def nsgd():
             lr = self.lr
             if self.initial_decay > 0:
                 lr *= (1. / (1. + self.decay * self.iterations))
-                self.updates.append(K.update_add(self.iterations, 1))
+                self.updates.append(tf.keras.backend.update_add(self.iterations, 1))
 
             # momentum
-            shapes = [K.get_variable_shape(p) for p in params]
-            moments = [K.zeros(shape) for shape in shapes]
+            shapes = [tf.keras.backend.int_shape(p) for p in params]
+            moments = [tf.keras.backend.zeros(shape) for shape in shapes]
             self.weights = [self.iterations] + moments
             for p, g, m in zip(params, grads, moments):
                 if p.name in self.lr_multipliers:
@@ -63,7 +62,7 @@ def nsgd():
                 else:
                     mlr = lr
                 v = self.momentum * m - mlr * g  # velocity
-                self.updates.append(K.update(m, v))
+                self.updates.append(tf.keras.backend.update(m, v))
 
                 if self.nesterov:
                     new_p = p + self.momentum * v - mlr * g
@@ -74,7 +73,7 @@ def nsgd():
                 if getattr(p, 'constraint', None) is not None:
                     new_p = p.constraint(new_p)
 
-                self.updates.append(K.update(p, new_p))
+                self.updates.append(tf.keras.backend.update(p, new_p))
 
             logger = logging.getLogger(__name__)
             logger.info(f'lr_multipliers: applied = {applied_lr_multipliers}')

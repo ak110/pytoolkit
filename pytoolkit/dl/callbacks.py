@@ -12,10 +12,9 @@ from .. import draw, io, log
 
 def learning_rate(reduce_epoch_rates=(0.5, 0.75), factor=0.1, epochs=None):
     """よくある150epoch目と225epoch目に学習率を1/10するコールバックを作って返す。"""
-    import keras
-    import keras.backend as K
+    import tensorflow as tf
 
-    class _LearningRate(keras.callbacks.Callback):
+    class _LearningRate(tf.keras.callbacks.Callback):
 
         def __init__(self, reduce_epoch_rates, factor, epochs):
             self.reduce_epoch_rates = reduce_epoch_rates
@@ -34,9 +33,9 @@ def learning_rate(reduce_epoch_rates=(0.5, 0.75), factor=0.1, epochs=None):
 
         def on_epoch_begin(self, epoch, logs=None):
             if epoch + 1 in self.reduce_epochs:
-                lr1 = K.get_value(self.model.optimizer.lr)
+                lr1 = tf.keras.backend.get_value(self.model.optimizer.lr)
                 lr2 = lr1 * self.factor
-                K.set_value(self.model.optimizer.lr, lr2)
+                tf.keras.backend.set_value(self.model.optimizer.lr, lr2)
                 logger = log.get(__name__)
                 logger.info(f'Epoch {epoch + 1}: Learning rate {lr1:.1e} -> {lr2:.1e}')
 
@@ -49,11 +48,10 @@ def cosine_annealing(factor=0.01, epochs=None):
     ■SGDR: Stochastic Gradient Descent with Warm Restarts
     https://arxiv.org/abs/1608.03983
     """
-    import keras
-    import keras.backend as K
+    import tensorflow as tf
     assert factor < 1
 
-    class _CosineAnnealing(keras.callbacks.Callback):
+    class _CosineAnnealing(tf.keras.callbacks.Callback):
 
         def __init__(self, factor, epochs):
             self.factor = factor
@@ -62,14 +60,14 @@ def cosine_annealing(factor=0.01, epochs=None):
             super().__init__()
 
         def on_train_begin(self, logs=None):
-            self.start_lr = float(K.get_value(self.model.optimizer.lr))
+            self.start_lr = float(tf.keras.backend.get_value(self.model.optimizer.lr))
 
         def on_epoch_begin(self, epoch, logs=None):
             lr_max = self.start_lr
             lr_min = self.start_lr * self.factor
             r = (epoch + 1) / (self.epochs or self.params['epochs'])
             lr = lr_min + 0.5 * (lr_max - lr_min) * (1 + np.cos(np.pi * r))
-            K.set_value(self.model.optimizer.lr, float(lr))
+            tf.keras.backend.set_value(self.model.optimizer.lr, float(lr))
 
     return _CosineAnnealing(factor=factor, epochs=epochs)
 
@@ -82,9 +80,9 @@ def learning_curve_plot(filename, metric='loss'):
     - metric: 対象とするmetric名。lossとかaccとか。
 
     """
-    import keras
+    import tensorflow as tf
 
-    class _LearningCurvePlotter(keras.callbacks.Callback):
+    class _LearningCurvePlotter(tf.keras.callbacks.Callback):
 
         def __init__(self, filename, metric='loss'):
             self.filename = pathlib.Path(filename).resolve()
@@ -132,12 +130,11 @@ def tsv_logger(filename, append=False):
     - append: 追記するのか否か。
 
     """
-    import keras
-    import keras.backend as K
+    import tensorflow as tf
 
     enabled = hvd.is_master()
 
-    class _TSVLogger(keras.callbacks.Callback):
+    class _TSVLogger(tf.keras.callbacks.Callback):
 
         def __init__(self, filename, append, enabled):
             self.filename = pathlib.Path(filename)
@@ -162,7 +159,7 @@ def tsv_logger(filename, append=False):
 
         def on_epoch_end(self, epoch, logs=None):
             logs = logs or {}
-            logs['lr'] = K.get_value(self.model.optimizer.lr)
+            logs['lr'] = tf.keras.backend.get_value(self.model.optimizer.lr)
             elapsed_time = time.time() - self.epoch_start_time
 
             def _format_metric(logs, k):
@@ -185,12 +182,11 @@ def tsv_logger(filename, append=False):
 
 def epoch_logger():
     """DEBUGログを色々出力するcallback。Horovod使用時はrank() == 0のみ有効。"""
-    import keras
-    import keras.backend as K
+    import tensorflow as tf
 
     enabled = hvd.is_master()
 
-    class _EpochLogger(keras.callbacks.Callback):
+    class _EpochLogger(tf.keras.callbacks.Callback):
 
         def __init__(self, enabled):
             self.enabled = enabled
@@ -202,7 +198,7 @@ def epoch_logger():
             self.epoch_start_time = time.time()
 
         def on_epoch_end(self, epoch, logs=None):
-            lr = K.get_value(self.model.optimizer.lr)
+            lr = tf.keras.backend.get_value(self.model.optimizer.lr)
             elapsed_time = time.time() - self.epoch_start_time
             metrics = ' '.join([f'{k}={logs.get(k):.4f}' for k in self.params['metrics'] if k in logs])
             if enabled:
@@ -230,9 +226,9 @@ def freeze_bn(freeze_epochs: int):
     ```
 
     """
-    import keras
+    import tensorflow as tf
 
-    class _FreezeBNCallback(keras.callbacks.Callback):
+    class _FreezeBNCallback(tf.keras.callbacks.Callback):
 
         def __init__(self, freeze_epochs):
             self.freeze_epochs = freeze_epochs
@@ -249,7 +245,7 @@ def freeze_bn(freeze_epochs: int):
         def _freeze_layers(self, container):
             freezed_count = 0
             for layer in container.layers:
-                if isinstance(layer, keras.layers.BatchNormalization):
+                if isinstance(layer, tf.keras.layers.BatchNormalization):
                     if layer.trainable:
                         layer.trainable = False
                         freezed_count += 1
@@ -282,11 +278,11 @@ def unfreeze(epoch_rate: float):
     ```
 
     """
-    import keras
+    import tensorflow as tf
 
-    class _UnfreezeCallback(keras.callbacks.Callback):
+    class _UnfreezeCallback(tf.keras.callbacks.Callback):
 
-        def __init__(self, epoch_rate, logger_name):
+        def __init__(self, epoch_rate):
             self.epoch_rate = epoch_rate
             self.target_epoch = 0
             super().__init__()

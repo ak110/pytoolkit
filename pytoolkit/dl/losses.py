@@ -11,22 +11,22 @@ def balanced_binary_crossentropy(alpha=0.5):
     Focal lossの論文ではα=0.75が良いとされていた。(class 0の重みが0.25)
     """
     def _balanced_binary_crossentropy(y_true, y_pred):
-        import keras.backend as K
+        import tensorflow as tf
         a_t = y_true * alpha + (1 - y_true) * (1 - alpha)
         p_t = y_true * y_pred + (1 - y_true) * (1 - y_pred)
-        p_t = K.clip(p_t, K.epsilon(), 1 - K.epsilon())
-        return -a_t * K.log(p_t)
+        p_t = tf.keras.backend.clip(p_t, tf.keras.backend.epsilon(), 1 - tf.keras.backend.epsilon())
+        return -a_t * tf.keras.backend.log(p_t)
     return balanced_binary_crossentropy
 
 
 def binary_focal_loss(alpha=0.25, gamma=2.0):
     """2クラス分類用focal loss (https://arxiv.org/pdf/1708.02002v1.pdf)。"""
     def _binary_focal_loss(y_true, y_pred):
-        import keras.backend as K
+        import tensorflow as tf
         a_t = y_true * alpha + (1 - y_true) * (1 - alpha)
         p_t = y_true * y_pred + (1 - y_true) * (1 - y_pred)
-        p_t = K.clip(p_t, K.epsilon(), 1 - K.epsilon())
-        return -a_t * K.pow(1 - p_t, gamma) * K.log(p_t)
+        p_t = tf.keras.backend.clip(p_t, tf.keras.backend.epsilon(), 1 - tf.keras.backend.epsilon())
+        return -a_t * tf.keras.backend.pow(1 - p_t, gamma) * tf.keras.backend.log(p_t)
     return _binary_focal_loss
 
 
@@ -35,33 +35,33 @@ def balanced_categorical_crossentropy(y_true, y_pred, alpha=None):
 
     Focal lossの論文ではα=0.75が良いとされていた。(class 0の重みが0.25)
     """
-    import keras.backend as K
-    assert K.image_data_format() == 'channels_last'
+    import tensorflow as tf
+    assert tf.keras.backend.image_data_format() == 'channels_last'
 
     if alpha is None:
-        class_weights = -1  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
+        class_weights = -1  # 「-tf.keras.backend.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
     else:
-        nb_classes = K.int_shape(y_pred)[-1]
+        nb_classes = tf.keras.backend.int_shape(y_pred)[-1]
         class_weights = np.array([(1 - alpha) * 2] * 1 + [alpha * 2] * (nb_classes - 1))
         class_weights = np.reshape(class_weights, (1, 1, -1))
-        class_weights = -class_weights  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
+        class_weights = -class_weights  # 「-tf.keras.backend.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
 
-    y_pred = K.maximum(y_pred, K.epsilon())
-    return K.sum(y_true * K.log(y_pred) * class_weights, axis=-1)
+    y_pred = tf.keras.backend.maximum(y_pred, tf.keras.backend.epsilon())
+    return tf.keras.backend.sum(y_true * tf.keras.backend.log(y_pred) * class_weights, axis=-1)
 
 
 def categorical_focal_loss(y_true, y_pred, alpha=0.25, gamma=2.0):
     """多クラス分類用focal loss (https://arxiv.org/pdf/1708.02002v1.pdf)。"""
-    import keras.backend as K
+    import tensorflow as tf
+    assert tf.keras.backend.image_data_format() == 'channels_last'
 
-    assert K.image_data_format() == 'channels_last'
-    nb_classes = K.int_shape(y_pred)[-1]
+    nb_classes = tf.keras.backend.int_shape(y_pred)[-1]
     class_weights = np.array([(1 - alpha) * 2] * 1 + [alpha * 2] * (nb_classes - 1))
     class_weights = np.reshape(class_weights, (1, 1, -1))
-    class_weights = -class_weights  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
+    class_weights = -class_weights  # 「-tf.keras.backend.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
 
-    y_pred = K.maximum(y_pred, K.epsilon())
-    return K.sum(K.pow(1 - y_pred, gamma) * y_true * K.log(y_pred) * class_weights, axis=-1)
+    y_pred = tf.keras.backend.maximum(y_pred, tf.keras.backend.epsilon())
+    return tf.keras.backend.sum(tf.keras.backend.pow(1 - y_pred, gamma) * y_true * tf.keras.backend.log(y_pred) * class_weights, axis=-1)
 
 
 def lovasz_hinge(y_true, y_pred):
@@ -90,19 +90,19 @@ def symmetric_lovasz_hinge_elup1(y_true, y_pred):
 def make_lovasz_softmax(ignore=None):
     """Lovasz softmax loss。"""
     def _lovasz_softmax(y_true, y_pred):
-        import keras.backend as K
+        import tensorflow as tf
         from .lovasz_softmax import lovasz_losses_tf
-        return lovasz_losses_tf.lovasz_softmax(y_pred, K.argmax(y_true, axis=-1), ignore=ignore)
+        return lovasz_losses_tf.lovasz_softmax(y_pred, tf.keras.backend.argmax(y_true, axis=-1), ignore=ignore)
     return _lovasz_softmax
 
 
 def make_mixed_lovasz_softmax(ignore=None):
     """Lovasz softmax loss + CE。"""
     def _lovasz_softmax(y_true, y_pred):
-        import keras.backend as K
+        import tensorflow as tf
         from .lovasz_softmax import lovasz_losses_tf
-        loss1 = lovasz_losses_tf.lovasz_softmax(y_pred, K.argmax(y_true, axis=-1), ignore=ignore)
-        loss2 = K.categorical_crossentropy(y_true, y_pred)
+        loss1 = lovasz_losses_tf.lovasz_softmax(y_pred, tf.keras.backend.argmax(y_true, axis=-1), ignore=ignore)
+        loss2 = tf.keras.backend.categorical_crossentropy(y_true, y_pred)
         return loss1 * 0.9 + loss2 * 0.1
     return _lovasz_softmax
 
@@ -113,10 +113,9 @@ def od_bias_initializer(nb_classes, pi=0.01):
     nb_classesは背景を含むクラス数。0が背景。
     あるいはnb_classes == 1なら2クラス分類として0が背景、1がオブジェクトとする。
     """
-    import keras
-    import keras.backend as K
+    import tensorflow as tf
 
-    class FocalLossBiasInitializer(keras.initializers.Initializer):
+    class FocalLossBiasInitializer(tf.keras.initializers.Initializer):
         """focal loss用の最後のクラス分類のbias_initializer。
 
         # 引数
@@ -127,7 +126,7 @@ def od_bias_initializer(nb_classes, pi=0.01):
             self.nb_classes = nb_classes
             self.pi = pi
 
-        def __call__(self, shape, dtype=None):
+        def __call__(self, shape, dtype=None, partition_info=None):
             assert len(shape) == 1
             assert shape[0] % self.nb_classes == 0
             if self.nb_classes == 1:
@@ -136,7 +135,7 @@ def od_bias_initializer(nb_classes, pi=0.01):
                 x = np.log(((nb_classes - 1) * (1 - self.pi)) / self.pi)
                 bias = [x] + [0] * (nb_classes - 1)  # 背景が0.99%になるような値。21クラス分類なら7.6くらい。(結構大きい…)
                 bias = bias * (shape[0] // self.nb_classes)
-            return K.constant(bias, shape=shape, dtype=dtype)
+            return tf.keras.backend.constant(bias, shape=shape, dtype=dtype)
 
         def get_config(self):
             return {'nb_classes': self.nb_classes}
@@ -146,10 +145,9 @@ def od_bias_initializer(nb_classes, pi=0.01):
 
 def l1_smooth_loss(y_true, y_pred):
     """L1-smooth loss。"""
-    import keras.backend as K
     import tensorflow as tf
-    abs_loss = K.abs(y_true - y_pred)
-    sq_loss = 0.5 * K.square(y_true - y_pred)
-    l1_loss = tf.where(K.less(abs_loss, 1.0), sq_loss, abs_loss - 0.5)
-    l1_loss = K.sum(l1_loss, axis=-1)
+    abs_loss = tf.keras.backend.abs(y_true - y_pred)
+    sq_loss = 0.5 * tf.keras.backend.square(y_true - y_pred)
+    l1_loss = tf.where(tf.keras.backend.less(abs_loss, 1.0), sq_loss, abs_loss - 0.5)
+    l1_loss = tf.keras.backend.sum(l1_loss, axis=-1)
     return l1_loss

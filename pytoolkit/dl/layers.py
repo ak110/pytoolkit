@@ -32,10 +32,9 @@ def get_custom_objects():
 
 def preprocess():
     """前処理レイヤー。"""
-    import keras
-    import keras.backend as K
+    import tensorflow as tf
 
-    class Preprocess(keras.layers.Layer):
+    class Preprocess(tf.keras.layers.Layer):
         """前処理レイヤー。"""
 
         def __init__(self, mode='tf', **kwargs):
@@ -43,13 +42,16 @@ def preprocess():
             assert mode in ('caffe', 'tf', 'torch', 'div255')
             self.mode = mode
 
+        def compute_output_shape(self, input_shape):
+            return input_shape
+
         def call(self, inputs, **kwargs):
             if self.mode == 'caffe':
-                return K.bias_add(inputs[..., ::-1], K.constant(np.array([-103.939, -116.779, -123.68])))
+                return tf.keras.backend.bias_add(inputs[..., ::-1], tf.keras.backend.constant(np.array([-103.939, -116.779, -123.68])))
             elif self.mode == 'tf':
                 return (inputs / 127.5) - 1
             elif self.mode == 'torch':
-                return K.bias_add((inputs / 255.), K.constant(np.array([-0.485, -0.456, -0.406]))) / np.array([0.229, 0.224, 0.225])
+                return tf.keras.backend.bias_add((inputs / 255.), tf.keras.backend.constant(np.array([-0.485, -0.456, -0.406]))) / np.array([0.229, 0.224, 0.225])
             elif self.mode == 'div255':
                 return inputs / 255.
             else:
@@ -66,34 +68,32 @@ def preprocess():
 
 def channel_argmax():
     """チャンネルをargmaxするレイヤー。"""
-    import keras
-    import keras.backend as K
+    import tensorflow as tf
 
-    class ChannelArgMax(keras.layers.Layer):
+    class ChannelArgMax(tf.keras.layers.Layer):
         """チャンネルをargmaxするレイヤー。"""
-
-        def call(self, inputs, **kwargs):
-            return K.argmax(inputs, axis=-1)
 
         def compute_output_shape(self, input_shape):
             return input_shape[:-1]
+
+        def call(self, inputs, **kwargs):
+            return tf.keras.backend.argmax(inputs, axis=-1)
 
     return ChannelArgMax
 
 
 def channel_max():
     """チャンネルをmaxするレイヤー。"""
-    import keras
-    import keras.backend as K
+    import tensorflow as tf
 
-    class ChannelMax(keras.layers.Layer):
+    class ChannelMax(tf.keras.layers.Layer):
         """チャンネルをmaxするレイヤー。"""
-
-        def call(self, inputs, **kwargs):
-            return K.max(inputs, axis=-1)
 
         def compute_output_shape(self, input_shape):
             return input_shape[:-1]
+
+        def call(self, inputs, **kwargs):
+            return tf.keras.backend.max(inputs, axis=-1)
 
     return ChannelMax
 
@@ -107,10 +107,9 @@ def resize2d():
     - interpolation: 'bilinear', 'nearest', 'bicubic', 'area'
 
     """
-    import keras
     import tensorflow as tf
 
-    class Resize2D(keras.layers.Layer):
+    class Resize2D(tf.keras.layers.Layer):
         """リサイズ。"""
 
         def __init__(self, size=None, scale=None, interpolation='bilinear', align_corners=False, **kwargs):
@@ -141,10 +140,12 @@ def resize2d():
             if self.size is not None:
                 size = self.size
             else:
-                shape = keras.backend.shape(inputs)
-                scale = keras.backend.constant(self.scale, dtype='float32')
-                new_h = keras.backend.cast(keras.backend.cast(shape[1], 'float32') * scale, 'int32')
-                new_w = keras.backend.cast(keras.backend.cast(shape[2], 'float32') * scale, 'int32')
+                if self.scale == 1:
+                    return inputs
+                shape = tf.keras.backend.shape(inputs)
+                scale = tf.keras.backend.constant(self.scale, dtype='float32')
+                new_h = tf.keras.backend.cast(tf.keras.backend.cast(shape[1], 'float32') * scale, 'int32')
+                new_w = tf.keras.backend.cast(tf.keras.backend.cast(shape[2], 'float32') * scale, 'int32')
                 size = (new_h, new_w)
             return tf.image.resize_images(inputs, size, method, self.align_corners)
 
@@ -163,11 +164,9 @@ def resize2d():
 
 def pad2d():
     """`tf.pad`するレイヤー。"""
-    import keras
-    import keras.backend as K
     import tensorflow as tf
 
-    class Pad2D(keras.layers.Layer):
+    class Pad2D(tf.keras.layers.Layer):
         """`tf.pad`するレイヤー。"""
 
         def __init__(self, padding=(1, 1), mode='constant', constant_values=0, **kwargs):
@@ -190,16 +189,16 @@ def pad2d():
             self.mode = mode
             self.constant_values = constant_values
 
-        def call(self, inputs, **kwargs):
-            padding = K.constant(((0, 0),) + self.padding + ((0, 0),), dtype='int32')
-            return tf.pad(inputs, padding, mode=self.mode, constant_values=self.constant_values, name=self.name)
-
         def compute_output_shape(self, input_shape):
             assert len(input_shape) == 4
             input_shape = list(input_shape)
             input_shape[1] += sum(self.padding[0])
             input_shape[2] += sum(self.padding[1])
             return tuple(input_shape)
+
+        def call(self, inputs, **kwargs):
+            padding = tf.keras.backend.constant(((0, 0),) + self.padding + ((0, 0),), dtype='int32')
+            return tf.pad(inputs, padding, mode=self.mode, constant_values=self.constant_values, name=self.name)
 
         def get_config(self):
             config = {
@@ -215,11 +214,9 @@ def pad2d():
 
 def pad_channel_2d():
     """チャンネルに対して`tf.pad`するレイヤー。"""
-    import keras
-    import keras.backend as K
     import tensorflow as tf
 
-    class PadChannel2D(keras.layers.Layer):
+    class PadChannel2D(tf.keras.layers.Layer):
         """`tf.pad`するレイヤー。"""
 
         def __init__(self, filters, mode='constant', constant_values=0, **kwargs):
@@ -236,7 +233,7 @@ def pad_channel_2d():
             return tuple(input_shape)
 
         def call(self, inputs, **kwargs):
-            padding = K.constant(((0, 0), (0, 0), (0, 0), (0, self.filters)), dtype='int32')
+            padding = tf.keras.backend.constant(((0, 0), (0, 0), (0, 0), (0, self.filters)), dtype='int32')
             return tf.pad(inputs, padding, mode=self.mode, constant_values=self.constant_values, name=self.name)
 
         def get_config(self):
@@ -257,10 +254,9 @@ def coord_channel_2d():
     ■[1807.03247] An Intriguing Failing of Convolutional Neural Networks and the CoordConv Solution
     https://arxiv.org/abs/1807.03247
     """
-    import keras
-    import keras.backend as K
+    import tensorflow as tf
 
-    class CoordChannel2D(keras.layers.Layer):
+    class CoordChannel2D(tf.keras.layers.Layer):
         """CoordConvなレイヤー。
 
         ■[1807.03247] An Intriguing Failing of Convolutional Neural Networks and the CoordConv Solution
@@ -282,17 +278,17 @@ def coord_channel_2d():
             return tuple(input_shape)
 
         def call(self, inputs, **kwargs):
-            input_shape = K.shape(inputs)
+            input_shape = tf.keras.backend.shape(inputs)
             pad_shape = (input_shape[0], input_shape[1], input_shape[2], 1)
-            ones = K.ones(pad_shape)
+            ones = tf.keras.backend.ones(pad_shape)
             pad_channels = []
             if self.x_channel:
-                gradation = K.cast(K.arange(0, input_shape[2]), K.floatx()) / K.cast(input_shape[2], K.floatx())
-                pad_channels.append(ones * K.reshape(gradation, (1, 1, input_shape[2], 1)))
+                gradation = tf.keras.backend.cast(tf.keras.backend.arange(0, input_shape[2]), tf.keras.backend.floatx()) / tf.keras.backend.cast(input_shape[2], tf.keras.backend.floatx())
+                pad_channels.append(ones * tf.keras.backend.reshape(gradation, (1, 1, input_shape[2], 1)))
             if self.y_channel:
-                gradation = K.cast(K.arange(0, input_shape[1]), K.floatx()) / K.cast(input_shape[1], K.floatx())
-                pad_channels.append(ones * K.reshape(gradation, (1, input_shape[1], 1, 1)))
-            return K.concatenate([inputs] + pad_channels, axis=-1)
+                gradation = tf.keras.backend.cast(tf.keras.backend.arange(0, input_shape[1]), tf.keras.backend.floatx()) / tf.keras.backend.cast(input_shape[1], tf.keras.backend.floatx())
+                pad_channels.append(ones * tf.keras.backend.reshape(gradation, (1, input_shape[1], 1, 1)))
+            return tf.keras.backend.concatenate([inputs] + pad_channels, axis=-1)
 
         def get_config(self):
             config = {
@@ -307,29 +303,26 @@ def coord_channel_2d():
 
 def channel_pair_2d():
     """チャンネル同士の2個の組み合わせの積。"""
-    import keras
-    import keras.backend as K
+    import tensorflow as tf
 
-    class ChannelPair2D(keras.layers.Layer):
+    class ChannelPair2D(tf.keras.layers.Layer):
         """チャンネル同士の2個の組み合わせの積。"""
-
-        def call(self, inputs, **kwargs):
-            ch = K.int_shape(inputs)[-1]
-            return K.concatenate([inputs[..., i:i + 1] * inputs[..., i + 1:] for i in range(ch - 1)], axis=-1)
 
         def compute_output_shape(self, input_shape):
             return input_shape[:-1] + ((input_shape[-1] * (input_shape[-1] - 1) // 2),)
+
+        def call(self, inputs, **kwargs):
+            ch = tf.keras.backend.int_shape(inputs)[-1]
+            return tf.keras.backend.concatenate([inputs[..., i:i + 1] * inputs[..., i + 1:] for i in range(ch - 1)], axis=-1)
 
     return ChannelPair2D
 
 
 def group_normalization():
     """Group normalization。"""
-    import keras
-    import keras.backend as K
     import tensorflow as tf
 
-    class GroupNormalization(keras.layers.Layer):
+    class GroupNormalization(tf.keras.layers.Layer):
         """Group normalization。
 
         # Arguments
@@ -378,12 +371,12 @@ def group_normalization():
             self.epsilon = epsilon
             self.center = center
             self.scale = scale
-            self.beta_initializer = keras.initializers.get(beta_initializer)
-            self.gamma_initializer = keras.initializers.get(gamma_initializer)
-            self.beta_regularizer = keras.regularizers.get(beta_regularizer)
-            self.gamma_regularizer = keras.regularizers.get(gamma_regularizer)
-            self.beta_constraint = keras.constraints.get(beta_constraint)
-            self.gamma_constraint = keras.constraints.get(gamma_constraint)
+            self.beta_initializer = tf.keras.initializers.get(beta_initializer)
+            self.gamma_initializer = tf.keras.initializers.get(gamma_initializer)
+            self.beta_regularizer = tf.keras.regularizers.get(beta_regularizer)
+            self.gamma_regularizer = tf.keras.regularizers.get(gamma_regularizer)
+            self.beta_constraint = tf.keras.constraints.get(beta_constraint)
+            self.gamma_constraint = tf.keras.constraints.get(gamma_constraint)
             self.gamma = None
             self.beta = None
 
@@ -409,30 +402,30 @@ def group_normalization():
                 self.beta = None
             super().build(input_shape)
 
+        def compute_output_shape(self, input_shape):
+            return input_shape
+
         def call(self, inputs, **kwargs):
             x = inputs
-            ndim = K.ndim(x)
-            shape = K.shape(x)
+            ndim = tf.keras.backend.ndim(x)
+            shape = tf.keras.backend.shape(x)
             if ndim == 4:  # 2D
                 N, H, W, C = shape[0], shape[1], shape[2], shape[3]
-                g = K.minimum(self.groups, C)
-                x = K.reshape(x, [N, H, W, g, C // g])
+                g = tf.keras.backend.minimum(self.groups, C)
+                x = tf.keras.backend.reshape(x, [N, H, W, g, C // g])
                 mean, var = tf.nn.moments(x, [1, 2, 4], keep_dims=True)
-                x = (x - mean) / K.sqrt(var + self.epsilon)
-                x = K.reshape(x, [N, H, W, C])
+                x = (x - mean) / tf.keras.backend.sqrt(var + self.epsilon)
+                x = tf.keras.backend.reshape(x, [N, H, W, C])
             elif ndim == 5:  # 3D
                 N, T, H, W, C = shape[0], shape[1], shape[2], shape[3], shape[4]
-                g = K.minimum(self.groups, C)
-                x = K.reshape(x, [N, T, H, W, g, C // g])
+                g = tf.keras.backend.minimum(self.groups, C)
+                x = tf.keras.backend.reshape(x, [N, T, H, W, g, C // g])
                 mean, var = tf.nn.moments(x, [1, 2, 3, 5], keep_dims=True)
-                x = (x - mean) / K.sqrt(var + self.epsilon)
-                x = K.reshape(x, [N, T, H, W, C])
+                x = (x - mean) / tf.keras.backend.sqrt(var + self.epsilon)
+                x = tf.keras.backend.reshape(x, [N, T, H, W, C])
             else:
                 assert ndim in (4, 5)
             return x * self.gamma + self.beta
-
-        def compute_output_shape(self, input_shape):
-            return input_shape
 
         def get_config(self):
             config = {
@@ -440,12 +433,12 @@ def group_normalization():
                 'epsilon': self.epsilon,
                 'center': self.center,
                 'scale': self.scale,
-                'beta_initializer': keras.initializers.serialize(self.beta_initializer),
-                'gamma_initializer': keras.initializers.serialize(self.gamma_initializer),
-                'beta_regularizer': keras.regularizers.serialize(self.beta_regularizer),
-                'gamma_regularizer': keras.regularizers.serialize(self.gamma_regularizer),
-                'beta_constraint': keras.constraints.serialize(self.beta_constraint),
-                'gamma_constraint': keras.constraints.serialize(self.gamma_constraint)
+                'beta_initializer': tf.keras.initializers.serialize(self.beta_initializer),
+                'gamma_initializer': tf.keras.initializers.serialize(self.gamma_initializer),
+                'beta_regularizer': tf.keras.regularizers.serialize(self.beta_regularizer),
+                'gamma_regularizer': tf.keras.regularizers.serialize(self.gamma_regularizer),
+                'beta_constraint': tf.keras.constraints.serialize(self.beta_constraint),
+                'gamma_constraint': tf.keras.constraints.serialize(self.gamma_constraint)
             }
             base_config = super().get_config()
             return dict(list(base_config.items()) + list(config.items()))
@@ -455,10 +448,9 @@ def group_normalization():
 
 def destandarization():
     """事前に求めた平均と標準偏差を元に出力を標準化するレイヤー。"""
-    import keras
-    import keras.backend as K
+    import tensorflow as tf
 
-    class Destandarization(keras.layers.Layer):
+    class Destandarization(tf.keras.layers.Layer):
         """事前に求めた平均と標準偏差を元に出力を標準化するレイヤー。
 
         # Arguments
@@ -477,10 +469,13 @@ def destandarization():
         def __init__(self, mean=0, std=0.3, **kwargs):
             super().__init__(**kwargs)
             self.supports_masking = True
-            self.mean = K.cast_to_floatx(mean)
-            self.std = K.cast_to_floatx(std)
-            if self.std <= K.epsilon():
+            self.mean = tf.keras.backend.cast_to_floatx(mean)
+            self.std = tf.keras.backend.cast_to_floatx(std)
+            if self.std <= tf.keras.backend.epsilon():
                 self.std = 1.  # 怪しい安全装置
+
+        def compute_output_shape(self, input_shape):
+            return input_shape
 
         def call(self, inputs, **kwargs):
             return inputs * self.std + self.mean
@@ -495,10 +490,9 @@ def destandarization():
 
 def stocastic_add():
     """Stocastic Depthのための確率的な加算。"""
-    import keras
-    import keras.backend as K
+    import tensorflow as tf
 
-    class StocasticAdd(keras.layers.Layer):
+    class StocasticAdd(tf.keras.layers.Layer):
         """Stocastic Depthのための確率的な加算。
 
         # 引数
@@ -511,6 +505,11 @@ def stocastic_add():
             self.survival_prob = float(survival_prob)
             self.calibration = calibration
             super().__init__(**kargs)
+
+        def compute_output_shape(self, input_shape):
+            assert input_shape and len(input_shape) == 2
+            assert input_shape[0] == input_shape[1]
+            return input_shape[0]
 
         def call(self, inputs, training=None, **kwargs):  # pylint: disable=arguments-differ
             assert len(inputs) == 2
@@ -525,8 +524,8 @@ def stocastic_add():
                 return inputs[0]
 
             def _stocastic_add():
-                r = K.random_uniform((1,), 0, 1)[0]
-                return K.switch(K.less_equal(r, self.survival_prob), _add, _drop)
+                r = tf.keras.backend.random_uniform((1,), 0, 1)[0]
+                return tf.keras.backend.switch(tf.keras.backend.less_equal(r, self.survival_prob), _add, _drop)
 
             def _calibrated_add():
                 if self.calibration:
@@ -534,12 +533,7 @@ def stocastic_add():
                 else:
                     return inputs[0] + inputs[1]
 
-            return K.in_train_phase(_stocastic_add, _calibrated_add, training=training)
-
-        def compute_output_shape(self, input_shape):
-            assert input_shape and len(input_shape) == 2
-            assert input_shape[0] == input_shape[1]
-            return input_shape[0]
+            return tf.keras.backend.in_train_phase(_stocastic_add, _calibrated_add, training=training)
 
         def get_config(self):
             config = {
@@ -554,16 +548,17 @@ def stocastic_add():
 
 def mixfeat():
     """MixFeat <https://openreview.net/forum?id=HygT9oRqFX>"""
-    import keras
-    import keras.backend as K
     import tensorflow as tf
 
-    class MixFeat(keras.layers.Layer):
+    class MixFeat(tf.keras.layers.Layer):
         """MixFeat <https://openreview.net/forum?id=HygT9oRqFX>"""
 
         def __init__(self, sigma=0.2, **kargs):
             self.sigma = sigma
             super().__init__(**kargs)
+
+        def compute_output_shape(self, input_shape):
+            return input_shape
 
         def call(self, inputs, training=None):  # pylint: disable=arguments-differ
             def _passthru():
@@ -572,25 +567,25 @@ def mixfeat():
             def _mixfeat():
                 @tf.custom_gradient
                 def _forward(x):
-                    shape = K.shape(x)
-                    indices = K.arange(start=0, stop=shape[0])
+                    shape = tf.keras.backend.shape(x)
+                    indices = tf.keras.backend.arange(start=0, stop=shape[0])
                     indices = tf.random_shuffle(indices)
-                    rs = K.concatenate([K.constant([1], dtype='int32'), shape[1:]])
-                    r = K.random_normal(rs, 0, self.sigma, dtype='float16')
-                    theta = K.random_uniform(rs, -np.pi, +np.pi, dtype='float16')
-                    a = 1 + r * K.cos(theta)
-                    b = r * K.sin(theta)
-                    y = x * K.cast(a, K.floatx()) + K.gather(x, indices) * K.cast(b, K.floatx())
+                    rs = tf.keras.backend.concatenate([tf.keras.backend.constant([1], dtype='int32'), shape[1:]])
+                    r = tf.keras.backend.random_normal(rs, 0, self.sigma, dtype='float16')
+                    theta = tf.keras.backend.random_uniform(rs, -np.pi, +np.pi, dtype='float16')
+                    a = 1 + r * tf.keras.backend.cos(theta)
+                    b = r * tf.keras.backend.sin(theta)
+                    y = x * tf.keras.backend.cast(a, tf.keras.backend.floatx()) + tf.keras.backend.gather(x, indices) * tf.keras.backend.cast(b, tf.keras.backend.floatx())
 
                     def _backword(dx):
                         inv = tf.invert_permutation(indices)
-                        return dx * K.cast(a, K.floatx()) + K.gather(dx, inv) * K.cast(b, K.floatx())
+                        return dx * tf.keras.backend.cast(a, tf.keras.backend.floatx()) + tf.keras.backend.gather(dx, inv) * tf.keras.backend.cast(b, tf.keras.backend.floatx())
 
                     return y, _backword
 
                 return _forward(inputs)
 
-            return K.in_train_phase(_mixfeat, _passthru, training=training)
+            return tf.keras.backend.in_train_phase(_mixfeat, _passthru, training=training)
 
         def get_config(self):
             config = {'sigma': self.sigma}
@@ -602,11 +597,9 @@ def mixfeat():
 
 def drop_activation():
     """Drop-Activation <https://arxiv.org/abs/1811.05850>"""
-    import keras
-    import keras.backend as K
     import tensorflow as tf
 
-    class DropActivation(keras.layers.Layer):
+    class DropActivation(tf.keras.layers.Layer):
         """Drop-Activation <https://arxiv.org/abs/1811.05850>"""
 
         def __init__(self, keep_rate=0.95, **kargs):
@@ -614,16 +607,19 @@ def drop_activation():
             self.keep_rate = keep_rate
             super().__init__(**kargs)
 
+        def compute_output_shape(self, input_shape):
+            return input_shape
+
         def call(self, inputs, training=None):  # pylint: disable=arguments-differ
             def _train():
-                shape = K.shape(inputs)
-                r = K.random_uniform(shape=(shape[0],))
-                return tf.where(r <= self.keep_rate, K.relu(inputs), inputs)
+                shape = tf.keras.backend.shape(inputs)
+                r = tf.keras.backend.random_uniform(shape=(shape[0],))
+                return tf.where(r <= self.keep_rate, tf.keras.backend.relu(inputs), inputs)
 
             def _test():
-                return K.relu(inputs, alpha=1 - self.keep_rate)
+                return tf.keras.backend.relu(inputs, alpha=1 - self.keep_rate)
 
-            return K.in_train_phase(_train, _test, training=training)
+            return tf.keras.backend.in_train_phase(_train, _test, training=training)
 
         def get_config(self):
             config = {'keep_rate': self.keep_rate}
@@ -635,16 +631,18 @@ def drop_activation():
 
 def normal_noise():
     """平均0、分散1のノイズをドロップアウト風に適用する。"""
-    import keras
-    import keras.backend as K
+    import tensorflow as tf
 
-    class NormalNoise(keras.layers.Layer):
+    class NormalNoise(tf.keras.layers.Layer):
         """平均0、分散1のノイズをドロップアウト風に適用する。"""
 
         def __init__(self, noise_rate=0.25, **kargs):
             assert 0 <= noise_rate < 1
             self.noise_rate = noise_rate
             super().__init__(**kargs)
+
+        def compute_output_shape(self, input_shape):
+            return input_shape
 
         def call(self, inputs, training=None):  # pylint: disable=arguments-differ
             if self.noise_rate <= 0:
@@ -654,12 +652,12 @@ def normal_noise():
                 return inputs
 
             def _erase_random():
-                shape = K.shape(inputs)
-                noise = K.random_normal(shape)
-                mask = K.cast(K.greater_equal(K.random_uniform(shape), self.noise_rate), K.floatx())
+                shape = tf.keras.backend.shape(inputs)
+                noise = tf.keras.backend.random_normal(shape)
+                mask = tf.keras.backend.cast(tf.keras.backend.greater_equal(tf.keras.backend.random_uniform(shape), self.noise_rate), tf.keras.backend.floatx())
                 return inputs * mask + noise * (1 - mask)
 
-            return K.in_train_phase(_erase_random, _passthru, training=training)
+            return tf.keras.backend.in_train_phase(_erase_random, _passthru, training=training)
 
         def get_config(self):
             config = {'noise_rate': self.noise_rate}
@@ -671,10 +669,9 @@ def normal_noise():
 
 def l2normalization():
     """L2 Normalizationレイヤー。"""
-    import keras
-    import keras.backend as K
+    import tensorflow as tf
 
-    class L2Normalization(keras.layers.Layer):
+    class L2Normalization(tf.keras.layers.Layer):
         """L2 Normalizationレイヤー。"""
 
         def __init__(self, scale=1, **kargs):
@@ -682,19 +679,22 @@ def l2normalization():
             self.gamma = None
             super().__init__(**kargs)
 
+        def compute_output_shape(self, input_shape):
+            return input_shape
+
         def build(self, input_shape):
-            ch_axis = 3 if K.image_data_format() == 'channels_last' else 1
+            ch_axis = 3 if tf.keras.backend.image_data_format() == 'channels_last' else 1
             shape = (input_shape[ch_axis],)
             init_gamma = self.scale * np.ones(shape)
             self.gamma = self.add_weight(name='gamma',
                                          shape=shape,
-                                         initializer=keras.initializers.Constant(init_gamma),
+                                         initializer=tf.keras.initializers.Constant(init_gamma),
                                          trainable=True)
             return super().build(input_shape)
 
         def call(self, inputs, **kwargs):
-            ch_axis = 3 if K.image_data_format() == 'channels_last' else 1
-            output = K.l2_normalize(inputs, ch_axis)
+            ch_axis = 3 if tf.keras.backend.image_data_format() == 'channels_last' else 1
+            output = tf.keras.backend.l2_normalize(inputs, ch_axis)
             output *= self.gamma
             return output
 
@@ -708,23 +708,22 @@ def l2normalization():
 
 def weighted_mean():
     """入力の加重平均を取るレイヤー。"""
-    import keras
-    import keras.backend as K
+    import tensorflow as tf
 
-    class WeightedMean(keras.layers.Layer):
+    class WeightedMean(tf.keras.layers.Layer):
         """入力の加重平均を取るレイヤー。"""
 
         def __init__(self,
-                     kernel_initializer=keras.initializers.Constant(0.1),
+                     kernel_initializer=tf.keras.initializers.Constant(0.1),
                      kernel_regularizer=None,
                      kernel_constraint='non_neg',
                      **kwargs):
             super().__init__(**kwargs)
             self.supports_masking = True
             self.kernel = None
-            self.kernel_initializer = keras.initializers.get(kernel_initializer)
-            self.kernel_regularizer = keras.regularizers.get(kernel_regularizer)
-            self.kernel_constraint = keras.constraints.get(kernel_constraint)
+            self.kernel_initializer = tf.keras.initializers.get(kernel_initializer)
+            self.kernel_regularizer = tf.keras.regularizers.get(kernel_regularizer)
+            self.kernel_constraint = tf.keras.constraints.get(kernel_constraint)
 
         def build(self, input_shape):
             self.kernel = self.add_weight(shape=(len(input_shape),),
@@ -735,10 +734,10 @@ def weighted_mean():
             super().build(input_shape)
 
         def call(self, inputs, **kwargs):
-            ot = K.zeros_like(inputs[0])
+            ot = tf.keras.backend.zeros_like(inputs[0])
             for i, inp in enumerate(inputs):
                 ot += inp * self.kernel[i]
-            ot /= K.sum(self.kernel) + K.epsilon()
+            ot /= tf.keras.backend.sum(self.kernel) + tf.keras.backend.epsilon()
             return ot
 
         def compute_output_shape(self, input_shape):
@@ -747,9 +746,9 @@ def weighted_mean():
 
         def get_config(self):
             config = {
-                'kernel_initializer': keras.initializers.serialize(self.kernel_initializer),
-                'kernel_regularizer': keras.regularizers.serialize(self.kernel_regularizer),
-                'kernel_constraint': keras.constraints.serialize(self.kernel_constraint),
+                'kernel_initializer': tf.keras.initializers.serialize(self.kernel_initializer),
+                'kernel_regularizer': tf.keras.regularizers.serialize(self.kernel_regularizer),
+                'kernel_constraint': tf.keras.constraints.serialize(self.kernel_constraint),
             }
             base_config = super().get_config()
             return dict(list(base_config.items()) + list(config.items()))
@@ -767,10 +766,9 @@ def parallel_grid_pooling_2d():
       https://github.com/akitotakeki/pgp-chainer
 
     """
-    import keras
     import tensorflow as tf
 
-    class ParallelGridPooling2D(keras.layers.Layer):
+    class ParallelGridPooling2D(tf.keras.layers.Layer):
         """Parallel Grid Poolingレイヤー。"""
 
         def __init__(self, pool_size=(2, 2), **kargs):
@@ -789,13 +787,13 @@ def parallel_grid_pooling_2d():
             return b, h // self.pool_size[0], w // self.pool_size[1], c
 
         def call(self, inputs, **kwargs):
-            shape = keras.backend.shape(inputs)
-            int_shape = keras.backend.int_shape(inputs)
+            shape = tf.keras.backend.shape(inputs)
+            int_shape = tf.keras.backend.int_shape(inputs)
             rh, rw = self.pool_size
             b, h, w, c = shape[0], shape[1], shape[2], int_shape[3]
-            inputs = keras.backend.reshape(inputs, (b, h // rh, rh, w // rw, rw, c))
+            inputs = tf.keras.backend.reshape(inputs, (b, h // rh, rh, w // rw, rw, c))
             inputs = tf.transpose(inputs, perm=(2, 4, 0, 1, 3, 5))
-            inputs = keras.backend.reshape(inputs, (rh * rw * b, h // rh, w // rw, c))
+            inputs = tf.keras.backend.reshape(inputs, (rh * rw * b, h // rh, w // rw, c))
             return inputs
 
         def get_config(self):
@@ -808,9 +806,9 @@ def parallel_grid_pooling_2d():
 
 def parallel_grid_gather():
     """ParallelGridPoolingでparallelにしたのを戻すレイヤー。"""
-    import keras
+    import tensorflow as tf
 
-    class ParallelGridGather(keras.layers.Layer):
+    class ParallelGridGather(tf.keras.layers.Layer):
         """ParallelGridPoolingでparallelにしたのを戻すレイヤー。"""
 
         def __init__(self, r, **kargs):
@@ -821,11 +819,11 @@ def parallel_grid_gather():
             return input_shape
 
         def call(self, inputs, **kwargs):
-            shape = keras.backend.shape(inputs)
+            shape = tf.keras.backend.shape(inputs)
             b = shape[0]
-            gather_shape = keras.backend.concatenate([[self.r, b // self.r], shape[1:]], axis=0)
-            inputs = keras.backend.reshape(inputs, gather_shape)
-            inputs = keras.backend.mean(inputs, axis=0)
+            gather_shape = tf.keras.backend.concatenate([[self.r, b // self.r], shape[1:]], axis=0)
+            inputs = tf.keras.backend.reshape(inputs, gather_shape)
+            inputs = tf.keras.backend.mean(inputs, axis=0)
             return inputs
 
         def get_config(self):
@@ -843,10 +841,9 @@ def subpixel_conv2d():
     https://arxiv.org/abs/1609.05158
 
     """
-    import keras
     import tensorflow as tf
 
-    class SubpixelConv2D(keras.layers.Layer):
+    class SubpixelConv2D(tf.keras.layers.Layer):
         """Sub-Pixel Convolutional Layer。
 
         ■ Real-Time Single Image and Video Super-Resolution Using an Efficient Sub-Pixel Convolutional Neural Network
@@ -854,7 +851,7 @@ def subpixel_conv2d():
 
         """
 
-        def __init__(self, scale, **kargs):
+        def __init__(self, scale=2, **kargs):
             super().__init__(**kargs)
             self.scale = scale
 
@@ -862,7 +859,7 @@ def subpixel_conv2d():
             assert len(input_shape) == 4
             assert input_shape[-1] % (self.scale ** 2) == 0
             h = None if input_shape[1] is None else input_shape[1] * self.scale
-            w = None if input_shape[0] is None else input_shape[2] * self.scale
+            w = None if input_shape[2] is None else input_shape[2] * self.scale
             return input_shape[0], h, w, input_shape[3] // (self.scale ** 2)
 
         def call(self, inputs, **kwargs):
@@ -888,11 +885,9 @@ def nms():
     nms_all_thresholdを指定すると別クラス間でもNMSをする。
     Noneにするとしない。(mAP算出など用)
     """
-    import keras
-    import keras.backend as K
     import tensorflow as tf
 
-    class NMS(keras.layers.Layer):
+    class NMS(tf.keras.layers.Layer):
         """Non maximum suppressionを行うレイヤー。"""
 
         def __init__(self, num_classes, prior_boxes, top_k=200, conf_threshold=0.01, nms_threshold=0.45, nms_all_threshold=None, **kwargs):
@@ -906,10 +901,10 @@ def nms():
 
         def call(self, inputs, **kwargs):
             classes, confs, locs = inputs
-            classes = K.reshape(K.cast(classes, K.floatx()), (-1, self.prior_boxes, 1))
-            confs = K.reshape(confs, (-1, self.prior_boxes, 1))
-            inputs = K.concatenate([classes, confs, locs], axis=-1)
-            return K.map_fn(self._process_image, inputs)
+            classes = tf.keras.backend.reshape(tf.keras.backend.cast(classes, tf.keras.backend.floatx()), (-1, self.prior_boxes, 1))
+            confs = tf.keras.backend.reshape(confs, (-1, self.prior_boxes, 1))
+            inputs = tf.keras.backend.concatenate([classes, confs, locs], axis=-1)
+            return tf.keras.backend.map_fn(self._process_image, inputs)
 
         def compute_output_shape(self, input_shape):
             assert input_shape and len(input_shape) >= 2
@@ -928,7 +923,7 @@ def nms():
             return dict(list(base_config.items()) + list(config.items()))
 
         def _process_image(self, image):
-            classes = K.cast(image[:, 0], 'int32')
+            classes = tf.keras.backend.cast(image[:, 0], 'int32')
             confs = image[:, 1]
             locs = image[:, 2:]
 
@@ -937,39 +932,39 @@ def nms():
             img_locs = []
             for class_id in range(self.num_classes):
                 # 対象のクラスのみ抜き出す
-                mask = tf.logical_and(K.equal(classes, class_id), K.greater(confs, self.conf_threshold))
+                mask = tf.logical_and(tf.keras.backend.equal(classes, class_id), tf.keras.backend.greater(confs, self.conf_threshold))
                 target_classes = tf.boolean_mask(classes, mask, axis=0)  # 無駄だが、tileの使い方が分からないのでとりあえず。。
                 target_confs = tf.boolean_mask(confs, mask, axis=0)
                 target_locs = tf.boolean_mask(locs, mask, axis=0)
                 # NMS
                 top_k = self.top_k * 2 if self.nms_all_threshold else self.top_k  # 全体でもNMSするなら余裕を持たせる必要がある
-                top_k = K.minimum(top_k, K.shape(target_confs)[0])
+                top_k = tf.keras.backend.minimum(top_k, tf.keras.backend.shape(target_confs)[0])
                 nms_indices = tf.image.non_max_suppression(target_locs, target_confs, top_k, self.nms_threshold)
-                img_classes.append(K.gather(target_classes, nms_indices))
-                img_confs.append(K.gather(target_confs, nms_indices))
-                img_locs.append(K.gather(target_locs, nms_indices))
+                img_classes.append(tf.keras.backend.gather(target_classes, nms_indices))
+                img_confs.append(tf.keras.backend.gather(target_confs, nms_indices))
+                img_locs.append(tf.keras.backend.gather(target_locs, nms_indices))
 
             # 全クラス分くっつける
-            img_classes = K.concatenate(img_classes, axis=0)
-            img_confs = K.concatenate(img_confs, axis=0)
-            img_locs = K.concatenate(img_locs, axis=0)
+            img_classes = tf.keras.backend.concatenate(img_classes, axis=0)
+            img_confs = tf.keras.backend.concatenate(img_confs, axis=0)
+            img_locs = tf.keras.backend.concatenate(img_locs, axis=0)
             # 全クラスで再度NMS or top_k
-            top_k = K.minimum(self.top_k, K.shape(img_confs)[0])
+            top_k = tf.keras.backend.minimum(self.top_k, tf.keras.backend.shape(img_confs)[0])
             if self.nms_all_threshold:
                 nms_indices = tf.image.non_max_suppression(img_locs, img_confs, top_k, self.nms_all_threshold)
-                img_classes = K.gather(img_classes, nms_indices)
-                img_confs = K.gather(img_confs, nms_indices)
-                img_locs = K.gather(img_locs, nms_indices)
+                img_classes = tf.keras.backend.gather(img_classes, nms_indices)
+                img_confs = tf.keras.backend.gather(img_confs, nms_indices)
+                img_locs = tf.keras.backend.gather(img_locs, nms_indices)
             else:
                 img_confs, top_k_indices = tf.nn.top_k(img_confs, top_k, sorted=True)
-                img_classes = K.gather(img_classes, top_k_indices)
-                img_locs = K.gather(img_locs, top_k_indices)
+                img_classes = tf.keras.backend.gather(img_classes, top_k_indices)
+                img_locs = tf.keras.backend.gather(img_locs, top_k_indices)
             # shapeとdtypeを合わせてconcat
-            output_size = K.shape(img_classes)[0]
-            img_classes = K.reshape(img_classes, (output_size, 1))
-            img_confs = K.reshape(img_confs, (output_size, 1))
-            img_classes = K.cast(img_classes, K.floatx())
-            output = K.concatenate([img_classes, img_confs, img_locs], axis=-1)
+            output_size = tf.keras.backend.shape(img_classes)[0]
+            img_classes = tf.keras.backend.reshape(img_classes, (output_size, 1))
+            img_confs = tf.keras.backend.reshape(img_confs, (output_size, 1))
+            img_classes = tf.keras.backend.cast(img_classes, tf.keras.backend.floatx())
+            output = tf.keras.backend.concatenate([img_classes, img_confs, img_locs], axis=-1)
             # top_k個に満たなければzero padding。
             output = tf.pad(output, [[0, self.top_k - output_size], [0, 0]])
             return output

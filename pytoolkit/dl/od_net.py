@@ -15,12 +15,11 @@ def get_preprocess_input():
 def create_network(pb, mode, strict_nms, load_base_weights):
     """学習とか予測とか用のネットワークを作って返す。"""
     assert mode in ('train', 'predict')
-    import keras
-    import keras.backend as K
+    import tensorflow as tf
     builder = networks.Builder()
 
-    K.reset_uids()
-    x = inputs = keras.layers.Input(pb.input_size + (3,))
+    tf.keras.backend.reset_uids()
+    x = inputs = tf.keras.layers.Input(pb.input_size + (3,))
     basenet = applications.darknet53.darknet53(input_tensor=x, weights='imagenet' if load_base_weights else None)
     ref_list = [
         basenet.get_layer(name='add_1').output,  # 320→160
@@ -61,8 +60,8 @@ def create_network(pb, mode, strict_nms, load_base_weights):
     x = builder.res_block(256, name='center_block2')(x)
     x = builder.res_block(256, name='center_block3')(x)
     x = builder.bn_act(name='center')(x)
-    x = keras.layers.Dropout(0.5)(x)
-    x = keras.layers.AveragePooling2D(map_size, name='center_pool')(x)
+    x = tf.keras.layers.Dropout(0.5)(x)
+    x = tf.keras.layers.AveragePooling2D(map_size, name='center_pool')(x)
     x = builder.conv2d(32 * (map_size ** 2), 1, name='center_ex')(x)
 
     # shared layers
@@ -78,7 +77,7 @@ def create_network(pb, mode, strict_nms, load_base_weights):
         shared_layers[f'pm-{pat_ix}_obj'] = builder.conv2d(
             1, 1,
             kernel_initializer='zeros',
-            kernel_regularizer=keras.regularizers.l2(1e-4),
+            kernel_regularizer=tf.keras.regularizers.l2(1e-4),
             bias_initializer=losses.od_bias_initializer(1),
             bias_regularizer=None,
             activation='sigmoid',
@@ -88,8 +87,8 @@ def create_network(pb, mode, strict_nms, load_base_weights):
         shared_layers[f'pm-{pat_ix}_clf'] = builder.conv2d(
             pb.num_classes, 1,
             kernel_initializer='zeros',
-            kernel_regularizer=keras.regularizers.l2(1e-4),
-            bias_regularizer=keras.regularizers.l2(1e-4),
+            kernel_regularizer=tf.keras.regularizers.l2(1e-4),
+            bias_regularizer=tf.keras.regularizers.l2(1e-4),
             activation='softmax',
             use_bias=True,
             use_bn=False,
@@ -99,8 +98,8 @@ def create_network(pb, mode, strict_nms, load_base_weights):
             builder.conv2d(
                 4, 1,
                 kernel_initializer='zeros',
-                kernel_regularizer=keras.regularizers.l2(1e-4),
-                bias_regularizer=keras.regularizers.l2(1e-4),
+                kernel_regularizer=tf.keras.regularizers.l2(1e-4),
+                bias_regularizer=tf.keras.regularizers.l2(1e-4),
                 use_bias=True,
                 use_bn=False,
                 use_act=False,
@@ -113,15 +112,12 @@ def create_network(pb, mode, strict_nms, load_base_weights):
     ref = {f'down{builder.shape(x)[1]}': x for x in ref_list}
     while True:
         up_count += 1
-        in_map_size = builder.shape(x)[1]
-        assert map_size % in_map_size == 0, f'map size error: {in_map_size} -> {map_size}'
-        up_size = map_size // in_map_size
-
+        up_size = map_size // builder.shape(x)[1] if up_count == 1 else 2
         x = layers.subpixel_conv2d()(scale=up_size, name=f'up{up_count}_us')(x)
         x = builder.dwconv2d(5, name=f'up{up_count}_dw')(x)
         x = builder.conv2d(256, 1, use_act=False, name=f'up{up_count}_pre')(x)
         t = builder.conv2d(256, 1, use_act=False, name=f'up{up_count}_lt')(ref[f'down{map_size}'])
-        x = keras.layers.add([x, t], name=f'up{up_count}_add')
+        x = tf.keras.layers.add([x, t], name=f'up{up_count}_add')
         x = shared_layers['up_layer1'](x)
         x = shared_layers['up_layer2'](x)
         ref[f'out{map_size}'] = x
@@ -142,24 +138,24 @@ def create_network(pb, mode, strict_nms, load_base_weights):
             obj = shared_layers[f'pm-{pat_ix}_obj'](x)
             loc = shared_layers[f'pm-{pat_ix}_loc'](x)
             clf = shared_layers[f'pm-{pat_ix}_clf'](x)
-            obj = keras.layers.Reshape((-1, 1), name=f'pm{map_size}-{pat_ix}_r1')(obj)
-            loc = keras.layers.Reshape((-1, 4), name=f'pm{map_size}-{pat_ix}_r3')(loc)
-            clf = keras.layers.Reshape((-1, pb.num_classes), name=f'pm{map_size}-{pat_ix}_r2')(clf)
+            obj = tf.keras.layers.Reshape((-1, 1), name=f'pm{map_size}-{pat_ix}_r1')(obj)
+            loc = tf.keras.layers.Reshape((-1, 4), name=f'pm{map_size}-{pat_ix}_r3')(loc)
+            clf = tf.keras.layers.Reshape((-1, pb.num_classes), name=f'pm{map_size}-{pat_ix}_r2')(clf)
             objs.append(obj)
             locs.append(loc)
             clfs.append(clf)
-    objs = keras.layers.concatenate(objs, axis=-2, name='output_objs')
-    locs = keras.layers.concatenate(locs, axis=-2, name='output_locs')
-    clfs = keras.layers.concatenate(clfs, axis=-2, name='output_clfs')
+    objs = tf.keras.layers.concatenate(objs, axis=-2, name='output_objs')
+    locs = tf.keras.layers.concatenate(locs, axis=-2, name='output_locs')
+    clfs = tf.keras.layers.concatenate(clfs, axis=-2, name='output_clfs')
 
     if mode == 'train':
         assert strict_nms is None
         # ラベル側とshapeを合わせるためのダミー
-        dummy1 = keras.layers.Lambda(K.zeros_like, name='dummy1')(objs)
-        dummy2 = keras.layers.Lambda(K.zeros_like, name='dummy2')(objs)
+        dummy1 = tf.keras.layers.Lambda(tf.keras.backend.zeros_like, name='dummy1')(objs)
+        dummy2 = tf.keras.layers.Lambda(tf.keras.backend.zeros_like, name='dummy2')(objs)
         # いったんくっつける (損失関数の中で分割して使う)
-        outputs = keras.layers.concatenate([dummy1, dummy2, objs, clfs, locs], axis=-1, name='outputs')
-        model = keras.models.Model(inputs=inputs, outputs=outputs)
+        outputs = tf.keras.layers.concatenate([dummy1, dummy2, objs, clfs, locs], axis=-1, name='outputs')
+        model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
     else:
         nms_all_threshold = 0.5 if strict_nms else None
 
@@ -173,9 +169,9 @@ def create_network(pb, mode, strict_nms, load_base_weights):
 
         classes = layers.channel_argmax()(name='classes')(clfs)
         confs = layers.channel_max()(name='confs')(clfs)
-        objconfs = keras.layers.Lambda(_conf, K.int_shape(clfs)[1:-1], name='objconfs')([objs, confs])
-        locs = keras.layers.Lambda(pb.decode_locs, name='locs')(locs)
+        objconfs = tf.keras.layers.Lambda(_conf, tf.keras.backend.int_shape(clfs)[1:-1], name='objconfs')([objs, confs])
+        locs = tf.keras.layers.Lambda(pb.decode_locs, name='locs')(locs)
         nms = layers.nms()(pb.num_classes, len(pb.pb_locs), nms_all_threshold=nms_all_threshold, name='nms')([classes, objconfs, locs])
-        model = keras.models.Model(inputs=inputs, outputs=nms)
+        model = tf.keras.models.Model(inputs=inputs, outputs=nms)
 
     return model, lr_multipliers

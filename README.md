@@ -21,7 +21,6 @@
 - better_exceptions
 - h5py
 - horovod
-- keras
 - matplotlib
 - mpi4py
 - opencv-python

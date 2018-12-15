@@ -8,7 +8,7 @@ import typing
 import numpy as np
 
 from . import hvd, models, od_net, od_pb
-from .. import generator, image, jsonex, log, ml, regex, utils
+from .. import generator, image, jsonex, log, ml, utils
 
 # バージョン
 _JSON_VERSION = '0.0.2'
@@ -182,13 +182,7 @@ class ObjectDetector:
                 initial_weights = self._get_voc_weights()
             else:
                 initial_weights = pathlib.Path(initial_weights)
-
-            def _loadable_layer(layer_name):
-                if regex.is_match(layer_name, r'^pm-\d+_(obj|clf|loc)$'):
-                    return False  # skip
-                return True
-
-            self.model.load_weights(initial_weights, where_fn=_loadable_layer, strict_warnings=False)
+            self.model.load_weights(initial_weights, by_name=True)
             logger.info(f'warm start: {initial_weights.name}')
 
         # 学習
@@ -230,7 +224,7 @@ class ObjectDetector:
             weights = self._get_voc_weights()
         else:
             weights = pathlib.Path(weights)
-        self.model.load_weights(weights, strict_warnings=False)
+        self.model.load_weights(weights, by_name=True)
         logger.info(f'{weights.name} loaded.')
         # マルチGPU化。
         if use_multi_gpu:

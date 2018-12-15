@@ -7,12 +7,12 @@ from .. import draw, generator, log, utils
 
 
 class Model:
-    """`keras.models.Model` + `tk.dl.generators.Generator`の薄いラッパー。"""
+    """`tf.keras.models.Model` + `tk.dl.generators.Generator`の薄いラッパー。"""
 
     def __init__(self, model, gen: generator.Generator, batch_size, postprocess=None):
-        import keras
-        self.model: keras.models.Model = model
-        self.parent_model: keras.models.Model = model
+        import tensorflow as tf
+        self.model: tf.keras.models.Model = model
+        self.parent_model: tf.keras.models.Model = model
         self.gen = gen
         self.batch_size = batch_size
         self.postprocess = postprocess
@@ -34,13 +34,9 @@ class Model:
             model.set_multi_gpu_model(gpus=gpus)
         return model
 
-    def load_weights(self, filepath, where_fn=None, strict_warnings=True):
-        """重みの読み込み。
-
-        model.load_weights()は重みの形が違うと読み込めないが、
-        警告を出しつつ読むようにしたもの。
-        """
-        load_weights(self.parent_model, filepath, where_fn, strict_warnings)
+    def load_weights(self, filepath, by_name=False):
+        """重みの読み込み。"""
+        self.parent_model.load_weights(str(filepath), by_name=by_name)
 
     def set_multi_gpu_model(self, gpus=None):
         """マルチGPU化。"""
@@ -48,9 +44,9 @@ class Model:
 
     def freeze(self, predicate=lambda layer: True, skip_bn=False):
         """条件に一致するレイヤーをfreezeする。"""
-        import keras
+        import tensorflow as tf
         for l in self.model.layers:
-            if skip_bn and isinstance(l, keras.layers.BatchNormalization):
+            if skip_bn and isinstance(l, tf.keras.layers.BatchNormalization):
                 continue
             if predicate(l):
                 l.trainable = False
@@ -71,7 +67,7 @@ class Model:
         この値はバッチサイズとHorovodを考慮してない値。
 
         """
-        import keras
+        import tensorflow as tf
         assert (optimizer is None) != (sgd_lr is None)  # どちらか必須
         assert loss is not None  # 必須 (optimizerを省略できるようにNoneにしているだけ)
         if lr_multipliers is not None:
@@ -80,7 +76,7 @@ class Model:
         if sgd_lr is None:
             assert clipnorm == 0
             assert clipvalue == 0
-            optimizer = keras.optimizers.get(optimizer)
+            optimizer = tf.keras.optimizers.get(optimizer)
         else:
             lr = sgd_lr * self.batch_size
             if hvd.initialized():
@@ -140,7 +136,7 @@ class Model:
         lr_list、reduce_lr、cosine_annealingの3つは排他。
 
         """
-        import keras
+        import tensorflow as tf
 
         # generatorの用意
         has_val = validation_data is not None and all(vd is not None for vd in validation_data)
@@ -172,7 +168,7 @@ class Model:
             assert not cosine_annealing
             assert reduce_lr_epoch_rates is None
             epochs = len(lr_list)
-            cb.append(keras.callbacks.LearningRateScheduler(lambda epoch, lr: lr_list[epoch]))
+            cb.append(tf.keras.callbacks.LearningRateScheduler(lambda epoch, lr: lr_list[epoch]))
         elif cosine_annealing:
             assert reduce_lr_epoch_rates is None
             cb.append(callbacks.cosine_annealing(epochs=epochs))
@@ -186,7 +182,7 @@ class Model:
         if tsv_log_path is not None:
             cb.append(callbacks.tsv_logger(tsv_log_path, append=tsv_log_append))
         cb.append(callbacks.epoch_logger())
-        cb.append(keras.callbacks.TerminateOnNaN())
+        cb.append(tf.keras.callbacks.TerminateOnNaN())
 
         # 学習
         hist = self.model.fit_generator(
@@ -237,15 +233,15 @@ class Model:
 
     @log.trace()
     def plot(self, to_file='model.png', show_shapes=False, show_layer_names=True, rankdir='TB'):
-        """pathlib対応＆hvd.is_master()な時のみ＆エラー握り潰しな`keras.utils.plot_model`。"""
+        """pathlib対応＆hvd.is_master()な時のみ＆エラー握り潰しな`tf.keras.utils.plot_model`。"""
         if hvd.is_master():
-            import keras
+            import tensorflow as tf
             try:
-                keras.utils.plot_model(self.parent_model, to_file=str(to_file),
-                                       show_shapes=show_shapes, show_layer_names=show_layer_names,
-                                       rankdir=rankdir)
+                tf.keras.utils.plot_model(self.parent_model, to_file=str(to_file),
+                                          show_shapes=show_shapes, show_layer_names=show_layer_names,
+                                          rankdir=rankdir)
             except BaseException:
-                log.get(__name__).warning('keras.utils.plot_model失敗', exc_info=True)
+                log.get(__name__).warning('tf.keras.utils.plot_model失敗', exc_info=True)
 
 
 @log.trace()
@@ -253,8 +249,8 @@ def multi_gpu_model(model, batch_size, gpus=None):
     """複数GPUでデータ並列するモデルを作成する。
 
     # 参考
-    https://github.com/fchollet/keras/issues/2436
-    https://github.com/kuza55/keras-extras/blob/master/utils/multi_gpu.py
+    https://github.com/fchollet/tf.keras/issues/2436
+    https://github.com/kuza55/tf.keras-extras/blob/master/utils/multi_gpu.py
 
     """
     if gpus is None:
@@ -266,12 +262,12 @@ def multi_gpu_model(model, batch_size, gpus=None):
     assert isinstance(model.inputs, list)
     assert isinstance(model.outputs, list)
 
-    import keras
+    import tensorflow as tf
 
-    parallel_model = keras.utils.multi_gpu_model(model, gpus)
+    parallel_model = tf.keras.utils.multi_gpu_model(model, gpus)
 
     # Model.saveの置き換え
-    # https://github.com/fchollet/keras/issues/2436#issuecomment-294243024
+    # https://github.com/fchollet/tf.keras/issues/2436#issuecomment-294243024
     def _save(self_, *args, **kargs):
         assert self_ is not None  # noqa
         model.save(*args, **kargs)
@@ -288,11 +284,11 @@ def multi_gpu_model(model, batch_size, gpus=None):
 
 def freeze_to_name(model, freeze_end_layer_name, skip_bn=False):
     """指定した名前までのレイヤーをfreezeする。skip_bn=TrueならBNはfreezeしない。"""
-    import keras
+    import tensorflow as tf
     for layer in model.layers:
         if layer.name == freeze_end_layer_name:
             break
-        if skip_bn and isinstance(layer, keras.layers.BatchNormalization):
+        if skip_bn and isinstance(layer, tf.keras.layers.BatchNormalization):
             pass
         else:
             layer.trainable = False
@@ -301,13 +297,12 @@ def freeze_to_name(model, freeze_end_layer_name, skip_bn=False):
 @log.trace()
 def plot_model_params(model, to_file='model.params.png', skip_bn=True):
     """パラメータ数を棒グラフ化"""
-    import keras
-    import keras.backend as K
+    import tensorflow as tf
     rows = []
     for layer in model.layers:
-        if skip_bn and isinstance(layer, keras.layers.BatchNormalization):
+        if skip_bn and isinstance(layer, tf.keras.layers.BatchNormalization):
             continue
-        pc = sum([K.count_params(p) for p in layer.trainable_weights])
+        pc = sum([tf.keras.backend.count_params(p) for p in layer.trainable_weights])
         if pc <= 0:
             continue
         rows.append([layer.name, pc])
@@ -324,15 +319,15 @@ def plot_model_params(model, to_file='model.params.png', skip_bn=True):
 
 def count_trainable_params(model):
     """modelのtrainable paramsを数える"""
-    import keras.backend as K
-    return sum([sum([K.count_params(p) for p in layer.trainable_weights]) for layer in model.layers])
+    import tensorflow as tf
+    return sum([sum([tf.keras.backend.count_params(p) for p in layer.trainable_weights]) for layer in model.layers])
 
 
 def print_largest_layers(model, top_n=10, print_fn=None):
     """パラメータ数の多いレイヤー`top_n`個を表示する。"""
-    import keras.backend as K
+    import tensorflow as tf
     print_fn = print_fn or log.get(__name__).info
-    layers = [(layer.name, sum([K.count_params(p) for p in layer.trainable_weights])) for layer in model.layers]
+    layers = [(layer.name, sum([tf.keras.backend.count_params(p) for p in layer.trainable_weights])) for layer in model.layers]
     total_params = sum(layer_params for _, layer_params in layers)
     layers = sorted(layers, key=lambda p: p[1], reverse=True)[:top_n]
     print_fn(f'Top-{top_n} largest layers:')
@@ -359,76 +354,9 @@ def count_network_depth(model):
 def load_model(filepath, compile=True, custom_objects=None):  # pylint: disable=W0622
     """モデルの読み込み。
 
-    `keras.models.load_model()` + `tk.dl.get_custom_objects()`
+    `tf.keras.models.load_model()` + `tk.dl.get_custom_objects()`
     """
-    import keras
+    import tensorflow as tf
     custom_objects = custom_objects or {}
     custom_objects.update(dl.get_custom_objects())
-    return keras.models.load_model(str(filepath), custom_objects=custom_objects, compile=compile)
-
-
-@log.trace()
-def load_weights(model, filepath, where_fn=None, strict_warnings=True):
-    """重みの読み込み。
-
-    model.load_weights()は重みの形が違うと読み込めないが、
-    警告を出しつつ読むようにしたもの。
-
-    # 引数
-    - model: 読み込み先モデル。
-    - filepath: モデルのファイルパス。(str or pathlib.Path)
-    - where_fn: 読み込むレイヤー名を受け取り、読み込むか否かを返すcallable。
-    - strict_warnings: 重みを持たないレイヤーについてもレイヤー名の不一致などにwarningログを出す。
-    """
-    import h5py
-    import keras.backend as K
-    try:
-        from keras.engine.saving import preprocess_weights_for_loading
-    except BaseException:
-        from keras.engine.topology import preprocess_weights_for_loading  # flake8: noqa
-
-    logger = log.get(__name__)
-    with h5py.File(str(filepath), mode='r') as f:
-        if 'layer_names' not in f.attrs and 'model_weights' in f:
-            f = f['model_weights']
-        original_keras_version = f.attrs['keras_version'].decode('utf8') if 'keras_version' in f.attrs else '1'
-        original_backend = f.attrs['backend'].decode('utf8') if 'backend' in f.attrs else None
-
-        layer_names = [n.decode('utf8') for n in f.attrs['layer_names']]  # pylint: disable=not-an-iterable
-
-        weight_value_tuples = []
-        for k, name in enumerate(layer_names):
-            if where_fn is not None and not where_fn(name):
-                continue
-
-            g = f[name]
-            weight_names = [n.decode('utf8') for n in g.attrs['weight_names']]
-            if not strict_warnings and len(weight_names) == 0:
-                continue
-            weight_values = [g[weight_name] for weight_name in weight_names]
-
-            try:
-                layer = model.get_layer(name=name)
-            except ValueError as e:
-                logger.warning(str(e))
-                continue
-
-            symbolic_weights = layer.weights
-            weight_values = preprocess_weights_for_loading(
-                layer,
-                weight_values,
-                original_keras_version,
-                original_backend)
-            if len(weight_values) != len(symbolic_weights):
-                logger.warning(f'Layer  # {k} (named "{layer.name}") expects {len(symbolic_weights)} weight(s), but the saved weights have {len(weight_values)} element(s).')
-                continue
-            is_match_shapes = True
-            for s, w in zip(symbolic_weights, weight_values):
-                if s.shape != w.shape:
-                    logger.warning(f'Layer #{k} (named "{layer.name}") expects {s.shape} weight(s), but the saved weights have {w.shape} element(s).')
-                    is_match_shapes = False
-                    continue
-            if is_match_shapes:
-                for s, w in zip(symbolic_weights, weight_values):
-                    weight_value_tuples.append((s, w))
-        K.batch_set_value(weight_value_tuples)
+    return tf.keras.models.load_model(str(filepath), custom_objects=custom_objects, compile=compile)
