@@ -103,6 +103,7 @@ def resize2d():
 
     # 引数
     - size: (new_height, new_width)
+    - scale: float (sizeと排他でどちらか必須)
     - interpolation: 'bilinear', 'nearest', 'bicubic', 'area'
 
     """
@@ -112,12 +113,23 @@ def resize2d():
     class Resize2D(keras.layers.Layer):
         """リサイズ。"""
 
-        def __init__(self, size, interpolation='bilinear', align_corners=False, **kwargs):
+        def __init__(self, size=None, scale=None, interpolation='bilinear', align_corners=False, **kwargs):
             super().__init__(**kwargs)
+            assert (size is None) != (scale is None)
             assert interpolation in ('bilinear', 'nearest', 'bicubic', 'area')
-            self.size = tuple(size)
+            self.size = None if size is None else tuple(size)
+            self.scale = None if scale is None else float(scale)
             self.interpolation = interpolation
             self.align_corners = align_corners
+
+        def compute_output_shape(self, input_shape):
+            assert len(input_shape) == 4
+            if self.size is not None:
+                return (input_shape[0], self.size[0], self.size[1], input_shape[-1])
+            else:
+                new_h = None if input_shape[1] is None else int(input_shape[1] * self.scale)
+                new_w = None if input_shape[2] is None else int(input_shape[2] * self.scale)
+                return (input_shape[0], new_h, new_w, input_shape[-1])
 
         def call(self, inputs, **kwargs):
             method = {
@@ -126,14 +138,23 @@ def resize2d():
                 'bicubic': tf.image.ResizeMethod.BICUBIC,
                 'area': tf.image.ResizeMethod.AREA,
             }[self.interpolation]
-            return tf.image.resize_images(inputs, self.size, method, self.align_corners)
-
-        def compute_output_shape(self, input_shape):
-            assert len(input_shape) == 4
-            return (input_shape[0], self.size[0], self.size[1], input_shape[-1])
+            if self.size is not None:
+                size = self.size
+            else:
+                shape = keras.backend.shape(inputs)
+                scale = keras.backend.constant(self.scale, dtype='float32')
+                new_h = keras.backend.cast(keras.backend.cast(shape[1], 'float32') * scale, 'int32')
+                new_w = keras.backend.cast(keras.backend.cast(shape[2], 'float32') * scale, 'int32')
+                size = (new_h, new_w)
+            return tf.image.resize_images(inputs, size, method, self.align_corners)
 
         def get_config(self):
-            config = {'size': self.size, 'interpolation': self.interpolation, 'align_corners': self.align_corners}
+            config = {
+                'size': self.size,
+                'scale': self.scale,
+                'interpolation': self.interpolation,
+                'align_corners': self.align_corners,
+            }
             base_config = super().get_config()
             return dict(list(base_config.items()) + list(config.items()))
 

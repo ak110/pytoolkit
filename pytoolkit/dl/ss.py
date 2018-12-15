@@ -41,14 +41,22 @@ class SemanticSegmentor(models.Model):
         down_list.append(base_network.get_layer(name='add_19').output)  # stage 4: 1/16
         down_list.append(base_network.get_layer(name='add_23').output)  # stage 5: 1/32
         x = base_network.outputs[0]
+        additional_stage = input_size // (32 * 8)
+        for _ in range(additional_stage):
+            x = builder.conv2d(256, 2, strides=2, use_act=False)(x)
+            x = builder.res_block(256)(x)
+            x = builder.res_block(256)(x)
+            x = builder.bn_act()(x)
+            down_list.append(x)
         x = keras.layers.GlobalAveragePooling2D()(x)
         x = builder.dense(128)(x)
         x = builder.act()(x)
-        x = builder.dense(512)(x)
-        x = keras.layers.Reshape((1, 1, 512))(x)
+        x = builder.dense(256)(x)
+        x = keras.layers.Reshape((1, 1, 256))(x)
         # decoder
         up_list = []
-        for stage, (d, filters) in list(enumerate(zip(down_list, [16, 32, 64, 128, 256, 512])))[::-1]:
+        for stage, d in list(enumerate(down_list))[::-1]:
+            filters = min(16 * 2 ** stage, 256)
             if stage != len(down_list) - 1:
                 x = layers.subpixel_conv2d()(scale=2)(x)
                 x = builder.conv2d(filters, 1, use_act=False)(x)
@@ -60,11 +68,11 @@ class SemanticSegmentor(models.Model):
             up_list.append(builder.conv2d(32, 1, use_act=False)(x))
         # Hypercolumn
         x = keras.layers.add([
-            keras.layers.UpSampling2D(32, interpolation='bilinear')(up_list[0]),
-            keras.layers.UpSampling2D(16, interpolation='bilinear')(up_list[1]),
-            keras.layers.UpSampling2D(8, interpolation='bilinear')(up_list[2]),
-            keras.layers.UpSampling2D(4, interpolation='bilinear')(up_list[3]),
-            keras.layers.UpSampling2D(2, interpolation='bilinear')(up_list[4]),
+            layers.resize2d()(scale=32)(up_list[0]),
+            layers.resize2d()(scale=16)(up_list[1]),
+            layers.resize2d()(scale=8)(up_list[2]),
+            layers.resize2d()(scale=4)(up_list[3]),
+            layers.resize2d()(scale=2)(up_list[4]),
             up_list[5],
         ])
         # Refinement
@@ -135,6 +143,7 @@ class SemanticSegmentor(models.Model):
             metadata = {
                 'class_colors': self.class_colors,
                 'void_color': self.void_color,
+                'input_size': self.input_size,
                 'rotation_type': self.rotation_type,
             }
             jsonex.dump(metadata, filepath.with_suffix('.json'))

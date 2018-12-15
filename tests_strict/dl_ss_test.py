@@ -4,6 +4,30 @@ import numpy as np
 import pytoolkit as tk
 
 
+def test_ss_binary(tmpdir):
+    models_dir = pathlib.Path(str(tmpdir))
+
+    X = np.zeros((2, 32, 32, 3))
+    y = np.random.uniform(0, 1, size=X.shape[:-1] + (1,))
+
+    with tk.dl.session():
+        model = tk.dl.ss.SemanticSegmentor.create(None, None, input_size=32, weights=None)
+        model.fit(X, y, validation_data=(X, y),
+                  epochs=1,
+                  tsv_log_path=models_dir / 'history.tsv',
+                  mixup=True, cosine_annealing=True)
+        model.save(models_dir / 'model.h5', include_optimizer=False)
+        del model
+
+    with tk.dl.session():
+        model = tk.dl.ss.SemanticSegmentor.load(models_dir / 'model.h5')
+        pred = model.predict(X)
+        assert len(pred) == len(y)
+        ious, miou = model.compute_mean_iou(y, pred)
+        assert len(ious) == 2
+        assert 0 <= miou <= 1
+
+
 def test_ss_multi(tmpdir):
     models_dir = pathlib.Path(str(tmpdir))
 
