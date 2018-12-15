@@ -92,7 +92,7 @@ def create_network(pb, mode, strict_nms, load_base_weights):
             activation='softmax',
             use_bias=True,
             use_bn=False,
-            name=f'pm-{pat_ix}_clf')
+            name=f'pm-{pat_ix}_clf_{pb.num_classes}')
         shared_layers[f'pm-{pat_ix}_loc'] = networks.Sequence([
             builder.conv2d(256, 1, name=f'pm-{pat_ix}_loc_conv'),
             builder.conv2d(

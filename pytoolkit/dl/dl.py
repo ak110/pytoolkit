@@ -72,3 +72,24 @@ def device(cpu=False, gpu=False):
         return tf.device('/cpu:0')
     else:
         return tf.device('/gpu:0')
+
+
+def finalize_graph():
+    """マルチスレッドで死なないようにgraphをfinalizeする。
+
+    これを呼ぶ前にpredictを一度以上実行しておき、今後predictする場合は以下のようにwithの中で呼び出す。
+
+    ```
+    with session.as_default(), graph.as_default():
+        pred = model.predict(...)
+    ```
+
+    # 戻り値
+    - session: tf.Session
+    - graph: tf.Graph
+    """
+    import tensorflow as tf
+    sess = tf.keras.backend.get_session()
+    graph = tf.get_default_graph()
+    graph.finalize()
+    return sess, graph
