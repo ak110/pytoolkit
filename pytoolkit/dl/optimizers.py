@@ -44,12 +44,11 @@ def nsgd():
             applied_lr_multipliers = 0
 
             grads = self.get_gradients(loss, params)
-            self.updates = []
+            self.updates = [tf.keras.backend.update_add(self.iterations, 1)]
 
             lr = self.lr
             if self.initial_decay > 0:
-                lr *= (1. / (1. + self.decay * self.iterations))
-                self.updates.append(tf.keras.backend.update_add(self.iterations, 1))
+                lr = lr * (1. / (1. + self.decay * self.iterations))
 
             # momentum
             shapes = [tf.keras.backend.int_shape(p) for p in params]
