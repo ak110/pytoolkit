@@ -64,7 +64,7 @@ class Model:
     @log.trace()
     def compile(self, optimizer=None, loss=None, metrics=None, loss_weights=None,
                 sample_weight_mode=None, weighted_metrics=None, target_tensors=None,
-                sgd_lr=None, clipnorm=0, clipvalue=0, lr_multipliers=None):
+                sgd_lr=None, clipnorm=None, clipvalue=None, lr_multipliers=None):
         """コンパイル。
 
         sgd_lrを指定するとSGD+Nesterov momentumでoptimizerを作る。
@@ -86,7 +86,12 @@ class Model:
             if hvd.initialized():
                 lr *= hvd.get().size()
             log.get(__name__).info(f'initial lr = {lr:.2e}')
-            optimizer = optimizers.nsgd()(lr=lr, lr_multipliers=lr_multipliers, clipnorm=clipnorm, clipvalue=clipvalue)
+            kwargs = {}
+            if clipnorm is not None:
+                kwargs['clipnorm'] = clipnorm
+            if clipvalue is not None:
+                kwargs['clipvalue'] = clipvalue
+            optimizer = optimizers.nsgd()(lr=lr, lr_multipliers=lr_multipliers, **kwargs)
 
         if hvd.initialized():
             optimizer = hvd.get().DistributedOptimizer(optimizer, compression=hvd.get().Compression.fp16)
