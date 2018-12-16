@@ -10,7 +10,7 @@ import numpy as np
 import scipy.stats
 
 
-def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], grayscale=False) -> np.ndarray:
+def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], grayscale=False, dtype=np.float32) -> np.ndarray:
     """画像の読み込み。
 
     やや余計なお世話だけど今後のためにfloat32に変換して返す。
@@ -22,9 +22,13 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
         img = np.copy(path_or_array)  # 念のためコピー
     else:
         suffix = pathlib.Path(path_or_array).suffix.lower() if isinstance(path_or_array, (str, pathlib.Path)) else None
-        if suffix == '.npy':
+        if suffix in ('.npy', '.npz'):
             # .npyなら読み込んでそのまま画像扱い
             img = np.load(str(path_or_array))
+            if isinstance(img, np.lib.npyio.NpzFile):
+                if len(img.files) != 1:
+                    raise ValueError(f'Image load failed: "{path_or_array}"" has multiple keys. ({img.files})')
+                img = img[img.files[0]]
         else:
             # PILで読み込む
             import PIL.Image
@@ -32,20 +36,16 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
                 target_mode = 'L' if grayscale else 'RGB'
                 if pil_img.mode != target_mode:
                     pil_img = pil_img.convert(target_mode)
-                img = np.asarray(pil_img, dtype=np.float32)
+                img = np.asarray(pil_img, dtype=dtype)
 
     if img is None:
         raise ValueError(f'Image load failed: {path_or_array}')
-    if grayscale:
-        if len(img.shape) == 2:
-            img = np.expand_dims(img, axis=-1)
-    else:
-        if img.shape[-1] != 3:
-            raise ValueError(f'Image load failed: shape={path_or_array.shape}')
+    if len(img.shape) == 2:
+        img = np.expand_dims(img, axis=-1)
     if len(img.shape) != 3:
         raise ValueError(f'Image load failed: shape={path_or_array}')
 
-    return img.astype(np.float32)
+    return img.astype(dtype)
 
 
 def save(path: typing.Union[str, pathlib.Path], img: np.ndarray):
@@ -94,7 +94,11 @@ def rotate(rgb: np.ndarray, degrees: float, expand=True, interp='lanczos', borde
         m[0, 2] += (ex_w / 2) - center[0]
         m[1, 2] += (ex_h / 2) - center[1]
         size = (ex_w, ex_h)
-    rgb = cv2.warpAffine(rgb, m, size, flags=cv2_interp, borderMode=cv2_border)
+    if rgb.shape[-1] in (1, 3):
+        rgb = cv2.warpAffine(rgb, m, size, flags=cv2_interp, borderMode=cv2_border)
+    else:
+        rotated_list = [cv2.warpAffine(rgb[:, :, ch], m, size, flags=cv2_interp, borderMode=cv2_border) for ch in range(rgb.shape[-1])]
+        rgb = np.transpose(rotated_list, (1, 2, 0))
     if len(rgb.shape) == 2:
         rgb = np.expand_dims(rgb, axis=-1)
     return rgb

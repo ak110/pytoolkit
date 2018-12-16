@@ -44,7 +44,7 @@ class ImageClassifier(models.Model):
         # モデルの読み込み
         network = models.load_model(filepath, compile=False)
         # 1回予測して計算グラフを構築
-        network.predict_on_batch(np.zeros((1, input_size, input_size, 3)))
+        network.predict(np.zeros((1, input_size, input_size, 3)))
         logger = log.get(__name__)
         logger.info('trainable params: %d', models.count_trainable_params(network))
         return cls(class_names, network_type, preprocess_mode, input_size, rotation_type, network, gen, batch_size)

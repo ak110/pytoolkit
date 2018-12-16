@@ -280,7 +280,7 @@ def coord_channel_2d():
         def call(self, inputs, **kwargs):
             input_shape = tf.keras.backend.shape(inputs)
             pad_shape = (input_shape[0], input_shape[1], input_shape[2], 1)
-            ones = tf.keras.backend.ones(pad_shape)
+            ones = tf.ones(pad_shape)
             pad_channels = []
             if self.x_channel:
                 gradation = tf.keras.backend.cast(tf.keras.backend.arange(0, input_shape[2]), tf.keras.backend.floatx()) / tf.keras.backend.cast(input_shape[2], tf.keras.backend.floatx())

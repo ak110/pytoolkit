@@ -8,7 +8,7 @@ def test_ss_binary(tmpdir):
     models_dir = pathlib.Path(str(tmpdir))
 
     X = np.zeros((2, 32, 32, 3))
-    y = np.random.uniform(0, 1, size=X.shape[:-1] + (1,))
+    y = np.random.randint(0, 256, size=X.shape[:-1] + (1,))
 
     with tk.dl.session():
         model = tk.dl.ss.SemanticSegmentor.create(None, None, input_size=32, weights=None)
@@ -32,7 +32,8 @@ def test_ss_multi(tmpdir):
     models_dir = pathlib.Path(str(tmpdir))
 
     X = np.zeros((2, 32, 32, 3))
-    y = np.random.randint(0, 256, size=X.shape)
+    y = np.random.uniform(0, 1, size=X.shape[:-1] + (5,))
+    y /= y.sum(axis=-1, keepdims=True)
     class_colors = [
         (0, 0, 0),
         (0, 0, 128),

@@ -16,12 +16,14 @@ def test_saveload_alpha(tmpdir):
 
 def test_saveload_grayscale(tmpdir):
     img = tk.ndimage.load(_BASE_DIR / 'data' / 'Lenna.png', grayscale=True)
+    assert img.shape[-1] == 1
     tk.ndimage.save(str(tmpdir.join('output.png')), img)
 
 
 def test_saveload_gif(tmpdir):
     img = tk.ndimage.load(_BASE_DIR / 'data' / 'Lenna.gif')
     assert img is not None
+    assert img.shape[-1] == 3
     tk.ndimage.save(str(tmpdir.join('output.bmp')), img)
     assert (tk.ndimage.load(str(tmpdir.join('output.bmp'))) == img).all()
 
