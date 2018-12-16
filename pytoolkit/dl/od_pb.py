@@ -214,10 +214,10 @@ class PriorBoxes:
         return (bbox - self.pb_locs[pb_ix, :]) / np.tile(self.pb_sizes[pb_ix, :], 2) / _VAR_LOC
 
     def decode_locs(self, pred, xp=None):
-        """encode_locsの逆変換。xpはnumpy or tf.keras.backend。"""
-        import tensorflow as tf
+        """encode_locsの逆変換。xpはnumpy or keras.backend。"""
         if xp is None:
-            xp = tf.keras.backend
+            import keras.backend as K
+            xp = K
         decoded = pred * (_VAR_LOC * np.tile(self.pb_sizes, 2)) + self.pb_locs
         return xp.clip(decoded, 0, 1)
 
@@ -364,68 +364,70 @@ class PriorBoxes:
 
     def loss(self, y_true, y_pred):
         """損失関数。"""
-        import tensorflow as tf
+        import keras.backend as K
         loss_obj = self.loss_obj(y_true, y_pred)
         loss_clf = self.loss_clf(y_true, y_pred)
         loss_loc = self.loss_loc(y_true, y_pred)
         loss = loss_obj + loss_clf + loss_loc
-        assert len(tf.keras.backend.int_shape(loss)) == 1  # (None,)
+        assert len(K.int_shape(loss)) == 1  # (None,)
         return loss
 
     @property
     def metrics(self):
         """各種metricをまとめて返す。"""
-        import tensorflow as tf
+        import keras.backend as K
 
         def rec_bg(y_true, y_pred):
             """背景の再現率。"""
             gt_mask = y_true[:, :, 0]
             gt_obj, pred_obj = y_true[:, :, 2], y_pred[:, :, 2]
             gt_bg = (1 - gt_obj) * gt_mask   # 背景
-            acc = tf.keras.backend.cast(tf.keras.backend.equal(tf.keras.backend.round(gt_obj), tf.keras.backend.round(pred_obj)), tf.keras.backend.floatx())
-            return tf.keras.backend.sum(acc * gt_bg, axis=-1) / tf.keras.backend.maximum(tf.keras.backend.sum(gt_bg, axis=-1), 1)
+            acc = K.cast(K.equal(K.round(gt_obj), K.round(pred_obj)), K.floatx())
+            return K.sum(acc * gt_bg, axis=-1) / K.maximum(K.sum(gt_bg, axis=-1), 1)
 
         def rec_obj(y_true, y_pred):
             """物体の再現率。"""
             gt_obj, pred_obj = y_true[:, :, 2], y_pred[:, :, 2]
-            acc = tf.keras.backend.cast(tf.keras.backend.equal(tf.keras.backend.round(gt_obj), tf.keras.backend.round(pred_obj)), tf.keras.backend.floatx())
-            return tf.keras.backend.sum(acc * gt_obj, axis=-1) / tf.keras.backend.maximum(tf.keras.backend.sum(gt_obj, axis=-1), 1)
+            acc = K.cast(K.equal(K.round(gt_obj), K.round(pred_obj)), K.floatx())
+            return K.sum(acc * gt_obj, axis=-1) / K.maximum(K.sum(gt_obj, axis=-1), 1)
 
         def acc_clf(y_true, y_pred):
             """分類の正解率。"""
             gt_obj = y_true[:, :, 2]
             gt_classes, pred_classes = y_true[:, :, 3:-4], y_pred[:, :, 3:-4]
-            acc = tf.keras.backend.cast(tf.keras.backend.equal(tf.keras.backend.argmax(gt_classes), tf.keras.backend.argmax(pred_classes)), tf.keras.backend.floatx())
-            return tf.keras.backend.sum(acc * gt_obj, axis=-1) / tf.keras.backend.maximum(tf.keras.backend.sum(gt_obj, axis=-1), 1)
+            acc = K.cast(K.equal(K.argmax(gt_classes), K.argmax(pred_classes)), K.floatx())
+            return K.sum(acc * gt_obj, axis=-1) / K.maximum(K.sum(gt_obj, axis=-1), 1)
 
         return [self.loss_obj, self.loss_clf, self.loss_loc, rec_bg, rec_obj, acc_clf]
 
     def loss_obj(self, y_true, y_pred):
         """Objectness scoreのloss。(binary focal loss)"""
-        import tensorflow as tf
+        import keras.backend as K
         gt_mask = y_true[:, :, 0]
         gt_obj, pred_obj = y_true[:, :, 2], y_pred[:, :, 2]
         mask = np.expand_dims(self.pb_mask, axis=0) * gt_mask
         loss = losses.binary_focal_loss()(gt_obj, pred_obj)
-        loss = tf.keras.backend.sum(loss * mask, axis=-1)
+        loss = K.sum(loss * mask, axis=-1)
         return loss * 3
 
     @staticmethod
     def loss_clf(y_true, y_pred):
         """クラス分類のloss。(categorical crossentropy)"""
-        import tensorflow as tf
+        import keras
+        import keras.backend as K
         gt_weights = y_true[:, :, 1]
         gt_classes, pred_classes = y_true[:, :, 3:-4], y_pred[:, :, 3:-4]
-        loss = tf.keras.losses.categorical_crossentropy(gt_classes, pred_classes)
-        loss = tf.keras.backend.sum(loss * gt_weights, axis=-1)
+        loss = keras.losses.categorical_crossentropy(gt_classes, pred_classes)
+        loss = K.sum(loss * gt_weights, axis=-1)
         return loss
 
     @staticmethod
     def loss_loc(y_true, y_pred):
         """位置のloss。(l2 smooth loss)"""
-        import tensorflow as tf
+        import keras
+        import keras.backend as K
         gt_weights = y_true[:, :, 1]
         gt_locs, pred_locs = y_true[:, :, -4:], y_pred[:, :, -4:]
-        loss = tf.keras.losses.mean_squared_error(gt_locs, pred_locs)
-        loss = tf.keras.backend.sum(loss * gt_weights, axis=-1)
+        loss = keras.losses.mean_squared_error(gt_locs, pred_locs)
+        loss = K.sum(loss * gt_weights, axis=-1)
         return loss * 2

@@ -40,8 +40,8 @@ class ImageDataGenerator(generator.Generator):
 def preprocess_input_mean(x: np.ndarray):
     """RGBそれぞれ平均値(定数)を引き算。
 
-    `tf.keras.applications.imagenet_utils.preprocess_input` のようなもの。(ただし `channels_last` 限定)
-    `tf.keras.applications`のVGG16/VGG19/ResNet50で使われる。
+    `keras.applications.imagenet_utils.preprocess_input` のようなもの。(ただし `channels_last` 限定)
+    `keras.applications`のVGG16/VGG19/ResNet50で使われる。
     """
     assert x.shape[-1] == 3, f'shape error: {x.shape}'
     # 'RGB'->'BGR'
@@ -56,7 +56,7 @@ def preprocess_input_mean(x: np.ndarray):
 def preprocess_input_abs1(x: np.ndarray):
     """0～255を-1～1に変換。
 
-    `tf.keras.applications`のInceptionV3/Xceptionで使われる。
+    `keras.applications`のInceptionV3/Xceptionで使われる。
     """
     x /= 127.5
     x -= 1

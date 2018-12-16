@@ -18,9 +18,9 @@ def focal_loss_bias_initializer():
     - nb_classes: 背景を含むクラス数。class 0が背景。
     - pi: π。前景の重み。
     """
-    import tensorflow as tf
+    import keras
 
-    class FocalLossBiasInitializer(tf.keras.initializers.Initializer):
+    class FocalLossBiasInitializer(keras.initializers.Initializer):
         """focal loss用の最後のクラス分類のbias_initializer。
 
         # 引数
@@ -41,7 +41,7 @@ def focal_loss_bias_initializer():
                 x = np.log(((self.nb_classes - 1) * (1 - self.pi)) / self.pi)
                 bias = [x] + [0] * (self.nb_classes - 1)  # 背景が0.99%になるような値。21クラス分類なら7.6くらい。(結構大きい…)
                 bias = bias * (shape[0] // self.nb_classes)
-            return tf.keras.backend.constant(bias, shape=shape, dtype=dtype)
+            return keras.backend.constant(bias, shape=shape, dtype=dtype)
 
         def get_config(self):
             return {

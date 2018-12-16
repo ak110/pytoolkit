@@ -475,7 +475,7 @@ def print_scores(precisions, recalls, fscores, supports, class_names=None, print
 
 
 def top_k_accuracy(y_true, proba_pred, k=5):
-    """Top-tf.keras.backend accuracy。"""
+    """Top-K accuracy。"""
     assert len(y_true.shape) == 1
     assert len(proba_pred.shape) == 2
     best_k = np.argsort(proba_pred, axis=1)[:, -k:]

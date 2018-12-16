@@ -13,21 +13,21 @@ class GradCamVisualizer:
     """
 
     def __init__(self, model, output_index):
-        import tensorflow as tf
+        import keras
         # GlobalAveragePoolingへの入力テンソルを取得
         map_output = None
         for layer in model.layers[::-1]:
-            if isinstance(layer, tf.keras.layers.GlobalAveragePooling2D):
+            if isinstance(layer, keras.layers.GlobalAveragePooling2D):
                 map_output = layer.input
                 break
         assert map_output is not None
         # 関数を作成
-        grad = tf.keras.backend.gradients(model.output[0, output_index], map_output)[0]
-        mask = tf.keras.backend.sum(map_output * grad, axis=-1)[0, :, :]
-        mask_min, mask_max = tf.keras.backend.min(mask), tf.keras.backend.max(mask)
-        mask = (mask - mask_min) / (mask_max - mask_min + tf.keras.backend.epsilon())  # [0-1)
-        self.get_mask_func = tf.keras.backend.function(
-            model.inputs + [tf.keras.backend.learning_phase()], [mask])
+        grad = keras.backend.gradients(model.output[0, output_index], map_output)[0]
+        mask = keras.backend.sum(map_output * grad, axis=-1)[0, :, :]
+        mask_min, mask_max = keras.backend.min(mask), keras.backend.max(mask)
+        mask = (mask - mask_min) / (mask_max - mask_min + keras.backend.epsilon())  # [0-1)
+        self.get_mask_func = keras.backend.function(
+            model.inputs + [keras.backend.learning_phase()], [mask])
 
     def draw(self, source_image, model_inputs, alpha=0.25, interpolation='nearest'):
         """ヒートマップ画像を作成して返す。

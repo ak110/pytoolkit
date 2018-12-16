@@ -8,21 +8,21 @@ class Builder:
     """Kerasでネットワークを作るときのヘルパークラス。"""
 
     def __init__(self, default_l2=1e-5):
-        import tensorflow as tf
+        import keras
         self.conv_defaults = {'kernel_initializer': 'he_uniform', 'padding': 'same', 'use_bias': False}
         self.dense_defaults = {'kernel_initializer': 'he_uniform'}
         self.bn_defaults = {}
         self.act_defaults = {'activation': 'elu'}
-        self.bn_class = tf.keras.layers.BatchNormalization
-        self.act_class = tf.keras.layers.Activation
+        self.bn_class = keras.layers.BatchNormalization
+        self.act_class = keras.layers.Activation
         self.use_mixfeat = False
-        if default_l2 is not None:
+        if default_l2:
             self.set_default_l2(default_l2)
 
     def set_default_l2(self, default_l2=1e-5):
         """全layerの既定値にL2を設定。"""
-        import tensorflow as tf
-        reg = tf.keras.regularizers.l2(default_l2)
+        from keras.regularizers import l2
+        reg = l2(default_l2)
         self.conv_defaults['kernel_regularizer'] = reg
         self.conv_defaults['bias_regularizer'] = reg
         self.dense_defaults['kernel_regularizer'] = reg
@@ -32,8 +32,8 @@ class Builder:
 
     def input_tensor(self, shape, name=None, dtype=None):
         """Input。"""
-        import tensorflow as tf
-        return tf.keras.layers.Input(shape, name=name, dtype=dtype)
+        import keras
+        return keras.layers.Input(shape, name=name, dtype=dtype)
 
     def preprocess(self, mode='tf'):
         """前処理。"""
@@ -41,38 +41,37 @@ class Builder:
 
     def conv1d(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """Conv1D+BN+Act。"""
-        import tensorflow as tf
-        return self._conv(1, tf.keras.layers.Conv1D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+        import keras
+        return self._conv(1, keras.layers.Conv1D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
     def conv2d(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """Conv2D+BN+Act。"""
-        import tensorflow as tf
-        return self._conv(2, tf.keras.layers.Conv2D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+        import keras
+        return self._conv(2, keras.layers.Conv2D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
     def conv3d(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """Conv3D+BN+Act。"""
-        import tensorflow as tf
-        return self._conv(3, tf.keras.layers.Conv3D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+        import keras
+        return self._conv(3, keras.layers.Conv3D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
     def conv2dtr(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """Conv2DTranspose+BN+Act。"""
-        import tensorflow as tf
-        return self._conv(2, tf.keras.layers.Conv2DTranspose, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+        import keras
+        return self._conv(2, keras.layers.Conv2DTranspose, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
     def dwconv2d(self, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """DepthwiseConv2D+BN+Act。"""
-        import tensorflow as tf
-        return self._conv(2, tf.keras.layers.DepthwiseConv2D, None, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+        import keras
+        return self._conv(2, keras.layers.DepthwiseConv2D, None, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
     def sepconv2d(self, filters, kernel_size=3, name=None, use_bn=True, use_act=True, bn_kwargs=None, act_kwargs=None, **kwargs):
         """SeparableConv2D+BN+Act。"""
-        import tensorflow as tf
-        return self._conv(2, tf.keras.layers.SeparableConv2D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
+        import keras
+        return self._conv(2, keras.layers.SeparableConv2D, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs)
 
     def _conv(self, rank, conv, filters, kernel_size, name, use_bn, use_act, bn_kwargs, act_kwargs, **kwargs):
         """ConvND+BN+Act。"""
-        import tensorflow as tf
-        from tensorflow.python.keras.utils.conv_utils import normalize_tuple  # pylint: disable=no-name-in-module
+        import keras
         kwargs = copy.copy(kwargs)
         bn_kwargs = copy.copy(bn_kwargs) if bn_kwargs is not None else {}
         act_kwargs = copy.copy(act_kwargs) if act_kwargs is not None else {}
@@ -91,10 +90,10 @@ class Builder:
         args = [filters, kernel_size]
         kwargs = self._params(self.conv_defaults, kwargs)
         kwargs['name'] = name
-        if conv == tf.keras.layers.DepthwiseConv2D:
+        if conv == keras.layers.DepthwiseConv2D:
             kwargs = {k.replace('kernel_', 'depthwise_'): v for k, v in kwargs.items()}
             args = args[1:]
-        elif conv == tf.keras.layers.SeparableConv2D:
+        elif conv == keras.layers.SeparableConv2D:
             kwargs = {k.replace('kernel_', 'depthwise_'): v for k, v in kwargs.items()}
             kwargs.update({k.replace('depthwise_', 'pointwise_'): v for k, v in kwargs.items() if k.startswith('depthwise_')})  # とりあえずdw/pwで同じにしとく
 
@@ -104,8 +103,8 @@ class Builder:
 
         seq = []
         if kwargs['padding'] in ('reflect', 'symmetric'):
-            kernel_size = normalize_tuple(kernel_size, rank, 'kernel_size')
-            strides = normalize_tuple(kwargs.get('strides', 1), rank, 'strides')
+            kernel_size = keras.utils.conv_utils.normalize_tuple(kernel_size, rank, 'kernel_size')
+            strides = keras.utils.conv_utils.normalize_tuple(kwargs.get('strides', 1), rank, 'strides')
             if kernel_size == strides:
                 pass  # padding無しのはず
             elif len(kernel_size) == 2:
@@ -143,8 +142,8 @@ class Builder:
 
     def dense(self, units, **kwargs):
         """Dense。"""
-        import tensorflow as tf
-        return tf.keras.layers.Dense(units, **self._params(self.dense_defaults, kwargs))
+        import keras
+        return keras.layers.Dense(units, **self._params(self.dense_defaults, kwargs))
 
     @staticmethod
     def _params(defaults, kwargs):
@@ -154,23 +153,23 @@ class Builder:
 
     @staticmethod
     def shape(x):
-        """`tf.keras.backend.int_shapeを実行するだけのヘルパー (これだけのためにbackendをimportするのが面倒なので)`"""
-        import tensorflow as tf
-        return tf.keras.backend.int_shape(x)
+        """`K.int_shapeを実行するだけのヘルパー (これだけのためにbackendをimportするのが面倒なので)`"""
+        import keras.backend as K
+        return K.int_shape(x)
 
     def res_block(self, filters, pre_bn=False, bottleneck_rate=1, dropout=None, se_block=False, name=None):
         """普通の(?)Residual Block。((3, 3) × 2)"""
-        import tensorflow as tf
+        import keras
         seq = []
         if pre_bn:
             seq.append(self.bn(center=False, scale=False, name=f'{name}_bn' if name else None))
         seq.append(self.conv2d(filters // bottleneck_rate, use_act=True, name=f'{name}_conv1' if name else None))
         if dropout:
-            seq.append(tf.keras.layers.Dropout(dropout, name=f'{name}_drop' if name else None))
+            seq.append(keras.layers.Dropout(dropout, name=f'{name}_drop' if name else None))
         seq.append(self.conv2d(filters, use_act=False, name=f'{name}_conv2' if name else None))
         if se_block:
             seq.append(self.se_block(filters, name=f'{name}_se' if name else None))
-        return Sequence(seq, tf.keras.layers.Add(name=f'{name}_add' if name else None))
+        return Sequence(seq, keras.layers.Add(name=f'{name}_add' if name else None))
 
     def scse_block(self, filters, name=None):
         """Concurrent Spatial and Channel Squeeze & Excitation block
@@ -178,23 +177,23 @@ class Builder:
         https://arxiv.org/abs/1803.02579
         """
         assert filters > 0
-        import tensorflow as tf
+        import keras
         sse = self.sse_block(name=f'{name}_sse' if name else None)
         cse = self.se_block(filters, name=f'{name}_cse' if name else None)
-        return Sequence([sse, cse], tf.keras.layers.Add(name=f'{name}_add' if name else None), mode='parallel')
+        return Sequence([sse, cse], keras.layers.Add(name=f'{name}_add' if name else None), mode='parallel')
 
     def sse_block(self, name=None):
         """Channel Squeeze and Spatial Excitation block
 
         https://arxiv.org/abs/1803.02579
         """
-        import tensorflow as tf
-        reg = tf.keras.regularizers.l2(1e-4)
+        import keras
+        reg = keras.regularizers.l2(1e-4)
         seq = [
-            tf.keras.layers.Conv2D(1, 1, activation='sigmoid', kernel_regularizer=reg,
-                                   name=f'{name}_sq' if name else None),
+            keras.layers.Conv2D(1, 1, activation='sigmoid', kernel_regularizer=reg,
+                                name=f'{name}_sq' if name else None),
         ]
-        return Sequence(seq, tf.keras.layers.Multiply(name=f'{name}_sr' if name else None))
+        return Sequence(seq, keras.layers.Multiply(name=f'{name}_sr' if name else None))
 
     def se_block(self, filters, ratio=16, name=None):
         """Squeeze-and-Excitation block (Spatial Squeeze and Channel Excitation block)
@@ -203,17 +202,17 @@ class Builder:
         https://arxiv.org/abs/1803.02579
         """
         assert filters > 0
-        import tensorflow as tf
-        reg = tf.keras.regularizers.l2(1e-4)
+        import keras
+        reg = keras.regularizers.l2(1e-4)
         seq = [
-            tf.keras.layers.GlobalAveragePooling2D(name=f'{name}_p' if name else None),
-            tf.keras.layers.Dense(max(filters // ratio, 4), activation='relu', kernel_regularizer=reg,
-                                  name=f'{name}_sq' if name else None),
-            tf.keras.layers.Dense(filters, activation='sigmoid', kernel_regularizer=reg,
-                                  name=f'{name}_ex' if name else None),
-            tf.keras.layers.Reshape((1, 1, filters), name=f'{name}_r' if name else None),
+            keras.layers.GlobalAveragePooling2D(name=f'{name}_p' if name else None),
+            keras.layers.Dense(max(filters // ratio, 4), activation='relu', kernel_regularizer=reg,
+                               name=f'{name}_sq' if name else None),
+            keras.layers.Dense(filters, activation='sigmoid', kernel_regularizer=reg,
+                               name=f'{name}_ex' if name else None),
+            keras.layers.Reshape((1, 1, filters), name=f'{name}_r' if name else None),
         ]
-        return Sequence(seq, tf.keras.layers.Multiply(name=f'{name}_cr' if name else None))
+        return Sequence(seq, keras.layers.Multiply(name=f'{name}_cr' if name else None))
 
 
 class Sequence:

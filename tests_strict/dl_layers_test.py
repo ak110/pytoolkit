@@ -1,4 +1,4 @@
-import tensorflow as tf
+import keras
 import numpy as np
 import pytest
 
@@ -18,17 +18,17 @@ def test_depth_to_space():
     ]], dtype=np.float32)
 
     with tk.dl.session():
-        x = inputs = tf.keras.layers.Input(shape=(2, 2, 4))
+        x = inputs = keras.layers.Input(shape=(2, 2, 4))
         x = tk.dl.layers.subpixel_conv2d()(scale=2)(x)
-        model = tf.keras.models.Model(inputs, x)
+        model = keras.models.Model(inputs, x)
         assert model.predict(X) == pytest.approx(y)
 
 
 def test_coord_channel_2d():
     with tk.dl.session():
-        x = inputs = tf.keras.layers.Input(shape=(4, 4, 1))
+        x = inputs = keras.layers.Input(shape=(4, 4, 1))
         x = tk.dl.layers.coord_channel_2d()()(x)
-        model = tf.keras.models.Model(inputs, x)
+        model = keras.models.Model(inputs, x)
         assert model.output_shape == (None, 4, 4, 3)
         assert model.predict(np.zeros((1, 4, 4, 1))) == pytest.approx(np.array([[
             [
@@ -66,9 +66,9 @@ def test_mixfeat():
     ], dtype=np.float32)
 
     with tk.dl.session():
-        x = inputs = tf.keras.layers.Input(shape=(2,))
+        x = inputs = keras.layers.Input(shape=(2,))
         x = tk.dl.layers.mixfeat()()(x)
-        model = tf.keras.models.Model(inputs, x)
+        model = keras.models.Model(inputs, x)
         assert model.predict(X) == pytest.approx(X)
         model.compile('sgd', loss='mse')
         model.fit(X, X, batch_size=3, epochs=1)

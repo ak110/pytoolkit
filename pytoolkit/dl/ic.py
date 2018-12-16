@@ -76,28 +76,28 @@ class ImageClassifier(models.Model):
 
 def _create_network(num_classes, network_type, image_size, freeze_type, additional_stages, weights):
     """ネットワークを作って返す。"""
-    import tensorflow as tf
+    import keras
     if network_type == 'vgg16bn':
         base_model = applications.vgg16bn.vgg16bn(include_top=False, input_shape=(None, None, 3), weights=weights)
         preprocess_mode = 'caffe'
     elif network_type == 'resnet50':
-        base_model = tf.keras.applications.ResNet50(include_top=False, input_shape=(None, None, 3), weights=weights)
+        base_model = keras.applications.ResNet50(include_top=False, input_shape=(None, None, 3), weights=weights)
         preprocess_mode = 'caffe'
     elif network_type == 'xception':
-        base_model = tf.keras.applications.Xception(include_top=False, input_shape=(None, None, 3), weights=weights)
+        base_model = keras.applications.Xception(include_top=False, input_shape=(None, None, 3), weights=weights)
         preprocess_mode = 'tf'
     elif network_type == 'darknet53':
         base_model = applications.darknet53.darknet53(include_top=False, input_shape=(None, None, 3), weights=weights)
         preprocess_mode = 'div255'
     elif network_type == 'nasnet_large':
-        base_model = tf.keras.applications.NASNetLarge(include_top=False, input_shape=image_size + (3,), weights=weights)
+        base_model = keras.applications.NASNetLarge(include_top=False, input_shape=image_size + (3,), weights=weights)
         preprocess_mode = 'tf'
     else:
         raise ValueError(f'Invalid network type: {network_type}')
 
     if freeze_type == 'without_bn':
         for layer in base_model.layers:
-            if not isinstance(layer, tf.keras.layers.BatchNormalization):
+            if not isinstance(layer, keras.layers.BatchNormalization):
                 layer.trainable = False
     elif freeze_type == 'all':
         for layer in base_model.layers:
@@ -105,47 +105,47 @@ def _create_network(num_classes, network_type, image_size, freeze_type, addition
 
     x = base_model.outputs[0]
     if additional_stages > 0:
-        x = tf.keras.layers.Conv2D(256, 1, padding='same', use_bias=False,
-                                   kernel_initializer='he_uniform',
-                                   kernel_regularizer=tf.keras.regularizers.l2(1e-4))(x)
-        x = tf.keras.layers.BatchNormalization(gamma_regularizer=tf.keras.regularizers.l2(1e-4),
-                                               beta_regularizer=tf.keras.regularizers.l2(1e-4))(x)
-        x = tf.keras.layers.Activation('relu')(x)
+        x = keras.layers.Conv2D(256, 1, padding='same', use_bias=False,
+                                kernel_initializer='he_uniform',
+                                kernel_regularizer=keras.regularizers.l2(1e-4))(x)
+        x = keras.layers.BatchNormalization(gamma_regularizer=keras.regularizers.l2(1e-4),
+                                            beta_regularizer=keras.regularizers.l2(1e-4))(x)
+        x = keras.layers.Activation('relu')(x)
     for _ in range(additional_stages):
-        x = tf.keras.layers.Conv2D(256, 2, strides=2, padding='same', use_bias=False,
-                                   kernel_initializer='he_uniform',
-                                   kernel_regularizer=tf.keras.regularizers.l2(1e-4))(x)
-        x = tf.keras.layers.BatchNormalization(gamma_regularizer=tf.keras.regularizers.l2(1e-4),
-                                               beta_regularizer=tf.keras.regularizers.l2(1e-4))(x)
+        x = keras.layers.Conv2D(256, 2, strides=2, padding='same', use_bias=False,
+                                kernel_initializer='he_uniform',
+                                kernel_regularizer=keras.regularizers.l2(1e-4))(x)
+        x = keras.layers.BatchNormalization(gamma_regularizer=keras.regularizers.l2(1e-4),
+                                            beta_regularizer=keras.regularizers.l2(1e-4))(x)
         for _ in range(3):
             shortcut = x
-            x = tf.keras.layers.Conv2D(256, 3, padding='same', use_bias=False,
-                                       kernel_initializer='he_uniform',
-                                       kernel_regularizer=tf.keras.regularizers.l2(1e-4))(x)
-            x = tf.keras.layers.BatchNormalization(gamma_regularizer=tf.keras.regularizers.l2(1e-4),
-                                                   beta_regularizer=tf.keras.regularizers.l2(1e-4))(x)
-            x = tf.keras.layers.Activation('relu')(x)
-            x = tf.keras.layers.Conv2D(256, 3, padding='same', use_bias=False,
-                                       kernel_initializer='he_uniform',
-                                       kernel_regularizer=tf.keras.regularizers.l2(1e-4))(x)
-            x = tf.keras.layers.BatchNormalization(gamma_regularizer=tf.keras.regularizers.l2(1e-4),
-                                                   beta_regularizer=tf.keras.regularizers.l2(1e-4))(x)
-            x = tf.keras.layers.add([shortcut, x])
-        x = tf.keras.layers.BatchNormalization(gamma_regularizer=tf.keras.regularizers.l2(1e-4),
-                                               beta_regularizer=tf.keras.regularizers.l2(1e-4))(x)
-        x = tf.keras.layers.Activation('relu')(x)
+            x = keras.layers.Conv2D(256, 3, padding='same', use_bias=False,
+                                    kernel_initializer='he_uniform',
+                                    kernel_regularizer=keras.regularizers.l2(1e-4))(x)
+            x = keras.layers.BatchNormalization(gamma_regularizer=keras.regularizers.l2(1e-4),
+                                                beta_regularizer=keras.regularizers.l2(1e-4))(x)
+            x = keras.layers.Activation('relu')(x)
+            x = keras.layers.Conv2D(256, 3, padding='same', use_bias=False,
+                                    kernel_initializer='he_uniform',
+                                    kernel_regularizer=keras.regularizers.l2(1e-4))(x)
+            x = keras.layers.BatchNormalization(gamma_regularizer=keras.regularizers.l2(1e-4),
+                                                beta_regularizer=keras.regularizers.l2(1e-4))(x)
+            x = keras.layers.add([shortcut, x])
+        x = keras.layers.BatchNormalization(gamma_regularizer=keras.regularizers.l2(1e-4),
+                                            beta_regularizer=keras.regularizers.l2(1e-4))(x)
+        x = keras.layers.Activation('relu')(x)
 
-    x = tf.keras.layers.GlobalAveragePooling2D()(x)
+    x = keras.layers.GlobalAveragePooling2D()(x)
     if freeze_type == 'all' and additional_stages <= 0:
-        x = tf.keras.layers.Dense(2048, activation='relu',
-                                  kernel_initializer='he_uniform',
-                                  kernel_regularizer=tf.keras.regularizers.l2(1e-4),
-                                  name=f'pred_{num_classes}_pre')(x)
-    x = tf.keras.layers.Dense(num_classes, activation='softmax',
-                              kernel_initializer='zeros',
-                              kernel_regularizer=tf.keras.regularizers.l2(1e-4),
-                              name=f'pred_{num_classes}')(x)
-    model = tf.keras.models.Model(base_model.inputs, x)
+        x = keras.layers.Dense(2048, activation='relu',
+                               kernel_initializer='he_uniform',
+                               kernel_regularizer=keras.regularizers.l2(1e-4),
+                               name=f'pred_{num_classes}_pre')(x)
+    x = keras.layers.Dense(num_classes, activation='softmax',
+                           kernel_initializer='zeros',
+                           kernel_regularizer=keras.regularizers.l2(1e-4),
+                           name=f'pred_{num_classes}')(x)
+    model = keras.models.Model(base_model.inputs, x)
     return model, preprocess_mode
 
 

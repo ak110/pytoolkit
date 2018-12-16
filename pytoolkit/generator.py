@@ -294,7 +294,7 @@ class ProcessInput(Operator):
 
     # 例3
     ```py
-    gen.add(tk.generator.ProcessInput(tf.keras.applications.vgg16.preprocess_input, batch_axis=True))
+    gen.add(tk.generator.ProcessInput(keras.applications.vgg16.preprocess_input, batch_axis=True))
     ```
     """
 
@@ -378,11 +378,11 @@ class RandomPickData(Operator):
 
 
 def generator_sequence(generator, steps):
-    """generatorを`tf.keras.utils.Sequence`に変換する。"""
-    import tensorflow as tf
+    """generatorを`keras.utils.Sequence`に変換する。"""
+    import keras
 
-    class GeneratorSequence(tf.keras.utils.Sequence):
-        """generatorによる`tf.keras.utils.Sequence`。"""
+    class GeneratorSequence(keras.utils.Sequence):
+        """generatorによる`keras.utils.Sequence`。"""
 
         def __init__(self, generator, steps):
             self.generator = generator

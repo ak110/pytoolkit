@@ -6,8 +6,8 @@ _initialized = False
 
 
 def get():
-    """`horovod.tensorflow.keras`モジュールを返す。"""
-    import horovod.tensorflow.keras as hvd
+    """`horovod.keras`モジュールを返す。"""
+    import horovod.keras as hvd
     return hvd
 
 
@@ -65,9 +65,9 @@ def bcast(buf, root=0):
 
 
 def get_file(name, url, **kwargs):
-    """`tf.keras.utils.get_file`のラッパー。"""
-    import tensorflow as tf
+    """`keras.utils.get_file`のラッパー。"""
+    import keras
     if is_local_master():
-        tf.keras.utils.get_file(name, url, **kwargs)
+        keras.utils.get_file(name, url, **kwargs)
     barrier()
-    return pathlib.Path(tf.keras.utils.get_file(name, url, **kwargs))
+    return pathlib.Path(keras.utils.get_file(name, url, **kwargs))
