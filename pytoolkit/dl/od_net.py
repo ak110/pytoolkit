@@ -176,7 +176,7 @@ def create_prediction_network(train_model, pb, strict_nms):
 
 def _create_prediction_part(pb, inputs, clfs, objs, locs, strict_nms):
     """予測部分。"""
-    import tensorflow as tf
+    import keras
     nms_all_threshold = 0.5 if strict_nms else None
 
     def _objconf(x):
