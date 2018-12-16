@@ -60,6 +60,8 @@ def cosine_annealing(factor=0.01, epochs=None):
             super().__init__()
 
         def on_train_begin(self, logs=None):
+            if not hasattr(self.model.optimizer, 'lr'):
+                raise ValueError('Optimizer must have a "lr" attribute.')
             self.start_lr = float(tf.keras.backend.get_value(self.model.optimizer.lr))
 
         def on_epoch_begin(self, epoch, logs=None):
