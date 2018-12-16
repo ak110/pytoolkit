@@ -190,6 +190,8 @@ def evaluate(y_true, y_pred):
         gt_bboxes_list, gt_classes_list, gt_difficults_list,
         use_07_metric=True)
     return {
-        'mAP': scores1,
-        'mAP_VOC': scores2,
+        'AP': scores1['ap'],
+        'mAP': scores1['map'],
+        'AP_VOC': scores2['ap'],
+        'mAP_VOC': scores2['map'],
     }

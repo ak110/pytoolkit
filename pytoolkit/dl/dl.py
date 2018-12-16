@@ -6,10 +6,11 @@ from . import hvd
 
 def get_custom_objects():
     """独自オブジェクトのdictを返す。"""
-    from . import layers, optimizers
+    from . import layers, optimizers, initializers
     custom_objects = {}
     custom_objects.update(layers.get_custom_objects())
     custom_objects.update(optimizers.get_custom_objects())
+    custom_objects.update(initializers.get_custom_objects())
     return custom_objects
 
 

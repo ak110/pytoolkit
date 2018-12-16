@@ -107,42 +107,6 @@ def make_mixed_lovasz_softmax(ignore=None):
     return _lovasz_softmax
 
 
-def od_bias_initializer(nb_classes, pi=0.01):
-    """Object Detectionの最後のクラス分類のbias_initializer。
-
-    nb_classesは背景を含むクラス数。0が背景。
-    あるいはnb_classes == 1なら2クラス分類として0が背景、1がオブジェクトとする。
-    """
-    import tensorflow as tf
-
-    class FocalLossBiasInitializer(tf.keras.initializers.Initializer):
-        """focal loss用の最後のクラス分類のbias_initializer。
-
-        # 引数
-        - nb_classes: 背景を含むクラス数。class 0が背景。
-        """
-
-        def __init__(self, nb_classes, pi=0.01):
-            self.nb_classes = nb_classes
-            self.pi = pi
-
-        def __call__(self, shape, dtype=None, partition_info=None):
-            assert len(shape) == 1
-            assert shape[0] % self.nb_classes == 0
-            if self.nb_classes == 1:
-                bias = -np.log((1 - self.pi) / self.pi)
-            else:
-                x = np.log(((nb_classes - 1) * (1 - self.pi)) / self.pi)
-                bias = [x] + [0] * (nb_classes - 1)  # 背景が0.99%になるような値。21クラス分類なら7.6くらい。(結構大きい…)
-                bias = bias * (shape[0] // self.nb_classes)
-            return tf.keras.backend.constant(bias, shape=shape, dtype=dtype)
-
-        def get_config(self):
-            return {'nb_classes': self.nb_classes}
-
-    return FocalLossBiasInitializer(nb_classes, pi)
-
-
 def l1_smooth_loss(y_true, y_pred):
     """L1-smooth loss。"""
     import tensorflow as tf

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from . import layers, losses, networks
+from . import initializers, layers, networks
 from .. import applications, log
 
 
@@ -12,7 +12,7 @@ def get_preprocess_input():
 
 
 @log.trace()
-def create_network(pb, mode, strict_nms, load_base_weights):
+def create_network(pb, mode, strict_nms: bool, load_base_weights: bool):
     """学習とか予測とか用のネットワークを作って返す。"""
     assert mode in ('train', 'predict')
     import tensorflow as tf
@@ -78,7 +78,7 @@ def create_network(pb, mode, strict_nms, load_base_weights):
             1, 1,
             kernel_initializer='zeros',
             kernel_regularizer=tf.keras.regularizers.l2(1e-4),
-            bias_initializer=losses.od_bias_initializer(1),
+            bias_initializer=initializers.focal_loss_bias_initializer()(nb_classes=1),
             bias_regularizer=None,
             activation='sigmoid',
             use_bias=True,
@@ -92,7 +92,7 @@ def create_network(pb, mode, strict_nms, load_base_weights):
             activation='softmax',
             use_bias=True,
             use_bn=False,
-            name=f'pm-{pat_ix}_clf_{pb.num_classes}')
+            name=f'pm-{pat_ix}_clf')
         shared_layers[f'pm-{pat_ix}_loc'] = networks.Sequence([
             builder.conv2d(256, 1, name=f'pm-{pat_ix}_loc_conv'),
             builder.conv2d(
@@ -157,21 +157,36 @@ def create_network(pb, mode, strict_nms, load_base_weights):
         outputs = tf.keras.layers.concatenate([dummy1, dummy2, objs, clfs, locs], axis=-1, name='outputs')
         model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
     else:
-        nms_all_threshold = 0.5 if strict_nms else None
-
-        def _conf(x):
-            objs = x[0][:, :, 0]
-            confs = x[1]
-            # objectnessとconfidenceの幾何平均をconfidenceということにしてみる
-            # → √すると1.0寄りになりすぎるので√無しに。(objectnessをgateにしたようなもの？)
-            conf = objs * confs
-            return conf * np.expand_dims(pb.pb_mask, axis=0)
-
-        classes = layers.channel_argmax()(name='classes')(clfs)
-        confs = layers.channel_max()(name='confs')(clfs)
-        objconfs = tf.keras.layers.Lambda(_conf, tf.keras.backend.int_shape(clfs)[1:-1], name='objconfs')([objs, confs])
-        locs = tf.keras.layers.Lambda(pb.decode_locs, name='locs')(locs)
-        nms = layers.nms()(pb.num_classes, len(pb.pb_locs), nms_all_threshold=nms_all_threshold, name='nms')([classes, objconfs, locs])
-        model = tf.keras.models.Model(inputs=inputs, outputs=nms)
-
+        model = _create_prediction_part(pb, inputs, clfs, objs, locs, strict_nms)
     return model, lr_multipliers
+
+
+def create_prediction_network(train_model, pb, strict_nms):
+    """学習用のネットワークから予測用のネットワークを作成する。"""
+    clfs = train_model.get_layer(name='output_clfs').output
+    objs = train_model.get_layer(name='output_objs').output
+    locs = train_model.get_layer(name='output_locs').output
+    return _create_prediction_part(pb, train_model.inputs, clfs, objs, locs, strict_nms)
+
+
+def _create_prediction_part(pb, inputs, clfs, objs, locs, strict_nms):
+    """予測部分。"""
+    import tensorflow as tf
+    nms_all_threshold = 0.5 if strict_nms else None
+
+    def _objconf(x):
+        """物体のconfidenceを算出するレイヤーの処理。"""
+        objs = x[0][:, :, 0]
+        confs = x[1]
+        # objectnessとconfidenceの幾何平均をconfidenceということにしてみる
+        # → √すると1.0寄りになりすぎるので√無しに。(objectnessをgateにしたようなもの？)
+        conf = objs * confs
+        return conf * np.expand_dims(pb.pb_mask, axis=0)
+
+    classes = layers.channel_argmax()(name='classes')(clfs)
+    confs = layers.channel_max()(name='confs')(clfs)
+    objconfs = tf.keras.layers.Lambda(_objconf, tf.keras.backend.int_shape(clfs)[1:-1], name='objconfs')([objs, confs])
+    locs = tf.keras.layers.Lambda(pb.decode_locs, name='locs')(locs)
+    nms = layers.nms()(pb.num_classes, len(pb.pb_locs), nms_all_threshold=nms_all_threshold, name='nms')([classes, objconfs, locs])
+    model = tf.keras.models.Model(inputs=inputs, outputs=nms)
+    return model
