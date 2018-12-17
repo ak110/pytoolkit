@@ -18,48 +18,57 @@ from .utils import compose
 
 
 @wraps(Conv2D)
-def DarknetConv2D(*args, **kwargs):
+def DarknetConv2D(*args, conv_index, **kwargs):
     """Wrapper to set Darknet parameters for Convolution2D."""
     darknet_conv_kwargs = {'kernel_regularizer': l2(5e-4)}
     darknet_conv_kwargs['padding'] = 'valid' if kwargs.get('strides') == (2, 2) else 'same'
     darknet_conv_kwargs.update(kwargs)
-    return Conv2D(*args, **darknet_conv_kwargs)
+    return Conv2D(*args, name=f'conv2d_{conv_index}', **darknet_conv_kwargs)
 
 
-def DarknetConv2D_BN_Leaky(*args, **kwargs):
+def DarknetConv2D_BN_Leaky(*args, conv_index, bn_index, **kwargs):
     """Darknet Convolution2D followed by BatchNormalization and LeakyReLU."""
     no_bias_kwargs = {'use_bias': False}
     no_bias_kwargs.update(kwargs)
     return compose(
-        DarknetConv2D(*args, **no_bias_kwargs),
-        BatchNormalization(),
+        DarknetConv2D(*args, conv_index=conv_index, **no_bias_kwargs),
+        BatchNormalization(name=f'batch_normalization_{bn_index}'),
         LeakyReLU(alpha=0.1))
 
 
-def resblock_body(x, num_filters, num_blocks, downsampling=True):
+def resblock_body(x, num_filters, num_blocks, conv_index, bn_index, add_index, downsampling=True):
     '''A series of resblocks starting with a downsampling Convolution2D'''
     # Darknet uses left and top padding instead of 'same' mode
     if downsampling:
         x = ZeroPadding2D(((1, 0), (1, 0)))(x)
-        x = DarknetConv2D_BN_Leaky(num_filters, (3, 3), strides=(2, 2))(x)
+        x = DarknetConv2D_BN_Leaky(num_filters, (3, 3), strides=(2, 2), conv_index=conv_index, bn_index=bn_index)(x)
     else:
-        x = DarknetConv2D_BN_Leaky(num_filters, (3, 3))(x)
+        x = DarknetConv2D_BN_Leaky(num_filters, (3, 3), conv_index=conv_index, bn_index=bn_index)(x)
+    conv_index += 1
+    bn_index += 1
     for _ in range(num_blocks):
         y = compose(
-            DarknetConv2D_BN_Leaky(num_filters // 2, (1, 1)),
-            DarknetConv2D_BN_Leaky(num_filters, (3, 3)))(x)
-        x = Add()([x, y])
+            DarknetConv2D_BN_Leaky(num_filters // 2, (1, 1), conv_index=conv_index, bn_index=bn_index),
+            DarknetConv2D_BN_Leaky(num_filters, (3, 3), conv_index=conv_index + 1, bn_index=bn_index + 1))(x)
+        conv_index += 2
+        bn_index += 2
+        x = Add(name=f'add_{add_index}')([x, y])
+        add_index += 1
     return x
 
 
 def darknet_body(x, for_small=False):
     '''Darknent body having 52 Convolution2D layers'''
-    x = DarknetConv2D_BN_Leaky(32, (3, 3))(x)
-    x = resblock_body(x, 64, 1, downsampling=not for_small)
-    x = resblock_body(x, 128, 2)
-    x = resblock_body(x, 256, 8)
-    x = resblock_body(x, 512, 8)
-    x = resblock_body(x, 1024, 4)
+    # kerasとtf.kerasで名前がずれるので仕方なく名前を指定
+    x = DarknetConv2D_BN_Leaky(32, (3, 3), conv_index=1, bn_index=1)(x)
+    x = resblock_body(x, 64, 1, conv_index=2, bn_index=2, add_index=1, downsampling=not for_small)
+    x = resblock_body(x, 128, 2, conv_index=5, bn_index=5, add_index=2)
+    x = resblock_body(x, 256, 8, conv_index=10, bn_index=10, add_index=4)
+    x = resblock_body(x, 512, 8, conv_index=27, bn_index=27, add_index=12)
+    x = resblock_body(x, 1024, 4, conv_index=44, bn_index=44, add_index=20)
+    _ = [K.get_uid('conv2d') for _ in range(52 + 1)]
+    _ = [K.get_uid('batch_normalization') for _ in range(52 + 1)]
+    _ = [K.get_uid('add') for _ in range(23 + 1)]
     return x
 
 

@@ -43,6 +43,9 @@ def preprocess():
             assert mode in ('caffe', 'tf', 'torch', 'div255')
             self.mode = mode
 
+        def compute_output_shape(self, input_shape):
+            return input_shape
+
         def call(self, inputs, **kwargs):
             if self.mode == 'caffe':
                 return K.bias_add(inputs[..., ::-1], K.constant(np.array([-103.939, -116.779, -123.68])))
@@ -72,11 +75,11 @@ def channel_argmax():
     class ChannelArgMax(keras.layers.Layer):
         """チャンネルをargmaxするレイヤー。"""
 
-        def call(self, inputs, **kwargs):
-            return K.argmax(inputs, axis=-1)
-
         def compute_output_shape(self, input_shape):
             return input_shape[:-1]
+
+        def call(self, inputs, **kwargs):
+            return K.argmax(inputs, axis=-1)
 
     return ChannelArgMax
 
@@ -89,11 +92,11 @@ def channel_max():
     class ChannelMax(keras.layers.Layer):
         """チャンネルをmaxするレイヤー。"""
 
-        def call(self, inputs, **kwargs):
-            return K.max(inputs, axis=-1)
-
         def compute_output_shape(self, input_shape):
             return input_shape[:-1]
+
+        def call(self, inputs, **kwargs):
+            return K.max(inputs, axis=-1)
 
     return ChannelMax
 
@@ -190,16 +193,16 @@ def pad2d():
             self.mode = mode
             self.constant_values = constant_values
 
-        def call(self, inputs, **kwargs):
-            padding = K.constant(((0, 0),) + self.padding + ((0, 0),), dtype='int32')
-            return tf.pad(inputs, padding, mode=self.mode, constant_values=self.constant_values, name=self.name)
-
         def compute_output_shape(self, input_shape):
             assert len(input_shape) == 4
             input_shape = list(input_shape)
             input_shape[1] += sum(self.padding[0])
             input_shape[2] += sum(self.padding[1])
             return tuple(input_shape)
+
+        def call(self, inputs, **kwargs):
+            padding = K.constant(((0, 0),) + self.padding + ((0, 0),), dtype='int32')
+            return tf.pad(inputs, padding, mode=self.mode, constant_values=self.constant_values, name=self.name)
 
         def get_config(self):
             config = {
@@ -259,6 +262,7 @@ def coord_channel_2d():
     """
     import keras
     import keras.backend as K
+    import tensorflow as tf
 
     class CoordChannel2D(keras.layers.Layer):
         """CoordConvなレイヤー。
@@ -284,7 +288,7 @@ def coord_channel_2d():
         def call(self, inputs, **kwargs):
             input_shape = K.shape(inputs)
             pad_shape = (input_shape[0], input_shape[1], input_shape[2], 1)
-            ones = K.ones(pad_shape)
+            ones = tf.ones(pad_shape, K.floatx())
             pad_channels = []
             if self.x_channel:
                 gradation = K.cast(K.arange(0, input_shape[2]), K.floatx()) / K.cast(input_shape[2], K.floatx())
@@ -313,12 +317,12 @@ def channel_pair_2d():
     class ChannelPair2D(keras.layers.Layer):
         """チャンネル同士の2個の組み合わせの積。"""
 
+        def compute_output_shape(self, input_shape):
+            return input_shape[:-1] + ((input_shape[-1] * (input_shape[-1] - 1) // 2),)
+
         def call(self, inputs, **kwargs):
             ch = K.int_shape(inputs)[-1]
             return K.concatenate([inputs[..., i:i + 1] * inputs[..., i + 1:] for i in range(ch - 1)], axis=-1)
-
-        def compute_output_shape(self, input_shape):
-            return input_shape[:-1] + ((input_shape[-1] * (input_shape[-1] - 1) // 2),)
 
     return ChannelPair2D
 
@@ -409,6 +413,9 @@ def group_normalization():
                 self.beta = None
             super().build(input_shape)
 
+        def compute_output_shape(self, input_shape):
+            return input_shape
+
         def call(self, inputs, **kwargs):
             x = inputs
             ndim = K.ndim(x)
@@ -430,9 +437,6 @@ def group_normalization():
             else:
                 assert ndim in (4, 5)
             return x * self.gamma + self.beta
-
-        def compute_output_shape(self, input_shape):
-            return input_shape
 
         def get_config(self):
             config = {
@@ -482,6 +486,9 @@ def destandarization():
             if self.std <= K.epsilon():
                 self.std = 1.  # 怪しい安全装置
 
+        def compute_output_shape(self, input_shape):
+            return input_shape
+
         def call(self, inputs, **kwargs):
             return inputs * self.std + self.mean
 
@@ -512,6 +519,11 @@ def stocastic_add():
             self.calibration = calibration
             super().__init__(**kargs)
 
+        def compute_output_shape(self, input_shape):
+            assert input_shape and len(input_shape) == 2
+            assert input_shape[0] == input_shape[1]
+            return input_shape[0]
+
         def call(self, inputs, training=None, **kwargs):  # pylint: disable=arguments-differ
             assert len(inputs) == 2
 
@@ -536,11 +548,6 @@ def stocastic_add():
 
             return K.in_train_phase(_stocastic_add, _calibrated_add, training=training)
 
-        def compute_output_shape(self, input_shape):
-            assert input_shape and len(input_shape) == 2
-            assert input_shape[0] == input_shape[1]
-            return input_shape[0]
-
         def get_config(self):
             config = {
                 'survival_prob': self.survival_prob,
@@ -564,6 +571,9 @@ def mixfeat():
         def __init__(self, sigma=0.2, **kargs):
             self.sigma = sigma
             super().__init__(**kargs)
+
+        def compute_output_shape(self, input_shape):
+            return input_shape
 
         def call(self, inputs, training=None):  # pylint: disable=arguments-differ
             def _passthru():
@@ -614,6 +624,9 @@ def drop_activation():
             self.keep_rate = keep_rate
             super().__init__(**kargs)
 
+        def compute_output_shape(self, input_shape):
+            return input_shape
+
         def call(self, inputs, training=None):  # pylint: disable=arguments-differ
             def _train():
                 shape = K.shape(inputs)
@@ -645,6 +658,9 @@ def normal_noise():
             assert 0 <= noise_rate < 1
             self.noise_rate = noise_rate
             super().__init__(**kargs)
+
+        def compute_output_shape(self, input_shape):
+            return input_shape
 
         def call(self, inputs, training=None):  # pylint: disable=arguments-differ
             if self.noise_rate <= 0:
@@ -692,6 +708,9 @@ def l2normalization():
                                          trainable=True)
             return super().build(input_shape)
 
+        def compute_output_shape(self, input_shape):
+            return input_shape
+
         def call(self, inputs, **kwargs):
             ch_axis = 3 if K.image_data_format() == 'channels_last' else 1
             output = K.l2_normalize(inputs, ch_axis)
@@ -734,16 +753,16 @@ def weighted_mean():
                                           constraint=self.kernel_constraint)
             super().build(input_shape)
 
+        def compute_output_shape(self, input_shape):
+            assert input_shape and len(input_shape) >= 2
+            return input_shape[0]
+
         def call(self, inputs, **kwargs):
             ot = K.zeros_like(inputs[0])
             for i, inp in enumerate(inputs):
                 ot += inp * self.kernel[i]
             ot /= K.sum(self.kernel) + K.epsilon()
             return ot
-
-        def compute_output_shape(self, input_shape):
-            assert input_shape and len(input_shape) >= 2
-            return input_shape[0]
 
         def get_config(self):
             config = {
@@ -854,7 +873,7 @@ def subpixel_conv2d():
 
         """
 
-        def __init__(self, scale, **kargs):
+        def __init__(self, scale=2, **kargs):
             super().__init__(**kargs)
             self.scale = scale
 
@@ -862,7 +881,7 @@ def subpixel_conv2d():
             assert len(input_shape) == 4
             assert input_shape[-1] % (self.scale ** 2) == 0
             h = None if input_shape[1] is None else input_shape[1] * self.scale
-            w = None if input_shape[0] is None else input_shape[2] * self.scale
+            w = None if input_shape[2] is None else input_shape[2] * self.scale
             return input_shape[0], h, w, input_shape[3] // (self.scale ** 2)
 
         def call(self, inputs, **kwargs):
@@ -904,16 +923,16 @@ def nms():
             self.nms_threshold = nms_threshold
             self.nms_all_threshold = nms_all_threshold
 
+        def compute_output_shape(self, input_shape):
+            assert input_shape and len(input_shape) >= 2
+            return (input_shape[0][0], self.top_k, 1 + 1 + 4)
+
         def call(self, inputs, **kwargs):
             classes, confs, locs = inputs
             classes = K.reshape(K.cast(classes, K.floatx()), (-1, self.prior_boxes, 1))
             confs = K.reshape(confs, (-1, self.prior_boxes, 1))
             inputs = K.concatenate([classes, confs, locs], axis=-1)
             return K.map_fn(self._process_image, inputs)
-
-        def compute_output_shape(self, input_shape):
-            assert input_shape and len(input_shape) >= 2
-            return (input_shape[0][0], self.top_k, 1 + 1 + 4)
 
         def get_config(self):
             config = {

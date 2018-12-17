@@ -21,8 +21,8 @@ class Builder:
 
     def set_default_l2(self, default_l2=1e-5):
         """全layerの既定値にL2を設定。"""
-        from keras.regularizers import l2
-        reg = l2(default_l2)
+        import keras
+        reg = keras.regularizers.l2(default_l2)
         self.conv_defaults['kernel_regularizer'] = reg
         self.conv_defaults['bias_regularizer'] = reg
         self.dense_defaults['kernel_regularizer'] = reg

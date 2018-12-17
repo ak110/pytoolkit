@@ -73,7 +73,7 @@ def _run(args):
     model.compile(sgd_lr=1e-3, loss='categorical_crossentropy', metrics=['acc'])
     model.summary()
 
-    model.fit(X_train, y_train, # validation_data=(X_val, y_val),
+    model.fit(X_train, y_train,  # validation_data=(X_val, y_val),
               epochs=args.epochs, tsv_log_path=args.result_dir / 'history.tsv',
               mixup=True, cosine_annealing=True)
     model.save(args.result_dir / 'model.h5')

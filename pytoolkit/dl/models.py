@@ -387,10 +387,7 @@ def load_weights(model, filepath, where_fn=None, strict_warnings=True):
     """
     import h5py
     import keras.backend as K
-    try:
-        from keras.engine.saving import preprocess_weights_for_loading
-    except BaseException:
-        from keras.engine.topology import preprocess_weights_for_loading  # flake8: noqa
+    from keras.engine.saving import preprocess_weights_for_loading
 
     logger = log.get(__name__)
     with h5py.File(str(filepath), mode='r') as f:
@@ -410,8 +407,8 @@ def load_weights(model, filepath, where_fn=None, strict_warnings=True):
             weight_names = [n.decode('utf8') for n in g.attrs['weight_names']]
             if not strict_warnings and len(weight_names) == 0:
                 continue
-            weight_values = [g[weight_name] for weight_name in weight_names]
 
+            weight_values = [g[weight_name] for weight_name in weight_names]
             try:
                 layer = model.get_layer(name=name)
             except ValueError as e:
