@@ -9,7 +9,7 @@ from . import hvd, layers, losses, metrics, models, networks
 from .. import applications, generator, image, jsonex, log, math, ndimage, utils
 
 
-def preprocess_masks(mask_files, cache_dir, class_colors, void_color, overwrite=False):
+def preprocess_masks(mask_files, cache_dir, class_colors, void_color, input_size=None, overwrite=False):
     """SemanticSegmentor用の前処理。
 
     マスク画像をone-hot vector化してファイル保存して保存先パスのリストを返す。
@@ -21,6 +21,7 @@ def preprocess_masks(mask_files, cache_dir, class_colors, void_color, overwrite=
     - cache_dir: 保存先ディレクトリのパス
     - class_colors: クラスの色の配列 or None (Noneなら白黒の2クラス)
     - void_color: ラベル付けされていないピクセルがある場合、その色
+    - input_size: 入力サイズでリサイズする場合、そのサイズ。int or tuple。tupleは(height, width)。
 
     # 戻り値
     - 保存先パスのリスト
@@ -35,6 +36,8 @@ def preprocess_masks(mask_files, cache_dir, class_colors, void_color, overwrite=
         num_classes = len(class_colors)
         colors_table = np.swapaxes(class_colors, 0, 1)[np.newaxis, np.newaxis, ...]
         assert colors_table.shape == (1, 1, 3, len(class_colors))
+    if isinstance(input_size, int):
+        input_size = (input_size, input_size)
 
     with utils.tqdm(total=len(mask_files), desc='preprocess_masks') as pbar:
         @joblib.delayed
@@ -52,6 +55,9 @@ def preprocess_masks(mask_files, cache_dir, class_colors, void_color, overwrite=
                         assert len(unmapped_rgb) == 0
                     else:
                         assert np.all(unmapped_rgb == np.reshape(void_color, (1, 3))), f'マスク画像に不正な色が存在: {unmapped_rgb}'
+                # リサイズ
+                if input_size is not None:
+                    oh = ndimage.resize(oh, input_size[1], input_size[0])
                 # 保存
                 np.savez_compressed(str(save_path), oh)
             pbar.update(1)
