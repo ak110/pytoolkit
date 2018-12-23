@@ -57,7 +57,7 @@ def preprocess_masks(mask_files, cache_dir, class_colors, void_color, input_size
                         assert np.all(unmapped_rgb == np.reshape(void_color, (1, 3))), f'マスク画像に不正な色が存在: {unmapped_rgb}'
                 # リサイズ
                 if input_size is not None:
-                    oh = ndimage.resize(oh, input_size[1], input_size[0])
+                    oh = ndimage.resize(oh.astype(np.uint8), input_size[1], input_size[0])
                 # 保存
                 np.savez_compressed(str(save_path), oh)
             pbar.update(1)
