@@ -9,7 +9,7 @@ from . import hvd, layers, losses, metrics, models, networks
 from .. import applications, generator, image, jsonex, log, math, ndimage, utils
 
 
-def preprocess_masks(mask_files, cache_dir, class_colors, void_color, input_size=None, overwrite=False, compress=False):
+def preprocess_masks(mask_files, cache_dir, class_colors, void_color, input_size=None, compress=False):
     """SemanticSegmentor用の前処理。
 
     マスク画像をone-hot vector化してファイル保存して保存先パスのリストを返す。
@@ -43,7 +43,7 @@ def preprocess_masks(mask_files, cache_dir, class_colors, void_color, input_size
         @joblib.delayed
         def _preprocess(p):
             save_path = cache_dir / f'{p.name}{".npz" if compress else ".npy"}'
-            if overwrite or not save_path.exists():
+            if not save_path.exists():
                 # 読み込み＆変換
                 mask = ndimage.load(p, dtype=np.uint8)
                 if class_colors is None:
