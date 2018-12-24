@@ -381,7 +381,7 @@ class RandomAugmentors(generator.Operator):
             rand.shuffle(augmentors)
             for a in augmentors:
                 x, y, w = a.execute(x, y, w, rand, ctx)
-                assert x.dtype == np.float32, f'dtype error: {a.__class__}'
+                assert x.dtype == np.uint8, f'dtype error: {a.__class__}'
         return x, y, w
 
 
@@ -683,9 +683,9 @@ class RandomAlpha(generator.Operator):
                     continue
                 ex = rand.randint(0, x.shape[1] - ew)
                 ey = rand.randint(0, x.shape[0] - eh)
+                rc = rand.randint(0, 256, size=x.shape[-1])
                 x_ref = x[ey:ey + eh, ex:ex + ew, :]
-                x_ref *= (1 - self.alpha)
-                x_ref += rand.randint(0, 256, size=x.shape[-1]) * self.alpha
+                x[ey:ey + eh, ex:ex + ew, :] = x_ref * (1 - self.alpha) + rc * self.alpha
                 break
         return x, y, w
 

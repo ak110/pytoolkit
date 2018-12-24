@@ -1,11 +1,15 @@
 """主にnumpy配列(rows×cols×channels(RGB))の画像処理関連。
 
-float32でRGBで0～255として扱う。
+uint8のRGBで0～255として扱うのを前提とする。
+あとグレースケールの場合もrows×cols×1の配列で扱う。
 """
 import io
 import pathlib
+import shutil
+import atexit
 import tempfile
 import typing
+import functools
 
 import numpy as np
 import scipy.stats
@@ -16,7 +20,22 @@ _LOAD_CACHE = None
 _DISKCACHE_LOAD_FAILED = False
 
 
-def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], grayscale=False, use_cache=False, max_size=None, dtype=np.float32) -> np.ndarray:
+def _clear_cache(dc):
+    """キャッシュのクリア。"""
+    cache_dir = dc.directory
+    dc.close()
+    shutil.rmtree(cache_dir, ignore_errors=True)
+
+
+def _float_to_uint8(func):
+    """floatからnp.uint8への変換。"""
+    @functools.wraps(func)
+    def _decorated(*args, **kwargs):
+        return np.clip(func(*args, **kwargs), 0, 255).astype(np.uint8)
+    return _decorated
+
+
+def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], grayscale=False, use_cache=False, max_size=None) -> np.ndarray:
     """画像の読み込み。
 
     # 引数
@@ -32,7 +51,7 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
     max_size = utils.normalize_tuple(max_size, 2)
 
     def _load():
-        img = _load_impl(path_or_array, grayscale=grayscale, dtype=dtype)
+        img = _load_impl(path_or_array, grayscale=grayscale)
         if max_size is not None and (img.shape[0] > max_size[0] or img.shape[1] > max_size[1]):
             r0 = max_size[0] / img.shape[0]
             r1 = max_size[1] / img.shape[1]
@@ -48,6 +67,7 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
             try:
                 import diskcache
                 _LOAD_CACHE = diskcache.Cache(temp_dir)
+                atexit.register(_clear_cache, _LOAD_CACHE)
             except BaseException:
                 pathlib.Path(temp_dir).rmdir()
                 _DISKCACHE_LOAD_FAILED = True
@@ -64,11 +84,8 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
     return _load()
 
 
-def _load_impl(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], grayscale=False, dtype=np.float32) -> np.ndarray:
-    """画像の読み込み。
-
-    やや余計なお世話だけど今後のためにfloat32に変換して返す。
-    """
+def _load_impl(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], grayscale=False) -> np.ndarray:
+    """画像の読み込みの実装。"""
     assert path_or_array is not None
 
     if isinstance(path_or_array, np.ndarray):
@@ -90,7 +107,7 @@ def _load_impl(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.P
                 target_mode = 'L' if grayscale else 'RGB'
                 if pil_img.mode != target_mode:
                     pil_img = pil_img.convert(target_mode)
-                img = np.asarray(pil_img, dtype=dtype)
+                img = np.asarray(pil_img, dtype=np.uint8)
 
     if img is None:
         raise ValueError(f'Image load failed: {path_or_array}')
@@ -99,7 +116,7 @@ def _load_impl(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.P
     if len(img.shape) != 3:
         raise ValueError(f'Image load failed: shape={path_or_array}')
 
-    return img.astype(dtype)
+    return img
 
 
 def save(path: typing.Union[str, pathlib.Path], img: np.ndarray):
@@ -180,13 +197,13 @@ def pad_ltrb(rgb: np.ndarray, x1: int, y1: int, x2: int, y2: int, padding='edge'
         mode = 'constant'
     elif padding == 'half':
         mode = 'constant'
-        kwargs['constant_values'] = (127.5,)
+        kwargs['constant_values'] = (np.uint8(127),)
     elif padding == 'one':
         mode = 'constant'
-        kwargs['constant_values'] = (255.0,)
+        kwargs['constant_values'] = (np.uint8(255),)
     elif padding == 'mean':
         mode = 'constant'
-        kwargs['constant_values'] = (rgb.mean(),)
+        kwargs['constant_values'] = (np.uint8(rgb.mean()),)
     else:
         mode = padding
 
@@ -261,9 +278,10 @@ def resize(rgb: np.ndarray, width: int, height: int, padding=None, interp='lancz
     return rgb
 
 
+@_float_to_uint8
 def gaussian_noise(rgb: np.ndarray, rand: np.random.RandomState, scale: float) -> np.ndarray:
     """ガウシアンノイズ。scaleは0～50くらい。小さいほうが色が壊れないかも。"""
-    return rgb + rand.normal(0, scale, size=rgb.shape).astype(rgb.dtype)
+    return rgb + rand.normal(0, scale, size=rgb.shape).astype(np.float32)
 
 
 def blur(rgb: np.ndarray, sigma: float) -> np.ndarray:
@@ -275,10 +293,11 @@ def blur(rgb: np.ndarray, sigma: float) -> np.ndarray:
     return rgb
 
 
+@_float_to_uint8
 def unsharp_mask(rgb: np.ndarray, sigma: float, alpha=2.0) -> np.ndarray:
     """シャープ化。sigmaは0～1程度、alphaは1～2程度がよい？"""
     blured = blur(rgb, sigma)
-    return rgb + (rgb - blured) * alpha
+    return rgb + (rgb.astype(np.float) - blured) * alpha
 
 
 def median(rgb: np.ndarray, size: int) -> np.ndarray:
@@ -290,34 +309,32 @@ def median(rgb: np.ndarray, size: int) -> np.ndarray:
     return rgb
 
 
+@_float_to_uint8
 def brightness(rgb: np.ndarray, beta: float) -> np.ndarray:
     """明度の変更。betaの例：`np.random.uniform(-32, +32)`"""
-    rgb += beta
-    return rgb
+    return rgb + np.float32(beta)
 
 
+@_float_to_uint8
 def contrast(rgb: np.ndarray, alpha: float) -> np.ndarray:
     """コントラストの変更。alphaの例：`np.random.uniform(0.75, 1.25)`"""
-    rgb *= alpha
-    return rgb
+    return rgb * alpha
 
 
+@_float_to_uint8
 def saturation(rgb: np.ndarray, alpha: float) -> np.ndarray:
     """彩度の変更。alphaの例：`np.random.uniform(0.5, 1.5)`"""
     gs = to_grayscale(rgb)
-    rgb *= alpha
-    rgb += (1 - alpha) * np.expand_dims(gs, axis=-1)
-    return rgb
+    return alpha * rgb + (1 - alpha) * np.expand_dims(gs, axis=-1)
 
 
+@_float_to_uint8
 def hue_lite(rgb: np.ndarray, alpha: np.ndarray, beta: np.ndarray) -> np.ndarray:
     """色相の変更の適当バージョン。"""
     assert alpha.shape == (3,)
     assert beta.shape == (3,)
     assert (alpha > 0).all()
-    rgb *= alpha / scipy.stats.hmean(alpha)
-    rgb += beta - np.mean(beta)
-    return rgb
+    return rgb * (alpha / scipy.stats.hmean(alpha, dtype=np.float32)) + (beta - np.mean(beta, dtype=np.float32))
 
 
 def to_grayscale(rgb: np.ndarray) -> np.ndarray:
@@ -325,17 +342,18 @@ def to_grayscale(rgb: np.ndarray) -> np.ndarray:
     return rgb.dot([0.299, 0.587, 0.114])
 
 
+@_float_to_uint8
 def standardize(rgb: np.ndarray) -> np.ndarray:
     """標準化。0～255に適当に収める。"""
-    rgb = (rgb - np.mean(rgb)) / (np.std(rgb) + 1e-5)
+    rgb = (rgb - np.mean(rgb, dtype=np.float32)) / (np.std(rgb, dtype=np.float32) + 1e-5)
     rgb = rgb * 64 + 127
-    return rgb.astype(np.float32)
+    return rgb
 
 
 def binarize(rgb: np.ndarray, threshold) -> np.ndarray:
     """二値化(白黒化)。"""
     assert 0 < threshold < 255
-    return (rgb >= threshold).astype(np.float32) * 255
+    return np.where(rgb >= threshold, np.uint8(255), np.uint8(0))
 
 
 def rot90(rgb: np.ndarray, k) -> np.ndarray:
@@ -350,15 +368,16 @@ def rot90(rgb: np.ndarray, k) -> np.ndarray:
     return rgb
 
 
+@_float_to_uint8
 def equalize(rgb: np.ndarray) -> np.ndarray:
     """ヒストグラム平坦化。"""
     import cv2
-    gray = np.clip(np.mean(rgb, axis=-1, keepdims=True), 0, 255)
+    gray = np.mean(rgb, axis=-1, keepdims=True, dtype=np.float32)
     eq = np.expand_dims(cv2.equalizeHist(gray.astype(np.uint8)), axis=-1)
-    rgb += eq - gray
-    return rgb
+    return rgb + (eq - gray)
 
 
+@_float_to_uint8
 def auto_contrast(rgb: np.ndarray, scale=255) -> np.ndarray:
     """オートコントラスト。"""
     gray = np.mean(rgb, axis=-1)
@@ -368,6 +387,7 @@ def auto_contrast(rgb: np.ndarray, scale=255) -> np.ndarray:
     return rgb
 
 
+@_float_to_uint8
 def posterize(rgb: np.ndarray, bits) -> np.ndarray:
     """ポスタリゼーション。"""
     assert bits in range(1, 8 + 1)

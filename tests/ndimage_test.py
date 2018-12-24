@@ -91,7 +91,7 @@ def test_filters():
         x = np.copy(rgb)
         t = filter_func(x[64:-64, 64:-64, :] if partial else x)
 
-        assert t.dtype == np.float32
+        assert t.dtype == np.uint8
         assert len(t.shape) == 3
 
         if partial:
