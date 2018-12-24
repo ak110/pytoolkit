@@ -144,12 +144,12 @@ class SemanticSegmentor(models.Model):
         # output
         if num_classes == 2:
             x = builder.conv2d(1, use_bias=True, use_bn=False, activation='sigmoid', name='predictions')(x)
-            loss = losses.symmetric_lovasz_hinge_elup1
+            loss = _binary_ss_loss
             mets = [metrics.binary_accuracy]
             assert void_color is None
         else:
             x = builder.conv2d(num_classes, use_bias=True, use_bn=False, activation='softmax', name=f'predictions_{num_classes}')(x)
-            loss = 'categorical_crossentropy'
+            loss = _multiclass_ss_loss
             mets = ['acc']
 
         network = keras.models.Model(inputs, x)
@@ -319,10 +319,6 @@ def _create_generator(class_colors, void_color, image_size,
         gen.add(image.RandomColorAugmentors())
     if random_erasing:
         gen.add(image.RandomErasing(probability=0.5))
-    if class_colors is None:
-        gen.add(generator.ProcessOutput(lambda y: y / 255))
-    else:
-        gen.add(generator.ProcessOutput(lambda y: y / np.sum(y, axis=-1, keepdims=True)))  # 合計を1に補正 (リサイズなどでずれる可能性があるので)
     return gen
 
 
@@ -362,3 +358,22 @@ def make_image_to_onehot(class_colors=None, void_color=None, strict=False):
             assert y.shape == y.shape[:2] + (num_classes,)
             return math.softmax(y)
         return image_to_onehot
+
+
+def _binary_ss_loss(y_true, y_pred):
+    """2クラス用loss。"""
+    import keras
+    y_true = y_true / 255  # [0-1)
+    loss1 = losses.lovasz_hinge_elup1(y_true, y_pred)
+    loss2 = keras.losses.binary_crossentropy(y_true, y_pred)
+    return loss1 * 0.9 + keras.backend.clip(loss2, -10, +10) * 0.1
+
+
+def _multiclass_ss_loss(y_true, y_pred):
+    """多クラス用loss。"""
+    import keras
+    scale = keras.backend.sum(y_true, axis=-1)
+    mask = keras.backend.cast(scale > 0, keras.backend.floatx())  # all-zero部分は学習しない
+    y_true = y_true / keras.backend.expand_dims(scale, axis=-1)  # 合計を1に補正 (リサイズなどでずれる可能性があるので)
+    cce = keras.backend.categorical_crossentropy(y_true, y_pred)
+    return cce * mask
