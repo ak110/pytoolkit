@@ -8,7 +8,7 @@ import pytoolkit as tk
 
 _BATCH_SIZE = 16
 _ITER = 32
-_IMAGE_SIZE = (256, 256)
+_IMAGE_SIZE = (512, 512)
 
 
 def _main():
@@ -21,7 +21,7 @@ def _main():
     gen = tk.image.ImageDataGenerator(profile=True)
     gen.add(tk.image.Resize(_IMAGE_SIZE))
     # gen.add(tk.image.ToGrayScale())
-    gen.add(tk.image.SamplewiseStandardize())
+    # gen.add(tk.image.SamplewiseStandardize())
     # gen.add(tk.image.RandomBinarize())
     gen.add(tk.image.Padding(probability=1))
     gen.add(tk.image.RandomRotate(probability=0.25))
