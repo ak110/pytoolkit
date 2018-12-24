@@ -284,15 +284,10 @@ class ProcessInput(Operator):
 
     # 例1
     ```py
-    gen.add(tk.generator.ProcessInput(tk.image.preprocess_input_abs1))
+    gen.add(tk.generator.ProcessInput(lambda x: x / 127.5 - 1))
     ```
 
     # 例2
-    ```py
-    gen.add(tk.generator.ProcessInput(tk.image.preprocess_input_mean))
-    ```
-
-    # 例3
     ```py
     gen.add(tk.generator.ProcessInput(keras.applications.vgg16.preprocess_input, batch_axis=True))
     ```

@@ -15,6 +15,18 @@ def noqa(*args):
     assert args is None or args is not None  # noqa
 
 
+def normalize_tuple(value, n):
+    """n個の要素を持つtupleにして返す。ただしNoneならNoneのまま。"""
+    if value is None:
+        return None
+    elif isinstance(value, int):
+        return (value,) * n
+    else:
+        value = tuple(value)
+        assert len(value) == n
+        return value
+
+
 def memoize(func):
     """単純なメモ化のデコレーター。"""
     cache = {}

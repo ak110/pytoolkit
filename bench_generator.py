@@ -18,7 +18,8 @@ def _main():
     save_dir = base_dir / '___check' / 'bench'
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    gen = tk.image.ImageDataGenerator(profile=True)
+    gen = tk.image.ImageDataGenerator(grayscale=False, use_cache=True, max_size=_IMAGE_SIZE, profile=True)
+    gen.add(tk.image.LoadOutputImage(grayscale=False, use_cache=True, max_size=_IMAGE_SIZE))
     gen.add(tk.image.Resize(_IMAGE_SIZE))
     # gen.add(tk.image.ToGrayScale())
     # gen.add(tk.image.SamplewiseStandardize())
@@ -33,16 +34,17 @@ def _main():
     gen.add(tk.image.RandomColorAugmentors())
     gen.add(tk.image.RandomErasing(probability=0.5))
     gen.add(tk.image.Preprocess(mode='none'))
-    gen.add(tk.generator.ProcessOutput(tk.ml.to_categorical(10), batch_axis=True))
+    # gen.add(tk.generator.ProcessOutput(tk.ml.to_categorical(10), batch_axis=True))
 
     X = np.array([data_dir / '9ab919332a1dceff9a252b43c0fb34a0_m.jpg'] * 16)
-    y = np.zeros((len(X),), dtype=int)
+    # y = np.zeros((len(X),), dtype=int)
+    y = X
     g, _ = gen.flow(X, y, batch_size=_BATCH_SIZE, data_augmentation=True, random_state=123)
     # 適当にループして速度を見る
     X_batch = []
     with tk.tqdm(total=_BATCH_SIZE * _ITER, unit='f') as pbar:
         for it, (X_batch, y_batch) in enumerate(g):
-            assert len(y_batch.shape) == 2
+            assert len(y_batch.shape) == 4
             pbar.update(len(X_batch))
             if it + 1 >= _ITER:
                 break

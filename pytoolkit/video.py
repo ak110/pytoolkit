@@ -25,7 +25,6 @@ class VideoDataGenerator(generator.Generator):
     gen.add(tk.video.RandomBrightness(probability=0.5))
     gen.add(tk.video.RandomContrast(probability=0.5))
     gen.add(tk.video.RandomHue(probability=0.5))
-    gen.add(tk.generator.ProcessInput(tk.video.preprocess_input_abs1))
     gen.add(tk.generator.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
     ```
 
@@ -97,11 +96,9 @@ def load_video(x):
 
 # 画像と同じのをそのまま使えるものたち
 
-preprocess_input_abs1 = image.preprocess_input_abs1
-preprocess_input_mean = image.preprocess_input_mean
-unpreprocess_input_abs1 = image.unpreprocess_input_abs1
 GaussianNoise = image.GaussianNoise
 RandomBrightness = image.RandomBrightness
 RandomContrast = image.RandomContrast
 RandomSaturation = image.RandomSaturation
 RandomHue = image.RandomHue
+Preprocess = image.Preprocess

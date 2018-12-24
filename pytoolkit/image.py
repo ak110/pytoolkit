@@ -32,42 +32,9 @@ class ImageDataGenerator(generator.Generator):
 
     """
 
-    def __init__(self, grayscale=False, multiple_input=False, multiple_output=False, profile=False):
+    def __init__(self, grayscale=False, use_cache=False, max_size=None, multiple_input=False, multiple_output=False, profile=False):
         super().__init__(multiple_input=multiple_input, multiple_output=multiple_output, profile=profile)
-        self.add(LoadImage(grayscale))
-
-
-def preprocess_input_mean(x: np.ndarray):
-    """RGBそれぞれ平均値(定数)を引き算。
-
-    `keras.applications.imagenet_utils.preprocess_input` のようなもの。(ただし `channels_last` 限定)
-    `keras.applications`のVGG16/VGG19/ResNet50で使われる。
-    """
-    assert x.shape[-1] == 3, f'shape error: {x.shape}'
-    # 'RGB'->'BGR'
-    x = x[..., ::-1]
-    # Zero-center by mean pixel
-    x[..., 0] -= 103.939
-    x[..., 1] -= 116.779
-    x[..., 2] -= 123.68
-    return x
-
-
-def preprocess_input_abs1(x: np.ndarray):
-    """0～255を-1～1に変換。
-
-    `keras.applications`のInceptionV3/Xceptionで使われる。
-    """
-    x /= 127.5
-    x -= 1
-    return x
-
-
-def unpreprocess_input_abs1(x: np.ndarray):
-    """`preprocess_input_abs1`の逆変換。"""
-    x += 1
-    x *= 127.5
-    return x
+        self.add(LoadImage(grayscale=grayscale, use_cache=use_cache, max_size=max_size))
 
 
 class LoadImage(generator.Operator):
@@ -76,15 +43,19 @@ class LoadImage(generator.Operator):
     # 引数
 
     - grayscale: グレースケールで読み込むならTrue、RGBならFalse
+    - use_cache: 読み込み結果をdiskcacheライブラリでキャッシュするならTrue
+    - max_size: このサイズを超えるなら縮小する。int or tuple。tupleは(height, width)
     """
 
-    def __init__(self, grayscale):
+    def __init__(self, grayscale=False, use_cache=False, max_size=None):
         self.grayscale = grayscale
+        self.use_cache = use_cache
+        self.max_size = max_size
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         """処理。"""
         assert rand is not None  # noqa
-        x = ndimage.load(x, self.grayscale)
+        x = ndimage.load(x, grayscale=self.grayscale, use_cache=self.use_cache, max_size=self.max_size)
         assert len(x.shape) == 3
         return x, y, w
 
@@ -95,16 +66,20 @@ class LoadOutputImage(generator.Operator):
     # 引数
 
     - grayscale: グレースケールで読み込むならTrue、RGBならFalse
+    - use_cache: 読み込み結果をdiskcacheライブラリでキャッシュするならTrue
+    - max_size: このサイズを超えるなら縮小する。int or tuple。tupleは(height, width)
     """
 
-    def __init__(self, grayscale):
+    def __init__(self, grayscale=False, use_cache=False, max_size=None):
         self.grayscale = grayscale
+        self.use_cache = use_cache
+        self.max_size = max_size
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         """処理。"""
         assert rand is not None  # noqa
         if y is not None:
-            y = ndimage.load(y, self.grayscale)
+            y = ndimage.load(y, grayscale=self.grayscale, use_cache=self.use_cache, max_size=self.max_size)
             assert len(y.shape) == 3
         return x, y, w
 
