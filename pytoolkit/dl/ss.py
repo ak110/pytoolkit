@@ -9,7 +9,7 @@ from . import hvd, layers, losses, metrics, models, networks
 from .. import applications, generator, image, jsonex, log, math, ndimage, utils
 
 
-def preprocess_masks(mask_files, cache_dir, class_colors, void_color, input_size=None, overwrite=False):
+def preprocess_masks(mask_files, cache_dir, class_colors, void_color, input_size=None, overwrite=False, compress=False):
     """SemanticSegmentor用の前処理。
 
     マスク画像をone-hot vector化してファイル保存して保存先パスのリストを返す。
@@ -22,6 +22,7 @@ def preprocess_masks(mask_files, cache_dir, class_colors, void_color, input_size
     - class_colors: クラスの色の配列 or None (Noneなら白黒の2クラス)
     - void_color: ラベル付けされていないピクセルがある場合、その色
     - input_size: 入力サイズでリサイズする場合、そのサイズ。int or tuple。tupleは(height, width)。
+    - compress: 圧縮の有無。(しない方がちょっと早い)
 
     # 戻り値
     - 保存先パスのリスト
@@ -31,9 +32,8 @@ def preprocess_masks(mask_files, cache_dir, class_colors, void_color, input_size
     cache_dir.mkdir(parents=True, exist_ok=True)
 
     if class_colors is None:
-        num_classes = 2
+        pass
     else:
-        num_classes = len(class_colors)
         colors_table = np.swapaxes(class_colors, 0, 1)[np.newaxis, np.newaxis, ...]
         assert colors_table.shape == (1, 1, 3, len(class_colors))
     if isinstance(input_size, int):
@@ -42,7 +42,7 @@ def preprocess_masks(mask_files, cache_dir, class_colors, void_color, input_size
     with utils.tqdm(total=len(mask_files), desc='preprocess_masks') as pbar:
         @joblib.delayed
         def _preprocess(p):
-            save_path = cache_dir / (p.name + '.npz')
+            save_path = cache_dir / f'{p.name}{".npz" if compress else ".npy"}'
             if overwrite or not save_path.exists():
                 # 読み込み＆変換
                 mask = ndimage.load(p, dtype=np.uint8)
@@ -55,11 +55,15 @@ def preprocess_masks(mask_files, cache_dir, class_colors, void_color, input_size
                         assert len(unmapped_rgb) == 0
                     else:
                         assert np.all(unmapped_rgb == np.reshape(void_color, (1, 3))), f'マスク画像に不正な色が存在: {unmapped_rgb}'
+                    mask = np.where(oh, np.uint8(255), np.uint8(0))
                 # リサイズ
                 if input_size is not None:
-                    oh = ndimage.resize(oh.astype(np.float32), input_size[1], input_size[0])
+                    mask = ndimage.resize(mask, input_size[1], input_size[0])
                 # 保存
-                np.savez_compressed(str(save_path), oh)
+                if compress:
+                    np.savez_compressed(str(save_path), mask)
+                else:
+                    np.save(str(save_path), mask)
             pbar.update(1)
             return save_path
 
