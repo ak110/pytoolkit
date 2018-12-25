@@ -365,8 +365,8 @@ def _binary_ss_loss(y_true, y_pred):
     import keras
     y_true = y_true / 255  # [0-1)
     loss1 = losses.lovasz_hinge_elup1(y_true, y_pred)
-    loss2 = keras.losses.binary_crossentropy(y_true, y_pred)
-    return loss1 * 0.9 + keras.backend.clip(loss2, -10, +10) * 0.1
+    loss2 = losses.binary_focal_loss(alpha=0.5)(y_true, y_pred)
+    return loss1 * 0.9 + loss2 * 0.1
 
 
 def _multiclass_ss_loss(y_true, y_pred):
