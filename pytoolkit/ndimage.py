@@ -91,6 +91,7 @@ def _load_impl(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.P
     if isinstance(path_or_array, np.ndarray):
         # ndarrayならそのまま画像扱い
         img = np.copy(path_or_array)  # 念のためコピー
+        assert img.dtype == np.uint8, f'ndarray dtype error: {img.dtype}'
     else:
         suffix = pathlib.Path(path_or_array).suffix.lower() if isinstance(path_or_array, (str, pathlib.Path)) else None
         if suffix in ('.npy', '.npz'):
@@ -100,6 +101,7 @@ def _load_impl(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.P
                 if len(img.files) != 1:
                     raise ValueError(f'Image load failed: "{path_or_array}"" has multiple keys. ({img.files})')
                 img = img[img.files[0]]
+            assert img.dtype == np.uint8, f'{suffix} dtype error: {img.dtype}'
         else:
             # PILで読み込む
             import PIL.Image

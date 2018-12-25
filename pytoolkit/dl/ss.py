@@ -45,7 +45,7 @@ def preprocess_masks(mask_files, cache_dir, class_colors, void_color, input_size
             save_path = cache_dir / f'{p.name}{".npz" if compress else ".npy"}'
             if not save_path.exists():
                 # 読み込み＆変換
-                mask = ndimage.load(p, dtype=np.uint8)
+                mask = ndimage.load(p)
                 if class_colors is None:
                     assert np.all(np.isin(mask, (0, 255)))
                 else:
