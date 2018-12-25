@@ -191,7 +191,7 @@ class Model:
         if tsv_log_path is not None:
             cb.append(callbacks.tsv_logger(tsv_log_path, append=tsv_log_append))
         cb.append(callbacks.epoch_logger())
-        cb.append(keras.callbacks.TerminateOnNaN())
+        cb.append(callbacks.terminate_on_nan())
 
         # 学習
         hist = self.model.fit_generator(

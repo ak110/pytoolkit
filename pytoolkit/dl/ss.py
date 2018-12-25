@@ -53,9 +53,12 @@ def preprocess_masks(mask_files, cache_dir, class_colors, void_color, input_size
                     unmapped_rgb = mask[np.logical_not(np.any(oh, axis=-1))]
                     if void_color is None:
                         assert len(unmapped_rgb) == 0
+                    elif isinstance(void_color, list):
+                        pass  # TODO: チェックしたいが難しいので後回し
                     else:
                         assert np.all(unmapped_rgb == np.reshape(void_color, (1, 3))), f'マスク画像に不正な色が存在: {unmapped_rgb}'
                     mask = np.where(oh, np.uint8(255), np.uint8(0))
+                    assert mask.shape == (mask.shape[0], mask.shape[1], len(class_colors))
                 # リサイズ
                 if input_size is not None:
                     mask = ndimage.resize(mask, input_size[1], input_size[0])

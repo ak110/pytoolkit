@@ -323,3 +323,20 @@ def unfreeze(epoch_rate: float):
                 weighted_metrics=self.model.weighted_metrics)
 
     return _UnfreezeCallback(epoch_rate=epoch_rate)
+
+
+def terminate_on_nan():
+    """NaNやinfで異常終了させる。"""
+    import keras
+
+    class TerminateOnNaN(keras.callbacks.Callback):
+        """NaNやinfで異常終了させる。"""
+
+        def on_batch_end(self, batch, logs=None):
+            logs = logs or {}
+            loss = logs.get('loss')
+            if loss is not None:
+                if np.isnan(loss) or np.isinf(loss):
+                    raise RuntimeError(f'Batch {batch}: Invalid loss')
+
+    return TerminateOnNaN()
