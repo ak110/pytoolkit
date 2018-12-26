@@ -2,7 +2,7 @@
 import pathlib
 import typing
 
-from . import callbacks, dl, hvd, optimizers
+from . import callbacks as tkcb, dl, hvd, optimizers
 from .. import draw, generator, log, utils
 
 
@@ -129,7 +129,8 @@ class Model:
             reduce_lr_epoch_rates=None,
             reduce_lr_factor=0.1,
             cosine_annealing=False,
-            lr_warmup=True):
+            lr_warmup=True,
+            callbacks=None):
         """学習。
 
         # 引数
@@ -180,18 +181,20 @@ class Model:
             cb.append(keras.callbacks.LearningRateScheduler(lambda epoch, lr: lr_list[epoch]))
         elif cosine_annealing:
             assert reduce_lr_epoch_rates is None
-            cb.append(callbacks.cosine_annealing(epochs=epochs))
+            cb.append(tkcb.cosine_annealing(epochs=epochs))
         elif reduce_lr_epoch_rates is not None and len(reduce_lr_epoch_rates) >= 1:
-            cb.append(callbacks.learning_rate(reduce_epoch_rates=reduce_lr_epoch_rates, factor=reduce_lr_factor, epochs=epochs))
+            cb.append(tkcb.learning_rate(reduce_epoch_rates=reduce_lr_epoch_rates, factor=reduce_lr_factor, epochs=epochs))
         if hvd.initialized() and hvd.get().size() > 1:
             cb.append(hvd.get().callbacks.BroadcastGlobalVariablesCallback(0))
             cb.append(hvd.get().callbacks.MetricAverageCallback())
             if lr_warmup:
                 cb.append(hvd.get().callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1))
         if tsv_log_path is not None:
-            cb.append(callbacks.tsv_logger(tsv_log_path, append=tsv_log_append))
-        cb.append(callbacks.epoch_logger())
-        cb.append(callbacks.terminate_on_nan())
+            cb.append(tkcb.tsv_logger(tsv_log_path, append=tsv_log_append))
+        if callbacks is not None:
+            cb.extend(callbacks)
+        cb.append(tkcb.epoch_logger())
+        cb.append(tkcb.terminate_on_nan())
 
         # 学習
         hist = self.model.fit_generator(
