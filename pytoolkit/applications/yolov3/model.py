@@ -66,9 +66,12 @@ def darknet_body(x, for_small=False):
     x = resblock_body(x, 256, 8, conv_index=10, bn_index=10, add_index=4)
     x = resblock_body(x, 512, 8, conv_index=27, bn_index=27, add_index=12)
     x = resblock_body(x, 1024, 4, conv_index=44, bn_index=44, add_index=20)
-    _ = [K.get_uid('conv2d') for _ in range(52 + 1)]
-    _ = [K.get_uid('batch_normalization') for _ in range(52 + 1)]
-    _ = [K.get_uid('add') for _ in range(23 + 1)]
+    for _ in range(52 + 1):
+        K.get_uid('Conv2D')
+    for _ in range(52 + 1):
+        K.get_uid('BatchNormalization')
+    for _ in range(23 + 1):
+        K.get_uid('Add')
     return x
 
 
