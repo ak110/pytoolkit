@@ -288,7 +288,7 @@ def unfreeze(epoch_rate: float):
 
     class _UnfreezeCallback(keras.callbacks.Callback):
 
-        def __init__(self, epoch_rate, logger_name):
+        def __init__(self, epoch_rate):
             self.epoch_rate = epoch_rate
             self.target_epoch = 0
             super().__init__()
