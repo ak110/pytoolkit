@@ -303,7 +303,7 @@ def unfreeze(epoch_rate: float):
                 if unfreeze_count > 0:
                     self._recompile()
                 logger = log.get(__name__)
-                logger.info(f'Epoch {epoch + 1}: Unfreezed layers: {unfreeze_count})')
+                logger.info(f'Epoch {epoch + 1}: Unfreezed layers: {unfreeze_count}')
 
         def _unfreeze_layers(self, container):
             count = 0
@@ -311,6 +311,8 @@ def unfreeze(epoch_rate: float):
                 if not layer.trainable:
                     layer.trainable = True
                     count += 1
+                elif hasattr(layer, 'layers'):
+                    count += self._unfreeze_layers(layer)
             return count
 
         def _recompile(self):

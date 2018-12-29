@@ -249,6 +249,8 @@ class Model:
         if hvd.is_master():
             import keras
             try:
+                to_file = pathlib.Path(to_file)
+                to_file.parent.mkdir(parents=True, exist_ok=True)
                 keras.utils.plot_model(self.parent_model, to_file=str(to_file),
                                        show_shapes=show_shapes, show_layer_names=show_layer_names,
                                        rankdir=rankdir)
