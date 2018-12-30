@@ -130,16 +130,22 @@ def save(path: typing.Union[str, pathlib.Path], img: np.ndarray):
     import PIL.Image
     path = pathlib.Path(path)
     img = np.clip(img, 0, 255).astype(np.uint8)
-    if img.shape[-1] == 1:
-        pil_img = PIL.Image.fromarray(np.squeeze(img, axis=-1), 'L')
-    elif img.shape[2] == 3:
-        pil_img = PIL.Image.fromarray(img, 'RGB')
-    elif img.shape[2] == 4:
-        pil_img = PIL.Image.fromarray(img, 'RGBA')
-    else:
-        raise RuntimeError(f'Unknown format: shape={img.shape}')
     path.parent.mkdir(parents=True, exist_ok=True)
-    pil_img.save(path)
+    suffix = path.suffix.lower()
+    if suffix == '.npy':
+        np.save(str(path), img)
+    elif suffix == '.npz':
+        np.savez_compressed(str(path), img)
+    else:
+        if img.shape[-1] == 1:
+            pil_img = PIL.Image.fromarray(np.squeeze(img, axis=-1), 'L')
+        elif img.shape[2] == 3:
+            pil_img = PIL.Image.fromarray(img, 'RGB')
+        elif img.shape[2] == 4:
+            pil_img = PIL.Image.fromarray(img, 'RGBA')
+        else:
+            raise RuntimeError(f'Unknown format: shape={img.shape}')
+        pil_img.save(path)
 
 
 def rotate(rgb: np.ndarray, degrees: float, expand=True, interp='lanczos', border_mode='edge') -> np.ndarray:

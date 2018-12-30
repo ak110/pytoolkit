@@ -63,10 +63,7 @@ def preprocess_masks(mask_files, cache_dir, class_colors, void_color, input_size
                 if input_size is not None:
                     mask = ndimage.resize(mask, input_size[1], input_size[0])
                 # 保存
-                if compress:
-                    np.savez_compressed(str(save_path), mask)
-                else:
-                    np.save(str(save_path), mask)
+                ndimage.save(save_path, mask)
             pbar.update(1)
             return save_path
 
