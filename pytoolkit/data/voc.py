@@ -105,6 +105,7 @@ def load_set(vocdevkit_dir, year, set_name, class_name_to_id=None, without_diffi
     - y: `tk.ml.ObjectsAnnotation`のndarray
 
     """
+    vocdevkit_dir = pathlib.Path(vocdevkit_dir)
     names = io.read_all_lines(vocdevkit_dir / f'VOC{year}' / 'ImageSets' / 'Main' / f'{set_name}.txt')
     return load_annotations(vocdevkit_dir, vocdevkit_dir / f'VOC{year}' / 'Annotations',
                             names, class_name_to_id, without_difficult)
@@ -129,6 +130,7 @@ def load_annotations(vocdevkit_dir, annotations_dir, names=None, class_name_to_i
 
 def load_annotation(vocdevkit_dir, xml_path, class_name_to_id=None, without_difficult=False):
     """VOC2007などのアノテーションデータの読み込み。"""
+    vocdevkit_dir = pathlib.Path(vocdevkit_dir)
     class_name_to_id = class_name_to_id or CLASS_NAMES_TO_ID
     root = xml.etree.ElementTree.parse(str(xml_path)).getroot()
     folder = root.find('folder').text
