@@ -3,13 +3,13 @@
 uint8のRGBで0～255として扱うのを前提とする。
 あとグレースケールの場合もrows×cols×1の配列で扱う。
 """
+import atexit
+import functools
 import io
 import pathlib
 import shutil
-import atexit
 import tempfile
 import typing
-import functools
 
 import numpy as np
 import scipy.stats
@@ -126,8 +126,7 @@ def save(path: typing.Union[str, pathlib.Path], img: np.ndarray):
 
     やや余計なお世話だけど0～255にクリッピング(飽和)してから保存。
     """
-    assert len(img.shape) == 3 and img.shape[-1] in (1, 3, 4)
-    import PIL.Image
+    assert len(img.shape) == 3
     path = pathlib.Path(path)
     img = np.clip(img, 0, 255).astype(np.uint8)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -137,6 +136,8 @@ def save(path: typing.Union[str, pathlib.Path], img: np.ndarray):
     elif suffix == '.npz':
         np.savez_compressed(str(path), img)
     else:
+        assert img.shape[-1] in (1, 3, 4)
+        import PIL.Image
         if img.shape[-1] == 1:
             pil_img = PIL.Image.fromarray(np.squeeze(img, axis=-1), 'L')
         elif img.shape[2] == 3:
@@ -347,7 +348,7 @@ def hue_lite(rgb: np.ndarray, alpha: np.ndarray, beta: np.ndarray) -> np.ndarray
 
 def to_grayscale(rgb: np.ndarray) -> np.ndarray:
     """グレースケール化。"""
-    return rgb.dot([0.299, 0.587, 0.114])
+    return rgb.dot(np.array([0.299, 0.587, 0.114], dtype=np.float32))
 
 
 @_float_to_uint8
