@@ -12,7 +12,7 @@ def balanced_binary_crossentropy(alpha=0.5):
     """
     def _balanced_binary_crossentropy(y_true, y_pred):
         import keras.backend as K
-        a_t = y_true * alpha + (1 - y_true) * (1 - alpha)
+        a_t = y_true * alpha + (1 - y_true) * (1 - alpha) if alpha is not None else 1
         p_t = y_true * y_pred + (1 - y_true) * (1 - y_pred)
         p_t = K.clip(p_t, K.epsilon(), 1 - K.epsilon())
         return -a_t * K.log(p_t)
@@ -23,7 +23,7 @@ def binary_focal_loss(alpha=0.25, gamma=2.0):
     """2クラス分類用focal loss (https://arxiv.org/pdf/1708.02002v1.pdf)。"""
     def _binary_focal_loss(y_true, y_pred):
         import keras.backend as K
-        a_t = y_true * alpha + (1 - y_true) * (1 - alpha)
+        a_t = y_true * alpha + (1 - y_true) * (1 - alpha) if alpha is not None else 1
         p_t = y_true * y_pred + (1 - y_true) * (1 - y_pred)
         p_t = K.clip(p_t, K.epsilon(), 1 - K.epsilon())
         return -a_t * K.pow(1 - p_t, gamma) * K.log(p_t)
@@ -55,10 +55,13 @@ def categorical_focal_loss(y_true, y_pred, alpha=0.25, gamma=2.0):
     import keras.backend as K
 
     assert K.image_data_format() == 'channels_last'
-    nb_classes = K.int_shape(y_pred)[-1]
-    class_weights = np.array([(1 - alpha) * 2] * 1 + [alpha * 2] * (nb_classes - 1))
-    class_weights = np.reshape(class_weights, (1, 1, -1))
-    class_weights = -class_weights  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
+    if alpha is None:
+        class_weights = -1  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
+    else:
+        nb_classes = K.int_shape(y_pred)[-1]
+        class_weights = np.array([(1 - alpha) * 2] * 1 + [alpha * 2] * (nb_classes - 1))
+        class_weights = np.reshape(class_weights, (1, 1, -1))
+        class_weights = -class_weights  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
 
     y_pred = K.maximum(y_pred, K.epsilon())
     return K.sum(K.pow(1 - y_pred, gamma) * y_true * K.log(y_pred) * class_weights, axis=-1)
