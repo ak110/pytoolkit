@@ -6,7 +6,7 @@ import numpy as np
 import sklearn.externals.joblib as joblib
 
 from . import hvd, layers, losses, metrics, models, networks
-from .. import applications, generator, image, jsonex, log, math, ndimage, utils
+from .. import applications, image, jsonex, log, math, ndimage, utils
 
 
 def preprocess_masks(mask_files, cache_dir, class_colors, void_color, input_size=None, compress=False):
@@ -153,7 +153,7 @@ class SemanticSegmentor(models.Model):
             mets = ['acc']
 
         network = keras.models.Model(inputs, x)
-        gen = _create_generator(class_colors, void_color, (input_size, input_size), rotation_type=rotation_type,
+        gen = _create_generator(class_colors, (input_size, input_size), rotation_type=rotation_type,
                                 color_jitters=color_jitters, random_erasing=random_erasing)
         model = cls(network, gen, batch_size,
                     class_colors=class_colors, void_color=void_color,
@@ -177,7 +177,7 @@ class SemanticSegmentor(models.Model):
         void_color = metadata['void_color']
         input_size = int(metadata.get('input_size', 256))
         rotation_type = metadata.get('rotation_type', 'none')
-        gen = _create_generator(class_colors, void_color, (input_size, input_size))
+        gen = _create_generator(class_colors, (input_size, input_size))
         # モデルの読み込み
         network = models.load_model(filepath, compile=False)
         # 1回予測して計算グラフを構築
@@ -300,7 +300,7 @@ class SemanticSegmentor(models.Model):
         return img, pred
 
 
-def _create_generator(class_colors, void_color, image_size,
+def _create_generator(class_colors, image_size,
                       rotation_type='none', color_jitters=False, random_erasing=False):
     """Generatorを作って返す。"""
     gen = image.ImageDataGenerator()
@@ -326,9 +326,12 @@ def make_image_to_onehot(class_colors=None, void_color=None, strict=False):
     """色をクラスに変換する処理を返す。"""
     if class_colors is None:
         # binary
-        if strict:
-            assert np.isin(y, (0, 255))
-        return lambda y: y / 255
+        def _convert(y):
+            if strict:
+                assert np.isin(y, (0, 255))
+            return y / 255
+
+        return _convert
 
     # multiclass
     num_classes = len(class_colors)
@@ -362,7 +365,6 @@ def make_image_to_onehot(class_colors=None, void_color=None, strict=False):
 
 def _binary_ss_loss(y_true, y_pred):
     """2クラス用loss。"""
-    import keras
     y_true = y_true / 255  # [0-1)
     loss1 = losses.lovasz_hinge_elup1(y_true, y_pred)
     loss2 = losses.binary_focal_loss(alpha=0.5)(y_true, y_pred)
