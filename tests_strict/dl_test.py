@@ -1,10 +1,12 @@
+import pathlib
 
 import numpy as np
 
 import pytoolkit as tk
 
 
-def test_xor():
+def test_xor(tmpdir):
+    models_dir = pathlib.Path(str(tmpdir))
     X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]], dtype=np.float32)
     y = np.array([0, 1, 1, 0], dtype=np.int32)
 
@@ -21,10 +23,13 @@ def test_xor():
         model = tk.dl.models.Model(network, gen, batch_size=32)
         model.compile('adam', 'binary_crossentropy', ['acc'])
         model.summary()
-        model.fit(X.repeat(4096, axis=0), y.repeat(4096, axis=0), epochs=8, verbose=2, callbacks=[
-            tk.dl.callbacks.unfreeze(0.0001),
-            tk.dl.callbacks.freeze_bn(1),
-        ])
+        model.fit(
+            X.repeat(4096, axis=0), y.repeat(4096, axis=0), epochs=8, verbose=2,
+            checkpoint_path=models_dir / 'checkpoint.h5',
+            callbacks=[
+                tk.dl.callbacks.unfreeze(0.0001),
+                tk.dl.callbacks.freeze_bn(1),
+            ])
 
         proba = model.predict(X)
         tk.ml.print_classification_metrics(y, proba)

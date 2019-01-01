@@ -122,19 +122,18 @@ class Model:
             class_weight=None,
             max_queue_size=10, workers=1, use_multiprocessing=False,
             initial_epoch=0,
-            tsv_log_path=None,
-            tsv_log_append=False,
             balanced=False, mixup=False,
             lr_list=None,
             reduce_lr_epoch_rates=None,
             reduce_lr_factor=0.1,
             cosine_annealing=False,
             lr_warmup=True,
+            tsv_log_path=None, tsv_log_append=False,
+            checkpoint_path=None, checkpoints=3,
             callbacks=None):
         """学習。
 
         # 引数
-        - tsv_log_path: lossなどをtsvファイルに出力するならそのパス。
         - balanced: クラス間のバランスが均等になるようにオーバーサンプリングするか否か。
         - mixup: Data augmentationにmixupを使用するか否か。
         - lr_list: 各epochでの学習率の配列。
@@ -142,6 +141,10 @@ class Model:
         - reduce_lr_factor: reduce_lr_epoch_ratesで学習率を減らす割合。
         - cosine_annealing: cosine annealingするならTrue。
         - lr_warmup: HorovodのLearningRateWarmupCallbackを使うか否か。
+        - tsv_log_path: lossなどをtsvファイルに出力するならそのパス。
+        - tsv_log_append: tsv_log_pathで追記するか否か。
+        - checkpoint_path: 学習時にモデルを保存するならそのパス。
+        - checkpoints: 保存する回数。epochs % (checkpoints + 1) == 0だとキリのいい感じになる。
 
         lr_list、reduce_lr、cosine_annealingの3つは排他。
 
@@ -174,6 +177,8 @@ class Model:
 
         # callback
         cb = []
+        if checkpoint_path is not None:
+            cb.append(tkcb.checkpoint(checkpoint_path=checkpoint_path, checkpoints=checkpoints))
         if lr_list is not None:
             assert not cosine_annealing
             assert reduce_lr_epoch_rates is None

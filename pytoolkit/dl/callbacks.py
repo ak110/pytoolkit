@@ -327,6 +327,66 @@ def unfreeze(epoch_rate: float):
     return _UnfreezeCallback(epoch_rate=epoch_rate)
 
 
+def checkpoint(checkpoint_path, checkpoints=3):
+    """学習中に定期的に保存する。
+
+    速度重視でinclude_optimizerはFalse固定。
+
+    # 引数
+    - checkpoint_path: 保存先パス
+    - checkpoints: 保存する回数。epochs % (checkpoints + 1) == 0だとキリのいい感じになる。
+
+    """
+    import keras
+
+    class Checkpoint(keras.callbacks.Callback):
+        """学習中に定期的に保存する。
+
+        速度重視でinclude_optimizerはFalse固定。
+
+        # 引数
+        - checkpoint_path: 保存先パス
+        - checkpoints: 保存する回数。epochs % (checkpoints + 1) == 0だとキリのいい感じになる。
+
+        """
+
+        def __init__(self, checkpoint_path, checkpoints):
+            self.checkpoint_path = pathlib.Path(checkpoint_path)
+            self.checkpoints = checkpoints
+            self.target_epochs = {}
+            super().__init__()
+
+        def on_train_begin(self, logs=None):
+            s = self.checkpoints + 1
+            self.target_epochs = {self.params['epochs'] * (i + 1) // s for i in range(s)}
+            assert 0 not in self.target_epochs
+            assert self.params['epochs'] - 1 not in self.target_epochs
+
+        def on_epoch_begin(self, epoch, logs=None):
+            if epoch in self.target_epochs:
+                if hvd.is_master():
+                    logger = log.get(__name__)
+                    logger.info(f'Epoch {epoch}: Saving model to {self.checkpoint_path}')
+                    # 保存の真っ最中に死んだときに大丈夫なように少し気を使った処理をする。
+                    # 一度.tmpに保存してから元のを.bkにリネームして.tmpを外して.bkを削除。
+                    self.checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+                    temp_path = self.checkpoint_path.parent / (self.checkpoint_path.name + '.tmp')
+                    backup_path = self.checkpoint_path.parent / (self.checkpoint_path.name + '.bk')
+                    if temp_path.exists():
+                        temp_path.unlink()
+                    if backup_path.exists():
+                        backup_path.unlink()
+                    self.model.save(str(temp_path), include_optimizer=False)
+                    if self.checkpoint_path.exists():
+                        self.checkpoint_path.rename(backup_path)
+                    temp_path.rename(self.checkpoint_path)
+                    if backup_path.exists():
+                        backup_path.unlink()
+                hvd.barrier()
+
+    return Checkpoint(checkpoint_path=checkpoint_path, checkpoints=checkpoints)
+
+
 def terminate_on_nan():
     """NaNやinfで異常終了させる。"""
     import keras
