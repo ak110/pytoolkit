@@ -1,15 +1,12 @@
 import pathlib
-import numpy as np
 
 import pytoolkit as tk
 
 
-def test_ic(tmpdir):
+def test_ic(data_dir, tmpdir):
     models_dir = pathlib.Path(str(tmpdir))
 
-    base_dir = pathlib.Path(__file__).resolve().parent
-    data_dir = base_dir.parent / 'tests' / 'data' / 'ic'
-    class_names, X, y = tk.ml.listup_classification(data_dir, check_image=True)
+    class_names, X, y = tk.ml.listup_classification(data_dir / 'ic', check_image=True)
 
     with tk.dl.session():
         model = tk.dl.ic.ImageClassifier.create(class_names, 'vgg16bn', input_size=64, weights=None)

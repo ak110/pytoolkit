@@ -5,14 +5,12 @@ import numpy as np
 import pytoolkit as tk
 
 
-def test_od(tmpdir):
+def test_od(data_dir, tmpdir):
     result_dir = pathlib.Path(str(tmpdir))
 
-    base_dir = pathlib.Path(__file__).resolve().parent
-    data_dir = base_dir.parent / 'tests' / 'data' / 'od'
     class_name_to_id = {'～': 0, '〇': 1}
-    X, y = tk.data.voc.load_annotations(data_dir, data_dir / 'Annotations', class_name_to_id=class_name_to_id)
-    X = np.array([data_dir / 'JPEGImages' / (p.stem + '.png') for p in X])  # TODO: VoTT対応
+    X, y = tk.data.voc.load_annotations(data_dir / 'od', data_dir / 'od' / 'Annotations', class_name_to_id=class_name_to_id)
+    X = np.array([data_dir / 'od' / 'JPEGImages' / (p.stem + '.png') for p in X])  # TODO: VoTT対応
 
     with tk.dl.session():
         od = tk.dl.od.ObjectDetector((128, 128), [8], 2)

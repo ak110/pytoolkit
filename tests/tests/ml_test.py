@@ -20,23 +20,21 @@ def test_to_str():
     assert p.to_str(100, 100, class_names, 0.5) == '(0, 0) [20 x 20]: class02\n(90, 90) [10 x 10]: class01'
 
 
-def test_plot_objects():
-    base_dir = pathlib.Path(__file__).resolve().parent
-    data_dir = base_dir / 'data' / 'od'
-    xml_path = data_dir / 'Annotations' / '無題.xml'
-    img_path = data_dir / 'JPEGImages' / '無題.png'
+def test_plot_objects(data_dir, check_dir):
+    xml_path = data_dir / 'od' / 'Annotations' / '無題.xml'
+    img_path = data_dir / 'od' / 'JPEGImages' / '無題.png'
     class_name_to_id = {'～': 0, '〇': 1}
     class_id_to_name = {v: k for k, v in class_name_to_id.items()}
-    ann = tk.data.voc.load_annotation(data_dir, xml_path, class_name_to_id)
+    ann = tk.data.voc.load_annotation(data_dir / 'od', xml_path, class_name_to_id)
 
     img = tk.ml.plot_objects(img_path, ann.classes, None, ann.bboxes, None)
-    tk.ndimage.save(base_dir.parent / '___check' / 'plot_objects1.png', img)
+    tk.ndimage.save(check_dir / 'plot_objects1.png', img)
 
     img = tk.ml.plot_objects(img_path, ann.classes, None, ann.bboxes, class_id_to_name)
-    tk.ndimage.save(base_dir.parent / '___check' / 'plot_objects2.png', img)
+    tk.ndimage.save(check_dir / 'plot_objects2.png', img)
 
     img = tk.ml.plot_objects(img_path, ann.classes, np.array([0.5]), ann.bboxes, class_id_to_name)
-    tk.ndimage.save(base_dir.parent / '___check' / 'plot_objects3.png', img)
+    tk.ndimage.save(check_dir / 'plot_objects3.png', img)
 
 
 def test_iou():
@@ -221,11 +219,10 @@ def test_print_regression_metrics():
     tk.ml.print_regression_metrics(y_true, prob_pred)
 
 
-def test_plot_cm():
-    filepath = pathlib.Path(__file__).resolve().parent.parent / '___check' / 'plot_cm.png'
+def test_plot_cm(check_dir):
     cm = [
         [5, 0, 0],
         [0, 3, 2],
         [0, 2, 3],
     ]
-    tk.ml.plot_cm(cm, filepath)
+    tk.ml.plot_cm(cm, check_dir / 'plot_cm.png')

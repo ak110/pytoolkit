@@ -5,37 +5,35 @@ import pytest
 
 import pytoolkit as tk
 
-_BASE_DIR = pathlib.Path(__file__).resolve().parent
 
-
-def test_saveload_alpha(tmpdir):
-    img = tk.ndimage.load(_BASE_DIR / 'data' / 'Alpha.png')
+def test_saveload_alpha(data_dir, tmpdir):
+    img = tk.ndimage.load(data_dir / 'Alpha.png')
     assert img.shape[-1] == 3
     tk.ndimage.save(str(tmpdir.join('output.png')), img)
 
 
-def test_saveload_grayscale(tmpdir):
-    img = tk.ndimage.load(_BASE_DIR / 'data' / 'Lenna.png', grayscale=True)
+def test_saveload_grayscale(data_dir, tmpdir):
+    img = tk.ndimage.load(data_dir / 'Lenna.png', grayscale=True)
     assert img.shape[-1] == 1
     tk.ndimage.save(str(tmpdir.join('output.png')), img)
 
 
-def test_saveload_gif(tmpdir):
-    img = tk.ndimage.load(_BASE_DIR / 'data' / 'Lenna.gif')
+def test_saveload_gif(data_dir, tmpdir):
+    img = tk.ndimage.load(data_dir / 'Lenna.gif')
     assert img is not None
     assert img.shape[-1] == 3
     tk.ndimage.save(str(tmpdir.join('output.bmp')), img)
     assert (tk.ndimage.load(str(tmpdir.join('output.bmp'))) == img).all()
 
 
-def test_load_text_failed():
+def test_load_text_failed(data_dir):
     with pytest.raises(BaseException):
-        tk.ndimage.load(_BASE_DIR / 'data' / 'text.txt')
+        tk.ndimage.load(data_dir / 'text.txt')
 
 
-def test_filters():
+def test_filters(data_dir, check_dir):
     """画像の変換のテスト。目視したいので結果を`../___check/ndimage/`に保存しちゃう。"""
-    save_dir = _BASE_DIR.parent / '___check' / 'ndimage'
+    save_dir = check_dir / 'ndimage'
     rand = np.random.RandomState(1234)
     filters = [
         (0, 'original', lambda rgb: rgb),
@@ -83,7 +81,7 @@ def test_filters():
         (0, 'rot270', lambda rgb: tk.ndimage.rot90(rgb, 3)),
     ]
 
-    rgb = tk.ndimage.load(_BASE_DIR / 'data' / 'Lenna.png')  # 256x256の某有名画像
+    rgb = tk.ndimage.load(data_dir / 'Lenna.png')  # 256x256の某有名画像
     save_dir.mkdir(parents=True, exist_ok=True)
     for cp in save_dir.iterdir():
         cp.unlink()
