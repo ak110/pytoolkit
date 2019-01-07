@@ -1,0 +1,46 @@
+[MASTER]
+ignore=docs,tests
+extension-pkg-whitelist=numpy,cv2
+
+[MESSAGES CONTROL]
+disable=
+    # C0103:Invalid attribute name
+    C0103
+    # C0111:Missing module docstring
+    ,C0111
+    # C0200:Consider using enumerate instead of iterating with range and len
+    ,C0200
+    # R0801:Similar lines
+    ,R0801
+    # W0125:Using a conditional statement with a constant value
+    ,W0125
+    # W0511:TODO
+    ,W0511
+    # W0603:Using the global statement
+    ,W0603
+    # W1202:Use % formatting in logging functions and pass the % parameters as arguments
+    ,W1202
+    ,bare-except
+    ,len-as-condition
+    ,locally-disabled
+    ,logging-fstring-interpolation
+    ,missing-docstring
+    ,no-else-return
+    ,no-self-use
+    ,too-few-public-methods
+    ,too-many-arguments
+    ,too-many-branches
+    ,too-many-instance-attributes
+    ,too-many-locals
+    ,too-many-nested-blocks
+    ,too-many-return-statements
+    ,too-many-statements
+    ,useless-import-alias
+
+[FORMAT]
+max-line-length=256
+
+[TYPECHECK]
+ignored-modules=__init__,numpy,matplotlib.cm,mpi4py,mpi4py.MPI,distutils,horovod
+ignored-classes=LookupDict,jinja_env,tuple,Empty,pathlib.PurePath,h5py.File,ConfigProto,SQLAlchemy,scoped_session
+

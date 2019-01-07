@@ -1,4 +1,5 @@
 language: python
+cache: pip
 
 python:
   - "3.6"
@@ -10,7 +11,11 @@ env:
     - PYTHONWARNINGS=default
 
 install:
+  - pip install cython
   - pip install -r .travis.requirements.txt
 
 script:
+  - flake8
+  - test "$(autopep8 --recursive --diff .)" = ""
+  - pylint --jobs=4 pytoolkit *.py
   - pytest

@@ -1,5 +1,14 @@
 # Travis CI用 requirements。
 Pillow
+autopep8
+better_exceptions
+chainercv
+diskcache
+flake8
+flake8-docstrings
+flake8-pep257
+flask
+git+https://github.com/cocodataset/cocoapi.git#egg=pycocotools&subdirectory=PythonAPI
 h5py
 keras
 matplotlib
@@ -7,7 +16,8 @@ numpy
 opencv-python
 pandas
 pydot
-pytest==3.9.3
+pylint
+pytest
 scikit-learn
 scipy
 sqlalchemy

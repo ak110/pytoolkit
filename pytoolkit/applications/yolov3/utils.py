@@ -34,4 +34,3 @@ def letterbox_image(image, size):
 
 def rand(a=0, b=1):
     return np.random.rand() * (b - a) + a
-
