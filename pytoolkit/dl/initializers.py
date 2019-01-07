@@ -14,16 +14,17 @@ def get_custom_objects():
 def focal_loss_bias_initializer():
     """focal loss用の最後のクラス分類のbias_initializer。
 
-    # 引数
-    - nb_classes: 背景を含むクラス数。class 0が背景。
-    - pi: π。前景の重み。
+    Args:
+        nb_classes: 背景を含むクラス数。class 0が背景。
+        pi: π。前景の重み。
+
     """
     import keras
 
     class FocalLossBiasInitializer(keras.initializers.Initializer):
         """focal loss用の最後のクラス分類のbias_initializer。
 
-        # 引数
+        Args:
         - nb_classes: 背景を含むクラス数。class 0が背景。
         - pi: π。前景の重み。
         """

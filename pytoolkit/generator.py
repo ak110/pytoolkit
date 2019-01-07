@@ -77,13 +77,13 @@ class Operator(metaclass=abc.ABCMeta):
 
 
 class SimpleGenerator:
-    """`fit_generator`などに渡すgeneratorを作るためのクラス。特にデータを変換しないシンプル版。"""
+    """fit_generatorなどに渡すgeneratorを作るためのクラス。特にデータを変換しないシンプル版。"""
 
     def flow(self, X, y=None, weights=None, batch_size=32, shuffle=False, data_augmentation=False, random_state=None, balanced=False):
-        """`fit_generator`などに渡すgeneratorと、1epochあたりのステップ数を返す。
+        """fit_generatorなどに渡すgeneratorと、1epochあたりのステップ数を返す。
 
-        # 引数
-        - balanced: クラス間のバランスが均等になるようにオーバーサンプリングするか否か。
+        Args:
+            balanced: クラス間のバランスが均等になるようにオーバーサンプリングするか否か。
                     (shuffle=Trueな場合のみ有効。yはクラスのindexかそれをone-hot化したものなどである必要あり)
 
         """
@@ -91,7 +91,7 @@ class SimpleGenerator:
         return self._generator(ctx), ctx.steps_per_epoch
 
     def _generator(self, ctx):
-        """`fit_generator`などに渡すgenerator。"""
+        """fit_generatorなどに渡すgenerator。"""
         for indices, _ in self._flow_batch(ctx):
             rx, ry, rw = data_utils.get(ctx.X, indices), data_utils.get(ctx.y, indices), data_utils.get(ctx.weights, indices)
             if ctx.weights is not None:
@@ -139,7 +139,7 @@ class SimpleGenerator:
 
 
 class Generator(SimpleGenerator):
-    """`fit_generator`などに渡すgeneratorを作るためのクラス。"""
+    """fit_generatorなどに渡すgeneratorを作るためのクラス。"""
 
     def __init__(self, multiple_input=False, multiple_output=False, profile=False):
         self.multiple_input = multiple_input
@@ -156,7 +156,7 @@ class Generator(SimpleGenerator):
         self.operators.append(operator)
 
     def _generator(self, ctx):
-        """`fit_generator`などに渡すgenerator。"""
+        """fit_generatorなどに渡すgenerator。"""
         cpu_count = os.cpu_count()
         worker_count = min(ctx.batch_size, cpu_count * 3)
         with joblib.Parallel(n_jobs=worker_count, backend='threading') as parallel:
@@ -277,20 +277,18 @@ class _TargetOperator(Operator):
 class ProcessInput(Operator):
     """入力に対する任意の処理。
 
-    # 引数
+    Args:
+        func: 入力のndarrayを受け取り、処理結果を返す関数
+        batch_axis: Trueの場合、funcに渡されるndarrayのshapeが(1, height, width, channels)になる。Falseなら(height, width, channels)。
 
-    func: 入力のndarrayを受け取り、処理結果を返す関数
-    batch_axis: Trueの場合、funcに渡されるndarrayのshapeが(1, height, width, channels)になる。Falseなら(height, width, channels)。
+    例1::
 
-    # 例1
-    ```py
-    gen.add(tk.generator.ProcessInput(lambda x: x / 127.5 - 1))
-    ```
+        gen.add(tk.generator.ProcessInput(lambda x: x / 127.5 - 1))
 
-    # 例2
-    ```py
-    gen.add(tk.generator.ProcessInput(keras.applications.vgg16.preprocess_input, batch_axis=True))
-    ```
+    例2::
+
+        gen.add(tk.generator.ProcessInput(keras.applications.vgg16.preprocess_input, batch_axis=True))
+
     """
 
     def __init__(self, func, batch_axis=False):
@@ -373,11 +371,11 @@ class RandomPickData(Operator):
 
 
 def generator_sequence(generator, steps):
-    """generatorを`keras.utils.Sequence`に変換する。"""
+    """generatorをkeras.utils.Sequenceに変換する。"""
     import keras
 
     class GeneratorSequence(keras.utils.Sequence):
-        """generatorによる`keras.utils.Sequence`。"""
+        """generatorによるkeras.utils.Sequence。"""
 
         def __init__(self, generator, steps):
             self.generator = generator

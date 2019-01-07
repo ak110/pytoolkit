@@ -11,14 +11,18 @@ _VAR_LOC = 0.10  # SSD風(?)適当スケーリング
 
 
 class PriorBoxes:
-    """Prior boxの集合を管理するクラス。"""
+    """Prior boxの集合を管理するクラス。
+
+    Args:
+        input_size: 入力画像のサイズ。(縦, 横)のタプル。
+        map_sizes: 出力するfeature mapのサイズ(降順)。例：[40, 20, 10]なら、40x40、20x20、10x10の出力を持つ
+        num_classes: クラス数
+
+    """
 
     def __init__(self, input_size, map_sizes, num_classes):
-        # 入力画像のサイズ。(縦, 横)のタプル。
         self.input_size = tuple(input_size)
-        # 出力するfeature mapのサイズ(降順)。例：[40, 20, 10]なら、40x40、20x20、10x10の出力を持つ
         self.map_sizes = np.array(sorted(map_sizes)[::-1])
-        # クラス数
         self.num_classes = num_classes
         # feature mapのグリッドサイズに対する、prior boxの基準サイズの割合(面積昇順)。[1.5, 0.5] なら横が1.5倍、縦が0.5倍。
         self.pb_size_patterns = np.empty((0,))
@@ -63,10 +67,10 @@ class PriorBoxes:
     def fit(self, y_train: [ml.ObjectsAnnotation], pb_size_pattern_count=8, rotate90=False, keep_aspect=False):
         """訓練データからパラメータを適当に決めてインスタンスを作成する。
 
-        # 引数
-        - y_train: 訓練データ
-        - input_size: 入力画像の縦幅と横幅のタプル
-        - pb_size_pattern_count: feature mapごとに何種類のサイズのprior boxを作るか。
+        Args:
+            y_train: 訓練データ
+            input_size: 入力画像の縦幅と横幅のタプル
+            pb_size_pattern_count: feature mapごとに何種類のサイズのprior boxを作るか。
 
         """
         logger = log.get(__name__)
@@ -297,7 +301,7 @@ class PriorBoxes:
                     delta_locs.mean(), delta_locs.std(), delta_locs.min(), delta_locs.max())
 
     def encode_truth(self, y_gt: [ml.ObjectsAnnotation]):
-        """学習用の`y_true`の作成。"""
+        """学習用のy_trueの作成。"""
         # mask, weights, objs, clfs, locs
         y_true = np.zeros((len(y_gt), len(self.pb_locs), 1 + 1 + 1 + self.num_classes + 4), dtype=np.float32)
         for i, y in enumerate(y_gt):

@@ -119,7 +119,7 @@ def capture_output():
 
 
 def tqdm(iterable=None, desc=None, total=None, leave=True, **kwargs):
-    """`tqdm`の簡単なラッパー。"""
+    """tqdmの簡単なラッパー。"""
     from tqdm import tqdm as t
     return t(iterable, desc, total, leave, ascii=True, ncols=100, **kwargs)
 
@@ -134,7 +134,7 @@ def delayed(fn):
 
 
 def better_exceptions():
-    """`better_exceptions`を有効にする。"""
+    """better_exceptionsを有効にする。"""
     try:
         # サブプロセスとか用に環境変数を設定
         os.environ['BETTER_EXCEPTIONS'] = '1'

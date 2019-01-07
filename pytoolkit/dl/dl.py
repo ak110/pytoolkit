@@ -17,17 +17,15 @@ def get_custom_objects():
 def session(config=None, gpu_options=None, use_horovod=False):
     """TensorFlowのセッションの初期化・後始末。
 
-    # 使い方
+    使い方::
 
-    ```
-    with tk.dl.session():
+        with tk.dl.session():
 
-        # kerasの処理
+            # kerasの処理
 
-    ```
 
-    # 引数
-    - use_horovod: hvd.init()と、visible_device_listの指定を行う。
+    Args:
+        use_horovod: hvd.init()と、visible_device_listの指定を行う。
 
     """
     import keras.backend as K
@@ -79,16 +77,17 @@ def device(cpu=False, gpu=False):
 def finalize_graph():
     """マルチスレッドで死なないようにgraphをfinalizeする。
 
-    これを呼ぶ前にpredictを一度以上実行しておき、今後predictする場合は以下のようにwithの中で呼び出す。
+    これを呼ぶ前にpredictを一度以上実行しておき、今後predictする場合は以下のようにwithの中で呼び出す。::
 
-    ```
-    with session.as_default(), graph.as_default():
-        pred = model.predict(...)
-    ```
+        with session.as_default(), graph.as_default():
+            pred = model.predict(...)
 
-    # 戻り値
-    - session: tf.Session
-    - graph: tf.Graph
+    Returns:
+        tuple:
+
+        - session: tf.Session
+        - graph: tf.Graph
+
     """
     import keras
     import tensorflow as tf

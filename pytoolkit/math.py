@@ -6,13 +6,13 @@ import scipy.stats
 
 
 def between(x, a, b):
-    """`a <= x <= b`を返す。"""
+    """a <= x <= bを返す。"""
     assert np.all(a <= b)
     return np.logical_and(a <= x, x <= b)
 
 
 def in_range(x, a, b):
-    """`a <= x < b`を返す。"""
+    """a <= x < bを返す。"""
     assert np.all(a < b)
     return np.logical_and(a <= x, x < b)
 
@@ -55,7 +55,7 @@ def format_histgram(a, bins=10, range=None, weights=None, with_stats=True, ncols
 
 
 def format_values(values: typing.Union[list, np.ndarray], padding_sign=True):
-    """`values`をいい感じに固定長の文字列にして返す。"""
+    """valuesをいい感じに固定長の文字列にして返す。"""
     values = np.asarray(values)
     assert len(values.shape) == 1
 

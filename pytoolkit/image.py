@@ -12,23 +12,22 @@ class ImageDataGenerator(generator.Generator):
     Xは画像のファイルパスの配列またはndarray。
     ndarrayの場合は、(BGRではなく)RGB形式で、samples×rows×cols×channels。
 
-    # 引数
-    - grayscale: グレースケールで読み込むならTrue、RGBならFalse
+    Args:
+        grayscale: グレースケールで読み込むならTrue、RGBならFalse
 
-    # 使用例
-    ```
-    gen = tk.image.ImageDataGenerator()
-    gen.add(tk.image.Resize((300, 300)))
-    gen.add(tk.image.Padding(probability=1))
-    gen.add(tk.image.RandomRotate(probability=0.25))
-    gen.add(tk.image.RandomCrop(probability=1))
-    gen.add(tk.image.Resize((300, 300)))
-    gen.add(tk.image.RandomFlipLR(probability=0.5))
-    gen.add(tk.image.RandomColorAugmentors())
-    gen.add(tk.image.RandomErasing(probability=0.5))
-    gen.add(tk.image.Preprocess(mode='tf'))
-    gen.add(tk.generator.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
-    ```
+    使用例::
+
+        gen = tk.image.ImageDataGenerator()
+        gen.add(tk.image.Resize((300, 300)))
+        gen.add(tk.image.Padding(probability=1))
+        gen.add(tk.image.RandomRotate(probability=0.25))
+        gen.add(tk.image.RandomCrop(probability=1))
+        gen.add(tk.image.Resize((300, 300)))
+        gen.add(tk.image.RandomFlipLR(probability=0.5))
+        gen.add(tk.image.RandomColorAugmentors())
+        gen.add(tk.image.RandomErasing(probability=0.5))
+        gen.add(tk.image.Preprocess(mode='tf'))
+        gen.add(tk.generator.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
 
     """
 
@@ -40,11 +39,11 @@ class ImageDataGenerator(generator.Generator):
 class LoadImage(generator.Operator):
     """画像の読み込み。
 
-    # 引数
+    Args:
+        grayscale: グレースケールで読み込むならTrue、RGBならFalse
+        use_cache: 読み込み結果をdiskcacheライブラリでキャッシュするならTrue
+        max_size: このサイズを超えるなら縮小する。int or tuple。tupleは(height, width)
 
-    - grayscale: グレースケールで読み込むならTrue、RGBならFalse
-    - use_cache: 読み込み結果をdiskcacheライブラリでキャッシュするならTrue
-    - max_size: このサイズを超えるなら縮小する。int or tuple。tupleは(height, width)
     """
 
     def __init__(self, grayscale=False, use_cache=False, max_size=None):
@@ -63,11 +62,11 @@ class LoadImage(generator.Operator):
 class LoadOutputImage(generator.Operator):
     """画像の読み込み。
 
-    # 引数
+    Args:
+        grayscale: グレースケールで読み込むならTrue、RGBならFalse
+        use_cache: 読み込み結果をdiskcacheライブラリでキャッシュするならTrue
+        max_size: このサイズを超えるなら縮小する。int or tuple。tupleは(height, width)
 
-    - grayscale: グレースケールで読み込むならTrue、RGBならFalse
-    - use_cache: 読み込み結果をdiskcacheライブラリでキャッシュするならTrue
-    - max_size: このサイズを超えるなら縮小する。int or tuple。tupleは(height, width)
     """
 
     def __init__(self, grayscale=False, use_cache=False, max_size=None):
@@ -87,10 +86,9 @@ class LoadOutputImage(generator.Operator):
 class Resize(generator.Operator):
     """画像のリサイズ。
 
-    # 引数
-
-    - image_size: (height, width)のタプル
-    - padding: アスペクト比を保持するためにパディングするならパディングの種類
+    Args:
+        image_size: (height, width)のタプル
+        padding: アスペクト比を保持するためにパディングするならパディングの種類
 
     """
 
@@ -222,18 +220,14 @@ class RandomCrop(generator.Operator):
 class RandomZoom(generator.Operator):
     """Padding or crop + アスペクト比変更を行う。とりあえず物体検知用。
 
-    # 引数
-
-    - output_size: 出力画像サイズ (width, heightのタプル)
-    - padding_rate: paddingする場合の面積の比の最大値。16なら最大で縦横4倍(SSD風)。
-    - crop_rate: cropする場合の面積の比の最大値。0.1なら最小で縦横0.32倍(SSD風)。
-    - keep_aspect: padding / cropの際にアスペクト比を保持するならTrue、正方形にリサイズしてしまうならFalse。
-    - aspect_prob: アスペクト比を歪ませる確率。
-    - max_aspect_ratio: アスペクト比を最大どこまで歪ませるか。(1.5なら正方形から3:2までランダムに歪ませる)
-    - min_object_px: paddingなどでどこまでオブジェクトが小さくなるのを許容するか。(ピクセル数)
-
-    padding_rateはNoneだとpaddingしない。
-    crop_rateもNoneだとcropしない。
+    Args:
+        output_size: 出力画像サイズ (width, heightのタプル)
+        padding_rate: paddingする場合の面積の比の最大値。16なら最大で縦横4倍(SSD風)。Noneならpaddingしない。
+        crop_rate: cropする場合の面積の比の最大値。0.1なら最小で縦横0.32倍(SSD風)。Noneならcropしない。
+        keep_aspect: padding / cropの際にアスペクト比を保持するならTrue、正方形にリサイズしてしまうならFalse。
+        aspect_prob: アスペクト比を歪ませる確率。
+        max_aspect_ratio: アスペクト比を最大どこまで歪ませるか。(1.5なら正方形から3:2までランダムに歪ませる)
+        min_object_px: paddingなどでどこまでオブジェクトが小さくなるのを許容するか。(ピクセル数)
 
     """
 
@@ -366,8 +360,9 @@ class RandomZoom(generator.Operator):
 class RandomAugmentors(generator.Operator):
     """順番と適用確率をランダムにDataAugmentationを行う。
 
-    # 引数
-    augmentors: Augmentorの配列
+    Args:
+        augmentors: Augmentorの配列
+
     """
 
     def __init__(self, augmentors, probability=1):
@@ -406,7 +401,7 @@ class RandomColorAugmentors(RandomAugmentors):
 
 
 class RandomFlipLR(generator.Operator):
-    """左右反転。(`tk.ml.ObjectsAnnotation`対応)"""
+    """左右反転。(tk.ml.ObjectsAnnotation対応)"""
 
     def __init__(self, probability=1, with_output=False):
         assert 0 < probability <= 1
@@ -424,7 +419,7 @@ class RandomFlipLR(generator.Operator):
 
 
 class RandomFlipTB(generator.Operator):
-    """上下反転。(`tk.ml.ObjectsAnnotation`対応)"""
+    """上下反転。(tk.ml.ObjectsAnnotation対応)"""
 
     def __init__(self, probability=1, with_output=False):
         assert 0 < probability <= 1
@@ -442,7 +437,7 @@ class RandomFlipTB(generator.Operator):
 
 
 class RandomRotate90(generator.Operator):
-    """90度/180度/270度回転。(`tk.ml.ObjectsAnnotation`対応)"""
+    """90度/180度/270度回転。(tk.ml.ObjectsAnnotation対応)"""
 
     def __init__(self, probability=1, with_output=False):
         assert 0 < probability <= 1
@@ -695,9 +690,9 @@ class RandomErasing(generator.Operator):
 
     https://arxiv.org/abs/1708.04896
 
-    # 引数
-    - object_aware: yがObjectsAnnotationのとき、各オブジェクト内でRandom Erasing。(論文によるとTrueとFalseの両方をやるのが良い)
-    - object_aware_prob: 各オブジェクト毎のRandom Erasing率。全体の確率は1.0にしてこちらで制御する。
+    Args:
+        object_aware: yがObjectsAnnotationのとき、各オブジェクト内でRandom Erasing。(論文によるとTrueとFalseの両方をやるのが良い)
+        object_aware_prob: 各オブジェクト毎のRandom Erasing率。全体の確率は1.0にしてこちらで制御する。
 
     """
 
@@ -782,18 +777,18 @@ class RandomErasing(generator.Operator):
 
 
 class Mixup(generator.Operator):
-    """`mixup`
+    """mixup
 
     yはone-hot化済みの前提
 
     - mixup: Beyond Empirical Risk Minimization
       https://arxiv.org/abs/1710.09412
 
-    # 引数
-    - alpha: α
-    - beta: β
-    - data_loader: X[i]と返すべきshapeを受け取り、データを読み込んで返す。
-    - num_classes: クラス数 (指定した場合、one-hot化を行う)
+    Args:
+        alpha: α
+        beta: β
+        data_loader: X[i]と返すべきshapeを受け取り、データを読み込んで返す。
+        num_classes: クラス数 (指定した場合、one-hot化を行う)
 
     """
 
@@ -878,9 +873,9 @@ class RotationsLearning(generator.Operator):
 
     # 使い方
 
-    - `y` は `np.zeros((len(X),))` とする。
+    - y は np.zeros((len(X),)) とする。
     - 4クラス分類として学習する。
-    - 一番最後に `gen.add(tk.image.RotationsLearning())`
+    - 一番最後に gen.add(tk.image.RotationsLearning())
 
     """
 
@@ -896,7 +891,7 @@ class RotationsLearning(generator.Operator):
 class Preprocess(generator.Operator):
     """画像データの前処理。
 
-    # 引数
+    Args:
 
     - mode: 'none', 'caffe', 'tf', 'torch', 'div255'
     """

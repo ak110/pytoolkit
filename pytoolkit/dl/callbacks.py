@@ -79,9 +79,9 @@ def cosine_annealing(factor=0.01, epochs=None):
 def learning_curve_plot(filename, metric='loss'):
     """Learning Curvesの描画を行う。
 
-    # 引数
-    - filename: 保存先ファイル名。「{metric}」はmetricの値に置換される。str or pathlib.Path
-    - metric: 対象とするmetric名。lossとかaccとか。
+    Args:
+        filename: 保存先ファイル名。「{metric}」はmetricの値に置換される。str or pathlib.Path
+        metric: 対象とするmetric名。lossとかaccとか。
 
     """
     import keras
@@ -129,9 +129,9 @@ def learning_curve_plot(filename, metric='loss'):
 def tsv_logger(filename, append=False):
     """ログを保存するコールバック。Horovod使用時はrank() == 0のみ有効。
 
-    # 引数
-    - filename: 保存先ファイル名。「{metric}」はmetricの値に置換される。str or pathlib.Path
-    - append: 追記するのか否か。
+    Args:
+        filename: 保存先ファイル名。「{metric}」はmetricの値に置換される。str or pathlib.Path
+        append: 追記するのか否か。
 
     """
     import keras
@@ -222,8 +222,8 @@ def freeze_bn(freeze_epochs: int):
     ■Squeeze-and-Excitation Networks
     https://arxiv.org/abs/1709.01507
 
-    # 引数
-    - freeze_epochs: BNをfreezeした状態で学習するepoch数。freeze_epochs=5なら最後の5epochをfreeze。
+    Args:
+        freeze_epochs: BNをfreezeした状態で学習するepoch数。freeze_epochs=5なら最後の5epochをfreeze。
 
     # 使用例
 
@@ -274,14 +274,12 @@ def freeze_bn(freeze_epochs: int):
 def unfreeze(epoch_rate: float):
     """指定epoch目で全レイヤーをfreeze解除する。
 
-    # 引数
-    - epoch_rate: 発動するepoch数の割合を指定。
+    Args:
+        epoch_rate: 発動するepoch数の割合を指定。
 
-    # 使用例
+    使用例::
 
-    ```
-    callbacks.append(tk.dl.callbacks.unfreeze(0.1))
-    ```
+        callbacks.append(tk.dl.callbacks.unfreeze(0.1))
 
     """
     import keras
@@ -332,9 +330,9 @@ def checkpoint(checkpoint_path, checkpoints=3):
 
     速度重視でinclude_optimizerはFalse固定。
 
-    # 引数
-    - checkpoint_path: 保存先パス
-    - checkpoints: 保存する回数。epochs % (checkpoints + 1) == 0だとキリのいい感じになる。
+    Args:
+        checkpoint_path: 保存先パス
+        checkpoints: 保存する回数。epochs % (checkpoints + 1) == 0だとキリのいい感じになる。
 
     """
     import keras
@@ -344,7 +342,7 @@ def checkpoint(checkpoint_path, checkpoints=3):
 
         速度重視でinclude_optimizerはFalse固定。
 
-        # 引数
+        Args:
         - checkpoint_path: 保存先パス
         - checkpoints: 保存する回数。epochs % (checkpoints + 1) == 0だとキリのいい感じになる。
 

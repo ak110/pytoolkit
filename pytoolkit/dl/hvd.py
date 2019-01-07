@@ -6,7 +6,7 @@ _initialized = False
 
 
 def get():
-    """`horovod.keras`モジュールを返す。"""
+    """horovod.kerasモジュールを返す。"""
     import horovod.keras as hvd
     return hvd
 
@@ -65,7 +65,7 @@ def bcast(buf, root=0):
 
 
 def get_file(name, url, **kwargs):
-    """`keras.utils.get_file`のラッパー。"""
+    """local_masterだけkeras.utils.get_fileを呼び出す。"""
     import keras
     if is_local_master():
         keras.utils.get_file(name, url, **kwargs)

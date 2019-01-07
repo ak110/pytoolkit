@@ -77,9 +77,9 @@ def close(logger):
 def trace(process_name=None, logger_name=__name__):
     """関数の開始・終了をログるdecorator。
 
-    # 引数
-    - process_name: ログに出力する処理の名前。(Noneなら関数名)
-    - logger_name: ロガーの名前。
+    Args:
+        process_name: ログに出力する処理の名前。(Noneなら関数名)
+        logger_name: ロガーの名前。
 
     """
     def _decorator(func):
@@ -95,9 +95,9 @@ def trace(process_name=None, logger_name=__name__):
 def trace_scope(process_name, logger_name=__name__):
     """withで使うと、処理前後でログを出力する。
 
-    # 引数
-    - process_name: ログに出力する処理の名前。
-    - logger_name: ロガーの名前。
+    Args:
+        process_name: ログに出力する処理の名前。
+        logger_name: ロガーの名前。
 
     """
     logger = get(logger_name)

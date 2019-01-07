@@ -80,11 +80,11 @@ class ObjectDetector:
     def load_voc(batch_size, input_size=(320, 320), keep_aspect=False, strict_nms=True, use_multi_gpu=True):
         """PASCAL VOC 07+12 trainvalで学習済みのモデルを読み込む。
 
-        # 引数
-        - batch_size: 予測時のバッチサイズ。
-        - keep_aspect: padding / cropの際にアスペクト比を保持するならTrue、正方形にリサイズしてしまうならFalse。
-        - strict_nms: クラスによらずNon-maximum suppressionするならTrue。(mAPは下がるが、重複したワクが出ないので実用上は良いはず)
-        - use_multi_gpu: 予測をマルチGPUで行うならTrue。
+        Args:
+            batch_size: 予測時のバッチサイズ。
+            keep_aspect: padding / cropの際にアスペクト比を保持するならTrue、正方形にリサイズしてしまうならFalse。
+            strict_nms: クラスによらずNon-maximum suppressionするならTrue。(mAPは下がるが、重複したワクが出ないので実用上は良いはず)
+            use_multi_gpu: 予測をマルチGPUで行うならTrue。
 
         """
         input_size = tuple(input_size)
@@ -107,26 +107,27 @@ class ObjectDetector:
             verbose=1, quiet=False):
         """学習。
 
-        # 引数
-        - lr_scale: 学習率を調整するときの係数
-        - initial_weights: 重みの初期値。
+        Args:
+            lr_scale: 学習率を調整するときの係数
+            initial_weights: 重みの初期値。
                            'imagenet'ならバックボーンのみ。
                            'voc'ならPASCAL VOC 07+12 trainvalで学習済みのもの。
                            ファイルパスならそれを読む。
                            Noneなら何も読まない。
-        - pb_size_pattern_count: Prior boxのサイズ・アスペクト比のパターンの種類数。
-        - flip_h: Data augmentationで水平flipを行うか否か。
-        - flip_v: Data augmentationで垂直flipを行うか否か。
-        - rotate90: Data augmentationで0, 90, 180, 270度の回転を行うか否か。
-        - padding_rate: paddingする場合の面積の比の最大値。16なら最大で縦横4倍。
-        - crop_rate: cropする場合の面積の比の最大値。0.1なら最小で縦横0.32倍。
-        - keep_aspect: padding / cropの際にアスペクト比を保持するならTrue、正方形にリサイズしてしまうならFalse。
-        - aspect_prob: アスペクト比を歪ませる確率。
-        - max_aspect_ratio: アスペクト比を最大どこまで歪ませるか。(1.5なら正方形から3:2までランダムに歪ませる)
-        - min_object_px: paddingなどでどこまでオブジェクトが小さくなるのを許容するか。(ピクセル数)
-        - plot_path: ネットワークの図を出力するならそのパス。拡張子はpngやsvgなど。
-        - tsv_log_path: lossなどをtsvファイルに出力するならそのパス。
-        - quiet: prior boxやネットワークのsummaryを表示しないならTrue。
+            pb_size_pattern_count: Prior boxのサイズ・アスペクト比のパターンの種類数。
+            flip_h: Data augmentationで水平flipを行うか否か。
+            flip_v: Data augmentationで垂直flipを行うか否か。
+            rotate90: Data augmentationで0, 90, 180, 270度の回転を行うか否か。
+            padding_rate: paddingする場合の面積の比の最大値。16なら最大で縦横4倍。
+            crop_rate: cropする場合の面積の比の最大値。0.1なら最小で縦横0.32倍。
+            keep_aspect: padding / cropの際にアスペクト比を保持するならTrue、正方形にリサイズしてしまうならFalse。
+            aspect_prob: アスペクト比を歪ませる確率。
+            max_aspect_ratio: アスペクト比を最大どこまで歪ませるか。(1.5なら正方形から3:2までランダムに歪ませる)
+            min_object_px: paddingなどでどこまでオブジェクトが小さくなるのを許容するか。(ピクセル数)
+            plot_path: ネットワークの図を出力するならそのパス。拡張子はpngやsvgなど。
+            tsv_log_path: lossなどをtsvファイルに出力するならそのパス。
+            quiet: prior boxやネットワークのsummaryを表示しないならTrue。
+
         """
         assert self.model is None
         assert lr_scale > 0
@@ -207,12 +208,12 @@ class ObjectDetector:
                      keep_aspect=False, strict_nms=True, use_multi_gpu=True):
         """重みの読み込み。(予測用)
 
-        # 引数
-        - weights: 読み込む重み。'voc'ならVOC07+12で学習したものを読み込む。pathlib.Pathならそのまま読み込む。
-        - batch_size: 予測時のバッチサイズ。
-        - keep_aspect: padding / cropの際にアスペクト比を保持するならTrue、正方形にリサイズしてしまうならFalse。
-        - strict_nms: クラスによらずNon-maximum suppressionするならTrue。(mAPは下がるが、重複したワクが出ないので実用上は良いはず)
-        - use_multi_gpu: 予測をマルチGPUで行うならTrue。
+        Args:
+            weights: 読み込む重み。'voc'ならVOC07+12で学習したものを読み込む。pathlib.Pathならそのまま読み込む。
+            batch_size: 予測時のバッチサイズ。
+            keep_aspect: padding / cropの際にアスペクト比を保持するならTrue、正方形にリサイズしてしまうならFalse。
+            strict_nms: クラスによらずNon-maximum suppressionするならTrue。(mAPは下がるが、重複したワクが出ないので実用上は良いはず)
+            use_multi_gpu: 予測をマルチGPUで行うならTrue。
 
         """
         if self.model is not None:

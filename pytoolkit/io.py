@@ -4,7 +4,7 @@ import time
 
 
 def open_devnull(mode='r', buffering=-1, encoding=None, errors=None, newline=None):
-    """`os.devnull`を開いて返す。"""
+    """os.devnullを開いて返す。"""
     import os
     return pathlib.Path(os.devnull).open(mode, buffering, encoding, errors, newline)
 

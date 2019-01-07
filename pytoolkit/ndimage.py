@@ -38,14 +38,14 @@ def _float_to_uint8(func):
 def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], grayscale=False, use_cache=False, max_size=None) -> np.ndarray:
     """画像の読み込み。
 
-    # 引数
-    - path_or_array: 画像ファイルへのパス or npy/npzファイルへのパス or ndarray
-    - grascale: Trueならグレースケールで読み込み、FalseならRGB
-    - use_cache: 読み込み結果をdiskcacheライブラリでキャッシュするならTrue
-    - max_size: このサイズを超えるなら縮小する。int or tuple。tupleは(height, width)
+    Args:
+        path_or_array: 画像ファイルへのパス or npy/npzファイルへのパス or ndarray
+        grascale: Trueならグレースケールで読み込み、FalseならRGB
+        use_cache: 読み込み結果をdiskcacheライブラリでキャッシュするならTrue
+        max_size: このサイズを超えるなら縮小する。int or tuple。tupleは(height, width)
 
-    # 戻り値
-    読み込み結果のndarray。
+    Returns:
+        読み込み結果のndarray。
 
     """
     max_size = utils.normalize_tuple(max_size, 2)
@@ -320,19 +320,19 @@ def median(rgb: np.ndarray, size: int) -> np.ndarray:
 
 @_float_to_uint8
 def brightness(rgb: np.ndarray, beta: float) -> np.ndarray:
-    """明度の変更。betaの例：`np.random.uniform(-32, +32)`"""
+    """明度の変更。betaの例：np.random.uniform(-32, +32)"""
     return rgb + np.float32(beta)
 
 
 @_float_to_uint8
 def contrast(rgb: np.ndarray, alpha: float) -> np.ndarray:
-    """コントラストの変更。alphaの例：`np.random.uniform(0.75, 1.25)`"""
+    """コントラストの変更。alphaの例：np.random.uniform(0.75, 1.25)"""
     return rgb * alpha
 
 
 @_float_to_uint8
 def saturation(rgb: np.ndarray, alpha: float) -> np.ndarray:
-    """彩度の変更。alphaの例：`np.random.uniform(0.5, 1.5)`"""
+    """彩度の変更。alphaの例：np.random.uniform(0.5, 1.5)"""
     gs = to_grayscale(rgb)
     return alpha * rgb + (1 - alpha) * np.expand_dims(gs, axis=-1)
 

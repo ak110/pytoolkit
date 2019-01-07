@@ -7,9 +7,9 @@ import threading
 def start_background_loop(fn, args=None, kwargs=None, interval=1):
     """別スレッドでループして定期的にfnを呼び出す。
 
-    # 引数
-    - fn: callable
-    - interval: fnを呼び出す間隔
+    Args:
+        fn: callable
+        interval: fnを呼び出す間隔
 
     """
     args = args or []

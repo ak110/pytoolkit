@@ -6,9 +6,9 @@ import numpy as np
 class GradCamVisualizer:
     """Grad-CAM(のようなもの)による可視化。
 
-    # 引数
-    - model: 対象のモデル。画像分類で最後がGlobalAveragePooling2D+Dense+softmaxで分類している前提。
-    - output_index: 使う出力(softmax)のインデックス。(クラスのindex)
+    Args:
+        model: 対象のモデル。画像分類で最後がGlobalAveragePooling2D+Dense+softmaxで分類している前提。
+        output_index: 使う出力(softmax)のインデックス。(クラスのindex)
 
     """
 
@@ -32,13 +32,14 @@ class GradCamVisualizer:
     def draw(self, source_image, model_inputs, alpha=0.25, interpolation='nearest'):
         """ヒートマップ画像を作成して返す。
 
-        # 引数
-        - source_image: 元画像 (RGB。shape=(height, width, 3))
-        - model_inputs: モデルの入力1件分。(例えば普通の画像分類ならshape=(1, height, width, 3))
-        - alpha: ヒートマップの不透明度
-        - interpolation: マスクの拡大方法 (nearest, bilinear, bicubic, lanczos)
-        # 戻り値
-        - 画像 (RGB。shape=(height, width, 3))
+        Args:
+            source_image: 元画像 (RGB。shape=(height, width, 3))
+            model_inputs: モデルの入力1件分。(例えば普通の画像分類ならshape=(1, height, width, 3))
+            alpha: ヒートマップの不透明度
+            interpolation: マスクの拡大方法 (nearest, bilinear, bicubic, lanczos)
+
+        Returns:
+            画像 (RGB。shape=(height, width, 3))
 
         """
         import cv2

@@ -2,9 +2,9 @@
 
 以下の3ファイルを解凍して出来たVOCdevkitディレクトリのパスを受け取って色々処理をする。
 
-- [VOCtrainval_06-Nov-2007.tar](http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar)
-- [VOCtrainval_11-May-2012.tar](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar)
-- [VOCtest_06-Nov-2007.tar](http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar)
+- `VOCtrainval_06-Nov-2007.tar <http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar>`_
+- `VOCtrainval_11-May-2012.tar <http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar>`_
+- `VOCtest_06-Nov-2007.tar <http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar>`_
 
 """
 import pathlib
@@ -45,13 +45,16 @@ CLASS_NAMES_TO_ID = {class_name: i for i, class_name in enumerate(CLASS_NAMES)}
 def load_od(vocdevkit_dir):
     """物体検出のデータを読み込む。
 
-    # 引数
-    - vocdevkit_dir: VOCdevkitディレクトリのパス
+    Args:
+        vocdevkit_dir: VOCdevkitディレクトリのパス
 
-    # 戻り値
-    - (X_train, y_train)
-    - (X_val, y_val)
-    - class_names
+    Returns:
+        tuple:
+
+        - (X_train, y_train): 訓練データ
+        - (X_val, y_val): 検証データ
+        - class_names: クラス名の配列
+
     """
     X_train, y_train = load_0712_trainval(vocdevkit_dir)
     X_val, y_val = load_07_test(vocdevkit_dir)
@@ -61,13 +64,15 @@ def load_od(vocdevkit_dir):
 def load_0712_trainval(vocdevkit_dir, class_name_to_id=None):
     """PASCAL VOCデータセットの、07+12 trainvalの読み込み。
 
-    # 引数
-    - vocdevkit_dir: VOCdevkitディレクトリのパス
-    - class_name_to_id: クラス名からIDへの変換の辞書。Noneなら0～19に変換。
+    Args:
+        vocdevkit_dir: VOCdevkitディレクトリのパス
+        class_name_to_id: クラス名からIDへの変換の辞書。Noneなら0～19に変換。
 
-    # 戻り値
-    - X: 画像ファイルのパスのndarray
-    - y: `tk.ml.ObjectsAnnotation`のndarray
+    Returns:
+        tuple:
+
+        - X: 画像ファイルのパスのndarray
+        - y: tk.ml.ObjectsAnnotationのndarray
 
     """
     X1, y1 = load_set(vocdevkit_dir, 2007, 'trainval', class_name_to_id, without_difficult=True)
@@ -78,13 +83,15 @@ def load_0712_trainval(vocdevkit_dir, class_name_to_id=None):
 def load_07_test(vocdevkit_dir, class_name_to_id=None):
     """PASCAL VOCデータセットの、07 testの読み込み。
 
-    # 引数
-    - vocdevkit_dir: VOCdevkitディレクトリのパス
-    - class_name_to_id: クラス名からIDへの変換の辞書。Noneなら0～19に変換。
+    Args:
+        vocdevkit_dir: VOCdevkitディレクトリのパス
+        class_name_to_id: クラス名からIDへの変換の辞書。Noneなら0～19に変換。
 
-    # 戻り値
-    - X: 画像ファイルのパスのndarray
-    - y: `tk.ml.ObjectsAnnotation`のndarray
+    Returns:
+        tuple:
+
+        - X: 画像ファイルのパスのndarray
+        - y: tk.ml.ObjectsAnnotationのndarray
 
     """
     return load_set(vocdevkit_dir, 2007, 'test', class_name_to_id)
@@ -93,16 +100,18 @@ def load_07_test(vocdevkit_dir, class_name_to_id=None):
 def load_set(vocdevkit_dir, year, set_name, class_name_to_id=None, without_difficult=False):
     """PASCAL VOCデータセットの読み込み。
 
-    # 引数
-    - vocdevkit_dir: VOCdevkitディレクトリのパス
-    - year: 2007とか2012とか
-    - set_name: 'trainval'とか'test'とか
-    - class_name_to_id: クラス名からIDへの変換の辞書。Noneなら0～19に変換。
-    - without_difficult: difficultフラグが'1'のものを読み込まないならTrue。
+    Args:
+        vocdevkit_dir: VOCdevkitディレクトリのパス
+        year: 2007とか2012とか
+        set_name: 'trainval'とか'test'とか
+        class_name_to_id: クラス名からIDへの変換の辞書。Noneなら0～19に変換。
+        without_difficult: difficultフラグが'1'のものを読み込まないならTrue。
 
-    # 戻り値
-    - X: 画像ファイルのパスのndarray
-    - y: `tk.ml.ObjectsAnnotation`のndarray
+    Returns:
+        tuple:
+
+        - X: 画像ファイルのパスのndarray
+        - y: tk.ml.ObjectsAnnotationのndarray
 
     """
     vocdevkit_dir = pathlib.Path(vocdevkit_dir)
@@ -114,10 +123,12 @@ def load_set(vocdevkit_dir, year, set_name, class_name_to_id=None, without_diffi
 def load_annotations(vocdevkit_dir, annotations_dir, names=None, class_name_to_id=None, without_difficult=False):
     """VOC2007などのアノテーションデータの読み込み。
 
-    # 戻り値
-    - X: 画像ファイルのパスのndarray
-    - y: `tk.ml.ObjectsAnnotation`のndarray
-    - names: 「画像ファイル名拡張子なし」のリスト。またはNone。
+    Returns:
+        tuple:
+
+        - X: 画像ファイルのパスのndarray
+        - y: tk.ml.ObjectsAnnotationのndarray
+        - names: 「画像ファイル名拡張子なし」のリスト。またはNone。
 
     """
     d = pathlib.Path(annotations_dir)
@@ -170,10 +181,11 @@ def evaluate(y_true, y_pred):
     ChainerCVを利用。
     https://chainercv.readthedocs.io/en/stable/reference/evaluations.html?highlight=eval_detection_coco#eval-detection-voc
 
-    # 戻り値
-    - dict
-      - 'mAP': 普通っぽい(?)metric。
-      - 'mAP_VOC': PASCAL VOC 2007版metric。11点での平均。
+    Returns:
+        dict:
+
+        - 'mAP': 普通っぽい(?)metric。
+        - 'mAP_VOC': PASCAL VOC 2007版metric。11点での平均。
 
     """
     import chainercv

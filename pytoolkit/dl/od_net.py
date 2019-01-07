@@ -7,7 +7,7 @@ from .. import applications, log
 
 
 def get_preprocess_input():
-    """`preprocess_input`を返す。"""
+    """preprocess_inputを返す。"""
     return applications.darknet53.preprocess_input
 
 

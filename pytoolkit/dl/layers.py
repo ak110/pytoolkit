@@ -104,10 +104,10 @@ def channel_max():
 def resize2d():
     """リサイズ。
 
-    # 引数
-    - size: (new_height, new_width)
-    - scale: float (sizeと排他でどちらか必須)
-    - interpolation: 'bilinear', 'nearest', 'bicubic', 'area'
+    Args:
+        size: (new_height, new_width)
+        scale: float (sizeと排他でどちらか必須)
+        interpolation: 'bilinear', 'nearest', 'bicubic', 'area'
 
     """
     import keras
@@ -165,13 +165,13 @@ def resize2d():
 
 
 def pad2d():
-    """`tf.pad`するレイヤー。"""
+    """tf.padするレイヤー。"""
     import keras
     import keras.backend as K
     import tensorflow as tf
 
     class Pad2D(keras.layers.Layer):
-        """`tf.pad`するレイヤー。"""
+        """tf.padするレイヤー。"""
 
         def __init__(self, padding=(1, 1), mode='constant', constant_values=0, **kwargs):
             super().__init__(**kwargs)
@@ -217,13 +217,13 @@ def pad2d():
 
 
 def pad_channel_2d():
-    """チャンネルに対して`tf.pad`するレイヤー。"""
+    """チャンネルに対してtf.padするレイヤー。"""
     import keras
     import keras.backend as K
     import tensorflow as tf
 
     class PadChannel2D(keras.layers.Layer):
-        """`tf.pad`するレイヤー。"""
+        """tf.padするレイヤー。"""
 
         def __init__(self, filters, mode='constant', constant_values=0, **kwargs):
             assert mode in ('constant', 'reflect', 'symmetric')
@@ -508,7 +508,7 @@ def stocastic_add():
     class StocasticAdd(keras.layers.Layer):
         """Stocastic Depthのための確率的な加算。
 
-        # 引数
+        Args:
         - p: survival probability。1だとdropせず、0.5だと1/2の確率でdrop
 
         """
@@ -779,11 +779,11 @@ def weighted_mean():
 def parallel_grid_pooling_2d():
     """Parallel Grid Poolingレイヤー。
 
-    - Parallel Grid Pooling for Data Augmentation
-      https://arxiv.org/abs/1803.11370
+    ■ Parallel Grid Pooling for Data Augmentation
+    https://arxiv.org/abs/1803.11370
 
-    - akitotakeki/pgp-chainer: Chainer Implementation of Parallel Grid Pooling for Data Augmentation
-      https://github.com/akitotakeki/pgp-chainer
+    ■ akitotakeki/pgp-chainer: Chainer Implementation of Parallel Grid Pooling for Data Augmentation
+    https://github.com/akitotakeki/pgp-chainer
 
     """
     import keras

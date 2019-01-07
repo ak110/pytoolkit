@@ -2,10 +2,9 @@
 
 出来るだけobject-oriented interfaceを使用する。
 
-例：
-```
-ax = df.plot()  # type: matplotlib.axes.Axes
-```
+例::
+
+    ax = df.plot()  # type: matplotlib.axes.Axes
 
 """
 import io
@@ -44,15 +43,13 @@ def create_figure(figsize=None, dpi=None, facecolor=None, edgecolor=None,
 def get_colors(count, cmap='hsv', scale=255):
     """色を列挙する。
 
-    # 引数
+    Args:
+        count: 色の個数
+        cmap: matplotlibのカラーマップの名前。
+        scale: 1なら0～1、255なら0～255で返す。
 
-    - count: 色の個数
-    - cmap: matplotlibのカラーマップの名前。
-    - scale: 1なら0～1、255なら0～255で返す。
-
-    # 戻り値
-
-    (count, 4)のndarray。4はRGBA。
+    Returns:
+        (count, 4)のndarray。4はRGBA。
 
     """
     import matplotlib.cm
@@ -62,12 +59,10 @@ def get_colors(count, cmap='hsv', scale=255):
 def set_axis_tick_to_int(axis):
     """軸のラベルを整数のみにする。
 
-    # 使用例
+    使用例::
 
-    ```
-    ax.set_xlabel('Epochs')
-    tk.draw.set_axis_tick_to_int(ax.get_xaxis())
-    ```
+        ax.set_xlabel('Epochs')
+        tk.draw.set_axis_tick_to_int(ax.get_xaxis())
 
     """
     import matplotlib

@@ -16,16 +16,16 @@ def preprocess_masks(mask_files, cache_dir, class_colors, void_color, input_size
     マルチクラスの場合、one-hot化する計算コストが高いため仕方なく用意した。
     2クラスの場合は不要だが、一応同じように動くようにしておく。
 
-    # 引数
-    - mask_files: マスク画像のパスのリスト
-    - cache_dir: 保存先ディレクトリのパス
-    - class_colors: クラスの色の配列 or None (Noneなら白黒の2クラス)
-    - void_color: ラベル付けされていないピクセルがある場合、その色
-    - input_size: 入力サイズでリサイズする場合、そのサイズ。int or tuple。tupleは(height, width)。
-    - compress: 圧縮の有無。(しない方がちょっと早い)
+    Args:
+        mask_files: マスク画像のパスのリスト
+        cache_dir: 保存先ディレクトリのパス
+        class_colors: クラスの色の配列 or None (Noneなら白黒の2クラス)
+        void_color: ラベル付けされていないピクセルがある場合、その色
+        input_size: 入力サイズでリサイズする場合、そのサイズ。int or tuple。tupleは(height, width)。
+        compress: 圧縮の有無。(しない方がちょっと早い)
 
-    # 戻り値
-    - 保存先パスのリスト
+    Returns:
+        保存先パスのリスト
 
     """
     cache_dir = pathlib.Path(cache_dir)
@@ -83,11 +83,11 @@ class SemanticSegmentor(models.Model):
                weights='imagenet'):
         """学習用インスタンスの作成。
 
-        # 引数
-        - class_colors: クラスの色の配列 or None (Noneなら白黒の2クラス)
-        - void_color: ラベル付けされていないピクセルがある場合、その色
-        - additional_stage: encoderをより深くするならそのダウンサンプリング回数。(1増やすごとに縦横半分になる。端数があると死ぬので注意)
-        - weights: None, 'imagenet', 読み込む重みファイルのパスのいずれか。
+        Args:
+            class_colors: クラスの色の配列 or None (Noneなら白黒の2クラス)
+            void_color: ラベル付けされていないピクセルがある場合、その色
+            additional_stage: encoderをより深くするならそのダウンサンプリング回数。(1増やすごとに縦横半分になる。端数があると死ぬので注意)
+            weights: None, 'imagenet', 読み込む重みファイルのパスのいずれか。
 
         """
         assert class_colors is None or len(class_colors) >= 3
@@ -215,9 +215,11 @@ class SemanticSegmentor(models.Model):
     def compute_mean_iou(self, y_true, y_pred):
         """クラス毎のIoUとその平均(mean IoU)を算出する。
 
-        # 戻り値
-        - ious: クラスごとのIoU
-        - miou: iousの平均 (ただし2クラスの場合は0:背景、1:物体と見なして物体のIoU)
+        Returns:
+            tuple:
+
+            - ious: クラスごとのIoU
+            - miou: iousの平均 (ただし2クラスの場合は0:背景、1:物体と見なして物体のIoU)
 
         """
         if self.class_colors is None:

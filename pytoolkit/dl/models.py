@@ -7,7 +7,7 @@ from .. import draw, generator, log, utils
 
 
 class Model:
-    """`keras.models.Model` + `tk.dl.generators.Generator`の薄いラッパー。"""
+    """keras.models.Model + tk.dl.generators.Generatorの薄いラッパー。"""
 
     def __init__(self, model, gen: generator.Generator, batch_size, postprocess=None):
         import keras
@@ -133,18 +133,18 @@ class Model:
             callbacks=None):
         """学習。
 
-        # 引数
-        - balanced: クラス間のバランスが均等になるようにオーバーサンプリングするか否か。
-        - mixup: Data augmentationにmixupを使用するか否か。
-        - lr_list: 各epochでの学習率の配列。
-        - reduce_lr_epoch_rates: 学習率を減らすepoch数の割合のタプル。(0.5, 0.75)ならepoch数が50%と75%のときに学習率をreduce_lr_factor倍にする。
-        - reduce_lr_factor: reduce_lr_epoch_ratesで学習率を減らす割合。
-        - cosine_annealing: cosine annealingするならTrue。
-        - lr_warmup: HorovodのLearningRateWarmupCallbackを使うか否か。
-        - tsv_log_path: lossなどをtsvファイルに出力するならそのパス。
-        - tsv_log_append: tsv_log_pathで追記するか否か。
-        - checkpoint_path: 学習時にモデルを保存するならそのパス。
-        - checkpoints: 保存する回数。epochs % (checkpoints + 1) == 0だとキリのいい感じになる。
+        Args:
+            balanced: クラス間のバランスが均等になるようにオーバーサンプリングするか否か。
+            mixup: Data augmentationにmixupを使用するか否か。
+            lr_list: 各epochでの学習率の配列。
+            reduce_lr_epoch_rates: 学習率を減らすepoch数の割合のタプル。(0.5, 0.75)ならepoch数が50%と75%のときに学習率をreduce_lr_factor倍にする。
+            reduce_lr_factor: reduce_lr_epoch_ratesで学習率を減らす割合。
+            cosine_annealing: cosine annealingするならTrue。
+            lr_warmup: HorovodのLearningRateWarmupCallbackを使うか否か。
+            tsv_log_path: lossなどをtsvファイルに出力するならそのパス。
+            tsv_log_append: tsv_log_pathで追記するか否か。
+            checkpoint_path: 学習時にモデルを保存するならそのパス。
+            checkpoints: 保存する回数。epochs % (checkpoints + 1) == 0だとキリのいい感じになる。
 
         lr_list、reduce_lr、cosine_annealingの3つは排他。
 
@@ -250,7 +250,7 @@ class Model:
 
     @log.trace()
     def plot(self, to_file='model.png', show_shapes=False, show_layer_names=True, rankdir='TB'):
-        """pathlib対応＆hvd.is_master()な時のみ＆エラー握り潰しな`keras.utils.plot_model`。"""
+        """pathlib対応＆hvd.is_master()な時のみ＆エラー握り潰しなkeras.utils.plot_model。"""
         if hvd.is_master():
             import keras
             try:
@@ -344,7 +344,7 @@ def count_trainable_params(model):
 
 
 def print_largest_layers(model, top_n=10, print_fn=None):
-    """パラメータ数の多いレイヤー`top_n`個を表示する。"""
+    """パラメータ数の多いレイヤーtop_n個を表示する。"""
     import keras.backend as K
     print_fn = print_fn or log.get(__name__).info
     layers = [(layer.name, sum([K.count_params(p) for p in layer.trainable_weights])) for layer in model.layers]
@@ -374,7 +374,7 @@ def count_network_depth(model):
 def load_model(filepath, compile=True, custom_objects=None):  # pylint: disable=W0622
     """モデルの読み込み。
 
-    `keras.models.load_model()` + `tk.dl.get_custom_objects()`
+    keras.models.load_model() + tk.dl.get_custom_objects()
     """
     import keras
     custom_objects = custom_objects or {}
@@ -389,11 +389,12 @@ def load_weights(model, filepath, where_fn=None, strict_warnings=True):
     model.load_weights()は重みの形が違うと読み込めないが、
     警告を出しつつ読むようにしたもの。
 
-    # 引数
-    - model: 読み込み先モデル。
-    - filepath: モデルのファイルパス。(str or pathlib.Path)
-    - where_fn: 読み込むレイヤー名を受け取り、読み込むか否かを返すcallable。
-    - strict_warnings: 重みを持たないレイヤーについてもレイヤー名の不一致などにwarningログを出す。
+    Args:
+        model: 読み込み先モデル。
+        filepath: モデルのファイルパス。(str or pathlib.Path)
+        where_fn: 読み込むレイヤー名を受け取り、読み込むか否かを返すcallable。
+        strict_warnings: 重みを持たないレイヤーについてもレイヤー名の不一致などにwarningログを出す。
+
     """
     import h5py
     import keras.backend as K

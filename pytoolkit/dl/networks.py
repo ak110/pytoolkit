@@ -218,9 +218,9 @@ class Builder:
 class Sequence:
     """複数のレイヤーの塊。kerasのlayer風にcall出来るもの。(プロパティなどは必要に応じて実装予定。。)
 
-    # 引数
-    - seq: Kerasのレイヤーの配列。
-    - merge_layer: 入力とlayers適用後のをマージする時に使用するレイヤーを指定する。Noneなら何もしない。
+    Args:
+        seq: Kerasのレイヤーの配列。
+        merge_layer: 入力とlayers適用後のをマージする時に使用するレイヤーを指定する。Noneなら何もしない。
 
     """
 

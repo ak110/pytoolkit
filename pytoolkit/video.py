@@ -12,21 +12,20 @@ class VideoDataGenerator(generator.Generator):
     Xは画像のファイルパスの配列またはndarray。
     ndarrayの場合はRGB形式で、samples×times×rows×cols×channels。
 
-    # 引数
-    - grayscale: グレースケールで読み込むならTrue、RGBならFalse
+    Args:
+        grayscale: グレースケールで読み込むならTrue、RGBならFalse
 
-    # 使用例
-    ```
-    gen = tk.video.VideoDataGenerator()
-    gen.add(tk.video.Resize((299, 299)))
-    gen.add(tk.video.RandomFlipLR(probability=0.5))
-    gen.add(tk.video.GaussianNoise(probability=0.5))
-    gen.add(tk.video.RandomSaturation(probability=0.5))
-    gen.add(tk.video.RandomBrightness(probability=0.5))
-    gen.add(tk.video.RandomContrast(probability=0.5))
-    gen.add(tk.video.RandomHue(probability=0.5))
-    gen.add(tk.generator.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
-    ```
+    使用例::
+
+        gen = tk.video.VideoDataGenerator()
+        gen.add(tk.video.Resize((299, 299)))
+        gen.add(tk.video.RandomFlipLR(probability=0.5))
+        gen.add(tk.video.GaussianNoise(probability=0.5))
+        gen.add(tk.video.RandomSaturation(probability=0.5))
+        gen.add(tk.video.RandomBrightness(probability=0.5))
+        gen.add(tk.video.RandomContrast(probability=0.5))
+        gen.add(tk.video.RandomHue(probability=0.5))
+        gen.add(tk.generator.ProcessOutput(tk.ml.to_categorical(num_classes), batch_axis=True))
 
     """
 

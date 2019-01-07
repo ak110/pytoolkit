@@ -15,18 +15,15 @@ from . import draw, log, ndimage, utils
 class ObjectsAnnotation:
     """物体検出のアノテーションデータを持つためのクラス。
 
-    # プロパティ
-    - path: 画像ファイルのパス
-    - width: 画像の横幅(px)
-    - height: 画像の縦幅(px)
-    - classes: クラスIDのndarray。値は[0, num_classes)の整数。shapeは(物体数,)
-    - bboxes: bounding box(x1, y1, x2, y2)のndarray。値は[0, 1]。shapeは(物体数, 4)
-    - difficults: difficultフラグ(PASCAL VOCデータセット等で使用)のndarray。値はTrue or False。shapeは(物体数,)
-    - num_objects: 物体数
-    - real_bboxes: [0, 1]ではなくピクセル数単位に変換したbboxes
-    - difficults: 難しいものか否か (PASCAL VOC用)
-    - areas: 面積 (MS COCO用)
-    - crowdeds: クラウドソーシングでアノテーションされたか否か (MS COCO用)
+    Args:
+        path: 画像ファイルのパス
+        width: 画像の横幅[px]
+        height: 画像の縦幅[px]
+        classes: クラスIDのndarray。値は[0, num_classes)の整数。shapeは(物体数,)
+        bboxes: bounding box(x1, y1, x2, y2)のndarray。値は[0, 1]。shapeは(物体数, 4)
+        difficults: difficultフラグ(PASCAL VOCデータセット等で使用)のndarray。値はTrue or False。shapeは(物体数,)
+        areas: 面積 (MS COCO用)
+        crowdeds: クラウドソーシングでアノテーションされたか否か (MS COCO用)
 
     """
 
@@ -115,11 +112,10 @@ class ObjectsAnnotation:
 class ObjectsPrediction:
     """物体検出の予測結果を持つクラス。
 
-    # プロパティ
-    - classes: クラスIDのndarray。値は[0, num_classes)の整数。shapeは(物体数,)
-    - confs: 確信度のndarray。値は[0, 1]。shapeは(物体数,)
-    - bboxes: bounding box(x1, y1, x2, y2)のndarray。値は[0, 1]。shapeは(物体数, 4)
-    - num_objects: 物体数
+    Args:
+        classes: クラスIDのndarray。値は[0, num_classes)の整数。shapeは(物体数,)
+        confs: 確信度のndarray。値は[0, 1]。shapeは(物体数,)
+        bboxes: bounding box(x1, y1, x2, y2)のndarray。値は[0, 1]。shapeは(物体数, 4)
 
     """
 
@@ -200,10 +196,10 @@ class ObjectsPrediction:
 def listup_classification(dirpath, class_names=None, use_tqdm=True, check_image=False):
     """画像分類でよくある、クラス名ディレクトリの列挙。クラス名の配列, X, yを返す。
 
-    # 引数
-    - class_names: クラス名の配列
-    - use_tqdm: tqdmを使用するか否か
-    - check_image: 画像として読み込みチェックを行い、読み込み可能なファイルのみ返すか否か (遅いので注意)
+    Args:
+        class_names: クラス名の配列
+        use_tqdm: tqdmを使用するか否か
+        check_image: 画像として読み込みチェックを行い、読み込み可能なファイルのみ返すか否か (遅いので注意)
 
     """
     dirpath = pathlib.Path(dirpath)
@@ -237,10 +233,10 @@ def listup_classification(dirpath, class_names=None, use_tqdm=True, check_image=
 def listup_files(dirpath, recurse=False, use_tqdm=True, check_image=False):
     """ファイルの列挙。
 
-    # 引数
-    - recurse: 再帰的に配下もリストアップするか否か
-    - use_tqdm: tqdmを使用するか否か
-    - check_image: 画像として読み込みチェックを行い、読み込み可能なファイルのみ返すか否か (遅いので注意)
+    Args:
+        recurse: 再帰的に配下もリストアップするか否か
+        use_tqdm: tqdmを使用するか否か
+        check_image: 画像として読み込みチェックを行い、読み込み可能なファイルのみ返すか否か (遅いので注意)
 
     """
     result, errors = _listup_files(dirpath, recurse, use_tqdm, check_image)
@@ -281,11 +277,11 @@ def _listup_files(dirpath, recurse, use_tqdm, check_image):
 def split(X, y, split_seed, validation_split=None, cv_count=None, cv_index=None, stratify=None):
     """データの分割。
 
-    # 引数
-    - validation_split: 実数を指定するとX, y, weightsの一部をランダムにvalidation dataとする
-    - cv_count: cross validationする場合の分割数
-    - cv_index: cross validationする場合の何番目か
-    - split_seed: validation_splitやcvする場合のseed
+    Args:
+        validation_split: 実数を指定するとX, y, weightsの一部をランダムにvalidation dataとする
+        cv_count: cross validationする場合の分割数
+        cv_index: cross validationする場合の何番目か
+        split_seed: validation_splitやcvする場合のseed
     """
     assert len(X) == len(y)
     if validation_split is not None:
@@ -326,7 +322,7 @@ def to_categorical(num_classes):
 
 
 def search_conf_threshold(gt, pred, iou_threshold=0.5):
-    """物体検出の正解と予測結果から、F1スコアが最大になる`conf_threshold`を返す。"""
+    """物体検出の正解と予測結果から、F1スコアが最大になるconf_thresholdを返す。"""
     conf_threshold_list = np.linspace(0.01, 0.99, 50)
     scores = []
     for conf_th in conf_threshold_list:
@@ -561,13 +557,13 @@ def is_in_box(boxes_a, boxes_b):
 
 
 def cluster_by_iou(X, n_clusters, **kwargs):
-    """`1 - IoU`の値によるクラスタリング。
+    """1 - IoUの値によるクラスタリング。
 
     YOLOv2のDimension Clustersで使用されているもの。
     KMeansのモデルのインスタンスを返す。
     """
     def _iou_distances(X, Y=None, Y_norm_squared=None, squared=False, X_norm_squared=None):
-        """`1 - IoU`を返す。"""
+        """1 - IoUを返す。"""
         if Y is None:
             return _iou_distances(X, X, Y_norm_squared, squared, X_norm_squared)
         if len(X.shape) == 1:
@@ -587,16 +583,16 @@ def cluster_by_iou(X, n_clusters, **kwargs):
 
 
 def non_maximum_suppression(boxes, scores, top_k=200, iou_threshold=0.45):
-    """`iou_threshold`分以上重なっている場合、スコアの大きい方のみ採用する。
+    """iou_threshold分以上重なっている場合、スコアの大きい方のみ採用する。
 
-    # 引数
-    - boxes: ボックスの座標。shape=(ボックス数, 4)
-    - scores: スコア。shape=(ボックス数,)
-    - top_k: 最大何個の結果を返すか。
-    - iou_threshold: 重なりの閾値。
+    Args:
+        boxes: ボックスの座標。shape=(ボックス数, 4)
+        scores: スコア。shape=(ボックス数,)
+        top_k: 最大何個の結果を返すか。
+        iou_threshold: 重なりの閾値。
 
-    # 戻り値
-    インデックス。
+    Returns:
+        インデックス。
 
     """
     assert len(boxes) == len(scores)
@@ -628,8 +624,8 @@ def non_maximum_suppression(boxes, scores, top_k=200, iou_threshold=0.45):
 def print_classification_metrics(y_true, proba_pred, average='micro', print_fn=None):
     """分類の指標色々を表示する。
 
-    # 引数
-    - average: 'micro' ならF値などをサンプルごとに計算。'macro'ならクラスごとの重み無し平均。
+    Args:
+        average: 'micro' ならF値などをサンプルごとに計算。'macro'ならクラスごとの重み無し平均。
 
     """
     try:
@@ -735,14 +731,14 @@ def plot_cm(cm, to_file='confusion_matrix.png', classes=None, normalize=True, ti
 def plot_objects(base_image, classes, confs, bboxes, class_names, conf_threshold=0, max_long_side=None):
     """画像＋オブジェクト([class_id + confidence + xmin/ymin/xmax/ymax]×n)を画像化する。
 
-    # 引数
-    - base_image: 元画像ファイルのパスまたはndarray
-    - max_long_side: 長辺の最大長(ピクセル数)。超えていたら縮小する。
-    - classes: クラスIDのリスト
-    - confs: confidenceのリスト (None可)
-    - bboxes: xmin/ymin/xmax/ymaxのリスト (それぞれ0.0 ～ 1.0)
-    - class_names: クラスID→クラス名のリスト  (None可)
-    - conf_threshold: この値以上のオブジェクトのみ描画する
+    Args:
+        base_image: 元画像ファイルのパスまたはndarray
+        max_long_side: 長辺の最大長(ピクセル数)。超えていたら縮小する。
+        classes: クラスIDのリスト
+        confs: confidenceのリスト (None可)
+        bboxes: xmin/ymin/xmax/ymaxのリスト (それぞれ0.0 ～ 1.0)
+        class_names: クラスID→クラス名のリスト  (None可)
+        conf_threshold: この値以上のオブジェクトのみ描画する
 
     """
     import cv2

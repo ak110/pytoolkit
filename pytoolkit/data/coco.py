@@ -17,14 +17,17 @@ from .. import ml, ndimage, utils
 def load_od(coco_dir, year=2017):
     """物体検出のデータを読み込む。
 
-    # 引数
-    - coco_dir: annotationsディレクトリなどが入っているディレクトリのパス
-    - year: 読み込むデータの西暦
+    Args:
+        coco_dir: annotationsディレクトリなどが入っているディレクトリのパス
+        year: 読み込むデータの西暦
 
-    # 戻り値
-    - (X_train, y_train)
-    - (X_val, y_val)
-    - class_names
+    Returns:
+        tuple:
+
+        - (X_train, y_train)
+        - (X_val, y_val)
+        - class_names
+
     """
     X_train, y_train, class_names = load_od_data(coco_dir, f'train{year}')
     X_val, y_val, class_names_val = load_od_data(coco_dir, f'val{year}')
@@ -75,16 +78,19 @@ def load_od_data(coco_dir, data_name):
 def load_ss(coco_dir, cache_dir, input_size=None, year=2017):
     """セマンティックセグメンテーションのデータを読み込む。
 
-    # 引数
-    - coco_dir: annotationsディレクトリなどが入っているディレクトリのパス
-    - year: 読み込むデータの西暦
-    - cache_dir: キャッシュの保存先ディレクトリ
-    - input_size: 読み込み時にリサイズする場合、そのサイズ
+    Args:
+        coco_dir: annotationsディレクトリなどが入っているディレクトリのパス
+        year: 読み込むデータの西暦
+        cache_dir: キャッシュの保存先ディレクトリ
+        input_size: 読み込み時にリサイズする場合、そのサイズ
 
-    # 戻り値
-    - (X_train, y_train)
-    - (X_val, y_val)
-    - class_names
+    Returns:
+        tuple:
+
+        - (X_train, y_train): 訓練データ
+        - (X_val, y_val): 検証データ
+        - class_names: クラス名の配列
+
     """
     X_train, y_train, class_names = load_ss_data(coco_dir, f'train{year}', cache_dir, input_size)
     X_val, y_val, class_names_val = load_ss_data(coco_dir, f'val{year}', cache_dir, input_size)
@@ -139,12 +145,13 @@ def evaluate(y_true, y_pred):
     ChainerCVを利用。
     https://chainercv.readthedocs.io/en/stable/reference/evaluations.html?highlight=eval_detection_coco#chainercv.evaluations.eval_detection_coco
 
-    # 戻り値
-    - dict:
-      - "map/iou=0.50:0.95/area=all/max_dets=100"
-      - "map/iou=0.50/area=all/max_dets=100"
-      - "map/iou=0.75/area=all/max_dets=100"
-      - などなど
+    Returns:
+        dict:
+
+        - "map/iou=0.50:0.95/area=all/max_dets=100"
+        - "map/iou=0.50/area=all/max_dets=100"
+        - "map/iou=0.75/area=all/max_dets=100"
+        - などなど
 
     """
     import chainercv
