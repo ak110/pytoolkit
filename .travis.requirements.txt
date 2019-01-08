@@ -21,5 +21,5 @@ pytest
 scikit-learn
 scipy
 sqlalchemy
-tensorflow==1.10.0
+tensorflow
 tqdm

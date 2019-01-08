@@ -951,6 +951,13 @@ def nms():
             confs = image[:, 1]
             locs = image[:, 2:]
 
+            # tf 1.11以降用のworkaround <https://github.com/tensorflow/tensorflow/issues/22581>
+            if tf.__version__ in ('1.11.0', '1.12.0'):
+                from tensorflow.python.ops import gen_image_ops
+                nms = gen_image_ops.non_max_suppression_v2
+            else:
+                nms = tf.image.non_max_suppression
+
             img_classes = []
             img_confs = []
             img_locs = []
@@ -963,7 +970,7 @@ def nms():
                 # NMS
                 top_k = self.top_k * 2 if self.nms_all_threshold else self.top_k  # 全体でもNMSするなら余裕を持たせる必要がある
                 top_k = K.minimum(top_k, K.shape(target_confs)[0])
-                nms_indices = tf.image.non_max_suppression(target_locs, target_confs, top_k, self.nms_threshold)
+                nms_indices = nms(target_locs, target_confs, top_k, self.nms_threshold)
                 img_classes.append(K.gather(target_classes, nms_indices))
                 img_confs.append(K.gather(target_confs, nms_indices))
                 img_locs.append(K.gather(target_locs, nms_indices))
@@ -975,7 +982,7 @@ def nms():
             # 全クラスで再度NMS or top_k
             top_k = K.minimum(self.top_k, K.shape(img_confs)[0])
             if self.nms_all_threshold:
-                nms_indices = tf.image.non_max_suppression(img_locs, img_confs, top_k, self.nms_all_threshold)
+                nms_indices = nms(img_locs, img_confs, top_k, self.nms_all_threshold)
                 img_classes = K.gather(img_classes, nms_indices)
                 img_confs = K.gather(img_confs, nms_indices)
                 img_locs = K.gather(img_locs, nms_indices)
