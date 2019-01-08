@@ -31,6 +31,7 @@ disable=
     ,too-many-arguments
     ,too-many-branches
     ,too-many-instance-attributes
+    ,too-many-lines
     ,too-many-locals
     ,too-many-nested-blocks
     ,too-many-return-statements
@@ -41,6 +42,6 @@ disable=
 max-line-length=256
 
 [TYPECHECK]
-ignored-modules=__init__,numpy,matplotlib.cm,mpi4py,mpi4py.MPI,distutils,horovod
+ignored-modules=__init__,numpy,matplotlib.cm,mpi4py,mpi4py.MPI,distutils,horovod,tensorflow
 ignored-classes=LookupDict,jinja_env,tuple,Empty,pathlib.PurePath,h5py.File,ConfigProto,SQLAlchemy,scoped_session
 
