@@ -296,7 +296,7 @@ class RandomZoom(generator.Operator):
             padded_size = np.maximum(padded_size, input_size)
             padding_size = padded_size - input_size
             paste_xy = np.array([rand.randint(0, padding_size[0] + 1), rand.randint(0, padding_size[1] + 1)])
-            if isinstance(y, ml.ObjectsAnnotation):
+            if isinstance(y, ml.ObjectsAnnotation) and y.num_objects > 0:
                 bboxes = np.copy(y.bboxes)
                 bboxes = (np.tile(paste_xy, 2) + bboxes * np.tile(input_size, 2)) / np.tile(padded_size, 2)
                 sb = bboxes * np.tile(self.output_size, 2)
@@ -328,7 +328,7 @@ class RandomZoom(generator.Operator):
             cropping_size = input_size - cropped_wh
             crop_xy = np.array([rand.randint(0, cropping_size[0] + 1), rand.randint(0, cropping_size[1] + 1)])
             crop_box = np.concatenate([crop_xy, crop_xy + cropped_wh]) / np.tile(input_size, 2)
-            if isinstance(y, ml.ObjectsAnnotation):
+            if isinstance(y, ml.ObjectsAnnotation) and y.num_objects > 0:
                 # 中心を含むbboxのみ有効
                 bb_mask = math.in_range(bb_center, crop_box[:2], crop_box[2:]).all(axis=-1)
                 if not bb_mask.any():
