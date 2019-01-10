@@ -119,3 +119,21 @@ def l1_smooth_loss(y_true, y_pred):
     l1_loss = tf.where(K.less(abs_loss, 1.0), sq_loss, abs_loss - 0.5)
     l1_loss = K.sum(l1_loss, axis=-1)
     return l1_loss
+
+
+def mse(y_true, y_pred):
+    """AutoEncoderとか用mean squared error"""
+    import keras.backend as K
+    return K.mean(K.square(y_pred - y_true), axis=list(range(1, K.ndim(y_true))))
+
+
+def mae(y_true, y_pred):
+    """AutoEncoderとか用mean absolute error"""
+    import keras.backend as K
+    return K.mean(K.abs(y_pred - y_true), axis=list(range(1, K.ndim(y_true))))
+
+
+def rmse(y_true, y_pred):
+    """AutoEncoderとか用root mean squared error"""
+    import keras.backend as K
+    return K.sqrt(K.mean(K.square(y_pred - y_true), axis=list(range(1, K.ndim(y_true)))))

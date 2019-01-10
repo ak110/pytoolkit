@@ -34,13 +34,21 @@ class Model:
             model.set_multi_gpu_model(gpus=gpus)
         return model
 
-    def load_weights(self, filepath, where_fn=None, strict_warnings=True):
+    def load_weights(self, filepath, where_fn=None, strict_warnings=True, verbose=True):
         """重みの読み込み。
 
         model.load_weights()は重みの形が違うと読み込めないが、
         警告を出しつつ読むようにしたもの。
+
+        Args:
+            model: 読み込み先モデル。
+            filepath: モデルのファイルパス。(str or pathlib.Path)
+            where_fn: 読み込むレイヤー名を受け取り、読み込むか否かを返すcallable。
+            strict_warnings: 重みを持たないレイヤーについてもレイヤー名の不一致などにwarningログを出す。
+            verbose: ログ出力するならTrue
+
         """
-        load_weights(self.parent_model, filepath, where_fn, strict_warnings)
+        load_weights(self.parent_model, filepath, where_fn, strict_warnings, verbose)
 
     def set_multi_gpu_model(self, gpus=None):
         """マルチGPU化。"""
@@ -383,7 +391,7 @@ def load_model(filepath, compile=True, custom_objects=None):  # pylint: disable=
 
 
 @log.trace()
-def load_weights(model, filepath, where_fn=None, strict_warnings=True):
+def load_weights(model, filepath, where_fn=None, strict_warnings=True, verbose=True):
     """重みの読み込み。
 
     model.load_weights()は重みの形が違うと読み込めないが、
@@ -394,6 +402,7 @@ def load_weights(model, filepath, where_fn=None, strict_warnings=True):
         filepath: モデルのファイルパス。(str or pathlib.Path)
         where_fn: 読み込むレイヤー名を受け取り、読み込むか否かを返すcallable。
         strict_warnings: 重みを持たないレイヤーについてもレイヤー名の不一致などにwarningログを出す。
+        verbose: ログ出力するならTrue
 
     """
     import h5py
@@ -401,6 +410,7 @@ def load_weights(model, filepath, where_fn=None, strict_warnings=True):
     from keras.engine.saving import preprocess_weights_for_loading
 
     logger = log.get(__name__)
+    loaded_layers = 0
     with h5py.File(str(filepath), mode='r') as f:
         if 'layer_names' not in f.attrs and 'model_weights' in f:
             f = f['model_weights']
@@ -444,4 +454,9 @@ def load_weights(model, filepath, where_fn=None, strict_warnings=True):
             if is_match_shapes:
                 for s, w in zip(symbolic_weights, weight_values):
                     weight_value_tuples.append((s, w))
+                loaded_layers += 1
+
         K.batch_set_value(weight_value_tuples)
+
+    if verbose:
+        logger.info(f'{filepath} was loaded. (loaded layers: {loaded_layers})')

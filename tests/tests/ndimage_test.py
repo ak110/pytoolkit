@@ -87,12 +87,15 @@ def test_filters(data_dir, check_dir):
         cp.unlink()
     for i, (partial, name, filter_func) in enumerate(filters):
         x = np.copy(rgb)
+        x.flags.writeable = False  # 書き込み禁止でも動くようにしておく
+
         t = filter_func(x[64:-64, 64:-64, :] if partial else x)
 
         assert t.dtype == np.uint8
         assert len(t.shape) == 3
 
         if partial:
+            x.flags.writeable = True
             x[64:-64, 64:-64, :] = t
         else:
             x = t
