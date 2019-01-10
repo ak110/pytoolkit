@@ -8,7 +8,7 @@ import pytoolkit as tk
 
 _BATCH_SIZE = 16
 _ITER = 32
-_IMAGE_SIZE = (512, 512)
+_IMAGE_SIZE = (1024, 1024)
 
 
 def _main():

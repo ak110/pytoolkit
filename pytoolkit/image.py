@@ -669,6 +669,7 @@ class RandomAlpha(generator.Operator):
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         if ctx.do_augmentation(rand, self.probability):
+            x = np.copy(x)
             for _ in range(self.max_tries):
                 s = x.shape[0] * x.shape[1] * rand.uniform(self.scale_low, self.scale_high)
                 r = np.exp(rand.uniform(np.log(self.rate_1), np.log(self.rate_2)))
@@ -679,8 +680,7 @@ class RandomAlpha(generator.Operator):
                 ex = rand.randint(0, x.shape[1] - ew)
                 ey = rand.randint(0, x.shape[0] - eh)
                 rc = rand.randint(0, 256, size=x.shape[-1])
-                x_ref = x[ey:ey + eh, ex:ex + ew, :]
-                x[ey:ey + eh, ex:ex + ew, :] = x_ref * (1 - self.alpha) + rc * self.alpha
+                x[ey:ey + eh, ex:ex + ew, :] = (x[ey:ey + eh, ex:ex + ew, :] * (1 - self.alpha) + rc * self.alpha).astype(np.uint8)
                 break
         return x, y, w
 
@@ -711,6 +711,7 @@ class RandomErasing(generator.Operator):
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         if ctx.do_augmentation(rand, self.probability):
+            x = np.copy(x)
             bboxes = np.round(y.bboxes * np.array(x.shape)[[1, 0, 1, 0]]) if isinstance(y, ml.ObjectsAnnotation) else None
             if self.object_aware:
                 assert bboxes is not None
