@@ -42,18 +42,12 @@ def register_csrf_token(app, session_key='_csrf_token', form_key='nonce', func_n
             if not token or token != flask.request.form.get(form_key):
                 flask.abort(403)
 
-    def _csrf_nocache(r):
-        if session_key in flask.session:
-            set_no_cache(r)
-        return r
-
     def _generate_csrf_token():
         if session_key not in flask.session:
             flask.session[session_key] = secrets.token_hex()
         return flask.session[session_key]
 
     app.before_request(_csrf_protect)
-    app.after_request(_csrf_nocache)
     app.jinja_env.globals[func_name] = _generate_csrf_token
 
 
