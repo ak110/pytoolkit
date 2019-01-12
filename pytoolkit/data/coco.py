@@ -37,9 +37,9 @@ def load_od(coco_dir, year=2017):
 
 def load_od_data(coco_dir, data_name):
     """物体検出のデータの読み込み。"""
-    import pycocotools
+    from pycocotools import coco
     coco_dir = pathlib.Path(coco_dir)
-    coco = pycocotools.coco.COCO(str(coco_dir / 'annotations' / f'instances_{data_name}.json'))
+    coco = coco.COCO(str(coco_dir / 'annotations' / f'instances_{data_name}.json'))
 
     class_names = [c['name'] for c in coco.loadCats(coco.getCatIds())]
     jsonclassid_to_index = {c['id']: class_names.index(c['name']) for c in coco.loadCats(coco.getCatIds())}
@@ -100,13 +100,13 @@ def load_ss(coco_dir, cache_dir, input_size=None, year=2017):
 
 def load_ss_data(coco_dir, data_name, cache_dir, input_size=None):
     """セマンティックセグメンテーションのデータの読み込み。"""
-    import pycocotools
+    from pycocotools import coco, mask
     coco_dir = pathlib.Path(coco_dir)
     cache_dir = pathlib.Path(cache_dir)
     if isinstance(input_size, int):
         input_size = (input_size, input_size)
 
-    coco = pycocotools.coco.COCO(str(coco_dir / 'annotations' / f'instances_{data_name}.json'))
+    coco = coco.COCO(str(coco_dir / 'annotations' / f'instances_{data_name}.json'))
 
     class_names = [c['name'] for c in coco.loadCats(coco.getCatIds())]
     jsonclassid_to_index = {c['id']: class_names.index(c['name']) for c in coco.loadCats(coco.getCatIds())}
@@ -124,8 +124,8 @@ def load_ss_data(coco_dir, data_name, cache_dir, input_size=None):
             for obj in objs:
                 if obj.get('ignore', 0) == 1:
                     continue
-                rle = pycocotools.mask.frPyObjects(obj['segmentation'], entry['height'], entry['width'])
-                m = pycocotools.mask.decode(rle)
+                rle = mask.frPyObjects(obj['segmentation'], entry['height'], entry['width'])
+                m = mask.decode(rle)
                 class_id = jsonclassid_to_index[obj['category_id']]
                 mask[:, :, class_id] |= m
             mask = np.where(mask, np.uint8(255), np.uint8(0))
