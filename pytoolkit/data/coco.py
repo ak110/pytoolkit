@@ -100,7 +100,7 @@ def load_ss(coco_dir, cache_dir, input_size=None, year=2017):
 
 def load_ss_data(coco_dir, data_name, cache_dir, input_size=None):
     """セマンティックセグメンテーションのデータの読み込み。"""
-    from pycocotools import coco, mask
+    from pycocotools import coco, mask as cocomask
     coco_dir = pathlib.Path(coco_dir)
     cache_dir = pathlib.Path(cache_dir)
     if isinstance(input_size, int):
@@ -124,8 +124,8 @@ def load_ss_data(coco_dir, data_name, cache_dir, input_size=None):
             for obj in objs:
                 if obj.get('ignore', 0) == 1:
                     continue
-                rle = mask.frPyObjects(obj['segmentation'], entry['height'], entry['width'])
-                m = mask.decode(rle)
+                rle = cocomask.frPyObjects(obj['segmentation'], entry['height'], entry['width'])
+                m = cocomask.decode(rle)
                 class_id = jsonclassid_to_index[obj['category_id']]
                 mask[:, :, class_id] |= m
             mask = np.where(mask, np.uint8(255), np.uint8(0))

@@ -1,4 +1,3 @@
-import pathlib
 
 import numpy as np
 import pytest
@@ -79,6 +78,10 @@ def test_filters(data_dir, check_dir):
         (0, 'rot90', lambda rgb: tk.ndimage.rot90(rgb, 1)),
         (0, 'rot180', lambda rgb: tk.ndimage.rot90(rgb, 2)),
         (0, 'rot270', lambda rgb: tk.ndimage.rot90(rgb, 3)),
+        (0, 'random_erasing', lambda rgb: tk.ndimage.erase_random(rgb, rand)),
+        (0, 'random_alpha', lambda rgb: tk.ndimage.erase_random(rgb, rand, alpha=0.125)),
+        (0, 'random_erasing', lambda rgb: tk.ndimage.erase_random(rgb, rand, bboxes=np.array([[64, 64, 128, 128]]))),
+        (0, 'random_alpha', lambda rgb: tk.ndimage.erase_random(rgb, rand, bboxes=np.array([[64, 64, 128, 128]]), alpha=0.125)),
     ]
 
     rgb = tk.ndimage.load(data_dir / 'Lenna.png')  # 256x256の某有名画像

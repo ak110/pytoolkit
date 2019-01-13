@@ -402,3 +402,51 @@ def posterize(rgb: np.ndarray, bits) -> np.ndarray:
     assert bits in range(1, 8 + 1)
     t = 2 ** (8 - bits) / 255
     return np.round(rgb * t) / t
+
+
+def erase_random(rgb, rand, bboxes=None, scale_low=0.02, scale_high=0.4, rate_1=1 / 3, rate_2=3, alpha=None, max_tries=30):
+    """Random erasing <https://arxiv.org/abs/1708.04896>"""
+    if bboxes is not None:
+        bb_lt = bboxes[:, :2]  # 左上
+        bb_rb = bboxes[:, 2:]  # 右下
+        bb_lb = bboxes[:, (0, 3)]  # 左下
+        bb_rt = bboxes[:, (1, 2)]  # 右上
+        bb_c = (bb_lt + bb_rb) / 2  # 中央
+
+    for _ in range(max_tries):
+        s = rgb.shape[0] * rgb.shape[1] * rand.uniform(scale_low, scale_high)
+        r = np.exp(rand.uniform(np.log(rate_1), np.log(rate_2)))
+        ew = int(np.sqrt(s / r))
+        eh = int(np.sqrt(s * r))
+        if ew <= 0 or eh <= 0 or ew >= rgb.shape[1] or eh >= rgb.shape[0]:
+            continue
+        ex = rand.randint(0, rgb.shape[1] - ew)
+        ey = rand.randint(0, rgb.shape[0] - eh)
+
+        if bboxes is not None:
+            box_lt = np.array([[ex, ey]])
+            box_rb = np.array([[ex + ew, ey + eh]])
+            # bboxの頂点および中央を1つでも含んでいたらNGとする
+            if np.logical_and(box_lt <= bb_lt, bb_lt <= box_rb).all(axis=-1).any() or \
+               np.logical_and(box_lt <= bb_rb, bb_rb <= box_rb).all(axis=-1).any() or \
+               np.logical_and(box_lt <= bb_lb, bb_lb <= box_rb).all(axis=-1).any() or \
+               np.logical_and(box_lt <= bb_rt, bb_rt <= box_rb).all(axis=-1).any() or \
+               np.logical_and(box_lt <= bb_c, bb_c <= box_rb).all(axis=-1).any():
+                continue
+            # 面積チェック。塗りつぶされるのがbboxの面積の25%を超えていたらNGとする
+            lt = np.maximum(bb_lt, box_lt)
+            rb = np.minimum(bb_rb, box_rb)
+            area_inter = np.prod(rb - lt, axis=-1) * (lt < rb).all(axis=-1)
+            area_bb = np.prod(bb_rb - bb_lt, axis=-1)
+            if (area_inter >= area_bb * 0.25).any():
+                continue
+
+        rgb = np.copy(rgb)
+        rc = rand.randint(0, 256, size=rgb.shape[-1])
+        if alpha:
+            rgb[ey:ey + eh, ex:ex + ew, :] = (rgb[ey:ey + eh, ex:ex + ew, :] * (1 - alpha) + rc * alpha).astype(np.uint8)
+        else:
+            rgb[ey:ey + eh, ex:ex + ew, :] = rc[np.newaxis, np.newaxis, :]
+        break
+
+    return rgb

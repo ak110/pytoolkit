@@ -669,26 +669,16 @@ class RandomAlpha(generator.Operator):
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         if ctx.do_augmentation(rand, self.probability):
-            x = np.copy(x)
-            for _ in range(self.max_tries):
-                s = x.shape[0] * x.shape[1] * rand.uniform(self.scale_low, self.scale_high)
-                r = np.exp(rand.uniform(np.log(self.rate_1), np.log(self.rate_2)))
-                ew = int(np.sqrt(s / r))
-                eh = int(np.sqrt(s * r))
-                if ew <= 0 or eh <= 0 or ew >= x.shape[1] or eh >= x.shape[0]:
-                    continue
-                ex = rand.randint(0, x.shape[1] - ew)
-                ey = rand.randint(0, x.shape[0] - eh)
-                rc = rand.randint(0, 256, size=x.shape[-1])
-                x[ey:ey + eh, ex:ex + ew, :] = (x[ey:ey + eh, ex:ex + ew, :] * (1 - self.alpha) + rc * self.alpha).astype(np.uint8)
-                break
+            x = ndimage.erase_random(
+                x, rand, bboxes=None,
+                scale_low=self.scale_low, scale_high=self.scale_high,
+                rate_1=self.rate_1, rate_2=self.rate_2,
+                alpha=self.alpha, max_tries=self.max_tries)
         return x, y, w
 
 
 class RandomErasing(generator.Operator):
-    """Random Erasing。
-
-    https://arxiv.org/abs/1708.04896
+    """Random Erasing <https://arxiv.org/abs/1708.04896>
 
     Args:
         object_aware: yがObjectsAnnotationのとき、各オブジェクト内でRandom Erasing。(論文によるとTrueとFalseの両方をやるのが良い)
@@ -729,52 +719,17 @@ class RandomErasing(generator.Operator):
                         inter_boxes = np.copy(bboxes[inter[i]])
                         inter_boxes -= np.expand_dims(np.tile(b[:2], 2), axis=0)  # bに合わせて平行移動
                         # random erasing
-                        x[b[1]:b[3], b[0]:b[2], :] = self._erase_random(x[b[1]:b[3], b[0]:b[2], :], rand, inter_boxes)
+                        x[b[1]:b[3], b[0]:b[2], :] = ndimage.erase_random(
+                            x[b[1]:b[3], b[0]:b[2], :], rand, bboxes=inter_boxes,
+                            scale_low=self.scale_low, scale_high=self.scale_high,
+                            rate_1=self.rate_1, rate_2=self.rate_2, max_tries=self.max_tries)
             else:
                 # 画像全体でrandom erasing。
-                x = self._erase_random(x, rand, bboxes)
+                x = ndimage.erase_random(
+                    x, rand, bboxes=None,
+                    scale_low=self.scale_low, scale_high=self.scale_high,
+                    rate_1=self.rate_1, rate_2=self.rate_2, max_tries=self.max_tries)
         return x, y, w
-
-    def _erase_random(self, x, rand, bboxes):
-        if bboxes is not None:
-            bb_lt = bboxes[:, :2]  # 左上
-            bb_rb = bboxes[:, 2:]  # 右下
-            bb_lb = bboxes[:, (0, 3)]  # 左下
-            bb_rt = bboxes[:, (1, 2)]  # 右上
-            bb_c = (bb_lt + bb_rb) / 2  # 中央
-
-        for _ in range(self.max_tries):
-            s = x.shape[0] * x.shape[1] * rand.uniform(self.scale_low, self.scale_high)
-            r = np.exp(rand.uniform(np.log(self.rate_1), np.log(self.rate_2)))
-            ew = int(np.sqrt(s / r))
-            eh = int(np.sqrt(s * r))
-            if ew <= 0 or eh <= 0 or ew >= x.shape[1] or eh >= x.shape[0]:
-                continue
-            ex = rand.randint(0, x.shape[1] - ew)
-            ey = rand.randint(0, x.shape[0] - eh)
-
-            if bboxes is not None:
-                box_lt = np.array([[ex, ey]])
-                box_rb = np.array([[ex + ew, ey + eh]])
-                # bboxの頂点および中央を1つでも含んでいたらNGとする
-                if np.logical_and(box_lt <= bb_lt, bb_lt <= box_rb).all(axis=-1).any() or \
-                   np.logical_and(box_lt <= bb_rb, bb_rb <= box_rb).all(axis=-1).any() or \
-                   np.logical_and(box_lt <= bb_lb, bb_lb <= box_rb).all(axis=-1).any() or \
-                   np.logical_and(box_lt <= bb_rt, bb_rt <= box_rb).all(axis=-1).any() or \
-                   np.logical_and(box_lt <= bb_c, bb_c <= box_rb).all(axis=-1).any():
-                    continue
-                # 面積チェック。塗りつぶされるのがbboxの面積の25%を超えていたらNGとする
-                lt = np.maximum(bb_lt, box_lt)
-                rb = np.minimum(bb_rb, box_rb)
-                area_inter = np.prod(rb - lt, axis=-1) * (lt < rb).all(axis=-1)
-                area_bb = np.prod(bb_rb - bb_lt, axis=-1)
-                if (area_inter >= area_bb * 0.25).any():
-                    continue
-
-            x[ey:ey + eh, ex:ex + ew, :] = rand.randint(0, 256, size=x.shape[-1])[np.newaxis, np.newaxis, :]
-            break
-
-        return x
 
 
 class Mixup(generator.Operator):
