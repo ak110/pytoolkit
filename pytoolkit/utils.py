@@ -119,9 +119,14 @@ def capture_output():
 
 
 def tqdm(iterable=None, desc=None, total=None, leave=True, **kwargs):
-    """tqdmの簡単なラッパー。"""
+    """ascii=Trueでncols=100なtqdm。"""
     from tqdm import tqdm as t
     return t(iterable, desc, total, leave, ascii=True, ncols=100, **kwargs)
+
+
+def trange(*args, **kwargs):
+    """ascii=Trueでncols=100なtqdm.trange。"""
+    return tqdm(range(*args), **kwargs)
 
 
 def delayed(fn):

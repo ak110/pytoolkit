@@ -98,7 +98,7 @@ class LoadOneHotMask(generator.Operator):
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         """処理。"""
-        assert rand is not None and ctx is not None # noqa
+        assert rand is not None and ctx is not None  # noqa
         if y is not None:
             mask = ndimage.load(y, grayscale=False)
             y = ndimage.mask_to_onehot(mask, class_colors=self.class_colors, append_bg=self.append_bg)
