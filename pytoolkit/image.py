@@ -53,14 +53,14 @@ class LoadImage(generator.Operator):
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         """処理。"""
-        assert rand is not None  # noqa
+        assert rand is not None and ctx is not None  # noqa
         x = ndimage.load(x, grayscale=self.grayscale, use_cache=self.use_cache, max_size=self.max_size)
         assert len(x.shape) == 3
         return x, y, w
 
 
 class LoadOutputImage(generator.Operator):
-    """画像の読み込み。
+    """画像とかの読み込み。
 
     Args:
         grayscale: グレースケールで読み込むならTrue、RGBならFalse
@@ -76,10 +76,32 @@ class LoadOutputImage(generator.Operator):
 
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         """処理。"""
-        assert rand is not None  # noqa
+        assert rand is not None and ctx is not None  # noqa
         if y is not None:
             y = ndimage.load(y, grayscale=self.grayscale, use_cache=self.use_cache, max_size=self.max_size)
             assert len(y.shape) == 3
+        return x, y, w
+
+
+class LoadOneHotMask(generator.Operator):
+    """画像の読み込み＆one-hot化。
+
+    Args:
+        class_colors: RGB値の配列。shape=(num_classes, 3)
+        append_bg: class_colorsに該当しない色を背景扱いとして末尾にクラスを追加するならTrue。
+
+    """
+
+    def __init__(self, class_colors, append_bg=False):
+        self.class_colors = class_colors
+        self.append_bg = append_bg
+
+    def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
+        """処理。"""
+        assert rand is not None and ctx is not None # noqa
+        if y is not None:
+            mask = ndimage.load(y, grayscale=False)
+            y = ndimage.mask_to_onehot(mask, class_colors=self.class_colors, append_bg=self.append_bg)
         return x, y, w
 
 

@@ -450,3 +450,43 @@ def erase_random(rgb, rand, bboxes=None, scale_low=0.02, scale_high=0.4, rate_1=
         break
 
     return rgb
+
+
+def mask_to_onehot(rgb, class_colors, append_bg=False):
+    """RGBのマスク画像をone-hot形式に変換する。
+
+    Args:
+        class_colors: 色の配列。shape=(num_classes, 3)
+        append_bg: class_colorsに該当しない色のクラスを追加するならTrue。
+
+    Returns:
+        ndarray shape=(H, W, num_classes) dtype=np.float32
+
+        append_bgがTrueの場合はnum_classesはlen(class_colors) + 1
+
+    """
+    num_classes = len(class_colors) + (1 if append_bg else 0)
+    result = np.zeros((rgb.shape[0], rgb.shape[1], num_classes), np.float32)
+    for i in range(len(class_colors)):
+        result[np.all(rgb == class_colors[i], axis=-1), i] = 1
+    if append_bg:
+        result[:, :, -1] = 1 - result[:, :, :-1].sum(axis=-1)
+    return result
+
+
+def mask_to_class(rgb, class_colors, void_class=-1):
+    """RGBのマスク画像をクラスIDの配列に変換する。
+
+    Args:
+        class_colors: 色の配列。shape=(num_classes, 3)
+        void_class: class_colorsに該当しない色のピクセルの値。
+
+    Returns:
+        ndarray shape=(H, W) dtype=np.int32
+
+    """
+    result = np.empty(rgb.shape[:2], dtype=np.int32)
+    result[:] = void_class
+    for i in range(len(class_colors)):
+        result[np.all(rgb == class_colors[i], axis=-1)] = i
+    return result
