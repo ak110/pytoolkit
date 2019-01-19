@@ -27,10 +27,6 @@ def learning_rate(reduce_epoch_rates=(0.5, 0.75), factor=0.1, epochs=None):
         def on_train_begin(self, logs=None):
             epochs = self.epochs or self.params['epochs']
             self.reduce_epochs = [min(max(int(epochs * r), 1), epochs) for r in self.reduce_epoch_rates]
-            # 重複は禁止
-            assert len(self.reduce_epochs) == len(np.unique(self.reduce_epochs)), f'reduce_epochsエラー: {self.reduce_epochs}'
-            # Horovod使用時はWarmupとぶつかりかねないので5epoch以下でのreduceは禁止
-            assert not (hvd.initialized() and self.reduce_epochs[0] <= 5), f'reduce_epochsエラー: {self.reduce_epochs}'
 
         def on_epoch_begin(self, epoch, logs=None):
             if epoch + 1 in self.reduce_epochs:
@@ -283,6 +279,7 @@ def unfreeze(epoch_rate: float):
 
     """
     import keras
+    assert 0 < epoch_rate <= 1
 
     class _UnfreezeCallback(keras.callbacks.Callback):
 
@@ -292,7 +289,6 @@ def unfreeze(epoch_rate: float):
             super().__init__()
 
         def on_train_begin(self, logs=None):
-            assert 0 < self.epoch_rate <= 1
             self.target_epoch = int(self.params['epochs'] * self.epoch_rate)
 
         def on_epoch_begin(self, epoch, logs=None):
@@ -357,8 +353,6 @@ def checkpoint(checkpoint_path, checkpoints=3):
         def on_train_begin(self, logs=None):
             s = self.checkpoints + 1
             self.target_epochs = {self.params['epochs'] * (i + 1) // s for i in range(s)}
-            assert 0 not in self.target_epochs
-            assert self.params['epochs'] - 1 not in self.target_epochs
 
         def on_epoch_begin(self, epoch, logs=None):
             if epoch in self.target_epochs:
