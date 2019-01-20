@@ -126,7 +126,7 @@ def tqdm(iterable=None, desc=None, total=None, leave=True, **kwargs):
 
 def trange(*args, **kwargs):
     """ascii=Trueでncols=100なtqdm.trange。"""
-    return tqdm(range(*args), **kwargs)
+    return tqdm(list(range(*args)), **kwargs)
 
 
 def delayed(fn):

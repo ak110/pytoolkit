@@ -77,7 +77,7 @@ class LoadOutputImage(generator.Operator):
     def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
         """処理。"""
         assert rand is not None and ctx is not None  # noqa
-        if y is not None:
+        if y is not None and not isinstance(y, np.ndarray):
             y = ndimage.load(y, grayscale=self.grayscale, use_cache=self.use_cache, max_size=self.max_size)
             assert len(y.shape) == 3
         return x, y, w
