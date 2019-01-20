@@ -160,7 +160,7 @@ def rotate(rgb: np.ndarray, degrees: float, expand=True, interp='lanczos', borde
     }[interp]
     cv2_border = {
         'edge': cv2.BORDER_REPLICATE,
-        'reflect': cv2.BORDER_REFLECT,
+        'reflect': cv2.BORDER_REFLECT_101,
         'wrap': cv2.BORDER_WRAP,
     }[border_mode]
     size = (rgb.shape[1], rgb.shape[0])
@@ -277,7 +277,7 @@ def resize(rgb: np.ndarray, width: int, height: int, padding=None, interp='lancz
         }[interp]
     else:  # 縮小
         cv2_interp = cv2.INTER_NEAREST if interp == 'nearest' else cv2.INTER_AREA
-    if rgb.shape[-1] in (1, 3, 4):
+    if rgb.shape[-1] in (1, 3):
         rgb = cv2.resize(rgb, (width, height), interpolation=cv2_interp)
         if len(rgb.shape) == 2:
             rgb = np.expand_dims(rgb, axis=-1)
@@ -402,6 +402,120 @@ def posterize(rgb: np.ndarray, bits) -> np.ndarray:
     assert bits in range(1, 8 + 1)
     t = 2 ** (8 - bits) / 255
     return np.round(rgb * t) / t
+
+
+def geometric_transform(rgb, width, height,
+                        flip_h=False, flip_v=False,
+                        scale_h=1.0, scale_v=1.0,
+                        degrees=0, shift_h=0, shift_v=0,
+                        interp='lanczos', border_mode='edge'):
+    """cropや回転などをまとめて処理。
+
+    Args:
+        rgb: 入力画像
+        width: 出力サイズ
+        height: 出力サイズ
+        flip_h: Trueなら水平に反転する。
+        flip_v: Trueなら垂直に反転する。
+        scale: スケール。例えば0.5だと縦横半分に縮小(zoom out / padding)、2.0だと縦横倍に拡大(zoom in / crop)、1.0で等倍。
+        shift_h: 水平移動の量。(-1～1)
+        shift_v: 垂直移動の量。(-1～1)
+        degrees: 回転する角度。(0や360なら回転無し。)
+
+    Returns:
+        rgb, m
+
+        変換後画像と変換行列。
+
+    """
+    import cv2
+    # 左上から時計回りに座標を用意
+    src_points = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32)
+    dst_points = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32)
+    # 反転
+    if flip_h:
+        dst_points = dst_points[[1, 0, 3, 2]]
+    if flip_v:
+        dst_points = dst_points[[3, 2, 1, 0]]
+    # スケール変換
+    src_points[:, 0] /= scale_h
+    src_points[:, 1] /= scale_v
+    src_points[:, 0] -= (1 / scale_h - 1) / 2
+    src_points[:, 1] -= (1 / scale_v - 1) / 2
+    # 回転
+    theta = degrees * np.pi * 2 / 360
+    c, s = np.cos(theta), np.sin(theta)
+    r = np.array([[c, -s], [s, c]], dtype=np.float32)
+    src_points = np.dot(r, (src_points - 0.5).T).T + 0.5
+    # shift
+    src_points[:, 0] -= shift_h / scale_h
+    src_points[:, 1] -= shift_v / scale_v
+    # 画像の変換処理
+    src_points[:, 0] *= rgb.shape[1]
+    src_points[:, 1] *= rgb.shape[0]
+    dst_points[:, 0] *= width
+    dst_points[:, 1] *= height
+    m = cv2.getPerspectiveTransform(src_points, dst_points)
+    rgb = transform_image(rgb, width, height, m, interp=interp, border_mode=border_mode)
+    return rgb, m
+
+
+def transform_image(rgb, width, height, m, interp='lanczos', border_mode='edge'):
+    """geometric_transformの画像変換処理部分。
+
+    Args:
+        rgb: 入力画像
+        width: 出力サイズ
+        height: 出力サイズ
+        m: 変換行列。
+        interp: 補間方法。'nearest', 'bilinear', 'bicubic', 'lanczos'。縮小時は自動的にcv2.INTER_AREA。
+        border_mode: パディング方法。'edge', 'reflect', 'wrap'
+
+    """
+    import cv2
+    cv2_interp = {
+        'nearest': cv2.INTER_NEAREST,
+        'bilinear': cv2.INTER_LINEAR,
+        'bicubic': cv2.INTER_CUBIC,
+        'lanczos': cv2.INTER_LANCZOS4,
+    }[interp]
+    cv2_border = {
+        'edge': cv2.BORDER_REPLICATE,
+        'reflect': cv2.BORDER_REFLECT_101,
+        'wrap': cv2.BORDER_WRAP,
+    }[border_mode]
+
+    # 縮小ならINTER_AREA
+    sh, sw = rgb.shape[:2]
+    dr = transform_points([(0, 0), (sw, 0), (sw, sh), (0, sh)], m)
+    dw = min(np.linalg.norm(dr[1] - dr[0]), np.linalg.norm(dr[2] - dr[3]))
+    dh = min(np.linalg.norm(dr[3] - dr[0]), np.linalg.norm(dr[2] - dr[1]))
+    if dw <= sw or dh <= sh:
+        cv2_interp = cv2.INTER_AREA
+
+    if rgb.shape[-1] in (1, 3):
+        rgb = cv2.warpPerspective(rgb, m, (width, height), flags=cv2_interp, borderMode=cv2_border)
+        if len(rgb.shape) == 2:
+            rgb = np.expand_dims(rgb, axis=-1)
+    else:
+        resized_list = [cv2.warpPerspective(rgb[:, :, ch], m, (width, height), flags=cv2_interp, borderMode=cv2_border) for ch in range(rgb.shape[-1])]
+        rgb = np.transpose(resized_list, (1, 2, 0))
+    return rgb
+
+
+def transform_points(points, m):
+    """geometric_transformの座標変換。
+
+    Args:
+        points: 座標の配列。shape=(num_points, 2)。[(x, y)]
+        m: 変換行列。
+
+    Returns:
+        変換後の座標の配列。
+
+    """
+    import cv2
+    return cv2.perspectiveTransform(np.reshape(points, (-1, 1, 2)).astype(np.float32), m).reshape(-1, 2)
 
 
 def erase_random(rgb, rand, bboxes=None, scale_low=0.02, scale_high=0.4, rate_1=1 / 3, rate_2=3, alpha=None, max_tries=30):

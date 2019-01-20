@@ -379,6 +379,62 @@ class RandomZoom(generator.Operator):
         return rgb
 
 
+class RandomTransform(generator.Operator):
+    """Scale, Resize, Rotateをまとめて処理。"""
+
+    def __init__(self, width, height, flip_h=True, flip_v=False,
+                 scale_prob=0.5, scale_range=(2 / 3, 3 / 2),
+                 aspect_prob=0.5, aspect_range=(3 / 4, 4 / 3),
+                 rotate_prob=0.25, rotate_range=(-15, +15),
+                 shift_range=(-0.15625, 0.15625),
+                 interp='lanczos', border_mode='edge',
+                 with_output=False):
+        self.width = width
+        self.height = height
+        self.flip_h = flip_h
+        self.flip_v = flip_v
+        self.scale_prob = scale_prob
+        self.scale_range = scale_range
+        self.aspect_prob = aspect_prob
+        self.aspect_range = aspect_range
+        self.rotate_prob = rotate_prob
+        self.rotate_range = rotate_range
+        self.shift_range = shift_range
+        self.interp = interp
+        self.border_mode = border_mode
+        self.with_output = with_output
+
+    def execute(self, x, y, w, rand, ctx: generator.GeneratorContext):
+        assert not isinstance(y, ml.ObjectsAnnotation)  # 物体検出は今のところ未対応
+        if ctx.do_augmentation(rand, 1):
+            old_size = x.shape[:2]
+            flip_h = self.flip_h and rand.rand() <= 0.5
+            flip_v = self.flip_v and rand.rand() <= 0.5
+            scale = np.exp(rand.uniform(np.log(self.scale_range[0]), np.log(self.scale_range[1]))) if rand.rand() <= self.scale_prob else 1.0
+            scale_h, scale_v = scale, scale
+            ar = np.exp(rand.uniform(np.log(self.aspect_range[0]), np.log(self.aspect_range[1]))) if rand.rand() <= self.aspect_prob else 1.0
+            scale_h *= np.sqrt(ar)
+            scale_v /= np.sqrt(ar)
+            degrees = rand.uniform(self.rotate_range[0], self.rotate_range[1]) if rand.rand() <= self.rotate_prob else 0
+            shift_h, shift_v = rand.uniform(self.shift_range[0], self.shift_range[1], size=2)
+            x, m = ndimage.geometric_transform(
+                x, self.width, self.height,
+                flip_h=flip_h, flip_v=flip_v,
+                scale_h=scale_h, scale_v=scale_v,
+                degrees=degrees, shift_h=shift_h, shift_v=shift_v,
+                interp=self.interp, border_mode=self.border_mode)
+            if self.with_output and y is not None:
+                if y.shape[:2] != old_size:
+                    y = ndimage.resize(y, old_size[1], old_size[0], interp=self.interp)
+                y = ndimage.transform_image(y, self.width, self.height, m, interp=self.interp, border_mode=self.border_mode)
+                assert x.shape[:2] == y.shape[:2]
+        else:
+            x = ndimage.resize(x, self.width, self.height)
+            if self.with_output and y is not None:
+                y = ndimage.resize(y, self.width, self.height)
+        return x, y, w
+
+
 class RandomAugmentors(generator.Operator):
     """順番と適用確率をランダムにDataAugmentationを行う。
 

@@ -82,6 +82,23 @@ def test_filters(data_dir, check_dir):
         (0, 'random_alpha', lambda rgb: tk.ndimage.erase_random(rgb, rand, alpha=0.125)),
         (0, 'random_erasing', lambda rgb: tk.ndimage.erase_random(rgb, rand, bboxes=np.array([[64, 64, 128, 128]]))),
         (0, 'random_alpha', lambda rgb: tk.ndimage.erase_random(rgb, rand, bboxes=np.array([[64, 64, 128, 128]]), alpha=0.125)),
+        (0, 'gt_none', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256)[0]),
+        (0, 'gt_flip_h', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, flip_h=True)[0]),
+        (0, 'gt_flip_v', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, flip_v=True)[0]),
+        (0, 'gt_zoomin_h', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, scale_h=1.5)[0]),
+        (0, 'gt_zoomout_h', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, scale_h=0.75)[0]),
+        (0, 'gt_zoomin_v', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, scale_v=1.5)[0]),
+        (0, 'gt_zoomout_v', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, scale_v=0.75)[0]),
+        (0, 'gt_rotate_1', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, degrees=+15)[0]),
+        (0, 'gt_rotate_2', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, degrees=-15)[0]),
+        (0, 'gt_shift_h', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, shift_h=0.5)[0]),
+        (0, 'gt_shift_v', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, shift_v=0.5)[0]),
+        (0, 'gt_nshift_h', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, shift_h=-0.5)[0]),
+        (0, 'gt_nshift_v', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, shift_v=-0.5)[0]),
+        (0, 'gt_mixed_1', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, scale_h=0.5, scale_v=0.75, degrees=-15, shift_h=-0.25, shift_v=0.125)[0]),
+        (0, 'gt_mixed_2', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, scale_h=2.0, scale_v=1.75, degrees=-15, shift_h=-0.25, shift_v=0.125)[0]),
+        (0, 'gt_mixed_3', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, flip_h=True, flip_v=True, scale_h=0.5, scale_v=0.75, degrees=-15, shift_h=-0.25, shift_v=0.125)[0]),
+        (0, 'gt_mixed_4', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, flip_h=True, flip_v=True, scale_h=2.0, scale_v=1.5, degrees=-15, shift_h=-0.25, shift_v=0.125)[0]),
     ]
 
     rgb = tk.ndimage.load(data_dir / 'Lenna.png')  # 256x256の某有名画像
