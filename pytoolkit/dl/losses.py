@@ -5,12 +5,12 @@ import numpy as np
 from . import backend
 
 
-def balanced_binary_crossentropy(alpha=0.5):
-    """αによるクラス間のバランス補正ありのbinary_crossentropy。
+def binary_crossentropy(alpha=0.5):
+    """クラス間のバランス補正ありのbinary_crossentropy。
 
     Focal lossの論文ではα=0.75が良いとされていた。(class 0の重みが0.25)
     """
-    def _balanced_binary_crossentropy(y_true, y_pred):
+    def balanced_binary_crossentropy(y_true, y_pred):
         import keras.backend as K
         a_t = y_true * alpha + (1 - y_true) * (1 - alpha) if alpha is not None else 1
         p_t = y_true * y_pred + (1 - y_true) * (1 - y_pred)
@@ -30,24 +30,30 @@ def binary_focal_loss(alpha=0.25, gamma=2.0):
     return _binary_focal_loss
 
 
-def balanced_categorical_crossentropy(y_true, y_pred, alpha=None):
-    """αによるクラス間のバランス補正ありのcategorical_crossentropy。
+def categorical_crossentropy(alpha=None, class_weights=None):
+    """クラス間のバランス補正ありのcategorical_crossentropy。
 
     Focal lossの論文ではα=0.75が良いとされていた。(class 0の重みが0.25)
     """
-    import keras.backend as K
-    assert K.image_data_format() == 'channels_last'
+    assert alpha is None or class_weights is None  # 両方同時の指定はNG
 
-    if alpha is None:
-        class_weights = -1  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
-    else:
-        nb_classes = K.int_shape(y_pred)[-1]
-        class_weights = np.array([(1 - alpha) * 2] * 1 + [alpha * 2] * (nb_classes - 1))
-        class_weights = np.reshape(class_weights, (1, 1, -1))
-        class_weights = -class_weights  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
+    def balanced_categorical_crossentropy(y_true, y_pred):
+        import keras.backend as K
+        assert K.image_data_format() == 'channels_last'
 
-    y_pred = K.maximum(y_pred, K.epsilon())
-    return K.sum(y_true * K.log(y_pred) * class_weights, axis=-1)
+        if alpha is None:
+            if class_weights is None:
+                cw = 1
+            else:
+                cw = np.reshape(class_weights, (1, 1, -1))
+        else:
+            num_classes = K.int_shape(y_pred)[-1]
+            cw = np.array([(1 - alpha) * 2] * 1 + [alpha * 2] * (num_classes - 1))
+            cw = np.reshape(cw, (1, 1, -1))
+
+        y_pred = K.maximum(y_pred, K.epsilon())
+        return -K.sum(y_true * K.log(y_pred) * cw, axis=-1)
+    return balanced_categorical_crossentropy
 
 
 def categorical_focal_loss(y_true, y_pred, alpha=0.25, gamma=2.0):
