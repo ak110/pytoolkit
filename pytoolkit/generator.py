@@ -362,7 +362,7 @@ class RandomPickData(Operator):
 
     """
 
-    def __init__(self, x_src, y_src, operators):
+    def __init__(self, x_src, y_src, operators=None):
         self.x_src = x_src
         self.y_src = y_src
         self.operators = operators
