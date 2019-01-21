@@ -353,11 +353,19 @@ class CustomAugmentation(Operator):
 
 
 class RandomPickData(Operator):
-    """pseudo-labelingなど用に、x, yがNoneだったときにx_src, y_srcからランダムに1件取得する処理。"""
+    """pseudo-labelingなど用に、x, yがNoneだったときにx_src, y_srcからランダムに1件取得する処理。
 
-    def __init__(self, x_src, y_src):
+    Args:
+        x_src: xのpick元。
+        y_src: yのpick元。
+        operators: pickした場合の追加処理。
+
+    """
+
+    def __init__(self, x_src, y_src, operators):
         self.x_src = x_src
         self.y_src = y_src
+        self.operators = operators
         self.length = data_utils.get_length(x_src)
         assert self.length == data_utils.get_length(y_src)
 
@@ -365,8 +373,12 @@ class RandomPickData(Operator):
         if data_utils.is_none(x):
             assert data_utils.is_none(y)
             i = rand.randint(0, self.length)
+            # pick
             x = data_utils.get(self.x_src, i)
             y = data_utils.get(self.y_src, i)
+            # 追加処理
+            for op in self.operators or []:
+                x, y, w = op.execute(x, y, w, rand, ctx)
         return x, y, w
 
 
