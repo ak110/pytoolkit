@@ -386,7 +386,6 @@ class RandomTransform(generator.Operator):
                  scale_prob=0.5, scale_range=(2 / 3, 3 / 2),
                  aspect_prob=0.5, aspect_range=(3 / 4, 4 / 3),
                  rotate_prob=0.25, rotate_range=(-15, +15),
-                 shift_range=(-0.15625, 0.15625),
                  interp='lanczos', border_mode='edge',
                  with_output=False):
         self.width = width
@@ -399,7 +398,6 @@ class RandomTransform(generator.Operator):
         self.aspect_range = aspect_range
         self.rotate_prob = rotate_prob
         self.rotate_range = rotate_range
-        self.shift_range = shift_range
         self.interp = interp
         self.border_mode = border_mode
         self.with_output = with_output
@@ -416,12 +414,12 @@ class RandomTransform(generator.Operator):
             scale_h *= np.sqrt(ar)
             scale_v /= np.sqrt(ar)
             degrees = rand.uniform(self.rotate_range[0], self.rotate_range[1]) if rand.rand() <= self.rotate_prob else 0
-            shift_h, shift_v = rand.uniform(self.shift_range[0], self.shift_range[1], size=2)
+            pos_h, pos_v = rand.uniform(0, 1, size=2)
             x, m = ndimage.geometric_transform(
                 x, self.width, self.height,
                 flip_h=flip_h, flip_v=flip_v,
                 scale_h=scale_h, scale_v=scale_v,
-                degrees=degrees, shift_h=shift_h, shift_v=shift_v,
+                degrees=degrees, pos_h=pos_h, pos_v=pos_v,
                 interp=self.interp, border_mode=self.border_mode)
             if self.with_output and y is not None:
                 if y.shape[:2] != old_size:

@@ -406,8 +406,8 @@ def posterize(rgb: np.ndarray, bits) -> np.ndarray:
 
 def geometric_transform(rgb, width, height,
                         flip_h=False, flip_v=False,
-                        scale_h=1.0, scale_v=1.0,
-                        degrees=0, shift_h=0, shift_v=0,
+                        degrees=0,
+                        scale_h=1.0, scale_v=1.0, pos_h=0.5, pos_v=0.5,
                         interp='lanczos', border_mode='edge'):
     """cropや回転などをまとめて処理。
 
@@ -417,10 +417,11 @@ def geometric_transform(rgb, width, height,
         height: 出力サイズ
         flip_h: Trueなら水平に反転する。
         flip_v: Trueなら垂直に反転する。
-        scale: スケール。例えば0.5だと縦横半分に縮小(zoom out / padding)、2.0だと縦横倍に拡大(zoom in / crop)、1.0で等倍。
-        shift_h: 水平移動の量。(-1～1)
-        shift_v: 垂直移動の量。(-1～1)
         degrees: 回転する角度。(0や360なら回転無し。)
+        scale_h: 水平方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
+        scale_v: 垂直方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
+        pos_h: スケール変換に伴う水平位置。0で左端、0.5で中央、1で右端。(0～1)
+        pos_v: スケール変換に伴う垂直位置。0で上端、0.5で中央、1で下端。(0～1)
 
     Returns:
         rgb, m
@@ -437,25 +438,23 @@ def geometric_transform(rgb, width, height,
         dst_points = dst_points[[1, 0, 3, 2]]
     if flip_v:
         dst_points = dst_points[[3, 2, 1, 0]]
-    # スケール変換
-    src_points[:, 0] /= scale_h
-    src_points[:, 1] /= scale_v
-    src_points[:, 0] -= (1 / scale_h - 1) / 2
-    src_points[:, 1] -= (1 / scale_v - 1) / 2
     # 回転
     theta = degrees * np.pi * 2 / 360
     c, s = np.cos(theta), np.sin(theta)
     r = np.array([[c, -s], [s, c]], dtype=np.float32)
     src_points = np.dot(r, (src_points - 0.5).T).T + 0.5
-    # shift
-    src_points[:, 0] -= shift_h / scale_h
-    src_points[:, 1] -= shift_v / scale_v
-    # 画像の変換処理
+    # スケール変換
+    src_points[:, 0] /= scale_h
+    src_points[:, 1] /= scale_v
+    src_points[:, 0] -= (1 / scale_h - 1) * pos_h
+    src_points[:, 1] -= (1 / scale_v - 1) * pos_v
+    # 変換行列の作成
     src_points[:, 0] *= rgb.shape[1]
     src_points[:, 1] *= rgb.shape[0]
     dst_points[:, 0] *= width
     dst_points[:, 1] *= height
     m = cv2.getPerspectiveTransform(src_points, dst_points)
+    # 画像の変換
     rgb = transform_image(rgb, width, height, m, interp=interp, border_mode=border_mode)
     return rgb, m
 
