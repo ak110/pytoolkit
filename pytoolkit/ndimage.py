@@ -620,15 +620,18 @@ def class_to_mask(classes, class_colors):
 
 
 def dense_crf(rgb, pred,
-              gaussian_sxy=(3, 2), gaussian_compat=3,
-              bilateral_sxy=(3, 2), bilateral_srgb=(20, 20, 20), bilateral_compat=3,
-              num_iter=5):
+              gaussian_sxy=(1, 1), gaussian_compat=6,
+              bilateral_sxy=(4, 4), bilateral_srgb=(13, 13, 13), bilateral_compat=10,
+              num_iter=40):
     """Dense CRF <https://github.com/lucasb-eyer/pydensecrf>
 
     Args:
         rgb: 入力画像。
         pred: 予測結果。shape=(height, width, num_classes) dtype=np.float32
         num_iter: 予測回数。
+
+    Returns:
+        ndarray shape=(height, width, num_classes) dtype=np.float32
 
     """
     import pydensecrf.densecrf as dcrf
