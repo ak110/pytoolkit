@@ -436,7 +436,11 @@ def group_normalization():
                 x = K.reshape(x, [N, T, H, W, C])
             else:
                 assert ndim in (4, 5)
-            return x * self.gamma + self.beta
+            if self.scale:
+                x = x * self.gamma
+            if self.center:
+                x = x + self.beta
+            return x
 
         def get_config(self):
             config = {
