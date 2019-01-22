@@ -620,9 +620,9 @@ def class_to_mask(classes, class_colors):
 
 
 def dense_crf(rgb, pred,
-              gaussian_sxy=(1, 1), gaussian_compat=6,
+              gaussian_sxy=(1, 1), gaussian_compat=3,
               bilateral_sxy=(4, 4), bilateral_srgb=(13, 13, 13), bilateral_compat=10,
-              num_iter=40):
+              num_iter=5):
     """Dense CRF <https://github.com/lucasb-eyer/pydensecrf>
 
     Args:
