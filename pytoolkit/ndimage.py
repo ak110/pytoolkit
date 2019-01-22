@@ -603,3 +603,59 @@ def mask_to_class(rgb, class_colors, void_class=-1):
     for i in range(len(class_colors)):
         result[np.all(rgb == class_colors[i], axis=-1)] = i
     return result
+
+
+def class_to_mask(classes, class_colors):
+    """クラスIDの配列をRGBのマスク画像に変換する。
+
+    Args:
+        classes: クラスIDの配列。 shape=(H, W)
+        class_colors: 色の配列。shape=(num_classes, 3)
+
+    Returns:
+        ndarray shape=(H, W, 3)
+
+    """
+    return np.asarray(class_colors)[classes]
+
+
+def dense_crf(rgb, pred,
+              gaussian_sxy=(3, 2), gaussian_compat=3,
+              bilateral_sxy=(3, 2), bilateral_srgb=(20, 20, 20), bilateral_compat=3,
+              num_iter=5):
+    """Dense CRF <https://github.com/lucasb-eyer/pydensecrf>
+
+    Args:
+        rgb: 入力画像。
+        pred: 予測結果。shape=(height, width, num_classes) dtype=np.float32
+        num_iter: 予測回数。
+
+    """
+    import pydensecrf.densecrf as dcrf
+    import pydensecrf.utils as du
+    rgb = np.copy(rgb).astype(np.uint8)
+    pred = pred.astype(np.float32)
+    pred /= pred.sum(axis=-1, keepdims=True)
+
+    if len(pred.shape) == 2:
+        pred = np.expand_dims(pred, axis=-1)
+    if pred.shape[-1] == 1:
+        pred = np.concatenate([1 - pred, pred], axis=-1)  # 2クラスのsoftmaxみたいにする
+    num_classes = pred.shape[-1]
+
+    height, width = rgb.shape[:2]
+    pred = resize(pred, width, height)
+    U = pred.transpose(2, 0, 1).reshape((num_classes, -1))
+
+    d = dcrf.DenseCRF2D(width, height, num_classes)
+    d.setUnaryEnergy(np.ascontiguousarray(du.unary_from_softmax(U)))
+    d.addPairwiseGaussian(sxy=gaussian_sxy, compat=gaussian_compat)
+    d.addPairwiseBilateral(sxy=bilateral_sxy, srgb=bilateral_srgb, rgbim=rgb, compat=bilateral_compat)
+    Q = d.inference(num_iter)
+    MAP = np.array(Q, dtype=np.float32)
+
+    if num_classes == 2:
+        proba = MAP[1, ...].reshape((height, width, 1))
+    else:
+        proba = MAP.reshape((num_classes, height, width)).transpose(1, 2, 0)
+    return proba
