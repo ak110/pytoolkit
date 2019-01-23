@@ -10,6 +10,7 @@ import pathlib
 import shutil
 import tempfile
 import typing
+import warnings
 
 import numpy as np
 import scipy.stats
@@ -124,12 +125,22 @@ def _load_impl(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.P
 def save(path: typing.Union[str, pathlib.Path], img: np.ndarray):
     """画像の保存。
 
-    やや余計なお世話だけど0～255にクリッピング(飽和)してから保存。
+    やや余計なお世話だけど0～255にクリッピング(飽和)してから保存する。
+
+    Args:
+        path: 保存先ファイルパス。途中のディレクトリが無ければ自動的に作成。
+        img: 画像のndarray。shape=(height, width, 3)のRGB画像。dtypeはnp.uint8
+
     """
     assert len(img.shape) == 3
+    if img.dtype != np.uint8:
+        warnings.warn(f'Invalid dtype: {img.dtype} (shape={img.shape})')
+
     path = pathlib.Path(path)
-    img = np.clip(img, 0, 255).astype(np.uint8)
     path.parent.mkdir(parents=True, exist_ok=True)
+
+    img = np.clip(img, 0, 255).astype(np.uint8)
+
     suffix = path.suffix.lower()
     if suffix == '.npy':
         np.save(str(path), img)
