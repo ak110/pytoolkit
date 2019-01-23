@@ -51,6 +51,8 @@ def format_histgram(a, bins=10, range=None, weights=None, with_stats=True, ncols
     if with_stats:
         lines.append(f'mean: {np.mean(a)}')
         lines.append(f'std:  {np.std(a)}')
+        lines.append(f'min:  {np.min(a)}')
+        lines.append(f'max:  {np.max(a)}')
     return lines
 
 
