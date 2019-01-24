@@ -40,7 +40,7 @@ def preprocess():
 
         def __init__(self, mode='tf', **kwargs):
             super().__init__(**kwargs)
-            assert mode in ('caffe', 'tf', 'torch', 'div255')
+            assert mode in ('caffe', 'tf', 'torch', 'div255', 'std')
             self.mode = mode
 
         def compute_output_shape(self, input_shape):
@@ -55,6 +55,9 @@ def preprocess():
                 return K.bias_add((inputs / 255.), K.constant(np.array([-0.485, -0.456, -0.406]))) / np.array([0.229, 0.224, 0.225])
             elif self.mode == 'div255':
                 return inputs / 255.
+            elif self.mode == 'std':
+                axes = tuple(range(1, K.ndim(inputs)))
+                return (inputs - K.mean(inputs, axis=axes, keepdims=True)) / (K.std(inputs, axis=axes, keepdims=True) + K.epsilon())
             else:
                 assert False
                 return None
