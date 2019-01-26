@@ -598,17 +598,19 @@ def mask_to_onehot(rgb, class_colors, append_bg=False):
     return result
 
 
-def mask_to_class(rgb, class_colors, void_class=-1):
+def mask_to_class(rgb, class_colors, void_class=None):
     """RGBのマスク画像をクラスIDの配列に変換する。
 
     Args:
         class_colors: 色の配列。shape=(num_classes, 3)
-        void_class: class_colorsに該当しない色のピクセルの値。
+        void_class: class_colorsに該当しない色のピクセルの値。Noneならlen(class_colors)
 
     Returns:
         ndarray shape=(H, W) dtype=np.int32
 
     """
+    if void_class is None:
+        void_class = len(class_colors)
     result = np.empty(rgb.shape[:2], dtype=np.int32)
     result[:] = void_class
     for i in range(len(class_colors)):
