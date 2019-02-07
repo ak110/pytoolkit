@@ -6,7 +6,6 @@ chainercv
 diskcache
 flake8
 flake8-docstrings
-flake8-pep257
 flask
 git+https://github.com/cocodataset/cocoapi.git#egg=pycocotools&subdirectory=PythonAPI
 h5py
@@ -15,6 +14,7 @@ matplotlib
 numpy
 opencv-python
 pandas
+pep8
 pydot
 pylint
 pytest
