@@ -176,3 +176,17 @@ class Paginator:
     def has_next(self):
         """次ページがあるか否か。"""
         return self.page < self.pages
+
+    @property
+    def prev_num(self):
+        """前ページ"""
+        return self.page - 1
+
+    @property
+    def next_num(self):
+        """次ページ"""
+        return self.page + 1
+
+    def iter_pages(self):
+        """対象のページのリストを返す。"""
+        return list(range(self.start_page, self.end_page + 1))
