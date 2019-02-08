@@ -11,7 +11,7 @@ def _main():
     parser = argparse.ArgumentParser()
     parser.add_argument('mode', default='all', choices=('all', 'train', 'validate'), nargs='?')
     parser.add_argument('--coco-dir', default=pathlib.Path('data/coco'), type=pathlib.Path)
-    parser.add_argument('--result-dir', default=pathlib.Path('results_voc'), type=pathlib.Path)
+    parser.add_argument('--result-dir', default=pathlib.Path('results_coco'), type=pathlib.Path)
     parser.add_argument('--input-size', default=(320, 320), type=int, nargs=2)
     parser.add_argument('--map-sizes', default=(40, 20, 10), type=int, nargs='+')
     parser.add_argument('--pb-sizes', default=8, type=int)
@@ -72,8 +72,12 @@ def _validate(args, X_val, y_val, class_names):
     pred_val = od.predict(X_val)
     scores = tk.data.coco.evaluate(y_val, pred_val)
     logger = tk.log.get(__name__)
-    for k in sorted(scores):
-        logger.info(f'{k}: {scores[k]}')
+    logger.info(f'mAP:        {scores["map/iou=0.50:0.95/area=all/max_dets=100"] * 100:.1f}')
+    logger.info(f'mAP(0.50)   {scores["map/iou=0.50/area=all/max_dets=100"] * 100:.1f}')
+    logger.info(f'mAP(0.75):  {scores["map/iou=0.75/area=all/max_dets=100"] * 100:.1f}')
+    logger.info(f'mAP(small): {scores["map/iou=0.50:0.95/area=small/max_dets=100"] * 100:.1f}')
+    logger.info(f'mAP(medi):  {scores["map/iou=0.50:0.95/area=medium/max_dets=100"] * 100:.1f}')
+    logger.info(f'mAP(large): {scores["map/iou=0.50:0.95/area=large/max_dets=100"] * 100:.1f}')
 
 
 if __name__ == '__main__':
