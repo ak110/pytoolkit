@@ -6,8 +6,7 @@ import pathlib
 
 import sklearn.externals.joblib as joblib
 
-from . import log
-from .dl import hvd
+from . import hvd, log
 
 
 def memorize(cache_dir, compress=0, verbose=True):

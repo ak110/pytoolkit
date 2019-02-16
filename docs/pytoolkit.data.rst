@@ -1,16 +1,5 @@
-pytoolkit.data package
-======================
-
-Submodules
-----------
-
-.. toctree::
-
-   pytoolkit.data.coco
-   pytoolkit.data.voc
-
-Module contents
----------------
+pytoolkit.data module
+=====================
 
 .. automodule:: pytoolkit.data
     :members:

@@ -6,33 +6,30 @@ Subpackages
 
 .. toctree::
 
-    pytoolkit.applications
-    pytoolkit.data
-    pytoolkit.dl
+    pytoolkit.datasets
+    pytoolkit.lovasz_softmax
 
 Submodules
 ----------
 
 .. toctree::
 
+   pytoolkit.backend
    pytoolkit.cache
-   pytoolkit.data_utils
-   pytoolkit.db
-   pytoolkit.draw
-   pytoolkit.ensemble
-   pytoolkit.generator
-   pytoolkit.image
-   pytoolkit.io
-   pytoolkit.jsonex
+   pytoolkit.callbacks
+   pytoolkit.data
+   pytoolkit.dl
+   pytoolkit.hvd
+   pytoolkit.layers
    pytoolkit.log
-   pytoolkit.math
+   pytoolkit.losses
+   pytoolkit.metrics
    pytoolkit.ml
    pytoolkit.ndimage
-   pytoolkit.regex
-   pytoolkit.thread
+   pytoolkit.od
+   pytoolkit.optimizers
    pytoolkit.utils
-   pytoolkit.video
-   pytoolkit.web
+   pytoolkit.vis
 
 Module contents
 ---------------

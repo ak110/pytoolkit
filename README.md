@@ -11,23 +11,19 @@
 
 ## importするために最低限必要なライブラリ
 
+- Pillow
 - numpy
+- opencv-python
 - scikit-learn
 - scipy
+- tensorflow-gpu
 
 ## 使うときに動的にimportしている依存ライブラリ
 
-- Pillow
+- better-exceptions
 - chainercv
-- better_exceptions
 - h5py
 - horovod
-- keras
 - matplotlib
 - mpi4py
-- opencv-python
-- pandas
-- pydot
-- sqlalchemy
-- tensorflow-gpu
 - tqdm

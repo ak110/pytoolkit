@@ -12,7 +12,9 @@ import tempfile
 import typing
 import warnings
 
+import cv2
 import numpy as np
+import PIL.Image
 import scipy.stats
 
 from . import log, utils
@@ -105,7 +107,6 @@ def _load_impl(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.P
             assert img.dtype == np.uint8, f'{suffix} dtype error: {img.dtype}'
         else:
             # PILで読み込む
-            import PIL.Image
             with PIL.Image.open(path_or_array) as pil_img:
                 target_mode = 'L' if grayscale else 'RGB'
                 if pil_img.mode != target_mode:
@@ -148,7 +149,6 @@ def save(path: typing.Union[str, pathlib.Path], img: np.ndarray):
         np.savez_compressed(str(path), img)
     else:
         assert img.shape[-1] in (1, 3, 4)
-        import PIL.Image
         if img.shape[-1] == 1:
             pil_img = PIL.Image.fromarray(np.squeeze(img, axis=-1), 'L')
         elif img.shape[2] == 3:
@@ -162,7 +162,6 @@ def save(path: typing.Union[str, pathlib.Path], img: np.ndarray):
 
 def rotate(rgb: np.ndarray, degrees: float, expand=True, interp='lanczos', border_mode='edge') -> np.ndarray:
     """回転。"""
-    import cv2
     cv2_interp = {
         'nearest': cv2.INTER_NEAREST,
         'bilinear': cv2.INTER_LINEAR,
@@ -265,7 +264,6 @@ def resize_long_side(rgb: np.ndarray, long_side: int, expand=True, interp='lancz
 
 def resize(rgb: np.ndarray, width: int, height: int, padding=None, interp='lanczos') -> np.ndarray:
     """リサイズ。"""
-    import cv2
     assert interp in ('nearest', 'bilinear', 'bicubic', 'lanczos')
     if rgb.shape[1] == width and rgb.shape[0] == height:
         return rgb
@@ -306,7 +304,6 @@ def gaussian_noise(rgb: np.ndarray, rand: np.random.RandomState, scale: float) -
 
 def blur(rgb: np.ndarray, sigma: float) -> np.ndarray:
     """ぼかし。sigmaは0～1程度がよい？"""
-    import cv2
     rgb = cv2.GaussianBlur(rgb, (5, 5), sigma)
     if len(rgb.shape) == 2:
         rgb = np.expand_dims(rgb, axis=-1)
@@ -322,7 +319,6 @@ def unsharp_mask(rgb: np.ndarray, sigma: float, alpha=2.0) -> np.ndarray:
 
 def median(rgb: np.ndarray, size: int) -> np.ndarray:
     """メディアンフィルタ。sizeは3程度がよい？"""
-    import cv2
     rgb = cv2.medianBlur(rgb, size)
     if len(rgb.shape) == 2:
         rgb = np.expand_dims(rgb, axis=-1)
@@ -391,7 +387,6 @@ def rot90(rgb: np.ndarray, k) -> np.ndarray:
 @_float_to_uint8
 def equalize(rgb: np.ndarray) -> np.ndarray:
     """ヒストグラム平坦化。"""
-    import cv2
     gray = np.mean(rgb, axis=-1, keepdims=True, dtype=np.float32)
     eq = np.expand_dims(cv2.equalizeHist(gray.astype(np.uint8)), axis=-1)
     return rgb + (eq - gray)
@@ -440,7 +435,6 @@ def geometric_transform(rgb, width, height,
         変換後画像と変換行列。
 
     """
-    import cv2
     # 左上から時計回りに座標を用意
     src_points = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32)
     dst_points = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32)
@@ -482,7 +476,6 @@ def transform_image(rgb, width, height, m, interp='lanczos', border_mode='edge')
         border_mode: パディング方法。'edge', 'reflect', 'wrap'
 
     """
-    import cv2
     cv2_interp = {
         'nearest': cv2.INTER_NEAREST,
         'bilinear': cv2.INTER_LINEAR,
@@ -524,7 +517,6 @@ def transform_points(points, m):
         変換後の座標の配列。
 
     """
-    import cv2
     return cv2.perspectiveTransform(np.reshape(points, (-1, 1, 2)).astype(np.float32), m).reshape(-1, 2)
 
 

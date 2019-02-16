@@ -1,7 +1,7 @@
-pytoolkit.dl module
+pytoolkit.od module
 ===================
 
-.. automodule:: pytoolkit.dl
+.. automodule:: pytoolkit.od
     :members:
     :undoc-members:
     :show-inheritance:

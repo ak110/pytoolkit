@@ -11,6 +11,8 @@ import logging.handlers
 import pathlib
 import time
 
+from . import hvd
+
 
 def init(output_path, append=False, rotate=False, max_bytes=1048576, backup_count=10,
          stream_level=logging.INFO,
@@ -20,7 +22,6 @@ def init(output_path, append=False, rotate=False, max_bytes=1048576, backup_coun
          matplotlib_level=logging.WARNING,
          pil_level=logging.INFO):
     """ルートロガーの初期化。"""
-    from .dl import hvd
     logger = get(None)
     logger.setLevel(logging.DEBUG)
     close(logger)
@@ -101,10 +102,10 @@ def trace_scope(process_name, logger_name=__name__):
 
     """
     logger = get(logger_name)
-    logger.debug('%s 開始', process_name)
+    logger.info(f'{process_name} 開始')
     start_time = time.time()
     try:
         yield
     finally:
         elapsed_time = time.time() - start_time
-        logger.debug('%s 終了 (%.3f[s])', process_name, elapsed_time)
+        logger.info(f'{process_name} 終了 ({elapsed_time:.3f}[s])')
