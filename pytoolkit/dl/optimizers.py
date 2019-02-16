@@ -40,6 +40,8 @@ def nsgd():
                 else:
                     for w in layer_or_weights_name.trainable_weights:
                         self.lr_multipliers[w.name] = mp
+            self.updates = None
+            self.weights = None
 
         def get_updates(self, loss, params):
             applied_lr_multipliers = 0

@@ -1,4 +1,5 @@
 """DeepLearning(主にKeras)関連。"""
+# pylint: disable=unused-argument
 import csv
 import pathlib
 import time

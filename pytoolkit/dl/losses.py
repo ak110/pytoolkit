@@ -62,15 +62,14 @@ def categorical_focal_loss(y_true, y_pred, alpha=0.25, gamma=2.0):
 
     assert K.image_data_format() == 'channels_last'
     if alpha is None:
-        class_weights = -1  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
+        class_weights = 1
     else:
         nb_classes = K.int_shape(y_pred)[-1]
         class_weights = np.array([(1 - alpha) * 2] * 1 + [alpha * 2] * (nb_classes - 1))
         class_weights = np.reshape(class_weights, (1, 1, -1))
-        class_weights = -class_weights  # 「-K.sum()」するとpylintが誤検知するのでここに入れ込んじゃう
 
     y_pred = K.maximum(y_pred, K.epsilon())
-    return K.sum(K.pow(1 - y_pred, gamma) * y_true * K.log(y_pred) * class_weights, axis=-1)
+    return -K.sum(K.pow(1 - y_pred, gamma) * y_true * K.log(y_pred) * class_weights, axis=-1)  # pylint: disable=invalid-unary-operand-type
 
 
 def lovasz_hinge(y_true, y_pred):
