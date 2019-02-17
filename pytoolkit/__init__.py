@@ -1,13 +1,13 @@
 # pylint: skip-file
 
+import sys
 import tensorflow as tf
 
-# tf.keras or keras。たぶんどっちでも動くつもり。
-USE_TF_KERAS = True
-if USE_TF_KERAS:
-    keras = tf.keras
-else:
+# kerasがimport済みならkeras、でなくばtf.kerasを使用
+if 'keras' in sys.modules:
     import keras
+else:
+    keras = tf.keras
 K = keras.backend
 
 from . import backend
@@ -17,6 +17,7 @@ from . import data
 from . import datasets
 from . import dl
 from . import hvd
+from . import image
 from . import layers
 from . import log
 from . import losses

@@ -173,25 +173,41 @@ def rotate(rgb: np.ndarray, degrees: float, expand=True, interp='lanczos', borde
         'reflect': cv2.BORDER_REFLECT_101,
         'wrap': cv2.BORDER_WRAP,
     }[border_mode]
-    size = (rgb.shape[1], rgb.shape[0])
-    center = (size[0] // 2, size[1] // 2)
+    m, w, h = compute_rotate(rgb.shape[1], rgb.shape[0], degrees=degrees, expand=expand)
+    if rgb.shape[-1] in (1, 3):
+        rgb = cv2.warpAffine(rgb, m, (w, h), flags=cv2_interp, borderMode=cv2_border)
+        if len(rgb.shape) == 2:
+            rgb = np.expand_dims(rgb, axis=-1)
+    else:
+        rotated_list = [cv2.warpAffine(rgb[:, :, ch], m, (w, h), flags=cv2_interp, borderMode=cv2_border) for ch in range(rgb.shape[-1])]
+        rgb = np.transpose(rotated_list, (1, 2, 0))
+    return rgb
+
+
+def compute_rotate(width, height, degrees, expand=False):
+    """回転の変換行列を作成して返す。
+
+    Args:
+        width (int): 横幅
+        height (int): 縦幅
+        degrees (float): 回転する角度
+        expand (bool, optional): Defaults to False. はみ出ないように画像を大きくするならTrue。
+
+    Returns:
+        tuple: 変換行列、幅、高さ
+
+    """
+    center = (width // 2, height // 2)
     m = cv2.getRotationMatrix2D(center=center, angle=degrees, scale=1.0)
     if expand:
         cos = np.abs(m[0, 0])
         sin = np.abs(m[0, 1])
-        ex_w = int(np.ceil(size[1] * sin + size[0] * cos))
-        ex_h = int(np.ceil(size[1] * cos + size[0] * sin))
+        ex_w = int(np.ceil(height * sin + width * cos))
+        ex_h = int(np.ceil(height * cos + width * sin))
         m[0, 2] += (ex_w / 2) - center[0]
         m[1, 2] += (ex_h / 2) - center[1]
-        size = (ex_w, ex_h)
-    if rgb.shape[-1] in (1, 3):
-        rgb = cv2.warpAffine(rgb, m, size, flags=cv2_interp, borderMode=cv2_border)
-    else:
-        rotated_list = [cv2.warpAffine(rgb[:, :, ch], m, size, flags=cv2_interp, borderMode=cv2_border) for ch in range(rgb.shape[-1])]
-        rgb = np.transpose(rotated_list, (1, 2, 0))
-    if len(rgb.shape) == 2:
-        rgb = np.expand_dims(rgb, axis=-1)
-    return rgb
+        width, height = ex_w, ex_h
+    return m, width, height
 
 
 def pad(rgb: np.ndarray, width: int, height: int, padding='edge') -> np.ndarray:
@@ -340,7 +356,7 @@ def contrast(rgb: np.ndarray, alpha: float) -> np.ndarray:
 @_float_to_uint8
 def saturation(rgb: np.ndarray, alpha: float) -> np.ndarray:
     """彩度の変更。alphaの例：np.random.uniform(0.5, 1.5)"""
-    gs = to_grayscale(rgb)
+    gs = rgb.dot(np.array([0.299, 0.587, 0.114], dtype=np.float32))
     return alpha * rgb + (1 - alpha) * np.expand_dims(gs, axis=-1)
 
 
@@ -353,6 +369,7 @@ def hue_lite(rgb: np.ndarray, alpha: np.ndarray, beta: np.ndarray) -> np.ndarray
     return rgb * (alpha / scipy.stats.hmean(alpha, dtype=np.float32)) + (beta - np.mean(beta, dtype=np.float32))
 
 
+@_float_to_uint8
 def to_grayscale(rgb: np.ndarray) -> np.ndarray:
     """グレースケール化。"""
     return rgb.dot(np.array([0.299, 0.587, 0.114], dtype=np.float32))
@@ -410,29 +427,57 @@ def posterize(rgb: np.ndarray, bits) -> np.ndarray:
     return np.round(rgb * t) / t
 
 
-def geometric_transform(rgb, width, height,
-                        flip_h=False, flip_v=False,
-                        degrees=0,
+def geometric_transform(rgb, output_width, output_height,
+                        flip_h=False, flip_v=False, degrees=0,
                         scale_h=1.0, scale_v=1.0, pos_h=0.5, pos_v=0.5,
                         interp='lanczos', border_mode='edge'):
-    """cropや回転などをまとめて処理。
+    """透視変換。
 
     Args:
-        rgb: 入力画像
-        width: 出力サイズ
-        height: 出力サイズ
-        flip_h: Trueなら水平に反転する。
-        flip_v: Trueなら垂直に反転する。
-        degrees: 回転する角度。(0や360なら回転無し。)
-        scale_h: 水平方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
-        scale_v: 垂直方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
-        pos_h: スケール変換に伴う水平位置。0で左端、0.5で中央、1で右端。(0～1)
-        pos_v: スケール変換に伴う垂直位置。0で上端、0.5で中央、1で下端。(0～1)
+        rgb (np.ndarray): 入力画像
+        output_width (int): 出力サイズ
+        output_height (int): 出力サイズ
+        flip_h (bool, optional): Defaults to False. Trueなら水平に反転する。
+        flip_v (bool, optional): Defaults to False. Trueなら垂直に反転する。
+        degrees (int, optional): Defaults to 0. 回転する角度。(0や360なら回転無し。)
+        scale_h (float, optional): Defaults to 1.0. 水平方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
+        scale_v (float, optional): Defaults to 1.0. 垂直方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
+        pos_h (float, optional): Defaults to 0.5. スケール変換に伴う水平位置。0で左端、0.5で中央、1で右端。
+        pos_v (float, optional): Defaults to 0.5. スケール変換に伴う垂直位置。0で上端、0.5で中央、1で下端。
+        interp (str, optional): Defaults to 'lanczos'. 補間方法。'nearest', 'bilinear', 'bicubic', 'lanczos'。縮小時は自動的にcv2.INTER_AREA。
+        border_mode (str, optional): Defaults to 'edge'. パディング方法。'edge', 'reflect', 'wrap'
 
     Returns:
-        rgb, m
+        ndarray: 変換後画像
 
-        変換後画像と変換行列。
+    """
+    m = compute_perspective(rgb.shape[1], rgb.shape[0], output_width, output_height,
+                            flip_h=flip_h, flip_v=flip_v, degrees=degrees,
+                            scale_h=scale_h, scale_v=scale_v, pos_h=pos_h, pos_v=pos_v)
+    rgb = perspective_transform(rgb, output_width, output_height, m, interp=interp, border_mode=border_mode)
+    return rgb
+
+
+def compute_perspective(input_width, input_height, output_width, output_height,
+                        flip_h=False, flip_v=False, degrees=0,
+                        scale_h=1.0, scale_v=1.0, pos_h=0.5, pos_v=0.5):
+    """透視変換の変換行列を作成。
+
+    Args:
+        input_width (int): 入力サイズ
+        input_height (int): 入力サイズ
+        output_width (int): 出力サイズ
+        output_height (int): 出力サイズ
+        flip_h (bool, optional): Defaults to False. Trueなら水平に反転する。
+        flip_v (bool, optional): Defaults to False. Trueなら垂直に反転する。
+        degrees (int, optional): Defaults to 0. 回転する角度。(0や360なら回転無し。)
+        scale_h (float, optional): Defaults to 1.0. 水平方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
+        scale_v (float, optional): Defaults to 1.0. 垂直方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
+        pos_h (float, optional): Defaults to 0.5. スケール変換に伴う水平位置。0で左端、0.5で中央、1で右端。
+        pos_v (float, optional): Defaults to 0.5. スケール変換に伴う垂直位置。0で上端、0.5で中央、1で下端。
+
+    Returns:
+        tuple: rgb, m 変換後画像と変換行列
 
     """
     # 左上から時計回りに座標を用意
@@ -454,26 +499,24 @@ def geometric_transform(rgb, width, height,
     src_points[:, 0] -= (1 / scale_h - 1) * pos_h
     src_points[:, 1] -= (1 / scale_v - 1) * pos_v
     # 変換行列の作成
-    src_points[:, 0] *= rgb.shape[1]
-    src_points[:, 1] *= rgb.shape[0]
-    dst_points[:, 0] *= width
-    dst_points[:, 1] *= height
+    src_points[:, 0] *= input_width
+    src_points[:, 1] *= input_height
+    dst_points[:, 0] *= output_width
+    dst_points[:, 1] *= output_height
     m = cv2.getPerspectiveTransform(src_points, dst_points)
-    # 画像の変換
-    rgb = transform_image(rgb, width, height, m, interp=interp, border_mode=border_mode)
-    return rgb, m
+    return m
 
 
-def transform_image(rgb, width, height, m, interp='lanczos', border_mode='edge'):
-    """geometric_transformの画像変換処理部分。
+def perspective_transform(rgb, width, height, m, interp='lanczos', border_mode='edge'):
+    """透視変換。
 
     Args:
-        rgb: 入力画像
-        width: 出力サイズ
-        height: 出力サイズ
-        m: 変換行列。
-        interp: 補間方法。'nearest', 'bilinear', 'bicubic', 'lanczos'。縮小時は自動的にcv2.INTER_AREA。
-        border_mode: パディング方法。'edge', 'reflect', 'wrap'
+        rgb (np.ndarray): 入力画像
+        width (int): 出力サイズ
+        height (int): 出力サイズ
+        m (ndarray): 変換行列。
+        interp (str, optional): Defaults to 'lanczos'. 補間方法。'nearest', 'bilinear', 'bicubic', 'lanczos'。縮小時は自動的にcv2.INTER_AREA。
+        border_mode (str, optional): Defaults to 'edge'. パディング方法。'edge', 'reflect', 'wrap'
 
     """
     cv2_interp = {
@@ -510,8 +553,8 @@ def transform_points(points, m):
     """geometric_transformの座標変換。
 
     Args:
-        points: 座標の配列。shape=(num_points, 2)。[(x, y)]
-        m: 変換行列。
+        points (ndarray): 座標の配列。shape=(num_points, 2)。[(x, y)]
+        m (ndarray): 変換行列。
 
     Returns:
         変換後の座標の配列。
