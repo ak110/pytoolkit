@@ -18,7 +18,7 @@ def init(output_path, append=False, rotate=False, max_bytes=1048576, backup_coun
          stream_level=logging.INFO,
          stream_fmt='[%(levelname)-5s] %(message)s',
          file_level=logging.DEBUG,
-         file_fmt='[%(levelname)-5s] %(message)s <%(name)s:%(filename)s:%(lineno)d>',
+         file_fmt='%(asctime)s [%(levelname)-5s] %(message)s <%(name)s> %(filename)s:%(lineno)d',
          matplotlib_level=logging.WARNING,
          pil_level=logging.INFO):
     """ルートロガーの初期化。"""
@@ -75,33 +75,31 @@ def close(logger):
         logger.removeHandler(handler)
 
 
-def trace(process_name=None, logger_name=__name__):
+def trace(process_name=None):
     """関数の開始・終了をログるdecorator。
 
     Args:
         process_name: ログに出力する処理の名前。(Noneなら関数名)
-        logger_name: ロガーの名前。
 
     """
     def _decorator(func):
         @functools.wraps(func)
         def _decorated_func(*args, **kwargs):
-            with trace_scope(process_name or func.__qualname__, logger_name):
+            with trace_scope(process_name or func.__qualname__):
                 return func(*args, **kwargs)
         return _decorated_func
     return _decorator
 
 
 @contextlib.contextmanager
-def trace_scope(process_name, logger_name=__name__):
+def trace_scope(process_name):
     """withで使うと、処理前後でログを出力する。
 
     Args:
         process_name: ログに出力する処理の名前。
-        logger_name: ロガーの名前。
 
     """
-    logger = get(logger_name)
+    logger = get(__name__)
     logger.info(f'{process_name} 開始')
     start_time = time.time()
     try:

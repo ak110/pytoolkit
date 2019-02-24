@@ -25,12 +25,11 @@ class GradCamVisualizer:
         assert map_output is not None
         # 関数を作成
         grad = K.gradients(model.output[0, output_index], map_output)[0]
-        mask = K.sum(map_output * grad, axis=-1)[0, :, :]
-        mask = K.maximum(mask, 0) / (K.max(mask) + 1e-3)  # [0, 1)
-        self.get_mask_func = K.function(
-            model.inputs + [K.learning_phase()], [mask])
+        mask = K.maximum(0.0, K.sum(map_output * grad, axis=-1)[0, :, :])
+        mask = mask / (K.max(mask) + 1e-3)  # [0, 1)
+        self.get_mask_func = K.function(model.inputs + [K.learning_phase()], [mask])
 
-    def draw(self, source_image, model_inputs, alpha=0.25, interpolation='nearest'):
+    def draw(self, source_image, model_inputs, alpha=0.5, interpolation='nearest'):
         """ヒートマップ画像を作成して返す。
 
         Args:

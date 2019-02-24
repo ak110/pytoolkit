@@ -40,10 +40,11 @@ def test_logger(tmpdir):
 def test_trace():
     import logging
     stderr = io.StringIO()
-    logger = tk.log.get('test_trace')
+    logger = tk.log.get(tk.log.__name__)
+    tk.log.close(logger)
     logger.addHandler(tk.log.stream_handler(stderr, level=logging.DEBUG, fmt=None))
 
-    @tk.log.trace(logger_name='test_trace')
+    @tk.log.trace()
     def _traced_func():
         logger.debug('あいうえお')
 

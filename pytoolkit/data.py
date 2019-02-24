@@ -10,7 +10,7 @@ _THREAD_POOL = concurrent.futures.ThreadPoolExecutor()
 
 
 class Dataset(metaclass=abc.ABCMeta):
-    """データの読み込みを行うクラス。"""
+    """データを読み込むクラス。"""
 
     @abc.abstractmethod
     def __len__(self):
@@ -46,30 +46,37 @@ class DataLoader(keras.utils.Sequence):
         dataset (Dataset): データセット。
         batch_size (int): バッチサイズ。
         shuffle (bool): データをシャッフルするか否か。
-        mixup (bool): mixupするか否か。
+        mp_size (int): プロセス数。
         parallel (bool): 並列処理を行うか否か。
+        mixup (bool): mixupするか否か。
 
     """
 
-    def __init__(self, dataset, batch_size, shuffle=False, mixup=False, parallel=False):
+    def __init__(self, dataset, batch_size, shuffle=False, mp_size=1, parallel=True, mixup=False):
         assert len(dataset) > 0
         self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle = shuffle
-        self.mixup = mixup
+        self.mp_size = mp_size
         self.parallel = parallel
-        self.indices = np.arange(len(self.dataset))
+        self.mixup = mixup
+        bs = self.batch_size * self.mp_size
+        self.steps_per_epoch = (len(self.dataset) + bs - 1) // bs
         if self.shuffle:
-            np.random.shuffle(self.indices)
+            self.index_generator = _generate_shuffled_indices(len(self.dataset))
+            self.indices = [next(self.index_generator) for _ in range(self.steps_per_epoch * self.batch_size)]
+        else:
+            self.index_generator = None
+            self.indices = np.arange(len(self.dataset))
 
     def on_epoch_end(self):
         """1エポック完了時の処理。(シャッフルする)"""
         if self.shuffle:
-            np.random.shuffle(self.indices)
+            self.indices = [next(self.index_generator) for _ in range(self.steps_per_epoch * self.batch_size)]
 
     def __len__(self):
         """1エポックあたりのミニバッチ数を返す。"""
-        return (len(self.indices) + self.batch_size - 1) // self.batch_size
+        return self.steps_per_epoch
 
     def __getitem__(self, index):
         """指定されたインデックスのミニバッチを1件返す。
@@ -83,6 +90,7 @@ class DataLoader(keras.utils.Sequence):
         """
         offset = self.batch_size * index
         batch_indices = self.indices[offset:offset + self.batch_size]
+        assert not self.shuffle or len(batch_indices) == self.batch_size
 
         if self.parallel:
             futures = [_THREAD_POOL.submit(self.get_sample, i) for i in batch_indices]
@@ -91,8 +99,7 @@ class DataLoader(keras.utils.Sequence):
             results = [self.get_sample(i) for i in batch_indices]
 
         X_batch, y_batch = zip(*results)
-        X_batch, y_batch = np.array(X_batch), np.array(y_batch)
-        return X_batch, y_batch
+        return np.array(X_batch), np.array(y_batch)
 
     def get_sample(self, index):
         """指定されたインデックスのデータを返す。
@@ -107,7 +114,7 @@ class DataLoader(keras.utils.Sequence):
         X_i, y_i = self.dataset[index]
 
         if self.mixup:
-            t = np.random.choice(len(self.indices))
+            t = np.random.choice(len(self.dataset))
             X_t, y_t = self.dataset[t]
             r = np.float32(np.random.beta(0.2, 0.2))
             X_i = (X_i * r + X_t * (1 - r))
@@ -119,3 +126,11 @@ class DataLoader(keras.utils.Sequence):
         """データを返す。"""
         for i in range(len(self)):
             yield self[i]
+
+
+def _generate_shuffled_indices(data_count):
+    """シャッフルしたインデックスのgenerator"""
+    indices = np.arange(data_count)
+    while True:
+        np.random.shuffle(indices)
+        yield from indices
