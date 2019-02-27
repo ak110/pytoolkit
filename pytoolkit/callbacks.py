@@ -179,8 +179,7 @@ class FreezeBNCallback(keras.callbacks.Callback):
             loss=self.model.loss,
             metrics=self.model.metrics,
             loss_weights=self.model.loss_weights,
-            sample_weight_mode=self.model.sample_weight_mode,
-            weighted_metrics=self.model.weighted_metrics)
+            sample_weight_mode=self.model.sample_weight_mode)
 
 
 class UnfreezeCallback(keras.callbacks.Callback):
