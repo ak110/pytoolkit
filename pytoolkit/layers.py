@@ -3,13 +3,14 @@
 import numpy as np
 import tensorflow as tf
 
-from . import K, keras
+from . import K, hvd, keras
 
 
 def get_custom_objects():
     """独自オブジェクトのdictを返す。"""
     classes = [
         Preprocess,
+        Conv2DEx,
         Resize2D,
         Pad2D,
         PadChannel2D,
@@ -59,6 +60,145 @@ class Preprocess(keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+class Conv2DEx(keras.layers.Layer):
+    """float16なConv2D+BN+Act。"""
+
+    def __init__(self,
+                 filters,
+                 kernel_size=3,
+                 strides=1,
+                 dilation_rate=1,
+                 center=True,
+                 scale=True,
+                 activation=None,
+                 **kwargs):
+        super().__init__(**kwargs)
+        self.filters = filters
+        self.kernel_size = (kernel_size,) * 2 if isinstance(kernel_size, int) else kernel_size
+        self.strides = (strides,) * 2 if isinstance(strides, int) else strides
+        self.dilation_rate = (dilation_rate,) * 2 if isinstance(dilation_rate, int) else dilation_rate
+        self.center = center
+        self.scale = scale
+        self.activation = keras.activations.get(activation)
+        self.kernel = None
+        self.gamma = None
+        self.beta = None
+        self.moving_mean = None
+        self.moving_variance = None
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
+
+    def build(self, input_shape):
+        if input_shape[-1] is None:
+            raise ValueError('The channel dimension of the inputs should be defined. Found `None`.')
+
+        kernel_shape = self.kernel_size + (int(input_shape[-1]), self.filters)
+        self.kernel = self.add_weight(shape=kernel_shape,
+                                      initializer=keras.initializers.he_uniform(),
+                                      name='kernel',
+                                      regularizer=keras.regularizers.l2(1e-5),
+                                      constraint=None,
+                                      dtype='float32')
+
+        bn_shape = (self.filters,)
+        if self.scale:
+            self.gamma = self.add_weight(shape=bn_shape,
+                                         name='gamma',
+                                         initializer=keras.initializers.ones(),
+                                         regularizer=keras.regularizers.l2(1e-5),
+                                         constraint=None,
+                                         dtype='float32')
+        else:
+            self.gamma = K.constant(1.0, dtype='float32')
+        if self.center:
+            self.beta = self.add_weight(shape=bn_shape,
+                                        name='beta',
+                                        initializer=keras.initializers.zeros(),
+                                        regularizer=keras.regularizers.l2(1e-5),
+                                        constraint=None,
+                                        dtype='float32')
+        else:
+            self.beta = K.constant(0.0, dtype='float32')
+        self.moving_mean = self.add_weight(shape=bn_shape,
+                                           name='moving_mean',
+                                           initializer=keras.initializers.zeros(),
+                                           trainable=False,
+                                           dtype='float32')
+        self.moving_variance = self.add_weight(shape=bn_shape,
+                                               name='moving_variance',
+                                               initializer=keras.initializers.ones(),
+                                               trainable=False,
+                                               dtype='float32')
+
+        super().build(input_shape)
+
+    def call(self, inputs, training=None):  # pylint: disable=W0221
+        if training is None:
+            training = K.learning_phase()
+        # conv
+        outputs = K.conv2d(
+            inputs,
+            K.cast(self.kernel, K.dtype(inputs)),
+            strides=self.strides,
+            padding='same',
+            data_format='channels_last',
+            dilation_rate=self.dilation_rate)
+        # bn
+        outputs = K.in_train_phase(
+            lambda: self._bn_train(outputs),
+            lambda: self._bn_test(outputs),
+            training)
+        # act
+        if self.activation is not None:
+            outputs = self.activation(outputs)
+        return outputs
+
+    def _bn_train(self, inputs):
+        """学習時のBN。"""
+        inputs32 = K.cast(inputs, 'float32')
+        mean = K.mean(inputs32, axis=[0, 1, 2])
+        squared_mean = K.mean(K.square(inputs32), axis=[0, 1, 2])
+        # Sync BN
+        if hvd.initialized():
+            import horovod.tensorflow as _hvd
+            mean = _hvd.allreduce(mean, average=True)
+            squared_mean = _hvd.allreduce(squared_mean, average=True)
+        var = squared_mean - K.square(mean)
+
+        # exponential moving average:
+        # m_new = m_old * 0.99 + x * 0.01
+        # m_new - m_old = (x - m_old) * 0.01
+        update1 = tf.assign_add(self.moving_mean, (mean - self.moving_mean) * 0.01)
+        update2 = tf.assign_add(self.moving_variance, (var - self.moving_variance) * 0.01)
+        self.add_update([update1, update2], inputs)
+
+        # y = (x - mean) / (sqrt(var) + epsilon) * gamma
+        a = self.gamma / (K.sqrt(var) + 1e-3)
+        b = self.beta - mean * a
+        return inputs * K.cast(a, K.dtype(inputs)) + K.cast(b, K.dtype(inputs))
+
+    def _bn_test(self, inputs):
+        """予測時のBN。"""
+        # y = (x - mean) / (sqrt(var) + epsilon) * gamma
+        a = self.gamma / (K.sqrt(self.moving_variance) + 1e-3)
+        b = self.beta - self.moving_mean * a
+        return inputs * K.cast(a, K.dtype(inputs)) + K.cast(b, K.dtype(inputs))
+
+    def get_config(self):
+        config = {
+            'filters': self.filters,
+            'kernel_size': self.kernel_size,
+            'strides': self.strides,
+            'dilation_rate': self.dilation_rate,
+            'center': self.center,
+            'scale': self.scale,
+            'activation': keras.activations.serialize(self.activation),
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
 class Resize2D(keras.layers.Layer):
     """リサイズ。
 
@@ -98,10 +238,10 @@ class Resize2D(keras.layers.Layer):
         if self.size is not None:
             size = self.size
         else:
-            shape = keras.backend.shape(inputs)
-            scale = keras.backend.constant(self.scale, dtype='float32')
-            new_h = keras.backend.cast(keras.backend.cast(shape[1], 'float32') * scale, 'int32')
-            new_w = keras.backend.cast(keras.backend.cast(shape[2], 'float32') * scale, 'int32')
+            shape = K.shape(inputs)
+            scale = K.constant(self.scale, dtype='float32')
+            new_h = K.cast(K.cast(shape[1], 'float32') * scale, 'int32')
+            new_w = K.cast(K.cast(shape[2], 'float32') * scale, 'int32')
             size = (new_h, new_w)
         return tf.image.resize_images(inputs, size, method, self.align_corners)
 
@@ -474,13 +614,13 @@ class ParallelGridPooling2D(keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         _ = kwargs  # noqa
-        shape = keras.backend.shape(inputs)
-        int_shape = keras.backend.int_shape(inputs)
+        shape = K.shape(inputs)
+        int_shape = K.int_shape(inputs)
         rh, rw = self.pool_size
         b, h, w, c = shape[0], shape[1], shape[2], int_shape[3]
-        inputs = keras.backend.reshape(inputs, (b, h // rh, rh, w // rw, rw, c))
+        inputs = K.reshape(inputs, (b, h // rh, rh, w // rw, rw, c))
         inputs = tf.transpose(inputs, perm=(2, 4, 0, 1, 3, 5))
-        inputs = keras.backend.reshape(inputs, (rh * rw * b, h // rh, w // rw, c))
+        inputs = K.reshape(inputs, (rh * rw * b, h // rh, w // rw, c))
         return inputs
 
     def get_config(self):
@@ -501,11 +641,11 @@ class ParallelGridGather(keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         _ = kwargs  # noqa
-        shape = keras.backend.shape(inputs)
+        shape = K.shape(inputs)
         b = shape[0]
-        gather_shape = keras.backend.concatenate([[self.r, b // self.r], shape[1:]], axis=0)
-        inputs = keras.backend.reshape(inputs, gather_shape)
-        inputs = keras.backend.mean(inputs, axis=0)
+        gather_shape = K.concatenate([[self.r, b // self.r], shape[1:]], axis=0)
+        inputs = K.reshape(inputs, gather_shape)
+        inputs = K.mean(inputs, axis=0)
         return inputs
 
     def get_config(self):

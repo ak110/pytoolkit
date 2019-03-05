@@ -45,11 +45,10 @@ def _run(args):
     optimizer = tk.optimizers.NSGD(lr=base_lr, momentum=0.9, nesterov=True)
     optimizer = hvd.DistributedOptimizer(optimizer, compression=hvd.Compression.fp16)
     model.compile(optimizer, 'categorical_crossentropy')
-    model.summary(print_fn=logger.info)
+    model.summary(print_fn=logger.info if hvd.rank() == 0 else lambda x: x)
 
     callbacks = [
         tk.callbacks.CosineAnnealing(),
-        tk.callbacks.FreezeBNCallback(freeze_epochs=5),
         hvd.callbacks.BroadcastGlobalVariablesCallback(0),
         hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1),
     ]
@@ -90,13 +89,14 @@ def _extract1000(X, y, num_classes):
 
 def _create_network(input_shape, num_classes):
     """ネットワークを作成して返す。"""
-    inputs = x = tk.keras.layers.Input(input_shape)
+    inputs = x = tk.keras.layers.Input(input_shape, dtype='float16')
     x = tk.layers.Preprocess(mode='tf')(x)
     for stage, filters in enumerate([128, 256, 384]):
         x = x if stage == 0 else tk.keras.layers.MaxPooling2D()(x)
         x = _conv2d(filters)(x)
         x = _conv2d(filters)(x)
         x = _conv2d(filters)(x)
+    x = tk.keras.layers.Lambda(lambda x: tk.K.cast(x, 'float32'))(x)
     x = tk.keras.layers.GlobalAveragePooling2D()(x)
     x = tk.keras.layers.Dense(num_classes, activation='softmax',
                               kernel_regularizer=tk.keras.regularizers.l2(1e-5),
@@ -105,23 +105,9 @@ def _create_network(input_shape, num_classes):
     return model
 
 
-def _conv2d(filters, kernel_size=3, strides=1, use_act=True):
+def _conv2d(filters, strides=1, use_act=True):
     def _layers(x):
-        x = tk.keras.layers.Conv2D(filters, kernel_size=kernel_size, strides=strides,
-                                   padding='same', use_bias=False,
-                                   kernel_initializer='he_uniform',
-                                   kernel_regularizer=tk.keras.regularizers.l2(1e-5),
-                                   bias_regularizer=tk.keras.regularizers.l2(1e-5))(x)
-        x = _bn_act(use_act=use_act)(x)
-        return x
-    return _layers
-
-
-def _bn_act(use_act=True):
-    def _layers(x):
-        x = tk.keras.layers.BatchNormalization(gamma_regularizer=tk.keras.regularizers.l2(1e-5),
-                                               beta_regularizer=tk.keras.regularizers.l2(1e-5))(x)
-        x = tk.keras.layers.Activation('relu')(x) if use_act else x
+        x = tk.layers.Conv2DEx(filters, strides=strides, activation='relu' if use_act else None)(x)
         return x
     return _layers
 

@@ -21,6 +21,7 @@ disable=
     # W1202:Use % formatting in logging functions and pass the % parameters as arguments
     ,W1202
     ,bare-except
+    ,broad-except
     ,len-as-condition
     ,locally-disabled
     ,logging-fstring-interpolation
@@ -43,4 +44,4 @@ max-line-length=256
 
 [TYPECHECK]
 ignored-modules=__init__,numpy,matplotlib.cm,mpi4py,mpi4py.MPI,distutils,horovod,tensorflow,pydensecrf.densecrf,pydensecrf.utils
-ignored-classes=tuple,Empty,pathlib.PurePath,h5py.File,ConfigProto
+ignored-classes=numpy.ndarray,tuple,Empty,pathlib.PurePath,h5py.File,ConfigProto
