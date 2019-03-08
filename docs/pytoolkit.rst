@@ -20,6 +20,7 @@ Submodules
    pytoolkit.data
    pytoolkit.dl
    pytoolkit.hvd
+   pytoolkit.image
    pytoolkit.layers
    pytoolkit.log
    pytoolkit.losses
