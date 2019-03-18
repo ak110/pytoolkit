@@ -11,7 +11,7 @@ from . import ndimage, od
 class RandomCompose(A.Compose):
     """シャッフル付きCompose。"""
 
-    def __call__(self, **data):
+    def __call__(self, **data):  # pylint: disable=signature-differs
         np.random.shuffle(self.transforms)
         return super().__call__(**data)
 

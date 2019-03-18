@@ -8,7 +8,6 @@ env:
   global:
     - OMP_NUM_THREADS=4
     - CUDA_VISIBLE_DEVICES=-1
-    - PYTHONWARNINGS=default
 
 install:
   - pip install cython
@@ -18,4 +17,4 @@ script:
   - flake8
   - test "$(autopep8 --recursive --diff .)" = ""
   - pylint --jobs=4 pytoolkit *.py
-  - pytest
+  - PYTHONWARNINGS=default pytest
