@@ -10,6 +10,7 @@ else:
     keras = tf.keras
 K = keras.backend
 
+from . import autoaugment
 from . import backend
 from . import cache
 from . import callbacks

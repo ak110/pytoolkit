@@ -1,5 +1,7 @@
-keras
+Pillow
+albumentations
 numpy
+opencv-python
 scikit-learn
 scipy
 tensorflow

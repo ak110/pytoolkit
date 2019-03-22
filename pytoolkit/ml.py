@@ -18,6 +18,9 @@ def listup_classification(dirpath, class_names=None, use_tqdm=True, check_image=
         use_tqdm: tqdmを使用するか否か
         check_image: 画像として読み込みチェックを行い、読み込み可能なファイルのみ返すか否か (遅いので注意)
 
+    Returns:
+        tuple: class_names, X, y
+
     """
     dirpath = pathlib.Path(dirpath)
 
@@ -99,6 +102,10 @@ def split(X, y, split_seed, validation_split=None, cv_count=None, cv_index=None,
         cv_count: cross validationする場合の分割数
         cv_index: cross validationする場合の何番目か
         split_seed: validation_splitやcvする場合のseed
+
+    Returns:
+        tuple: (X_train, y_train), (X_val, y_val)
+
     """
     assert len(X) == len(y)
     if validation_split is not None:

@@ -50,7 +50,7 @@ class RandomRotate(A.DualTransform):
 
 
 class RandomTransform(A.DualTransform):
-    """Scale, Resize, Rotateをまとめて処理。"""
+    """Flip, Scale, Resize, Rotateをまとめて処理。"""
 
     def __init__(self, width, height, flip_h=True, flip_v=False,
                  scale_prob=0.5, scale_range=(2 / 3, 3 / 2),
@@ -112,10 +112,26 @@ class RandomTransform(A.DualTransform):
         raise NotImplementedError()  # for pylint
 
 
+class Resize(A.Resize):
+    """リサイズ。"""
+
+    def __init__(self, width, height, always_apply=False, p=1):
+        super().__init__(height=height, width=width, always_apply=False, p=1)
+
+    def apply(self, img, **params):  # pylint: disable=signature-differs
+        return ndimage.resize(img, width=self.width, height=self.height)
+
+    def apply_to_keypoint(self, keypoint, **params):
+        return keypoint  # for pylint
+
+    def get_params_dependent_on_targets(self, params):
+        raise NotImplementedError()  # for pylint
+
+
 class RandomColorAugmentors(RandomCompose):
     """色関連のDataAugmentationをいくつかまとめたもの。"""
 
-    def __init__(self):
+    def __init__(self, p=1):
         argumentors = [
             RandomBlur(p=0.125),
             RandomUnsharpMask(p=0.125),
@@ -129,7 +145,7 @@ class RandomColorAugmentors(RandomCompose):
             RandomPosterize(p=0.0625),
             RandomAlpha(p=0.125),
         ]
-        super().__init__(argumentors, p=1)
+        super().__init__(argumentors, p=p)
 
 
 class RandomBlur(A.ImageOnlyTransform):

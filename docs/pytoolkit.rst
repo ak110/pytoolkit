@@ -14,6 +14,7 @@ Submodules
 
 .. toctree::
 
+   pytoolkit.autoaugment
    pytoolkit.backend
    pytoolkit.cache
    pytoolkit.callbacks
