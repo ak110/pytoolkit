@@ -1,8 +1,5 @@
 import io
 import os
-import pathlib
-
-import pytest
 
 import pytoolkit as tk
 

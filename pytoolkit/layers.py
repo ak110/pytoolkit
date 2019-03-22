@@ -70,7 +70,7 @@ class Conv2DEx(keras.layers.Layer):
                  dilation_rate=1,
                  center=True,
                  scale=True,
-                 activation=None,
+                 activation='relu',
                  **kwargs):
         super().__init__(**kwargs)
         self.filters = filters
@@ -97,7 +97,7 @@ class Conv2DEx(keras.layers.Layer):
         self.kernel = self.add_weight(shape=kernel_shape,
                                       initializer=keras.initializers.he_uniform(),
                                       name='kernel',
-                                      regularizer=keras.regularizers.l2(1e-5),
+                                      regularizer=keras.regularizers.l2(1e-4),
                                       constraint=None,
                                       dtype='float32')
 
@@ -106,7 +106,7 @@ class Conv2DEx(keras.layers.Layer):
             self.gamma = self.add_weight(shape=bn_shape,
                                          name='gamma',
                                          initializer=keras.initializers.ones(),
-                                         regularizer=keras.regularizers.l2(1e-5),
+                                         regularizer=keras.regularizers.l2(1e-4),
                                          constraint=None,
                                          dtype='float32')
         else:
@@ -115,7 +115,7 @@ class Conv2DEx(keras.layers.Layer):
             self.beta = self.add_weight(shape=bn_shape,
                                         name='beta',
                                         initializer=keras.initializers.zeros(),
-                                        regularizer=keras.regularizers.l2(1e-5),
+                                        regularizer=keras.regularizers.l2(1e-4),
                                         constraint=None,
                                         dtype='float32')
         else:
@@ -289,7 +289,7 @@ class Pad2D(keras.layers.Layer):
     def call(self, inputs, **kwargs):
         _ = kwargs  # noqa
         padding = K.constant(((0, 0),) + self.padding + ((0, 0),), dtype='int32')
-        return tf.pad(inputs, padding, mode=self.mode, constant_values=self.constant_values, name=self.name)
+        return tf.pad(tensor=inputs, paddings=padding, mode=self.mode, constant_values=self.constant_values, name=self.name)
 
     def get_config(self):
         config = {
@@ -319,7 +319,7 @@ class PadChannel2D(keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         padding = K.constant(((0, 0), (0, 0), (0, 0), (0, self.filters)), dtype='int32')
-        return tf.pad(inputs, padding, mode=self.mode, constant_values=self.constant_values, name=self.name)
+        return tf.pad(tensor=inputs, paddings=padding, mode=self.mode, constant_values=self.constant_values, name=self.name)
 
     def get_config(self):
         config = {
@@ -480,14 +480,14 @@ class GroupNormalization(keras.layers.Layer):
             N, H, W, C = shape[0], shape[1], shape[2], shape[3]
             g = K.minimum(self.groups, C)
             x = K.reshape(x, [N, H, W, g, C // g])
-            mean, var = tf.nn.moments(x, [1, 2, 4], keep_dims=True)
+            mean, var = tf.nn.moments(x=x, axes=[1, 2, 4], keep_dims=True)  # TODO: tf v2からkeepdims
             x = (x - mean) / K.sqrt(var + self.epsilon)
             x = K.reshape(x, [N, H, W, C])
         elif ndim == 5:  # 3D
             N, T, H, W, C = shape[0], shape[1], shape[2], shape[3], shape[4]
             g = K.minimum(self.groups, C)
             x = K.reshape(x, [N, T, H, W, g, C // g])
-            mean, var = tf.nn.moments(x, [1, 2, 3, 5], keep_dims=True)
+            mean, var = tf.nn.moments(x=x, axes=[1, 2, 3, 5], keep_dims=True)  # TODO: tf v2からkeepdims
             x = (x - mean) / K.sqrt(var + self.epsilon)
             x = K.reshape(x, [N, T, H, W, C])
         else:
@@ -534,7 +534,7 @@ class MixFeat(keras.layers.Layer):
             def _forward(x):
                 shape = K.shape(x)
                 indices = K.arange(start=0, stop=shape[0])
-                indices = tf.random_shuffle(indices)
+                indices = tf.random.shuffle(indices)
                 rs = K.concatenate([K.constant([1], dtype='int32'), shape[1:]])
                 r = K.random_normal(rs, 0, self.sigma, dtype='float16')
                 theta = K.random_uniform(rs, -np.pi, +np.pi, dtype='float16')
@@ -543,7 +543,7 @@ class MixFeat(keras.layers.Layer):
                 y = x * K.cast(a, K.floatx()) + K.gather(x, indices) * K.cast(b, K.floatx())
 
                 def _backword(dx):
-                    inv = tf.invert_permutation(indices)
+                    inv = tf.math.invert_permutation(indices)
                     return dx * K.cast(a, K.floatx()) + K.gather(dx, inv) * K.cast(b, K.floatx())
 
                 return y, _backword
@@ -619,7 +619,7 @@ class ParallelGridPooling2D(keras.layers.Layer):
         rh, rw = self.pool_size
         b, h, w, c = shape[0], shape[1], shape[2], int_shape[3]
         inputs = K.reshape(inputs, (b, h // rh, rh, w // rw, rw, c))
-        inputs = tf.transpose(inputs, perm=(2, 4, 0, 1, 3, 5))
+        inputs = tf.transpose(a=inputs, perm=(2, 4, 0, 1, 3, 5))
         inputs = K.reshape(inputs, (rh * rw * b, h // rh, w // rw, c))
         return inputs
 
@@ -675,7 +675,7 @@ class SubpixelConv2D(keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         _ = kwargs  # noqa
-        return tf.depth_to_space(inputs, self.scale)
+        return tf.depth_to_space(input=inputs, block_size=self.scale)
 
     def get_config(self):
         config = {'scale': self.scale}

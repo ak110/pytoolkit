@@ -15,8 +15,8 @@ def global_setup():
 @pytest.fixture()
 def dl_session():
     """関数ごとにsessionするfixture。"""
-    with tk.dl.session():
-        yield
+    with tk.dl.session() as sess:
+        yield sess
 
 
 @pytest.fixture()
