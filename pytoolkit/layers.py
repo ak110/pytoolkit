@@ -387,6 +387,58 @@ class ChannelPair2D(keras.layers.Layer):
         return K.concatenate([inputs[..., i:i + 1] * inputs[..., i + 1:] for i in range(ch - 1)], axis=-1)
 
 
+class BatchNormalization(keras.layers.BatchNormalization):
+    """BatchNormalizationのカスタマイズ版。基本的には互換性があるように元のを継承＆同名で。"""
+
+    def call(self, inputs, training=None):  # pylint: disable=W0221
+        return K.in_train_phase(
+            lambda: self._bn_train(inputs),
+            lambda: self._bn_test(inputs),
+            training)
+
+    def _bn_train(self, inputs):
+        """学習時のBN。"""
+        # self.axisを除く軸で平均・分散を算出する
+        target_axis = self.axis
+        if isinstance(target_axis, int):
+            target_axis = [target_axis]
+        stat_axes = [a for a in range(K.ndim(inputs)) if a not in target_axis]
+
+        # 平均・分散の算出
+        if K.dtype(inputs) == 'float32':
+            x = inputs
+        else:
+            x = K.cast(inputs, 'float32')
+        mean = K.mean(x, axis=stat_axes)
+        squared_mean = K.mean(K.square(x), axis=stat_axes)
+        # Sync BN
+        if hvd.initialized():
+            import horovod.tensorflow as _hvd
+            mean = _hvd.allreduce(mean, average=True)
+            squared_mean = _hvd.allreduce(squared_mean, average=True)
+        var = squared_mean - K.square(mean)
+
+        # exponential moving average:
+        # m_new = m_old * 0.99 + x * 0.01
+        # m_new - m_old = (x - m_old) * 0.01
+        decay = 1 - self.momentum
+        update1 = tf.assign_add(self.moving_mean, (mean - self.moving_mean) * decay)
+        update2 = tf.assign_add(self.moving_variance, (var - self.moving_variance) * decay)
+        self.add_update([update1, update2], inputs)
+
+        # y = (x - mean) / (sqrt(var) + epsilon) * gamma
+        a = self.gamma / (K.sqrt(var) + 1e-3)
+        b = self.beta - mean * a
+        return inputs * K.cast(a, K.dtype(inputs)) + K.cast(b, K.dtype(inputs))
+
+    def _bn_test(self, inputs):
+        """予測時のBN。"""
+        # y = (x - mean) / (sqrt(var) + epsilon) * gamma
+        a = self.gamma / (K.sqrt(self.moving_variance) + 1e-3)
+        b = self.beta - self.moving_mean * a
+        return inputs * K.cast(a, K.dtype(inputs)) + K.cast(b, K.dtype(inputs))
+
+
 class GroupNormalization(keras.layers.Layer):
     """Group normalization。
 
