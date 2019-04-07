@@ -6,23 +6,28 @@ import tensorflow as tf
 from . import K, backend
 
 
-def binary_crossentropy(y_true, y_pred, alpha=0.5):
+def binary_crossentropy(y_true, y_pred, alpha=None):
     """クラス間のバランス補正ありのbinary_crossentropy。
 
     Focal lossの論文ではα=0.75が良いとされていた。(class 0の重みが0.25)
     """
-    a_t = y_true * alpha + (1 - y_true) * (1 - alpha) if alpha is not None else 1
+    a_t = (y_true * alpha + (1 - y_true) * (1 - alpha)) * 2 if alpha is not None else 1
     p_t = y_true * y_pred + (1 - y_true) * (1 - y_pred)
     p_t = K.clip(p_t, K.epsilon(), 1 - K.epsilon())
-    return -a_t * K.log(p_t)
+    return -K.sum(a_t * K.log(p_t), axis=list(range(1, K.ndim(y_true))))
 
 
-def binary_focal_loss(y_true, y_pred, alpha=0.25, gamma=2.0):
-    """2クラス分類用focal loss (https://arxiv.org/pdf/1708.02002v1.pdf)。"""
-    a_t = y_true * alpha + (1 - y_true) * (1 - alpha) if alpha is not None else 1
+def binary_focal_loss(y_true, y_pred, gamma=2.0, alpha=None):
+    """2クラス分類用focal loss (https://arxiv.org/abs/1708.02002)。
+
+    Args:
+        alpha (float or None): class 1の重み。論文では0.25。
+
+    """
+    a_t = (y_true * alpha + (1 - y_true) * (1 - alpha)) * 2 if alpha is not None else 1
     p_t = y_true * y_pred + (1 - y_true) * (1 - y_pred)
     p_t = K.clip(p_t, K.epsilon(), 1 - K.epsilon())
-    return -a_t * K.pow(1 - p_t, gamma) * K.log(p_t)
+    return -K.sum(a_t * K.pow(1 - p_t, gamma) * K.log(p_t), axis=list(range(1, K.ndim(y_true))))
 
 
 def categorical_crossentropy(y_true, y_pred, alpha=None, class_weights=None):
@@ -44,11 +49,16 @@ def categorical_crossentropy(y_true, y_pred, alpha=None, class_weights=None):
         cw = np.reshape(cw, (1, 1, -1))
 
     y_pred = K.maximum(y_pred, K.epsilon())
-    return -K.sum(y_true * K.log(y_pred) * cw, axis=-1)
+    return -K.sum(y_true * K.log(y_pred) * cw, axis=list(range(1, K.ndim(y_true))))
 
 
-def categorical_focal_loss(y_true, y_pred, alpha=0.25, gamma=2.0):
-    """多クラス分類用focal loss (https://arxiv.org/pdf/1708.02002v1.pdf)。"""
+def categorical_focal_loss(y_true, y_pred, gamma=2.0, alpha=None):
+    """多クラス分類用focal loss (https://arxiv.org/abs/1708.02002)。
+
+    Args:
+        alpha (float or None): class 0以外の重み。論文では0.25。
+
+    """
     assert K.image_data_format() == 'channels_last'
     if alpha is None:
         class_weights = 1
@@ -58,7 +68,7 @@ def categorical_focal_loss(y_true, y_pred, alpha=0.25, gamma=2.0):
         class_weights = np.reshape(class_weights, (1, 1, -1))
 
     y_pred = K.maximum(y_pred, K.epsilon())
-    return -K.sum(K.pow(1 - y_pred, gamma) * y_true * K.log(y_pred) * class_weights, axis=-1)  # pylint: disable=invalid-unary-operand-type
+    return -K.sum(K.pow(1 - y_pred, gamma) * y_true * K.log(y_pred) * class_weights, axis=list(range(1, K.ndim(y_true))))  # pylint: disable=invalid-unary-operand-type
 
 
 def lovasz_hinge(y_true, y_pred, activation='elu+1'):

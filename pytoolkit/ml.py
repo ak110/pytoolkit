@@ -94,38 +94,21 @@ def _listup_files(dirpath, recurse, use_tqdm, check_image):
     return result, errors
 
 
-def split(X, y, split_seed, validation_split=None, cv_count=None, cv_index=None, stratify=None):
-    """データの分割。
+def cv_indices(X, y, cv_count, cv_index, split_seed, stratify=None):
+    """Cross validationのインデックスを返す。
 
     Args:
-        validation_split: 実数を指定するとX, y, weightsの一部をランダムにvalidation dataとする
-        cv_count: cross validationする場合の分割数
-        cv_index: cross validationする場合の何番目か
-        split_seed: validation_splitやcvする場合のseed
+        X: 入力データ。
+        y: 出力データ。
+        cv_count (int): 分割数。
+        cv_index (int): 何番目か。
+        split_seed (int): 乱数のseed。
+        stratify (bool or None): StratifiedKFoldにするならTrue。
 
     Returns:
-        tuple: (X_train, y_train), (X_val, y_val)
+        tuple: train_indices, val_indices
 
     """
-    assert len(X) == len(y)
-    if validation_split is not None:
-        # split
-        assert cv_count is None
-        assert cv_index is None
-        X_train, X_val, y_train, y_val = sklearn.model_selection.train_test_split(
-            X, y, test_size=validation_split, shuffle=True, random_state=split_seed, stratify=y if stratify else None)
-    else:
-        # cross validation
-        assert cv_count is not None
-        assert cv_index in range(cv_count)
-        train_indices, val_indices = cv_indices(X, y, cv_count, cv_index, split_seed, stratify)
-        X_train, y_train = X[train_indices], y[train_indices]
-        X_val, y_val = X[val_indices], y[val_indices]
-    return (X_train, y_train), (X_val, y_val)
-
-
-def cv_indices(X, y, cv_count, cv_index, split_seed, stratify=None):
-    """Cross validationのインデックスを返す。"""
     if stratify is None:
         stratify = isinstance(y, np.ndarray) and len(y.shape) == 1
     cv = sklearn.model_selection.StratifiedKFold if stratify else sklearn.model_selection.KFold
