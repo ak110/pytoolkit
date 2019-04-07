@@ -17,4 +17,4 @@ script:
   - flake8
   - test "$(autopep8 --recursive --diff .)" = ""
   - pylint --jobs=4 pytoolkit *.py
-  - PYTHONWARNINGS=default pytest
+  - pytest

@@ -2,7 +2,7 @@
 
 import tensorflow as tf
 
-from . import K, losses
+from . import K
 
 
 def binary_accuracy(y_true, y_pred):
