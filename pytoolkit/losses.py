@@ -143,6 +143,19 @@ def mixed_lovasz_softmax(y_true, y_pred):
     return loss1 * 0.9 + loss2 * 0.1
 
 
+def fbeta_score(y_true, y_pred, beta=1):
+    """Fβ-score。"""
+    y_true = K.round(y_true)
+    y_pred = K.round(y_pred)
+    axis = list(range(1, K.ndim(y_true)))
+    tp = K.sum(y_true * y_pred, axis=axis)
+    p = K.sum(y_pred, axis=axis)
+    t = K.sum(y_true, axis=axis)
+    prec = tp / (p + K.epsilon())
+    rec = tp / (t + K.epsilon())
+    return ((1 + beta ** 2) * prec * rec) / ((beta ** 2) * prec + rec + K.epsilon())
+
+
 def l1_smooth_loss(y_true, y_pred):
     """L1-smooth loss。"""
     abs_loss = K.abs(y_true - y_pred)

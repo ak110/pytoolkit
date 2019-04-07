@@ -2,7 +2,7 @@
 
 import tensorflow as tf
 
-from . import K
+from . import K, losses
 
 
 def binary_accuracy(y_true, y_pred):
@@ -82,3 +82,6 @@ recall = tpr
 binary_accuracy.__name__ = 'acc'
 binary_iou.__name__ = 'iou'
 categorical_iou.__name__ = 'iou'
+
+# losses
+fbeta_score = losses.fbeta_score
