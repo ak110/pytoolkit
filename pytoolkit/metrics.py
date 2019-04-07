@@ -75,6 +75,19 @@ def fpr(y_true, y_pred):
     return K.sum(pred * mask) / K.sum(mask)
 
 
+def fbeta_score(y_true, y_pred, beta=1):
+    """Fβ-score。"""
+    y_true = K.round(y_true)
+    y_pred = K.round(y_pred)
+    axis = list(range(1, K.ndim(y_true)))
+    tp = K.sum(y_true * y_pred, axis=axis)
+    p = K.sum(y_pred, axis=axis)
+    t = K.sum(y_true, axis=axis)
+    prec = tp / (p + K.epsilon())
+    rec = tp / (t + K.epsilon())
+    return ((1 + beta ** 2) * prec * rec) / ((beta ** 2) * prec + rec + K.epsilon())
+
+
 # 再現率(recall)
 recall = tpr
 
@@ -82,6 +95,3 @@ recall = tpr
 binary_accuracy.__name__ = 'acc'
 binary_iou.__name__ = 'iou'
 categorical_iou.__name__ = 'iou'
-
-# losses
-fbeta_score = losses.fbeta_score

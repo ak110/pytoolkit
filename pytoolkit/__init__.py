@@ -1,5 +1,6 @@
 # pylint: skip-file
 
+
 import sys
 import tensorflow as tf
 
@@ -10,25 +11,28 @@ else:
     keras = tf.keras
 K = keras.backend
 
-from . import autoaugment
-from . import backend
-from . import cache
-from . import callbacks
-from . import data
-from . import datasets
-from . import dl
-from . import hvd
-from . import image
-from . import layers
-from . import log
-from . import losses
-from . import metrics
-from . import ml
-from . import ndimage
-from . import od
-from . import optimizers
-from . import utils
-from . import vis
+# その他のimport
+if True:
+    from . import vis
+    from . import autoaugment
+    from . import backend
+    from . import cache
+    from . import callbacks
+    from . import data
+    from . import datasets
+    from . import dl
+    from . import hvd
+    from . import image
+    from . import layers
+    from . import log
+    from . import losses
+    from . import metrics
+    from . import ml
+    from . import models
+    from . import ndimage
+    from . import od
+    from . import optimizers
+    from . import utils
 
 
 def get_custom_objects():
