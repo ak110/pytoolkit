@@ -7,7 +7,6 @@ Subpackages
 .. toctree::
 
     pytoolkit.datasets
-    pytoolkit.lovasz_softmax
 
 Submodules
 ----------
@@ -27,11 +26,13 @@ Submodules
    pytoolkit.losses
    pytoolkit.metrics
    pytoolkit.ml
+   pytoolkit.models
    pytoolkit.ndimage
    pytoolkit.od
    pytoolkit.optimizers
    pytoolkit.utils
    pytoolkit.vis
+   pytoolkit.web
 
 Module contents
 ---------------

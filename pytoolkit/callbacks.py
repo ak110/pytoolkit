@@ -9,7 +9,7 @@ from . import K, hvd, keras, log
 
 
 class LearningRateStepDecay(keras.callbacks.Callback):
-    """よくある150epoch目と225epoch目に学習率を1/10するコールバックを作って返す。"""
+    """よくある150epoch目と225epoch目に学習率を1/10するコールバック。"""
 
     def __init__(self, reduce_epoch_rates=(0.5, 0.75), factor=0.1, epochs=None):
         super().__init__()
@@ -34,8 +34,8 @@ class LearningRateStepDecay(keras.callbacks.Callback):
 class CosineAnnealing(keras.callbacks.Callback):
     """Cosine Annealing without restart。
 
-    - SGDR: Stochastic Gradient Descent with Warm Restarts
-      https://arxiv.org/abs/1608.03983
+    References:
+        SGDR: Stochastic Gradient Descent with Warm Restarts <https://arxiv.org/abs/1608.03983>
 
     """
 
@@ -120,17 +120,24 @@ class EpochLogger(keras.callbacks.Callback):
         super().__init__()
         self.enabled = enabled if enabled is not None else hvd.is_master()
         self.logger = log.get(__name__)
+        self.train_start_time = None
         self.epoch_start_time = None
+
+    def on_train_begin(self, logs=None):
+        self.train_start_time = time.time()
 
     def on_epoch_begin(self, epoch, logs=None):
         self.epoch_start_time = time.time()
 
     def on_epoch_end(self, epoch, logs=None):
         lr = K.get_value(self.model.optimizer.lr)
-        elapsed_time = time.time() - self.epoch_start_time
+        now = time.time()
+        elapsed_time = now - self.epoch_start_time
+        time_per_epoch = (now - self.train_start_time) / (epoch + 1)
+        eta = time_per_epoch * (self.params['epochs'] - epoch - 1)
         metrics = ' '.join([f'{k}={logs.get(k):.4f}' for k in self.params['metrics'] if k in logs])
         if self.enabled:
-            self.logger.debug(f'Epoch {epoch + 1:3d}: lr={lr:.1e} {metrics} time={int(np.ceil(elapsed_time))}')
+            self.logger.debug(f'Epoch {epoch + 1:3d}: lr={lr:.1e} {metrics} time={int(np.ceil(elapsed_time))} ETA={int(np.ceil(eta))}')
 
 
 class FreezeBNCallback(keras.callbacks.Callback):
@@ -138,15 +145,15 @@ class FreezeBNCallback(keras.callbacks.Callback):
 
     SENetの論文の最後の方にしれっと書いてあったので真似てみた。
 
-    ■Squeeze-and-Excitation Networks
-    https://arxiv.org/abs/1709.01507
-
     Args:
         freeze_epochs: BNをfreezeした状態で学習するepoch数。freeze_epochs=5なら最後の5epochをfreeze。
 
     使用例::
 
         callbacks.append(tk.dl.callbacks.freeze_bn(0.95))
+
+    References:
+        Squeeze-and-Excitation Networks <https://arxiv.org/abs/1709.01507>
 
     """
 
