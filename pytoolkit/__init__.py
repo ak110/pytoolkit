@@ -13,7 +13,6 @@ K = keras.backend
 
 # その他のimport
 if True:
-    from . import vis
     from . import autoaugment
     from . import backend
     from . import cache
@@ -33,6 +32,8 @@ if True:
     from . import od
     from . import optimizers
     from . import utils
+    from . import vis
+    from . import web
 
 
 def get_custom_objects():
