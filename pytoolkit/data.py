@@ -27,6 +27,27 @@ class Dataset(metaclass=abc.ABCMeta):
         Returns:
             入力データとラベル。
 
+            入力データが複数ある場合はlist形式で返す。
+            出力が複数ある場合も同様にlist形式。
+            単数の場合はnp.ndarrayである必要があるため注意。
+
+            例えば、::
+
+                input_a = keras.layers.Input((None,))
+                input_b = keras.layers.Input((None,))
+                x = ...
+                x1 = keras.layers.Dense(1)(x)
+                x2 = keras.layers.Dense(1)(x)
+                model = keras.models.Model(inputs=[input_a, input_b], outputs=[x1, x2])
+
+            上記のようなモデルにデータを渡す場合、::
+
+                def __getitem__(self, index):
+                    ...
+                    return [x1, x2], [y1, y2]
+
+            のように実装する。
+
         """
         raise NotImplementedError
 
@@ -99,7 +120,17 @@ class DataLoader(keras.utils.Sequence):
             results = [self.get_sample(i) for i in batch_indices]
 
         X_batch, y_batch = zip(*results)
-        return np.array(X_batch), np.array(y_batch)
+
+        if isinstance(X_batch[0], list):
+            X_batch = [np.array([x[i] for x in X_batch]) for i in range(len(X_batch[0]))]
+        else:
+            X_batch = np.array(X_batch)
+        if isinstance(y_batch[0], list):
+            y_batch = [np.array([y[i] for y in y_batch]) for i in range(len(y_batch[0]))]
+        else:
+            y_batch = np.array(y_batch)
+
+        return X_batch, y_batch
 
     def get_sample(self, index):
         """指定されたインデックスのデータを返す。
@@ -117,8 +148,15 @@ class DataLoader(keras.utils.Sequence):
             t = np.random.choice(len(self.dataset))
             X_t, y_t = self.dataset[t]
             r = np.float32(np.random.beta(0.2, 0.2))
-            X_i = (X_i * r + X_t * (1 - r))
-            y_i = (y_i * r + y_t * (1 - r))
+
+            if isinstance(X_i, list):
+                X_i = [X_i[i] * r + X_t[i] * (1 - r) for i in range(len(X_i))]
+            else:
+                X_i = (X_i * r + X_t * (1 - r))
+            if isinstance(y_i, list):
+                y_i = [y_i[i] * r + y_t[i] * (1 - r) for i in range(len(y_i))]
+            else:
+                y_i = (y_i * r + y_t * (1 - r))
 
         return X_i, y_i
 

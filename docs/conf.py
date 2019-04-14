@@ -185,6 +185,8 @@ epub_exclude_files = ['search.html']
 
 autosummary_generate = True
 
+autodoc_default_flags = ['members', 'undoc-members', 'special-members', 'show-inheritance']
+
 # -- Options for todo extension ----------------------------------------------
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.

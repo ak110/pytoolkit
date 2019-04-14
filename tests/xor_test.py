@@ -28,7 +28,7 @@ def test_xor(dl_session, tmpdir):
             tk.callbacks.FreezeBNCallback(1),
             tk.callbacks.UnfreezeCallback(0.0001),
             tk.callbacks.Checkpoint(models_dir / 'checkpoint.h5'),
-            tk.callbacks.TerminateOnNaN(),
+            tk.callbacks.ErrorOnNaN(),
         ])
 
     proba = model.predict(X)

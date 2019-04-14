@@ -282,7 +282,7 @@ class Checkpoint(keras.callbacks.Callback):
             hvd.barrier()
 
 
-class TerminateOnNaN(keras.callbacks.Callback):
+class ErrorOnNaN(keras.callbacks.Callback):
     """NaNやinfで異常終了させる。"""
 
     def on_batch_end(self, batch, logs=None):
