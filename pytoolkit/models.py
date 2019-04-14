@@ -3,12 +3,16 @@ import os
 import pathlib
 import sys
 
-from . import callbacks as cb, data, get_custom_objects, hvd, keras, log
+import numpy as np
+
+from . import callbacks as cb, data, hvd, keras, log, utils
 
 
 def load(path: pathlib.Path, custom_objects=None, compile=False) -> keras.models.Model:  # pylint: disable=redefined-outer-name
     """モデルの読み込み。"""
-    custom_objects = (custom_objects or dict()) + get_custom_objects()
+    from . import get_custom_objects
+    custom_objects = custom_objects.copy() if custom_objects else dict()
+    custom_objects.update(get_custom_objects())
     return keras.models.load_model(str(path), custom_objects=custom_objects, compile=compile)
 
 
@@ -20,6 +24,14 @@ def load_weights(model: keras.models.Model, path: pathlib.Path, by_name=False):
             model.load_weights(str(path), by_name=by_name)
     else:
         log.get(__name__).info(f'{path.name} is not found.')
+
+
+@log.trace()
+def save(model: keras.models.Model, path: pathlib.Path, include_optimizer=False):
+    """モデルの保存。"""
+    if hvd.is_master():
+        model.save(str(path), include_optimizer=include_optimizer)
+    hvd.barrier()
 
 
 def summary(model: keras.models.Model):
@@ -34,7 +46,7 @@ def compile(model: keras.models.Model, optimizer, loss, metrics=None, loss_weigh
     model.compile(optimizer, loss, metrics, loss_weights=loss_weights)
 
 
-def fit(model: keras.models.Model, training_data, validation_data=None,
+def fit(model: keras.models.Model, training_data: data.Dataset, validation_data: data.Dataset = None,
         batch_size=32, epochs=1800,
         callbacks=None, verbose=1,
         mixup=False):
@@ -42,8 +54,8 @@ def fit(model: keras.models.Model, training_data, validation_data=None,
 
     Args:
         model: モデル。
-        training_data (tk.utils.Dataset): 訓練データ。
-        validation_data (tk.utils.Dataset): 検証データ。Noneなら省略。
+        training_data (tk.data.Dataset): 訓練データ。
+        validation_data (tk.data.Dataset): 検証データ。Noneなら省略。
         callbacks (list): コールバック。EpochLoggerとErrorOnNaNは自動追加。
         verbose (int): 1ならプログレスバー表示、2ならepoch毎の結果だけ表示。
         mixup (bool): mixupするのか否か。
@@ -73,9 +85,46 @@ def fit(model: keras.models.Model, training_data, validation_data=None,
             sys.stdout = backup_stdout
 
 
-@log.trace()
-def save(model: keras.models.Model, path: pathlib.Path, include_optimizer=False):
-    """モデルの保存。"""
-    if hvd.is_master():
-        model.save(str(path), include_optimizer=include_optimizer)
-    hvd.barrier()
+def predict(model: keras.models.Model, predict_data: data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None):
+    """予測。
+
+    Args:
+        model: モデル。
+        predict_data: 予測したい入力データ。
+        batch_size (int): バッチサイズ
+        verbose (int): プログレスバー(tqdm)を表示するか否か。
+        desc (str): プログレスバーの説明。
+        on_batch_fn (callable): モデルとミニバッチ分の入力データを受け取り、予測結果を返す処理。(TTA用)
+
+    Returns:
+        np.ndarray: 予測結果。
+
+    """
+    return np.array(list(predict_flow(model, predict_data, batch_size, verbose, desc, on_batch_fn)))
+
+
+def predict_flow(model: keras.models.Model, predict_data: data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None):
+    """予測。(yieldバージョン)
+
+    Args:
+        model: モデル。
+        predict_data: 予測したい入力データ。
+        batch_size (int): バッチサイズ
+        verbose (int): プログレスバー(tqdm)を表示するか否か。
+        desc (str): プログレスバーの説明。
+        on_batch_fn (callable): モデルとミニバッチ分の入力データを受け取り、予測結果を返す処理。(TTA用)
+
+    Yields:
+        np.ndarray: 予測結果。(サンプル毎)
+
+    """
+    if on_batch_fn is None:
+        on_batch_fn = _predict_on_batch
+    data_loader = data.DataLoader(predict_data, batch_size)
+    for X, _ in utils.tqdm(data_loader, desc=desc, total=len(data_loader), disable=verbose < 1):
+        pred_batch = on_batch_fn(model, X)
+        yield from pred_batch
+
+
+def _predict_on_batch(model: keras.models.Model, X):
+    return model.predict_on_batch(X)
