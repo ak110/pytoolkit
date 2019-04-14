@@ -3,7 +3,13 @@ import os
 import pathlib
 import sys
 
-from . import callbacks as cb, data, hvd, keras, log
+from . import callbacks as cb, data, get_custom_objects, hvd, keras, log
+
+
+def load(path: pathlib.Path, custom_objects=None, compile=False) -> keras.models.Model:  # pylint: disable=redefined-outer-name
+    """モデルの読み込み。"""
+    custom_objects = (custom_objects or dict()) + get_custom_objects()
+    return keras.models.load_model(str(path), custom_objects=custom_objects, compile=compile)
 
 
 def load_weights(model: keras.models.Model, path: pathlib.Path, by_name=False):
@@ -21,7 +27,7 @@ def summary(model: keras.models.Model):
     model.summary(print_fn=log.get(__name__).info if hvd.is_master() else lambda x: None)
 
 
-def compile(model: keras.models.Model, optimizer, loss, metrics=None, loss_weights=None):
+def compile(model: keras.models.Model, optimizer, loss, metrics=None, loss_weights=None):  # pylint: disable=redefined-builtin
     """compileするだけ。"""
     if hvd.initialized():
         optimizer = hvd.get().DistributedOptimizer(optimizer, compression=hvd.get().Compression.fp16)
@@ -69,7 +75,7 @@ def fit(model: keras.models.Model, training_data, validation_data=None,
 
 @log.trace()
 def save(model: keras.models.Model, path: pathlib.Path, include_optimizer=False):
-    """saveを実行するだけ。"""
+    """モデルの保存。"""
     if hvd.is_master():
         model.save(str(path), include_optimizer=include_optimizer)
     hvd.barrier()
