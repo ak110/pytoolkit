@@ -72,7 +72,7 @@ def categorical_focal_loss(y_true, y_pred, gamma=2.0, alpha=None):
 
 
 def lovasz_hinge(y_true, y_pred, from_logits=False, per_image=True, activation='elu+1'):
-    """Binary Lovasz hinge loss。"""
+    """Lovasz hinge loss。"""
     if not from_logits:
         y_pred = backend.logit(y_pred)
     if per_image:
@@ -105,12 +105,36 @@ def lovasz_hinge(y_true, y_pred, from_logits=False, per_image=True, activation='
 
 
 def symmetric_lovasz_hinge(y_true, y_pred, from_logits=False, activation='elu+1'):
-    """Binary Lovasz hinge lossの0, 1対称版。"""
+    """Lovasz hinge lossの0, 1対称版。"""
     if not from_logits:
         y_pred = backend.logit(y_pred)
     loss1 = lovasz_hinge(y_true, y_pred, from_logits=True, activation=activation)
     loss2 = lovasz_hinge(1 - y_true, -y_pred, from_logits=True, activation=activation)
     return (loss1 + loss2) / 2
+
+
+def lovasz_sigmoid(y_true, y_pred, per_image=True):
+    """Lovasz hinge lossのhingeじゃない版。"""
+    if per_image:
+        def loss_per_image(elems):
+            label, logit = elems
+            return lovasz_sigmoid(label, logit, per_image=False)
+        return tf.map_fn(loss_per_image, (y_true, y_pred), dtype=tf.float32)
+
+    y_true = K.reshape(y_true, (-1,))
+    y_pred = K.reshape(y_pred, (-1,))
+    y_true = K.cast(y_true, 'float32')
+    errors = K.abs(y_true - y_pred)
+    errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0], name='sort')
+    gt_sorted = K.gather(y_true, perm)
+    gts = K.sum(gt_sorted)
+    inter = gts - tf.cumsum(gt_sorted)
+    union = gts + tf.cumsum(1. - gt_sorted)
+    iou = 1.0 - inter / union
+    grad = tf.concat((iou[:1], iou[1:] - iou[:-1]), 0)
+    loss = tf.tensordot(errors_sorted, tf.stop_gradient(grad), 1, name='loss')
+    assert K.ndim(loss) == 0
+    return loss
 
 
 def lovasz_softmax(y_true, y_pred, per_image=True):
