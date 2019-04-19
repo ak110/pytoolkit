@@ -71,22 +71,22 @@ def categorical_focal_loss(y_true, y_pred, gamma=2.0, alpha=None):
     return -K.sum(K.pow(1 - y_pred, gamma) * y_true * K.log(y_pred) * class_weights, axis=list(range(1, K.ndim(y_true))))  # pylint: disable=invalid-unary-operand-type
 
 
-def lovasz_hinge(y_true, y_pred, from_logits=False, per_image=True, activation='elu+1'):
+def lovasz_hinge(y_true, y_pred, from_logits=False, per_sample=True, activation='elu+1'):
     """Lovasz hinge loss。"""
     if not from_logits:
         y_pred = backend.logit(y_pred)
-    if per_image:
-        def loss_per_image(elems):
+    if per_sample:
+        def loss_per_sample(elems):
             label, logit = elems
-            return lovasz_hinge(label, logit, from_logits=True, per_image=False, activation=activation)
-        return tf.map_fn(loss_per_image, (y_true, y_pred), dtype=tf.float32)
+            return lovasz_hinge(label, logit, from_logits=True, per_sample=False, activation=activation)
+        return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=tf.float32)
 
     y_true = K.reshape(y_true, (-1,))
     y_pred = K.reshape(y_pred, (-1,))
     y_true = K.cast(y_true, 'float32')
     signs = y_true * 2.0 - 1.0  # -1 ～ +1
     errors = 1.0 - y_pred * tf.stop_gradient(signs)
-    errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0], name='sort')
+    errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
     gt_sorted = K.gather(y_true, perm)
     gts = K.sum(gt_sorted)
     inter = gts - tf.cumsum(gt_sorted)
@@ -94,56 +94,56 @@ def lovasz_hinge(y_true, y_pred, from_logits=False, per_image=True, activation='
     iou = 1.0 - inter / union
     grad = tf.concat((iou[:1], iou[1:] - iou[:-1]), 0)
     if activation == 'relu':
-        a = tf.nn.relu(errors_sorted)
+        errors_sorted = tf.nn.relu(errors_sorted)
     elif activation == 'elu+1':
-        a = tf.nn.elu(errors_sorted) + 1
+        errors_sorted = tf.nn.elu(errors_sorted) + 1
     else:
         raise ValueError(f'Invalid activation: {activation}')
-    loss = tf.tensordot(a, tf.stop_gradient(grad), 1, name='loss')
+    loss = tf.tensordot(errors_sorted, tf.stop_gradient(grad), 1)
     assert K.ndim(loss) == 0
     return loss
 
 
-def symmetric_lovasz_hinge(y_true, y_pred, from_logits=False, activation='elu+1'):
+def symmetric_lovasz_hinge(y_true, y_pred, from_logits=False, per_sample=False, activation='elu+1'):
     """Lovasz hinge lossの0, 1対称版。"""
     if not from_logits:
         y_pred = backend.logit(y_pred)
-    loss1 = lovasz_hinge(y_true, y_pred, from_logits=True, activation=activation)
-    loss2 = lovasz_hinge(1 - y_true, -y_pred, from_logits=True, activation=activation)
+    loss1 = lovasz_hinge(y_true, y_pred, from_logits=True, per_sample=per_sample, activation=activation)
+    loss2 = lovasz_hinge(1 - y_true, -y_pred, from_logits=True, per_sample=per_sample, activation=activation)
     return (loss1 + loss2) / 2
 
 
-def lovasz_sigmoid(y_true, y_pred, per_image=True):
+def lovasz_sigmoid(y_true, y_pred, per_sample=True):
     """Lovasz hinge lossのhingeじゃない版。"""
-    if per_image:
-        def loss_per_image(elems):
+    if per_sample:
+        def loss_per_sample(elems):
             label, logit = elems
-            return lovasz_sigmoid(label, logit, per_image=False)
-        return tf.map_fn(loss_per_image, (y_true, y_pred), dtype=tf.float32)
+            return lovasz_sigmoid(label, logit, per_sample=False)
+        return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=tf.float32)
 
     y_true = K.reshape(y_true, (-1,))
     y_pred = K.reshape(y_pred, (-1,))
     y_true = K.cast(y_true, 'float32')
     errors = K.abs(y_true - y_pred)
-    errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0], name='sort')
+    errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
     gt_sorted = K.gather(y_true, perm)
     gts = K.sum(gt_sorted)
     inter = gts - tf.cumsum(gt_sorted)
     union = gts + tf.cumsum(1. - gt_sorted)
     iou = 1.0 - inter / union
     grad = tf.concat((iou[:1], iou[1:] - iou[:-1]), 0)
-    loss = tf.tensordot(errors_sorted, tf.stop_gradient(grad), 1, name='loss')
+    loss = tf.tensordot(errors_sorted, tf.stop_gradient(grad), 1)
     assert K.ndim(loss) == 0
     return loss
 
 
-def lovasz_softmax(y_true, y_pred, per_image=True):
+def lovasz_softmax(y_true, y_pred, per_sample=True):
     """Lovasz softmax loss。"""
-    if per_image:
-        def loss_per_image(elems):
+    if per_sample:
+        def loss_per_sample(elems):
             label, proba = elems
-            return lovasz_softmax(label, proba, per_image=False)
-        return tf.map_fn(loss_per_image, (y_true, y_pred), dtype=tf.float32)
+            return lovasz_softmax(label, proba, per_sample=False)
+        return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=tf.float32)
 
     num_classes = K.int_shape(y_true)[-1]
     y_pred = K.reshape(y_pred, (-1, num_classes))
@@ -152,14 +152,14 @@ def lovasz_softmax(y_true, y_pred, per_image=True):
     losses = []
     for c in range(num_classes):
         errors = K.abs(y_true[:, c] - y_pred[:, c])
-        errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0], name=f'sort_{c}')
+        errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
         gt_sorted = K.gather(y_true[:, c], perm)
         gts = K.sum(gt_sorted)
         inter = gts - tf.cumsum(gt_sorted)
         union = gts + tf.cumsum(1. - gt_sorted)
         iou = 1.0 - inter / union
         grad = tf.concat((iou[:1], iou[1:] - iou[:-1]), 0)
-        loss = tf.tensordot(errors_sorted, tf.stop_gradient(grad), 1, name=f'loss_{c}')
+        loss = tf.tensordot(errors_sorted, tf.stop_gradient(grad), 1)
         losses.append(loss)
     return K.mean(tf.stack(losses))
 
