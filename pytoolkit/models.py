@@ -85,9 +85,8 @@ def fit(model: keras.models.Model,
     # TensorFlowのバグ対策
     if tf.__version__ == '1.13.1':
         from tensorflow.python.keras.engine import training_generator
-        import functools
-        backup = training_generator.evaluate_generator
-        training_generator.evaluate_generator = functools.partial(training_generator.model_iteration, mode='test', shuffle=False, verbose=0)
+        original = training_generator.model_iteration
+        training_generator.model_iteration = lambda *args, verbose=0, **kwargs: original(*args, verbose=verbose, **kwargs)  # pylint: disable=unnecessary-lambda
     try:
         model.fit_generator(
             train_data_loader, validation_data=val_data_loader,
@@ -96,7 +95,7 @@ def fit(model: keras.models.Model,
             initial_epoch=initial_epoch)
     finally:
         if tf.__version__ == '1.13.1':
-            training_generator.evaluate_generator = backup
+            training_generator.model_iteration = original
 
 
 def predict(model: keras.models.Model, predict_data: data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None):

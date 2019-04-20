@@ -19,11 +19,11 @@ class BasicTransform(metaclass=abc.ABCMeta):
     def __call__(self, **data):
         data['rand'] = sklearn.utils.check_random_state(data.get('rand', None))
         if data['rand'].rand() <= self.p:
-            data = self.call(**data)
+            data = self.apply_transform(**data)
         return data
 
     @abc.abstractmethod
-    def call(self, **data):
+    def apply_transform(self, **data):
         """変換の適用。"""
 
 
@@ -35,14 +35,14 @@ class BasicCompose(BasicTransform, metaclass=abc.ABCMeta):
         self.transforms = transforms
 
     @abc.abstractmethod
-    def call(self, **data):
+    def apply_transform(self, **data):
         """変換の適用。"""
 
 
 class Compose(BasicCompose):
     """複数の変換をまとめて適用するクラス。"""
 
-    def call(self, **data):
+    def apply_transform(self, **data):
         """変換の適用。"""
         for transform in self.transforms:
             data = transform(**data)
@@ -52,12 +52,12 @@ class Compose(BasicCompose):
 class RandomCompose(Compose):
     """シャッフル付きCompose。"""
 
-    def call(self, **data):
+    def apply_transform(self, **data):
         """変換の適用。"""
         backup = self.transforms.copy()
         try:
             data['rand'].shuffle(self.transforms)
-            return super().call(**data)
+            return super().apply_transform(**data)
         finally:
             self.transforms = backup
 
@@ -65,7 +65,7 @@ class RandomCompose(Compose):
 class OneOf(BasicCompose):
     """複数の中からランダムに1つだけ適用するクラス。"""
 
-    def call(self, **data):
+    def apply_transform(self, **data):
         """変換の適用。"""
         transform = data['rand'].choice(self.transforms)
         data = transform(**data)
@@ -79,7 +79,7 @@ class ImageOnlyTransform(BasicTransform):
     def targets(self):
         return {'image': self.apply}
 
-    def call(self, **data):
+    def apply_transform(self, **data):
         """変換の適用。"""
         targets = self.targets
         params = data.copy()

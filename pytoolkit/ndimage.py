@@ -38,7 +38,7 @@ def _float_to_uint8(func):
     return _decorated
 
 
-def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], grayscale=False, use_cache=False, max_size=None) -> np.ndarray:
+def load_with_cache(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], grayscale=False, use_cache=True, max_size=None) -> np.ndarray:
     """画像の読み込み。
 
     Args:
@@ -54,7 +54,7 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
     max_size = utils.normalize_tuple(max_size, 2)
 
     def _load():
-        img = _load_impl(path_or_array, grayscale=grayscale)
+        img = load(path_or_array, grayscale=grayscale)
         if max_size is not None and (img.shape[0] > max_size[0] or img.shape[1] > max_size[1]):
             r0 = max_size[0] / img.shape[0]
             r1 = max_size[1] / img.shape[1]
@@ -87,7 +87,7 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
     return _load()
 
 
-def _load_impl(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], grayscale=False) -> np.ndarray:
+def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], grayscale=False) -> np.ndarray:
     """画像の読み込みの実装。"""
     assert path_or_array is not None
 
