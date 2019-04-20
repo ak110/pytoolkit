@@ -55,7 +55,8 @@ def fit(model: keras.models.Model,
         batch_size=32, epochs=1800,
         callbacks=None, verbose=1,
         mixup=False,
-        initial_epoch=0):
+        initial_epoch=0,
+        use_multiprocessing=False, workers=1, max_queue_size=10):
     """独自のtraining loopになる予定の関数。
 
     Args:
@@ -69,6 +70,9 @@ def fit(model: keras.models.Model,
         verbose (int): 1ならプログレスバー表示、2ならepoch毎の結果だけ表示。
         mixup (bool): mixupするのか否か。
         initial_epoch (int): 学習を開始するエポック数 - 1。
+        use_multiprocessing (bool): Trueならマルチプロセス。
+        workers (int): ワーカー数。
+        max_queue_size (int): キューの最大サイズ。
 
     """
     callbacks = (callbacks or []) + [
@@ -92,7 +96,9 @@ def fit(model: keras.models.Model,
             train_data_loader, validation_data=val_data_loader,
             epochs=epochs, callbacks=callbacks,
             verbose=verbose if hvd.is_master() else 0,
-            initial_epoch=initial_epoch)
+            initial_epoch=initial_epoch,
+            use_multiprocessing=use_multiprocessing,
+            workers=workers, max_queue_size=max_queue_size)
     finally:
         if tf.__version__ == '1.13.1':
             training_generator.model_iteration = original
