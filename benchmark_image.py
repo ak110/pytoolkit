@@ -2,7 +2,6 @@
 """ImageDataGeneratorのチェック用コード。"""
 import pathlib
 
-import albumentations as A
 import numpy as np
 
 import pytoolkit as tk
@@ -27,13 +26,13 @@ def _main():
             self.y = y
             self.num_classes = num_classes
             if data_augmentation:
-                self.aug = A.Compose([
+                self.aug = tk.image.Compose([
                     tk.image.RandomTransform(_IMAGE_SIZE[1], _IMAGE_SIZE[0]),
                     tk.image.RandomColorAugmentors(),
                     tk.image.RandomErasing(),
                 ])
             else:
-                self.aug = A.Compose([])
+                self.aug = tk.image.Compose([])
 
         def __len__(self):
             return len(self.X)

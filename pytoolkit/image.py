@@ -1,22 +1,154 @@
 """画像処理関連"""
-# pylint: disable=arguments-differ
+# pylint: disable=signature-differs,arguments-differ,unused-argument
+import abc
 import warnings
 
 import numpy as np
-import albumentations as A
+import sklearn.utils
 
 from . import ndimage, od
 
 
-class RandomCompose(A.Compose):
+class BasicTransform(metaclass=abc.ABCMeta):
+    """変換を行うクラス。"""
+
+    def __init__(self, always_apply=False, p=1.0):
+        self.always_apply = always_apply
+        self.p = p
+        self.rand = None
+
+    def set_rand(self, rand: np.random.RandomState = None):
+        """np.random.RandomStateのインスタンスを設定する。"""
+        self.rand = sklearn.utils.check_random_state(None) if self.rand is None else self.rand
+
+    def __call__(self, **data):
+        if self.rand is None:
+            self.set_rand()
+        if self.rand.rand() <= self.p:
+            data = self.call(**data)
+        return data
+
+    @abc.abstractmethod
+    def call(self, **data):
+        """変換の適用。"""
+
+
+class BasicCompose(BasicTransform, metaclass=abc.ABCMeta):
+    """複数の変換をまとめて適用するクラス。"""
+
+    def __init__(self, transforms, p=1.0):
+        super().__init__(p=p)
+        self.transforms = transforms
+
+    def set_rand(self, rand=None):
+        """np.random.RandomStateのインスタンスを設定する。"""
+        super().set_rand(rand=rand)
+        for transform in self.transforms:
+            transform.set_rand(rand=self.rand)
+
+    @abc.abstractmethod
+    def call(self, **data):
+        """変換の適用。"""
+
+
+class Compose(BasicCompose):
+    """複数の変換をまとめて適用するクラス。"""
+
+    def call(self, **data):
+        """変換の適用。"""
+        for transform in self.transforms:
+            data = transform(**data)
+        return data
+
+
+class RandomCompose(Compose):
     """シャッフル付きCompose。"""
 
-    def __call__(self, **data):  # pylint: disable=signature-differs
-        np.random.shuffle(self.transforms)
-        return super().__call__(**data)
+    def call(self, **data):
+        """変換の適用。"""
+        self.rand.shuffle(self.transforms)
+        return super().call(**data)
 
 
-class RandomRotate(A.DualTransform):
+class OneOf(BasicCompose):
+    """複数の中からランダムに1つだけ適用するクラス。"""
+
+    def call(self, **data):
+        """変換の適用。"""
+        transform = self.rand.choice(self.transforms)
+        data = transform(**data)
+        return data
+
+
+class ImageOnlyTransform(BasicTransform):
+    """画像のみの変換."""
+
+    @property
+    def targets(self):
+        return {'image': self.apply}
+
+    def call(self, **data):
+        """変換の適用。"""
+        targets = self.targets
+        params = self.get_params()
+        result = {}
+        for key, value in data.items():
+            if key in targets:
+                result[key] = targets[key](value, **params)
+            else:
+                result[key] = value
+        return result
+
+    def apply(self, image, **params):
+        """画像の変換。"""
+        raise NotImplementedError('Method apply is not implemented in class ' + self.__class__.__name__)
+
+    def get_params(self):
+        """パラメータを返す。"""
+        return {}
+
+
+class DualTransform(ImageOnlyTransform):
+    """画像、バウンディングボックス、キーポイント、マスクの変換。"""
+
+    @property
+    def targets(self):
+        return {
+            'image': self.apply,
+            'mask': self.apply_to_mask,
+            'masks': self.apply_to_masks,
+            'bboxes': self.apply_to_bboxes,
+            'keypoints': self.apply_to_keypoints,
+        }
+
+    def apply_to_bbox(self, bbox, **params):
+        """バウンディングボックス(単数)の変換。"""
+        raise NotImplementedError('Method apply_to_bbox is not implemented in class ' + self.__class__.__name__)
+
+    def apply_to_keypoint(self, keypoint, **params):
+        """キーポイント(単数)の変換。"""
+        raise NotImplementedError('Method apply_to_keypoint is not implemented in class ' + self.__class__.__name__)
+
+    def apply_to_mask(self, image, **params):
+        """マスク(単数)の変換。"""
+        return self.apply(image, **params)
+
+    def apply_to_bboxes(self, bboxes, **params):
+        """バウンディングボックス(複数)の変換。"""
+        bboxes = [list(bbox) for bbox in bboxes]
+        return [self.apply_to_bbox(bbox[:4], **params) + bbox[4:] for bbox in bboxes]
+
+    def apply_to_keypoints(self, keypoints, **params):
+        """キーポイント(複数)の変換。"""
+        keypoints = [list(keypoint) for keypoint in keypoints]
+        return [self.apply_to_keypoint(keypoint[:4], **params) + keypoint[4:] for keypoint in keypoints]
+
+    def apply_to_masks(self, masks, **params):
+        """マスク(複数)の変換。"""
+        return [self.apply_to_mask(mask, **params) for mask in masks]
+
+
+class RandomRotate(DualTransform):
     """回転。"""
 
     def __init__(self, degrees=15, expand=True, border_mode='edge', always_apply=False, p=.5):
@@ -36,7 +168,7 @@ class RandomRotate(A.DualTransform):
         return ndimage.rotate(image, degrees, expand=self.expand, border_mode=self.border_mode)
 
     def apply_to_bbox(self, bbox, **params):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def apply_to_keypoint(self, keypoint, **params):
         # TODO
@@ -45,11 +177,8 @@ class RandomRotate(A.DualTransform):
     def get_params(self):
         return {'degrees': np.random.uniform(-self.degrees, self.degrees)}
 
-    def get_params_dependent_on_targets(self, params):
-        raise NotImplementedError()  # for pylint
 
-
-class RandomTransform(A.DualTransform):
+class RandomTransform(DualTransform):
     """Flip, Scale, Resize, Rotateをまとめて処理。"""
 
     def __init__(self, width, height, flip_h=True, flip_v=False,
@@ -108,24 +237,23 @@ class RandomTransform(A.DualTransform):
             'pos_v': pos_v,
         }
 
-    def get_params_dependent_on_targets(self, params):
-        raise NotImplementedError()  # for pylint
 
-
-class Resize(A.Resize):
+class Resize(DualTransform):
     """リサイズ。"""
 
     def __init__(self, width, height, always_apply=False, p=1):
-        super().__init__(height=height, width=width, always_apply=False, p=1)
+        super().__init__(always_apply=False, p=1)
+        self.width = width
+        self.height = height
 
-    def apply(self, img, **params):  # pylint: disable=signature-differs
-        return ndimage.resize(img, width=self.width, height=self.height)
+    def apply(self, image, **params):
+        return ndimage.resize(image, width=self.width, height=self.height)
+
+    def apply_to_bbox(self, bbox, **params):
+        raise bbox
 
     def apply_to_keypoint(self, keypoint, **params):
-        return keypoint  # for pylint
-
-    def get_params_dependent_on_targets(self, params):
-        raise NotImplementedError()  # for pylint
+        raise keypoint
 
 
 class RandomColorAugmentors(RandomCompose):
@@ -133,9 +261,9 @@ class RandomColorAugmentors(RandomCompose):
 
     def __init__(self, p=1):
         argumentors = [
+            GaussNoise(p=0.125),
             RandomBlur(p=0.125),
             RandomUnsharpMask(p=0.125),
-            A.GaussNoise(p=0.125),
             RandomSaturation(p=0.25),
             RandomBrightness(p=0.25),
             RandomContrast(p=0.25),
@@ -148,7 +276,18 @@ class RandomColorAugmentors(RandomCompose):
         super().__init__(argumentors, p=p)
 
 
-class RandomBlur(A.ImageOnlyTransform):
+class GaussNoise(ImageOnlyTransform):
+    """ガウシアンノイズ。"""
+
+    def __init__(self, scale=5, always_apply=False, p=.5):
+        super().__init__(always_apply, p)
+        self.scale = scale
+
+    def apply(self, image, **params):
+        return ndimage.gaussian_noise(image, np.random, self.scale)
+
+
+class RandomBlur(ImageOnlyTransform):
     """ぼかし。"""
 
     def __init__(self, radius=0.75, always_apply=False, p=.5):
@@ -159,11 +298,8 @@ class RandomBlur(A.ImageOnlyTransform):
         _ = params  # noqa
         return ndimage.blur(image, self.radius * np.random.rand())
 
-    def get_params_dependent_on_targets(self, params):
-        raise NotImplementedError()  # for pylint
 
-
-class RandomUnsharpMask(A.ImageOnlyTransform):
+class RandomUnsharpMask(ImageOnlyTransform):
     """シャープ化。"""
 
     def __init__(self, sigma=0.5, min_alpha=1, max_alpha=2, always_apply=False, p=.5):
@@ -176,11 +312,8 @@ class RandomUnsharpMask(A.ImageOnlyTransform):
         _ = params  # noqa
         return ndimage.unsharp_mask(image, self.sigma, np.random.uniform(self.min_alpha, self.max_alpha))
 
-    def get_params_dependent_on_targets(self, params):
-        raise NotImplementedError()  # for pylint
 
-
-class RandomBrightness(A.ImageOnlyTransform):
+class RandomBrightness(ImageOnlyTransform):
     """明度の変更。"""
 
     def __init__(self, shift=32, always_apply=False, p=.5):
@@ -191,11 +324,8 @@ class RandomBrightness(A.ImageOnlyTransform):
         _ = params  # noqa
         return ndimage.brightness(image, np.random.uniform(-self.shift, self.shift))
 
-    def get_params_dependent_on_targets(self, params):
-        raise NotImplementedError()  # for pylint
 
-
-class RandomContrast(A.ImageOnlyTransform):
+class RandomContrast(ImageOnlyTransform):
     """コントラストの変更。"""
 
     def __init__(self, var=0.25, always_apply=False, p=.5):
@@ -206,11 +336,8 @@ class RandomContrast(A.ImageOnlyTransform):
         _ = params  # noqa
         return ndimage.contrast(image, np.random.uniform(1 - self.var, 1 + self.var))
 
-    def get_params_dependent_on_targets(self, params):
-        raise NotImplementedError()  # for pylint
 
-
-class RandomSaturation(A.ImageOnlyTransform):
+class RandomSaturation(ImageOnlyTransform):
     """彩度の変更。"""
 
     def __init__(self, var=0.5, always_apply=False, p=.5):
@@ -221,11 +348,8 @@ class RandomSaturation(A.ImageOnlyTransform):
         _ = params  # noqa
         return ndimage.saturation(image, np.random.uniform(1 - self.var, 1 + self.var))
 
-    def get_params_dependent_on_targets(self, params):
-        raise NotImplementedError()  # for pylint
 
-
-class RandomHue(A.ImageOnlyTransform):
+class RandomHue(ImageOnlyTransform):
     """色相の変更。"""
 
     def __init__(self, var=1 / 16, shift=8, always_apply=False, p=.5):
@@ -239,11 +363,8 @@ class RandomHue(A.ImageOnlyTransform):
         beta = np.random.uniform(- self.shift, + self.shift, (3,))
         return ndimage.hue_lite(image, alpha, beta)
 
-    def get_params_dependent_on_targets(self, params):
-        raise NotImplementedError()  # for pylint
 
-
-class RandomEqualize(A.ImageOnlyTransform):
+class RandomEqualize(ImageOnlyTransform):
     """ヒストグラム平坦化。
 
     ↓で有効そうだったので。
@@ -257,11 +378,8 @@ class RandomEqualize(A.ImageOnlyTransform):
         _ = params  # noqa
         return ndimage.equalize(image)
 
-    def get_params_dependent_on_targets(self, params):
-        raise NotImplementedError()  # for pylint
 
-
-class RandomAutoContrast(A.ImageOnlyTransform):
+class RandomAutoContrast(ImageOnlyTransform):
     """オートコントラスト。
 
     ↓で有効そうだったので。
@@ -275,11 +393,8 @@ class RandomAutoContrast(A.ImageOnlyTransform):
         _ = params  # noqa
         return ndimage.auto_contrast(image)
 
-    def get_params_dependent_on_targets(self, params):
-        raise NotImplementedError()  # for pylint
 
-
-class RandomPosterize(A.ImageOnlyTransform):
+class RandomPosterize(ImageOnlyTransform):
     """ポスタリゼーション。
 
     ↓で有効そうだったので。
@@ -299,11 +414,8 @@ class RandomPosterize(A.ImageOnlyTransform):
         bits = np.random.randint(self.min_bits, self.max_bits + 1)
         return ndimage.posterize(image, bits)
 
-    def get_params_dependent_on_targets(self, params):
-        raise NotImplementedError()  # for pylint
 
-
-class RandomAlpha(A.ImageOnlyTransform):
+class RandomAlpha(ImageOnlyTransform):
     """画像の一部にランダムな色の半透明の矩形を描画する。"""
 
     def __init__(self, alpha=0.125, scale_low=0.02, scale_high=0.4, rate_1=1 / 3, rate_2=3, max_tries=30, always_apply=False, p=.5):
@@ -325,11 +437,8 @@ class RandomAlpha(A.ImageOnlyTransform):
             rate_1=self.rate_1, rate_2=self.rate_2,
             alpha=self.alpha, max_tries=self.max_tries)
 
-    def get_params_dependent_on_targets(self, params):
-        raise NotImplementedError()  # for pylint
 
-
-class RandomErasing(A.ImageOnlyTransform):
+class RandomErasing(ImageOnlyTransform):
     """Random Erasing <https://arxiv.org/abs/1708.04896>
 
     Args:
@@ -381,21 +490,15 @@ class RandomErasing(A.ImageOnlyTransform):
                 rate_1=self.rate_1, rate_2=self.rate_2, max_tries=self.max_tries)
         return image
 
-    def get_params_dependent_on_targets(self, params):
-        raise NotImplementedError()  # for pylint
 
-
-class Standardize(A.ImageOnlyTransform):
+class Standardize(ImageOnlyTransform):
     """標準化。0～255に適当に収める。"""
 
     def apply(self, image, **params):
         return ndimage.standardize(image)
 
-    def get_params_dependent_on_targets(self, params):
-        raise NotImplementedError()  # for pylint
 
-
-class ToGrayScale(A.ImageOnlyTransform):
+class ToGrayScale(ImageOnlyTransform):
     """グレースケール化。チャンネル数はとりあえず維持。"""
 
     def apply(self, image, **params):
@@ -406,11 +509,8 @@ class ToGrayScale(A.ImageOnlyTransform):
         assert image.shape == start_shape
         return image
 
-    def get_params_dependent_on_targets(self, params):
-        raise NotImplementedError()  # for pylint
 
-
-class RandomBinarize(A.ImageOnlyTransform):
+class RandomBinarize(ImageOnlyTransform):
     """ランダム2値化(白黒化)。"""
 
     def __init__(self, threshold_min=128 - 32, threshold_max=128 + 32, always_apply=False, p=.5):
@@ -425,11 +525,8 @@ class RandomBinarize(A.ImageOnlyTransform):
         threshold = np.random.uniform(self.threshold_min, self.threshold_max)
         return ndimage.binarize(image, threshold)
 
-    def get_params_dependent_on_targets(self, params):
-        raise NotImplementedError()  # for pylint
 
-
-class Preprocess(A.ImageOnlyTransform):
+class Preprocess(ImageOnlyTransform):
     """画像データの前処理。
 
     Args:
@@ -456,6 +553,3 @@ class Preprocess(A.ImageOnlyTransform):
         elif self.mode == 'div255':
             image = image / 255.
         return image
-
-    def get_params_dependent_on_targets(self, params):
-        raise NotImplementedError()  # for pylint

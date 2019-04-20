@@ -3,13 +3,14 @@
 <https://github.com/tensorflow/models/tree/master/research/autoaugment>
 
 """
-# pylint: disable=arguments-differ,abstract-method
+# pylint: disable=arguments-differ,abstract-method,unused-argument
 
-import albumentations as A
 import numpy as np
 import PIL.Image
 import PIL.ImageEnhance
 import PIL.ImageOps
+
+from . import image as A
 
 
 class CIFAR10Policy(A.OneOf):
@@ -197,12 +198,16 @@ class AutoContrast(A.ImageOnlyTransform):
         return np.asarray(PIL.ImageOps.autocontrast(img), dtype=np.uint8)
 
 
-class Invert(A.InvertImg):
+class Invert(A.ImageOnlyTransform):
     """PIL.ImageOps.equalizeなTransform"""
 
     def __init__(self, mag, always_apply=False, p=.5):
         super().__init__(always_apply, p)
         _ = mag  # noqa
+
+    def apply(self, img, **params):
+        img = PIL.Image.fromarray(img, mode='RGB')
+        return np.asarray(PIL.ImageOps.invert(img), dtype=np.uint8)
 
 
 class Equalize(A.ImageOnlyTransform):

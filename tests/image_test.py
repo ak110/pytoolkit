@@ -1,5 +1,4 @@
 
-import albumentations as A
 import pytest
 
 import pytoolkit as tk
@@ -15,7 +14,7 @@ def save_dir(check_dir):
 @pytest.mark.parametrize('filename', ['cifar.png', 'Lenna.png'])
 def test_data_augmentation(data_dir, save_dir, filename):
     """画像の変換のテスト。目視したいので結果を`../___check/image[12]/`に保存しちゃう。"""
-    aug = A.Compose([
+    aug = tk.image.Compose([
         tk.image.RandomRotate(),
         tk.image.RandomTransform(256, 256),
         tk.image.Standardize(),

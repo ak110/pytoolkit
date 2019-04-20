@@ -12,7 +12,6 @@
 ## importするために最低限必要なライブラリ
 
 - Pillow
-- albumentations
 - numpy
 - opencv-python
 - scikit-learn

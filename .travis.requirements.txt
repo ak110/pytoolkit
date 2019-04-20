@@ -1,6 +1,5 @@
 # Travis CI用 requirements。
 Pillow
-albumentations
 autopep8
 better_exceptions
 chainercv
