@@ -22,6 +22,7 @@ def get_custom_objects():
         ParallelGridPooling2D,
         ParallelGridGather,
         SubpixelConv2D,
+        OctaveConv2D,
     ]
     return {c.__name__: c for c in classes}
 
@@ -731,5 +732,78 @@ class SubpixelConv2D(keras.layers.Layer):
 
     def get_config(self):
         config = {'scale': self.scale}
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
+class OctaveConv2D(keras.layers.Layer):
+    """Octave Convolutional Layer <https://arxiv.org/abs/1904.05049>"""
+
+    def __init__(self, filters, strides=1, alpha=0.5, **kargs):
+        super().__init__(**kargs)
+        self.filters = filters
+        self.alpha = alpha
+        self.strides = strides if isinstance(strides, tuple) else (strides, strides)
+        self.filters_l = int(self.filters * self.alpha)
+        self.filters_h = self.filters - self.filters_l
+
+    def compute_output_shape(self, input_shape):
+        assert len(input_shape) == 4
+        input_shape = list(input_shape)
+        input_shape[-1] = self.filters
+        return tuple(input_shape)
+
+    def build(self, input_shape):
+        in_filters = int(input_shape[-1])
+        in_filters_l = int(in_filters * self.alpha)
+        in_filters_h = in_filters - in_filters_l
+        # TODO: depth_to_spaceとか分で4倍ずれている。。
+        self.kernel_hh = self.add_weight(shape=(3, 3, in_filters_h // 4, self.filters_h // 4),
+                                         initializer=keras.initializers.he_uniform(),
+                                         regularizer=keras.regularizers.l2(1e-4),
+                                         name='kernel_hh')
+        self.kernel_hl = self.add_weight(shape=(3, 3, in_filters_h // 4, self.filters_l),
+                                         initializer=keras.initializers.he_uniform(),
+                                         regularizer=keras.regularizers.l2(1e-4),
+                                         name='kernel_hl')
+        self.kernel_lh = self.add_weight(shape=(3, 3, in_filters_l, self.filters_h // 4),
+                                         initializer=keras.initializers.he_uniform(),
+                                         regularizer=keras.regularizers.l2(1e-4),
+                                         name='kernel_lh')
+        self.kernel_ll = self.add_weight(shape=(3, 3, in_filters_l, self.filters_l),
+                                         initializer=keras.initializers.he_uniform(),
+                                         regularizer=keras.regularizers.l2(1e-4),
+                                         name='kernel_ll')
+        super().build(input_shape)
+
+    def call(self, inputs, **kwargs):
+        _ = kwargs  # noqa
+        in_filters = K.int_shape(inputs)[-1]
+        in_filters_l = int(in_filters * self.alpha)
+        in_filters_h = in_filters - in_filters_l
+        input_h = inputs[..., :in_filters_h]
+        input_h = tf.nn.depth_to_space(input_h, 2)
+        input_l = inputs[..., in_filters_h:]
+
+        hh = K.conv2d(input_h, self.kernel_hh, padding='same', strides=self.strides)
+        ll = K.conv2d(input_l, self.kernel_ll, padding='same', strides=self.strides)
+
+        hl = K.pool2d(input_h, (2, 2), (2, 2), padding='same', pool_mode='avg')
+        hl = K.conv2d(hl, self.kernel_hl, padding='same', strides=self.strides)
+
+        lh = K.conv2d(input_l, self.kernel_lh, padding='same', strides=self.strides)
+        lh = K.resize_images(lh, 2, 2, data_format='channels_last', interpolation='bilinear')
+
+        output_h = hh + lh
+        output_h = tf.nn.space_to_depth(output_h, 2)
+        output_l = ll + hl
+        return K.concatenate([output_h, output_l], axis=-1)
+
+    def get_config(self):
+        config = {
+            'filters': self.filters,
+            'strides': self.strides,
+            'alpha': self.alpha,
+        }
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
