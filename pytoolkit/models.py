@@ -1,36 +1,38 @@
 """Kerasのモデル関連。"""
-import os
 import pathlib
-import sys
 
 import numpy as np
+import tensorflow as tf
 
 from . import callbacks as cb, data, hvd, keras, log, utils
 
 
 def load(path: pathlib.Path, custom_objects=None, compile=False) -> keras.models.Model:  # pylint: disable=redefined-outer-name
     """モデルの読み込み。"""
-    from . import get_custom_objects
-    custom_objects = custom_objects.copy() if custom_objects else dict()
-    custom_objects.update(get_custom_objects())
-    return keras.models.load_model(str(path), custom_objects=custom_objects, compile=compile)
+    path = pathlib.Path(path)
+    with log.trace_scope(f'load({path})'):
+        from . import get_custom_objects
+        custom_objects = custom_objects.copy() if custom_objects else dict()
+        custom_objects.update(get_custom_objects())
+        return keras.models.load_model(str(path), custom_objects=custom_objects, compile=compile)
 
 
 def load_weights(model: keras.models.Model, path: pathlib.Path, by_name=False):
     """存在すればload_weights。"""
     path = pathlib.Path(path)
     if path.exists():
-        with log.trace_scope(f'load_weights({path.name})'):
+        with log.trace_scope(f'load_weights({path})'):
             model.load_weights(str(path), by_name=by_name)
     else:
         log.get(__name__).info(f'{path.name} is not found.')
 
 
-@log.trace()
 def save(model: keras.models.Model, path: pathlib.Path, include_optimizer=False):
     """モデルの保存。"""
+    path = pathlib.Path(path)
     if hvd.is_master():
-        model.save(str(path), include_optimizer=include_optimizer)
+        with log.trace_scope(f'save({path})'):
+            model.save(str(path), include_optimizer=include_optimizer)
     hvd.barrier()
 
 
@@ -46,19 +48,27 @@ def compile(model: keras.models.Model, optimizer, loss, metrics=None, loss_weigh
     model.compile(optimizer, loss, metrics, loss_weights=loss_weights)
 
 
-def fit(model: keras.models.Model, training_data: data.Dataset, validation_data: data.Dataset = None,
+def fit(model: keras.models.Model,
+        training_data: data.Dataset,
+        validation_data: data.Dataset = None,
+        validation_freq: int = 1,
         batch_size=32, epochs=1800,
         callbacks=None, verbose=1,
-        mixup=False):
+        mixup=False,
+        initial_epoch=0):
     """独自のtraining loopになる予定の関数。
 
     Args:
         model: モデル。
         training_data (tk.data.Dataset): 訓練データ。
         validation_data (tk.data.Dataset): 検証データ。Noneなら省略。
+        validation_freq (int or list): 検証を行うエポック数の間隔、またはエポック数のリスト。
+        batch_size (int): バッチサイズ。
+        epochs (int): エポック数。
         callbacks (list): コールバック。EpochLoggerとErrorOnNaNは自動追加。
         verbose (int): 1ならプログレスバー表示、2ならepoch毎の結果だけ表示。
         mixup (bool): mixupするのか否か。
+        initial_epoch (int): 学習を開始するエポック数 - 1。
 
     """
     callbacks = (callbacks or []) + [
@@ -66,23 +76,27 @@ def fit(model: keras.models.Model, training_data: data.Dataset, validation_data:
         cb.ErrorOnNaN(),
     ]
     mp_size = hvd.get().size()
-    train_data = data.DataLoader(training_data, batch_size, shuffle=True, mixup=mixup, mp_size=mp_size)
-    val_data = data.DataLoader(validation_data, batch_size * 2, shuffle=True, mp_size=mp_size) if validation_data is not None else None
+    train_data_loader = data.DataLoader(training_data, batch_size, shuffle=True, mixup=mixup, mp_size=mp_size)
+    val_data_loader = data.DataLoader(validation_data, batch_size * 2, shuffle=True, mp_size=mp_size) if validation_data is not None else None
 
-    if not hvd.is_master():
-        # TensorFlow 1.13.1くらい用のworkaround
-        backup_stdout = sys.stdout
-        devnull = open(os.devnull, 'w')
-        sys.stdout = devnull
+    # TODO: TensorFlowに合わせて対応予定
+    _ = validation_freq
+
+    # TensorFlowのバグ対策
+    if tf.__version__ == '1.13.1':
+        from tensorflow.python.keras.engine import training_generator
+        import functools
+        backup = training_generator.evaluate_generator
+        training_generator.evaluate_generator = functools.partial(training_generator.model_iteration, mode='test', shuffle=False, verbose=0)
     try:
         model.fit_generator(
-            train_data, validation_data=val_data,
+            train_data_loader, validation_data=val_data_loader,
             epochs=epochs, callbacks=callbacks,
-            verbose=verbose if hvd.is_master() else 0)
+            verbose=verbose if hvd.is_master() else 0,
+            initial_epoch=initial_epoch)
     finally:
-        if not hvd.is_master():
-            devnull.close()
-            sys.stdout = backup_stdout
+        if tf.__version__ == '1.13.1':
+            training_generator.evaluate_generator = backup
 
 
 def predict(model: keras.models.Model, predict_data: data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None):
@@ -128,3 +142,20 @@ def predict_flow(model: keras.models.Model, predict_data: data.Dataset, batch_si
 
 def _predict_on_batch(model: keras.models.Model, X):
     return model.predict_on_batch(X)
+
+
+def evaluate(model: keras.models.Model, evaluate_data: data.Dataset, batch_size=32, verbose=1):
+    """評価。
+
+    Args:
+        model: モデル。
+        evaluate_data (tk.data.Dataset): データ。
+        verbose (int): 1ならプログレスバー表示。
+
+    Returns:
+        dict: metricsの文字列と値のdict
+
+    """
+    data_loader = data.DataLoader(evaluate_data, batch_size)
+    values = model.evaluate_generator(data_loader, verbose=verbose)
+    return dict(zip(model.metrics_names, values))
