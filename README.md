@@ -22,8 +22,10 @@
 
 - better-exceptions
 - chainercv
+- diskcache
 - h5py
 - horovod
 - matplotlib
 - mpi4py
+- pydensecrf
 - tqdm

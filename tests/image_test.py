@@ -1,6 +1,8 @@
 
 import pytest
 
+import numpy as np
+
 import pytoolkit as tk
 
 
@@ -37,3 +39,24 @@ def test_to_random_binarize(data_dir, save_dir):
     img = tk.ndimage.load(data_dir / 'Lenna.png')
     for i in range(4):
         tk.ndimage.save(save_dir / f'Lenna.RandomBinarize.{i}.png', aug(image=img)['image'])
+
+
+def test_seed(data_dir):
+    """シード値を固定して結果が再現できることの確認。"""
+    aug = tk.image.Compose([
+        tk.image.OneOf([
+            tk.image.Standardize(),
+            tk.image.ToGrayScale(p=0.125),
+            tk.image.RandomBinarize(p=0.125),
+        ], p=0.25),
+        tk.image.RandomRotate(),
+        tk.image.RandomTransform(256, 256),
+        tk.image.RandomColorAugmentors(),
+    ])
+    img = tk.ndimage.load(data_dir / 'Lenna.png')
+
+    for seed in range(100):
+        a = aug(image=img, rand=np.random.RandomState(seed + 123))['image']
+        _ = aug(image=img, rand=np.random.RandomState(seed + 456))['image']
+        b = aug(image=img, rand=np.random.RandomState(seed + 123))['image']
+        assert np.all(a == b)

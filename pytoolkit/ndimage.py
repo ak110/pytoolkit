@@ -563,7 +563,7 @@ def transform_points(points, m):
     return cv2.perspectiveTransform(np.reshape(points, (-1, 1, 2)).astype(np.float32), m).reshape(-1, 2)
 
 
-def erase_random(rgb, rand, bboxes=None, scale_low=0.02, scale_high=0.4, rate_1=1 / 3, rate_2=3, alpha=None, max_tries=30):
+def erase_random(rgb, rand: np.random.RandomState, bboxes=None, scale_low=0.02, scale_high=0.4, rate_1=1 / 3, rate_2=3, alpha=None, max_tries=30):
     """Random erasing <https://arxiv.org/abs/1708.04896>"""
     if bboxes is not None:
         bb_lt = bboxes[:, :2]  # 左上
