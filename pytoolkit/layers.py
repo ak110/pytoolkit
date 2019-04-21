@@ -746,6 +746,7 @@ class WSConv2D(keras.layers.Layer):
         self.kernel_size = kernel_size if isinstance(kernel_size, tuple) else (kernel_size, kernel_size)
         self.strides = strides if isinstance(strides, tuple) else (strides, strides)
         self.activation = keras.activations.get(activation)
+        self.kernel = None
 
     def compute_output_shape(self, input_shape):
         assert len(input_shape) == 4

@@ -196,7 +196,6 @@ class SubDataset(Dataset):
     def __len__(self):
         return len(self.indices)
 
-    @abc.abstractmethod
     def __getitem__(self, index):
         return self.dataset[self.indices[index]]
 
