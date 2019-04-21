@@ -746,46 +746,46 @@ class OctaveConv2D(keras.layers.Layer):
         self.strides = strides if isinstance(strides, tuple) else (strides, strides)
         self.filters_l = int(self.filters * self.alpha)
         self.filters_h = self.filters - self.filters_l
+        self.kernel_ll = None
+        self.kernel_hl = None
+        self.kernel_lh = None
+        self.kernel_hh = None
 
     def compute_output_shape(self, input_shape):
-        assert len(input_shape) == 4
-        input_shape = list(input_shape)
-        input_shape[-1] = self.filters
-        return tuple(input_shape)
+        assert len(input_shape) == 2
+        assert len(input_shape[0]) == 4 and len(input_shape[1]) == 4
+        assert input_shape[0][1] * 2 == input_shape[1][1]
+        assert input_shape[0][2] * 2 == input_shape[1][2]
+        input_shape = [list(input_shape[0]), list(input_shape[1])]
+        input_shape[0][-1] = self.filters_l
+        input_shape[1][-1] = self.filters_h
+        return [tuple(input_shape[0]), tuple(input_shape[1])]
 
     def build(self, input_shape):
-        in_filters = int(input_shape[-1])
-        in_filters_l = int(in_filters * self.alpha)
-        in_filters_h = in_filters - in_filters_l
-        # TODO: depth_to_spaceとか分で4倍ずれている。。
-        self.kernel_hh = self.add_weight(shape=(3, 3, in_filters_h // 4, self.filters_h // 4),
-                                         initializer=keras.initializers.he_uniform(),
-                                         regularizer=keras.regularizers.l2(1e-4),
-                                         name='kernel_hh')
-        self.kernel_hl = self.add_weight(shape=(3, 3, in_filters_h // 4, self.filters_l),
-                                         initializer=keras.initializers.he_uniform(),
-                                         regularizer=keras.regularizers.l2(1e-4),
-                                         name='kernel_hl')
-        self.kernel_lh = self.add_weight(shape=(3, 3, in_filters_l, self.filters_h // 4),
-                                         initializer=keras.initializers.he_uniform(),
-                                         regularizer=keras.regularizers.l2(1e-4),
-                                         name='kernel_lh')
+        in_filters_l = int(input_shape[0][-1])
+        in_filters_h = int(input_shape[1][-1])
         self.kernel_ll = self.add_weight(shape=(3, 3, in_filters_l, self.filters_l),
                                          initializer=keras.initializers.he_uniform(),
                                          regularizer=keras.regularizers.l2(1e-4),
                                          name='kernel_ll')
+        self.kernel_hl = self.add_weight(shape=(3, 3, in_filters_h, self.filters_l),
+                                         initializer=keras.initializers.he_uniform(),
+                                         regularizer=keras.regularizers.l2(1e-4),
+                                         name='kernel_hl')
+        self.kernel_lh = self.add_weight(shape=(3, 3, in_filters_l, self.filters_h),
+                                         initializer=keras.initializers.he_uniform(),
+                                         regularizer=keras.regularizers.l2(1e-4),
+                                         name='kernel_lh')
+        self.kernel_hh = self.add_weight(shape=(3, 3, in_filters_h, self.filters_h),
+                                         initializer=keras.initializers.he_uniform(),
+                                         regularizer=keras.regularizers.l2(1e-4),
+                                         name='kernel_hh')
         super().build(input_shape)
 
     def call(self, inputs, **kwargs):
         _ = kwargs  # noqa
-        in_filters = K.int_shape(inputs)[-1]
-        in_filters_l = int(in_filters * self.alpha)
-        in_filters_h = in_filters - in_filters_l
-        input_h = inputs[..., :in_filters_h]
-        input_h = tf.nn.depth_to_space(input_h, 2)
-        input_l = inputs[..., in_filters_h:]
+        input_l, input_h = inputs
 
-        hh = K.conv2d(input_h, self.kernel_hh, padding='same', strides=self.strides)
         ll = K.conv2d(input_l, self.kernel_ll, padding='same', strides=self.strides)
 
         hl = K.pool2d(input_h, (2, 2), (2, 2), padding='same', pool_mode='avg')
@@ -794,10 +794,11 @@ class OctaveConv2D(keras.layers.Layer):
         lh = K.conv2d(input_l, self.kernel_lh, padding='same', strides=self.strides)
         lh = K.resize_images(lh, 2, 2, data_format='channels_last', interpolation='bilinear')
 
-        output_h = hh + lh
-        output_h = tf.nn.space_to_depth(output_h, 2)
+        hh = K.conv2d(input_h, self.kernel_hh, padding='same', strides=self.strides)
+
         output_l = ll + hl
-        return K.concatenate([output_h, output_l], axis=-1)
+        output_h = hh + lh
+        return output_l, output_h
 
     def get_config(self):
         config = {
