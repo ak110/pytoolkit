@@ -17,14 +17,16 @@ def load(path: pathlib.Path, custom_objects=None, compile=False) -> keras.models
         return keras.models.load_model(str(path), custom_objects=custom_objects, compile=compile)
 
 
-def load_weights(model: keras.models.Model, path: pathlib.Path, by_name=False):
-    """存在すればload_weights。"""
+def load_weights(model: keras.models.Model, path: pathlib.Path, by_name=False, skip_not_exist=False):
+    """モデルの重みの読み込み。"""
     path = pathlib.Path(path)
     if path.exists():
         with log.trace_scope(f'load_weights({path})'):
             model.load_weights(str(path), by_name=by_name)
+    elif skip_not_exist:
+        log.get(__name__).info(f'{path} is not found.')
     else:
-        log.get(__name__).info(f'{path.name} is not found.')
+        raise RuntimeError(f'{path} is not found.')
 
 
 def save(model: keras.models.Model, path: pathlib.Path, include_optimizer=False):
@@ -48,6 +50,7 @@ def compile(model: keras.models.Model, optimizer, loss, metrics=None, loss_weigh
     model.compile(optimizer, loss, metrics, loss_weights=loss_weights)
 
 
+@log.trace()
 def fit(model: keras.models.Model,
         training_data: data.Dataset,
         validation_data: data.Dataset = None,
@@ -79,9 +82,8 @@ def fit(model: keras.models.Model,
         cb.EpochLogger(),
         cb.ErrorOnNaN(),
     ]
-    mp_size = hvd.get().size()
-    train_data_loader = data.DataLoader(training_data, batch_size, shuffle=True, mixup=mixup, mp_size=mp_size)
-    val_data_loader = data.DataLoader(validation_data, batch_size * 2, shuffle=True, mp_size=mp_size) if validation_data is not None else None
+    train_data_loader = data.DataLoader(training_data, batch_size, shuffle=True, mixup=mixup, use_horovod=True)
+    val_data_loader = data.DataLoader(validation_data, batch_size * 2, shuffle=True, use_horovod=True) if validation_data is not None else None
 
     # TODO: TensorFlowに合わせて対応予定
     _ = validation_freq
@@ -104,6 +106,7 @@ def fit(model: keras.models.Model,
             training_generator.model_iteration = original
 
 
+@log.trace()
 def predict(model: keras.models.Model, predict_data: data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None):
     """予測。
 
@@ -149,6 +152,7 @@ def _predict_on_batch(model: keras.models.Model, X):
     return model.predict_on_batch(X)
 
 
+@log.trace()
 def evaluate(model: keras.models.Model, evaluate_data: data.Dataset, batch_size=32, verbose=1):
     """評価。
 
@@ -161,6 +165,13 @@ def evaluate(model: keras.models.Model, evaluate_data: data.Dataset, batch_size=
         dict: metricsの文字列と値のdict
 
     """
+    if hvd.initialized():
+        evaluate_data = data.split(evaluate_data, hvd.get().size())[hvd.get().rank()]
+
     data_loader = data.DataLoader(evaluate_data, batch_size)
-    values = model.evaluate_generator(data_loader, verbose=verbose)
+    values = model.evaluate_generator(data_loader, verbose=verbose if hvd.is_master() else 0)
+
+    if hvd.initialized():
+        values = hvd.get().allreduce(values)
+
     return dict(zip(model.metrics_names, values))
