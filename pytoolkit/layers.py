@@ -22,6 +22,7 @@ def get_custom_objects():
         ParallelGridPooling2D,
         ParallelGridGather,
         SubpixelConv2D,
+        WSConv2D,
         OctaveConv2D,
     ]
     return {c.__name__: c for c in classes}
@@ -736,11 +737,56 @@ class SubpixelConv2D(keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+class WSConv2D(keras.layers.Layer):
+    """Weight StandardizationなConv2D <https://arxiv.org/abs/1903.10520>"""
+
+    def __init__(self, filters, kernel_size=3, strides=1, activation=None, **kwargs):
+        super().__init__(**kwargs)
+        self.filters = filters
+        self.kernel_size = kernel_size if isinstance(kernel_size, tuple) else (kernel_size, kernel_size)
+        self.strides = strides if isinstance(strides, tuple) else (strides, strides)
+        self.activation = keras.activations.get(activation)
+
+    def compute_output_shape(self, input_shape):
+        assert len(input_shape) == 4
+        return input_shape
+
+    def build(self, input_shape):
+        in_filters = int(input_shape[-1])
+        self.kernel = self.add_weight(shape=(self.kernel_size[0], self.kernel_size[1], in_filters, self.filters),
+                                      initializer=keras.initializers.he_uniform(),
+                                      regularizer=keras.regularizers.l2(1e-4),
+                                      name='kernel')
+        super().build(input_shape)
+
+    def call(self, inputs, **kwargs):
+        _ = kwargs  # noqa
+
+        kernel_mean = K.mean(self.kernel, axis=[0, 1, 2])
+        kernel_std = K.std(self.kernel, axis=[0, 1, 2])
+        kernel = (self.kernel - kernel_mean) / (kernel_std + 1e-5)
+
+        outputs = K.conv2d(inputs, kernel, padding='same', strides=self.strides)
+        if self.activation is not None:
+            outputs = self.activation(outputs)
+        return outputs
+
+    def get_config(self):
+        config = {
+            'filters': self.filters,
+            'kernel_size': self.kernel_size,
+            'strides': self.strides,
+            'activation': keras.activations.serialize(self.activation),
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
 class OctaveConv2D(keras.layers.Layer):
     """Octave Convolutional Layer <https://arxiv.org/abs/1904.05049>"""
 
-    def __init__(self, filters, strides=1, alpha=0.5, **kargs):
-        super().__init__(**kargs)
+    def __init__(self, filters, strides=1, alpha=0.5, **kwargs):
+        super().__init__(**kwargs)
         self.filters = filters
         self.alpha = alpha
         self.strides = strides if isinstance(strides, tuple) else (strides, strides)

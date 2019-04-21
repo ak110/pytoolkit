@@ -7,7 +7,7 @@ import tensorflow as tf
 from . import callbacks as cb, data, hvd, keras, log, utils
 
 
-def load(path: pathlib.Path, custom_objects=None, compile=False) -> keras.models.Model:  # pylint: disable=redefined-outer-name
+def load(path, custom_objects=None, compile=False) -> keras.models.Model:  # pylint: disable=redefined-outer-name
     """モデルの読み込み。"""
     path = pathlib.Path(path)
     with log.trace_scope(f'load({path})'):
@@ -17,7 +17,7 @@ def load(path: pathlib.Path, custom_objects=None, compile=False) -> keras.models
         return keras.models.load_model(str(path), custom_objects=custom_objects, compile=compile)
 
 
-def load_weights(model: keras.models.Model, path: pathlib.Path, by_name=False, skip_not_exist=False):
+def load_weights(model: keras.models.Model, path, by_name=False, skip_not_exist=False):
     """モデルの重みの読み込み。"""
     path = pathlib.Path(path)
     if path.exists():
@@ -29,7 +29,7 @@ def load_weights(model: keras.models.Model, path: pathlib.Path, by_name=False, s
         raise RuntimeError(f'{path} is not found.')
 
 
-def save(model: keras.models.Model, path: pathlib.Path, include_optimizer=False):
+def save(model: keras.models.Model, path, include_optimizer=False):
     """モデルの保存。"""
     path = pathlib.Path(path)
     if hvd.is_master():
@@ -41,6 +41,15 @@ def save(model: keras.models.Model, path: pathlib.Path, include_optimizer=False)
 def summary(model: keras.models.Model):
     """summaryを実行するだけ。"""
     model.summary(print_fn=log.get(__name__).info if hvd.is_master() else lambda x: None)
+
+
+def plot_model(model: keras.models.Model, to_file='model.svg', show_shapes=True, show_layer_names=True, rankdir='TB'):
+    """モデルのグラフのplot。"""
+    path = pathlib.Path(to_file)
+    if hvd.is_master():
+        with log.trace_scope(f'plot_model({path})'):
+            keras.utils.plot_model(model, str(path), show_shapes=show_shapes, show_layer_names=show_layer_names, rankdir=rankdir)
+    hvd.barrier()
 
 
 def compile(model: keras.models.Model, optimizer, loss, metrics=None, loss_weights=None):  # pylint: disable=redefined-builtin
