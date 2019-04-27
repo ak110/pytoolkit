@@ -1,7 +1,10 @@
 """DeepLearning(主にKeras)関連。"""
 import functools
 import os
+import pathlib
+import subprocess
 
+import numpy as np
 import tensorflow as tf
 
 from . import K, hvd
@@ -62,3 +65,25 @@ def session(config=None, gpu_options=None, use_horovod=False):
                 K.clear_session()
 
     return _Scope(config=config, gpu_options=gpu_options, use_horovod=use_horovod)
+
+
+def get_gpu_count():
+    """GPU数の取得。"""
+    if 'CUDA_VISIBLE_DEVICES' in os.environ:
+        gpus = os.environ['CUDA_VISIBLE_DEVICES'].strip()
+        if gpus in ('-1', 'none'):
+            return 0
+        return len(np.unique(gpus.split(',')))
+    try:
+        return len(nvidia_smi('--list-gpus').strip().split('\n'))
+    except FileNotFoundError:
+        return 0
+
+
+def nvidia_smi(*args):
+    """nvidia-smiコマンドを実行する。"""
+    path = pathlib.Path(os.environ.get('ProgramFiles', '')) / 'NVIDIA Corporation' / 'NVSMI' / 'nvidia-smi.exe'
+    if not path.is_file():
+        path = 'nvidia-smi'
+    command = [str(path)] + list(args)
+    return subprocess.check_output(command, stderr=subprocess.STDOUT, universal_newlines=True)

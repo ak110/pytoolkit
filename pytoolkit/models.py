@@ -4,7 +4,7 @@ import pathlib
 import numpy as np
 import tensorflow as tf
 
-from . import callbacks as cb, data, hvd, keras, log, utils
+from . import callbacks as cb, dl, data, hvd, keras, log, utils
 
 
 def load(path, custom_objects=None, compile=False) -> keras.models.Model:  # pylint: disable=redefined-outer-name
@@ -55,6 +55,7 @@ def plot_model(model: keras.models.Model, to_file='model.svg', show_shapes=True,
 def compile(model: keras.models.Model, optimizer, loss, metrics=None, loss_weights=None):  # pylint: disable=redefined-builtin
     """compileするだけ。"""
     if hvd.initialized():
+        optimizer = keras.optimizers.get(optimizer)
         optimizer = hvd.get().DistributedOptimizer(optimizer, compression=hvd.get().Compression.fp16)
     model.compile(optimizer, loss, metrics, loss_weights=loss_weights)
 
@@ -116,12 +117,61 @@ def fit(model: keras.models.Model,
 
 
 @log.trace()
-def predict(model: keras.models.Model, predict_data: data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None):
+def predict(model: keras.models.Model, dataset: data.Dataset, batch_size, verbose=1):
     """予測。
 
     Args:
         model: モデル。
-        predict_data: 予測したい入力データ。
+        dataset: 予測したい入力データ。
+        batch_size (int): バッチサイズ
+        verbose (int): プログレスバー(tqdm)を表示するか否か。
+
+    Returns:
+        np.ndarray: 予測結果。
+
+    """
+    if hvd.initialized():
+        dataset = data.split(dataset, hvd.get().size())[hvd.get().rank()]
+
+    data_loader = data.DataLoader(dataset, batch_size)
+    values = model.predict_generator(data_loader, verbose=verbose if hvd.is_master() else 0)
+
+    if hvd.initialized():
+        values = hvd.get().allgather(values)
+    return values
+
+
+@log.trace()
+def evaluate(model: keras.models.Model, dataset: data.Dataset, batch_size=32, verbose=1):
+    """評価。
+
+    Args:
+        model: モデル。
+        dataset (tk.data.Dataset): データ。
+        verbose (int): 1ならプログレスバー表示。
+
+    Returns:
+        zip: metricsの文字列と値のdict
+
+    """
+    if hvd.initialized():
+        dataset = data.split(dataset, hvd.get().size())[hvd.get().rank()]
+
+    data_loader = data.DataLoader(dataset, batch_size)
+    values = model.evaluate_generator(data_loader, verbose=verbose if hvd.is_master() else 0)
+
+    if hvd.initialized():
+        values = hvd.get().allreduce(values)
+    return zip(model.metrics_names, values)
+
+
+@log.trace()
+def custom_predict(model: keras.models.Model, dataset: data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None):
+    """予測。
+
+    Args:
+        model: モデル。
+        dataset: 予測したい入力データ。
         batch_size (int): バッチサイズ
         verbose (int): プログレスバー(tqdm)を表示するか否か。
         desc (str): プログレスバーの説明。
@@ -131,15 +181,15 @@ def predict(model: keras.models.Model, predict_data: data.Dataset, batch_size, v
         np.ndarray: 予測結果。
 
     """
-    return np.array(list(predict_flow(model, predict_data, batch_size, verbose, desc, on_batch_fn)))
+    return np.array(list(custom_predict_flow(model, dataset, batch_size, verbose, desc, on_batch_fn)))
 
 
-def predict_flow(model: keras.models.Model, predict_data: data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None):
+def custom_predict_flow(model: keras.models.Model, dataset: data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None):
     """予測。(yieldバージョン)
 
     Args:
         model: モデル。
-        predict_data: 予測したい入力データ。
+        dataset: 予測したい入力データ。
         batch_size (int): バッチサイズ
         verbose (int): プログレスバー(tqdm)を表示するか否か。
         desc (str): プログレスバーの説明。
@@ -151,7 +201,7 @@ def predict_flow(model: keras.models.Model, predict_data: data.Dataset, batch_si
     """
     if on_batch_fn is None:
         on_batch_fn = _predict_on_batch
-    data_loader = data.DataLoader(predict_data, batch_size)
+    data_loader = data.DataLoader(dataset, batch_size)
     for X, _ in utils.tqdm(data_loader, desc=desc, total=len(data_loader), disable=verbose < 1):
         pred_batch = on_batch_fn(model, X)
         yield from pred_batch
@@ -162,25 +212,36 @@ def _predict_on_batch(model: keras.models.Model, X):
 
 
 @log.trace()
-def evaluate(model: keras.models.Model, evaluate_data: data.Dataset, batch_size=32, verbose=1):
-    """評価。
+def multi_gpu_model(model, batch_size, gpus=None):
+    """複数GPUでデータ並列するモデルを作成する。
 
-    Args:
-        model: モデル。
-        evaluate_data (tk.data.Dataset): データ。
-        verbose (int): 1ならプログレスバー表示。
-
-    Returns:
-        dict: metricsの文字列と値のdict
+    References:
+        - <https://github.com/fchollet/keras/issues/2436>
+        - <https://github.com/kuza55/keras-extras/blob/master/utils/multi_gpu.py>
 
     """
-    if hvd.initialized():
-        evaluate_data = data.split(evaluate_data, hvd.get().size())[hvd.get().rank()]
+    if gpus is None:
+        gpus = dl.get_gpu_count()
+        log.get(__name__).info(f'gpu count = {gpus}')
+    if gpus <= 1:
+        return model, batch_size
 
-    data_loader = data.DataLoader(evaluate_data, batch_size)
-    values = model.evaluate_generator(data_loader, verbose=verbose if hvd.is_master() else 0)
+    assert isinstance(model.inputs, list)
+    assert isinstance(model.outputs, list)
 
-    if hvd.initialized():
-        values = hvd.get().allreduce(values)
+    parallel_model = keras.utils.multi_gpu_model(model, gpus)
 
-    return dict(zip(model.metrics_names, values))
+    # Model.saveの置き換え
+    # https://github.com/fchollet/keras/issues/2436#issuecomment-294243024
+    def _save(self_, *args, **kargs):
+        assert self_ is not None  # noqa
+        model.save(*args, **kargs)
+
+    def _save_weights(self_, *args, **kargs):
+        assert self_ is not None  # noqa
+        model.save_weights(*args, **kargs)
+
+    parallel_model.save = type(model.save)(_save, parallel_model)
+    parallel_model.save_weights = type(model.save_weights)(_save_weights, parallel_model)
+
+    return parallel_model, batch_size * gpus
