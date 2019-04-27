@@ -47,7 +47,7 @@ def session(config=None, gpu_options=None, use_horovod=False):
                     hvd.barrier()  # 初期化済みなら初期化はしない。念のためタイミングだけ合わせる。
                 else:
                     hvd.init()
-                if hvd.initialized():
+                if hvd.initialized() and get_gpu_count() > 0:
                     self.gpu_options['visible_device_list'] = str(hvd.get().local_rank())
             if K.backend() == 'tensorflow':
                 self.config['allow_soft_placement'] = True
@@ -75,7 +75,10 @@ def get_gpu_count():
             return 0
         return len(np.unique(gpus.split(',')))
     try:
-        return len(nvidia_smi('--list-gpus').strip().split('\n'))
+        result_text = nvidia_smi('--list-gpus').strip()
+        if 'No devices found' in result_text:
+            return 0
+        return len([l for l in result_text.split('\n') if len(l) > 0])
     except FileNotFoundError:
         return 0
 
