@@ -82,12 +82,12 @@ class ImageOnlyTransform(BasicTransform):
     def apply_transform(self, **data):
         """変換の適用。"""
         targets = self.targets
-        params = data.copy()
+        params = {key: value for key, value in data.items() if key not in targets}
         params.update(self.get_params(**data))
         result = {}
         for key, value in data.items():
             if key in targets:
-                result[key] = targets[key](**params)
+                result[key] = targets[key](value, **params)
             else:
                 result[key] = value
         return result
