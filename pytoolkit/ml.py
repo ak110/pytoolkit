@@ -9,6 +9,8 @@ import sklearn.utils
 
 from . import log, ndimage, utils
 
+_logger = log.get(__name__)
+
 
 def listup_classification(dirpath, class_names=None, use_tqdm=True, check_image=False):
     """画像分類でよくある、クラス名ディレクトリの列挙。クラス名の配列, X, yを返す。
@@ -135,7 +137,7 @@ def print_scores(precisions, recalls, fscores, supports, class_names=None, print
     assert len(precisions) == len(supports)
     if class_names is None:
         class_names = [f'class{i:02d}' for i in range(len(precisions))]
-    print_fn = print_fn or log.get(__name__).info
+    print_fn = print_fn or _logger.info
 
     print_fn('                   適合率  再現率  F値    件数')
     # .......'0123456789abcdef:  0.123   0.123   0.123  0123456'
@@ -167,7 +169,7 @@ def print_classification_metrics(y_true, proba_pred, average='micro', print_fn=N
 
     """
     try:
-        print_fn = print_fn or log.get(__name__).info
+        print_fn = print_fn or _logger.info
         true_type = sklearn.utils.multiclass.type_of_target(y_true)
         pred_type = sklearn.utils.multiclass.type_of_target(proba_pred)
         if true_type == 'binary':  # binary
@@ -200,14 +202,13 @@ def print_classification_metrics(y_true, proba_pred, average='micro', print_fn=N
             print_fn(f'AUC-{average:5s}: {auc:.3f}')
             print_fn(f'Logloss:   {logloss:.3f}')
     except BaseException:
-        logger = log.get(__name__)
-        logger.warning('Error: print_classification_metrics', exc_info=True)
+        _logger.warning('Error: print_classification_metrics', exc_info=True)
 
 
 def print_regression_metrics(y_true, y_pred, print_fn=None):
     """回帰の指標色々を表示する。"""
     try:
-        print_fn = print_fn or log.get(__name__).info
+        print_fn = print_fn or _logger.info
         y_mean = np.tile(np.mean(y_pred), len(y_true))
         r2 = sklearn.metrics.r2_score(y_true, y_pred)
         rmse = np.sqrt(sklearn.metrics.mean_squared_error(y_true, y_pred))
@@ -218,5 +219,4 @@ def print_regression_metrics(y_true, y_pred, print_fn=None):
         print_fn(f'RMSE: {rmse:.3f} (base: {rmseb:.3f})')
         print_fn(f'MAE:  {mae:.3f} (base: {maeb:.3f})')
     except BaseException:
-        logger = log.get(__name__)
-        logger.warning('Error: print_regression_metrics', exc_info=True)
+        _logger.warning('Error: print_regression_metrics', exc_info=True)

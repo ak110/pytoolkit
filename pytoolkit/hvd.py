@@ -5,6 +5,7 @@ import pathlib
 import tensorflow as tf
 from . import keras
 
+_logger = logging.getLogger(__name__)
 _initialized = False
 
 
@@ -25,8 +26,7 @@ def init():
             get().init()
             _initialized = True
         except ImportError:
-            logger = logging.getLogger(__name__)
-            logger.warning('Horovod読み込み失敗', exc_info=True)
+            _logger.warning('Horovod読み込み失敗', exc_info=True)
 
 
 def initialized():

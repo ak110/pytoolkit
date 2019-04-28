@@ -3,6 +3,8 @@ import logging
 
 from . import K, keras
 
+_logger = logging.getLogger(__name__)
+
 
 def get_custom_objects():
     """独自オブジェクトのdictを返す。"""
@@ -73,8 +75,7 @@ class NSGD(keras.optimizers.SGD):
 
             self.updates.append(K.update(p, new_p))
 
-        logger = logging.getLogger(__name__)
-        logger.info(f'lr_multipliers: applied = {applied_lr_multipliers}')
+        _logger.info(f'lr_multipliers: applied = {applied_lr_multipliers}')
         return self.updates
 
     def get_config(self):

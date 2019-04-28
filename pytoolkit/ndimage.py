@@ -19,8 +19,9 @@ import scipy.stats
 
 from . import log, utils
 
-_LOAD_CACHE = None
-_DISKCACHE_LOAD_FAILED = False
+_logger = log.get(__name__)
+_load_cache = None
+_diskcache_load_failed = False
 
 
 def _clear_cache(dc):
@@ -63,25 +64,24 @@ def load_with_cache(path_or_array: typing.Union[np.ndarray, io.IOBase, str, path
         return img
 
     if use_cache and isinstance(path_or_array, (str, pathlib.Path)):
-        global _LOAD_CACHE
-        global _DISKCACHE_LOAD_FAILED
-        if _LOAD_CACHE is None and not _DISKCACHE_LOAD_FAILED:
+        global _load_cache
+        global _diskcache_load_failed
+        if _load_cache is None and not _diskcache_load_failed:
             temp_dir = tempfile.mkdtemp(suffix='pytoolkit')
             try:
                 import diskcache
-                _LOAD_CACHE = diskcache.Cache(temp_dir)
-                atexit.register(_clear_cache, _LOAD_CACHE)
+                _load_cache = diskcache.Cache(temp_dir)
+                atexit.register(_clear_cache, _load_cache)
             except BaseException:
                 pathlib.Path(temp_dir).rmdir()
-                _DISKCACHE_LOAD_FAILED = True
-                logger = log.get(__name__)
-                logger.warning('diskcache load failed.', exc_info=True)
-        if _LOAD_CACHE is not None:
+                _diskcache_load_failed = True
+                _logger.warning('diskcache load failed.', exc_info=True)
+        if _load_cache is not None:
             key = f'{path_or_array}::{max_size}'
-            img = _LOAD_CACHE.get(key)
+            img = _load_cache.get(key)
             if img is None:
                 img = _load()
-                _LOAD_CACHE.set(key, img)
+                _load_cache.set(key, img)
             return img
 
     return _load()

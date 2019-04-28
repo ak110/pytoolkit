@@ -22,10 +22,10 @@ def binary_iou(y_true, y_pred, target_classes=None, threshold=0.5):
         y_true = y_true[..., target_classes]
         y_pred = y_pred[..., target_classes]
     axes = list(range(1, K.ndim(y_true) - 1))
-    t = K.greater_equal(y_true, 0.5)
-    p = K.greater_equal(y_pred, threshold)
-    inter = K.sum(K.cast(tf.math.logical_and(t, p, name='inter'), 'float32'), axis=axes)
-    union = K.sum(K.cast(tf.math.logical_or(t, p, name='union'), 'float32'), axis=axes)
+    t = y_true >= 0.5
+    p = y_pred >= threshold
+    inter = K.sum(K.cast(tf.math.logical_and(t, p), 'float32'), axis=axes)
+    union = K.sum(K.cast(tf.math.logical_or(t, p), 'float32'), axis=axes)
     return inter / K.maximum(union, 1)
 
 
@@ -46,8 +46,8 @@ def categorical_iou(y_true, y_pred, target_classes=None, strict=True):
         with tf.name_scope(f'class_{c}'):
             y_c = K.equal(y_classes, c)
             p_c = K.equal(p_classes, c)
-            inter = K.sum(K.cast(tf.math.logical_and(y_c, p_c, name='inter'), 'float32'), axis=axes)
-            union = K.sum(K.cast(tf.math.logical_or(y_c, p_c, name='union'), 'float32'), axis=axes)
+            inter = K.sum(K.cast(tf.math.logical_and(y_c, p_c), 'float32'), axis=axes)
+            union = K.sum(K.cast(tf.math.logical_or(y_c, p_c), 'float32'), axis=axes)
             active = union > 0 if strict else K.any(y_c, axis=axes)
             iou = inter / (union + K.epsilon())
             active_list.append(K.cast(active, 'float32'))

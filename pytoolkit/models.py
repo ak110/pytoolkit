@@ -1,10 +1,18 @@
-"""Kerasのモデル関連。"""
+"""Kerasのモデル関連。
+
+Horovodに対応した簡単なwrapperなど。
+
+ただし引数のデフォルトや細かい挙動を変えていたりするので要注意。
+
+"""
 import pathlib
 
 import numpy as np
 import tensorflow as tf
 
 from . import callbacks as cb, dl, data, hvd, keras, log, utils
+
+_logger = log.get(__name__)
 
 
 def load(path, custom_objects=None, compile=False) -> keras.models.Model:  # pylint: disable=redefined-outer-name
@@ -125,6 +133,8 @@ def fit(model: keras.models.Model,
 def predict(model: keras.models.Model, dataset: data.Dataset, batch_size, verbose=1):
     """予測。
 
+    Horovod使用時は全ワーカーで分担して処理する。
+
     Args:
         model: モデル。
         dataset: 予測したい入力データ。
@@ -147,16 +157,19 @@ def predict(model: keras.models.Model, dataset: data.Dataset, batch_size, verbos
 
 
 @log.trace()
-def evaluate(model: keras.models.Model, dataset: data.Dataset, batch_size=32, verbose=1):
+def evaluate(model: keras.models.Model, dataset: data.Dataset, batch_size=32, verbose=1, log_results=True):
     """評価。
+
+    Horovod使用時は全ワーカーで分担して処理する。
 
     Args:
         model: モデル。
         dataset (tk.data.Dataset): データ。
         verbose (int): 1ならプログレスバー表示。
+        log_results (bool): ログ出力するならTrue。
 
     Returns:
-        zip: metricsの文字列と値のdict
+        dict: metricsの文字列と値のdict
 
     """
     if hvd.initialized():
@@ -167,12 +180,22 @@ def evaluate(model: keras.models.Model, dataset: data.Dataset, batch_size=32, ve
 
     if hvd.initialized():
         values = hvd.get().allreduce(values)
-    return zip(model.metrics_names, values)
+    evals = dict(zip(model.metrics_names, values))
+
+    if log_results and hvd.is_master():
+        max_len = max([len(n) for n in evals])
+        for n, v in evals.items():
+            _logger.info(f'{n}:{" " * (max_len - len(n))} {v:.3f}')
+    hvd.barrier()
+
+    return evals
 
 
 @log.trace()
 def custom_predict(model: keras.models.Model, dataset: data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None):
     """予測。
+
+    TTAなど用。Horovodでの分散処理機能は無し。(複数GPUで処理したい場合はmulti_gpu_modelを使用。)
 
     Args:
         model: モデル。
@@ -191,6 +214,8 @@ def custom_predict(model: keras.models.Model, dataset: data.Dataset, batch_size,
 
 def custom_predict_flow(model: keras.models.Model, dataset: data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None):
     """予測。(yieldバージョン)
+
+    TTAなど用。Horovodでの分散処理機能は無し。(複数GPUで処理したい場合はmulti_gpu_modelを使用。)
 
     Args:
         model: モデル。

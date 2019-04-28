@@ -8,11 +8,12 @@ import sklearn.externals.joblib as joblib
 
 from . import hvd, log
 
+_logger = log.get(__name__)
+
 
 def memorize(cache_dir, compress=0, verbose=True):
     """関数の戻り値をファイルにキャッシュするデコレーター。"""
     cache_dir = pathlib.Path(cache_dir)
-    logger = log.get(__name__)
 
     def _decorator(func):
         @functools.wraps(func)
@@ -21,12 +22,12 @@ def memorize(cache_dir, compress=0, verbose=True):
             # キャッシュがあれば読む
             if cache_path.is_file():
                 if verbose:
-                    logger.info(f'Cache is found: {cache_path}')
+                    _logger.info(f'Cache is found: {cache_path}')
                 return joblib.load(cache_path)
             # 無ければ実処理
             if hvd.is_local_master():
                 if verbose:
-                    logger.info(f'Cache is not found: {cache_path}')
+                    _logger.info(f'Cache is not found: {cache_path}')
                 result = func(*args, **kwargs)
                 cache_path.parent.mkdir(parents=True, exist_ok=True)
                 joblib.dump(result, cache_path, compress=compress)

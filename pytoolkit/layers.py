@@ -390,7 +390,7 @@ class ChannelPair2D(keras.layers.Layer):
 
 
 class BatchNormalization(keras.layers.BatchNormalization):
-    """BatchNormalizationのカスタマイズ版。基本的には互換性があるように元のを継承＆同名で。"""
+    """Sync BN。基本的には互換性があるように元のを継承＆同名で。"""
 
     def call(self, inputs, training=None):  # pylint: disable=W0221
         return K.in_train_phase(
@@ -407,10 +407,7 @@ class BatchNormalization(keras.layers.BatchNormalization):
         stat_axes = [a for a in range(K.ndim(inputs)) if a not in target_axis]
 
         # 平均・分散の算出
-        if K.dtype(inputs) == 'float32':
-            x = inputs
-        else:
-            x = K.cast(inputs, 'float32')
+        x = inputs if K.dtype(inputs) == 'float32' else K.cast(inputs, 'float32')
         mean = K.mean(x, axis=stat_axes)
         squared_mean = K.mean(K.square(x), axis=stat_axes)
         # Sync BN

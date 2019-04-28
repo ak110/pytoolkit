@@ -6,6 +6,8 @@ import subprocess
 
 import numpy as np
 
+_logger = logging.getLogger(__name__)
+
 
 def normalize_tuple(value, n):
     """n個の要素を持つtupleにして返す。ただしNoneならNoneのまま。"""
@@ -74,5 +76,4 @@ def better_exceptions():
         import better_exceptions as be
         be.hook()
     except BaseException:
-        logger = logging.getLogger(__name__)
-        logger.warning('better_exceptions error', exc_info=True)
+        _logger.warning('better_exceptions error', exc_info=True)

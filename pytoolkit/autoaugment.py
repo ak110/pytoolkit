@@ -131,14 +131,14 @@ class Affine(A.ImageOnlyTransform):
         self.translate_x_mag = translate_x_mag
         self.translate_y_mag = translate_y_mag
 
-    def apply(self, img, **params):
+    def apply(self, image, **params):
         shear_x = float_parameter(self.shear_x_mag, 0.3, flip_sign=True)
         shear_y = float_parameter(self.shear_y_mag, 0.3, flip_sign=True)
         translate_x = float_parameter(self.translate_x_mag, 150 / 331, flip_sign=True)
         translate_y = float_parameter(self.translate_y_mag, 150 / 331, flip_sign=True)
-        img = PIL.Image.fromarray(img, mode='RGB')
+        image = PIL.Image.fromarray(image, mode='RGB')
         data = (1, shear_x, translate_x, shear_y, 1, translate_y)
-        return np.asarray(img.transform(img.size, PIL.Image.AFFINE, data, PIL.Image.BICUBIC, fillcolor=(128, 128, 128)), dtype=np.uint8)
+        return np.asarray(image.transform(image.size, PIL.Image.AFFINE, data, PIL.Image.BICUBIC, fillcolor=(128, 128, 128)), dtype=np.uint8)
 
 
 class ShearX(Affine):
@@ -180,10 +180,10 @@ class Rotate(A.ImageOnlyTransform):
         super().__init__(always_apply, p)
         self.mag = mag
 
-    def apply(self, img, **params):
+    def apply(self, image, **params):
         degrees = int_parameter(self.mag, 30, flip_sign=True)
-        img = PIL.Image.fromarray(img, mode='RGB')
-        return np.asarray(img.rotate(degrees), dtype=np.uint8)
+        image = PIL.Image.fromarray(image, mode='RGB')
+        return np.asarray(image.rotate(degrees), dtype=np.uint8)
 
 
 class AutoContrast(A.ImageOnlyTransform):
@@ -193,9 +193,9 @@ class AutoContrast(A.ImageOnlyTransform):
         super().__init__(always_apply, p)
         _ = mag  # noqa
 
-    def apply(self, img, **params):
-        img = PIL.Image.fromarray(img, mode='RGB')
-        return np.asarray(PIL.ImageOps.autocontrast(img), dtype=np.uint8)
+    def apply(self, image, **params):
+        image = PIL.Image.fromarray(image, mode='RGB')
+        return np.asarray(PIL.ImageOps.autocontrast(image), dtype=np.uint8)
 
 
 class Invert(A.ImageOnlyTransform):
@@ -205,9 +205,9 @@ class Invert(A.ImageOnlyTransform):
         super().__init__(always_apply, p)
         _ = mag  # noqa
 
-    def apply(self, img, **params):
-        img = PIL.Image.fromarray(img, mode='RGB')
-        return np.asarray(PIL.ImageOps.invert(img), dtype=np.uint8)
+    def apply(self, image, **params):
+        image = PIL.Image.fromarray(image, mode='RGB')
+        return np.asarray(PIL.ImageOps.invert(image), dtype=np.uint8)
 
 
 class Equalize(A.ImageOnlyTransform):
@@ -217,9 +217,9 @@ class Equalize(A.ImageOnlyTransform):
         super().__init__(always_apply, p)
         _ = mag  # noqa
 
-    def apply(self, img, **params):
-        img = PIL.Image.fromarray(img, mode='RGB')
-        return np.asarray(PIL.ImageOps.equalize(img), dtype=np.uint8)
+    def apply(self, image, **params):
+        image = PIL.Image.fromarray(image, mode='RGB')
+        return np.asarray(PIL.ImageOps.equalize(image), dtype=np.uint8)
 
 
 class Solarize(A.ImageOnlyTransform):
@@ -229,10 +229,10 @@ class Solarize(A.ImageOnlyTransform):
         super().__init__(always_apply, p)
         self.mag = mag
 
-    def apply(self, img, **params):
+    def apply(self, image, **params):
         threshold = 256 - int_parameter(self.mag, 256)
-        img = PIL.Image.fromarray(img, mode='RGB')
-        return np.asarray(PIL.ImageOps.solarize(img, threshold), dtype=np.uint8)
+        image = PIL.Image.fromarray(image, mode='RGB')
+        return np.asarray(PIL.ImageOps.solarize(image, threshold), dtype=np.uint8)
 
 
 class Posterize(A.ImageOnlyTransform):
@@ -242,10 +242,10 @@ class Posterize(A.ImageOnlyTransform):
         super().__init__(always_apply, p)
         self.mag = mag
 
-    def apply(self, img, **params):
+    def apply(self, image, **params):
         bit = 4 + int_parameter(self.mag, 4)  # https://github.com/tensorflow/models/blob/master/research/autoaugment/augmentation_transforms.py#L267 🤔
-        img = PIL.Image.fromarray(img, mode='RGB')
-        return np.asarray(PIL.ImageOps.posterize(img, bit), dtype=np.uint8)
+        image = PIL.Image.fromarray(image, mode='RGB')
+        return np.asarray(PIL.ImageOps.posterize(image, bit), dtype=np.uint8)
 
 
 class Contrast(A.ImageOnlyTransform):
@@ -255,10 +255,10 @@ class Contrast(A.ImageOnlyTransform):
         super().__init__(always_apply, p)
         self.mag = mag
 
-    def apply(self, img, **params):
+    def apply(self, image, **params):
         factor = float_parameter(self.mag, 1.8) + 0.1
-        img = PIL.Image.fromarray(img, mode='RGB')
-        return np.asarray(PIL.ImageEnhance.Contrast(img).enhance(factor), dtype=np.uint8)
+        image = PIL.Image.fromarray(image, mode='RGB')
+        return np.asarray(PIL.ImageEnhance.Contrast(image).enhance(factor), dtype=np.uint8)
 
 
 class Color(A.ImageOnlyTransform):
@@ -268,10 +268,10 @@ class Color(A.ImageOnlyTransform):
         super().__init__(always_apply, p)
         self.mag = mag
 
-    def apply(self, img, **params):
+    def apply(self, image, **params):
         factor = float_parameter(self.mag, 1.8) + 0.1
-        img = PIL.Image.fromarray(img, mode='RGB')
-        return np.asarray(PIL.ImageEnhance.Color(img).enhance(factor), dtype=np.uint8)
+        image = PIL.Image.fromarray(image, mode='RGB')
+        return np.asarray(PIL.ImageEnhance.Color(image).enhance(factor), dtype=np.uint8)
 
 
 class Brightness(A.ImageOnlyTransform):
@@ -281,10 +281,10 @@ class Brightness(A.ImageOnlyTransform):
         super().__init__(always_apply, p)
         self.mag = mag
 
-    def apply(self, img, **params):
+    def apply(self, image, **params):
         factor = float_parameter(self.mag, 1.8) + 0.1
-        img = PIL.Image.fromarray(img, mode='RGB')
-        return np.asarray(PIL.ImageEnhance.Brightness(img).enhance(factor), dtype=np.uint8)
+        image = PIL.Image.fromarray(image, mode='RGB')
+        return np.asarray(PIL.ImageEnhance.Brightness(image).enhance(factor), dtype=np.uint8)
 
 
 class Sharpness(A.ImageOnlyTransform):
@@ -294,10 +294,10 @@ class Sharpness(A.ImageOnlyTransform):
         super().__init__(always_apply, p)
         self.mag = mag
 
-    def apply(self, img, **params):
+    def apply(self, image, **params):
         factor = float_parameter(self.mag, 1.8) + 0.1
-        img = PIL.Image.fromarray(img, mode='RGB')
-        return np.asarray(PIL.ImageEnhance.Sharpness(img).enhance(factor), dtype=np.uint8)
+        image = PIL.Image.fromarray(image, mode='RGB')
+        return np.asarray(PIL.ImageEnhance.Sharpness(image).enhance(factor), dtype=np.uint8)
 
 
 def float_parameter(level, maxval, flip_sign=False):
