@@ -89,7 +89,7 @@ def fit(model: keras.models.Model,
 
     """
     train_data_loader = data.DataLoader(training_data, batch_size, shuffle=True, mixup=mixup, use_horovod=True)
-    val_data_loader = data.DataLoader(validation_data, batch_size * 2, shuffle=True, use_horovod=True) if validation_data is not None else None
+    val_data_loader = data.DataLoader(validation_data, batch_size, shuffle=True, use_horovod=True) if validation_data is not None else None
 
     callbacks = (callbacks or []) + [
         cb.EpochLogger(),
@@ -98,8 +98,7 @@ def fit(model: keras.models.Model,
     if hvd.initialized():
         callbacks.append(hvd.get().callbacks.BroadcastGlobalVariablesCallback(0))
         callbacks.append(hvd.get().callbacks.MetricAverageCallback())
-        if epochs > 5:
-            callbacks.append(hvd.get().callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1))
+        callbacks.append(hvd.get().callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1))
 
     # TODO: TensorFlowに合わせて対応予定
     _ = validation_freq
