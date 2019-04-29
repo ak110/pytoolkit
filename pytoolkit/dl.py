@@ -34,12 +34,13 @@ def session(config=None, gpu_options=None, use_horovod=False):
         use_horovod: hvd.init()と、visible_device_listの指定を行う。
 
     """
-    class _Scope:  # pylint: disable=R0903
+    class SessionScope:  # pylint: disable=R0903
 
         def __init__(self, config=None, gpu_options=None, use_horovod=False):
             self.config = config or {}
             self.gpu_options = gpu_options or {}
             self.use_horovod = use_horovod
+            self.session = None
 
         def __enter__(self):
             if self.use_horovod:
@@ -57,14 +58,16 @@ def session(config=None, gpu_options=None, use_horovod=False):
                 config = tf.ConfigProto(**self.config)
                 for k, v in self.gpu_options.items():
                     setattr(config.gpu_options, k, v)
-                K.set_session(tf.Session(config=config))
+                self.session = tf.Session(config=config)
+                K.set_session(self.session)
             return self
 
         def __exit__(self, *exc_info):
             if K.backend() == 'tensorflow':
+                self.session = None
                 K.clear_session()
 
-    return _Scope(config=config, gpu_options=gpu_options, use_horovod=use_horovod)
+    return SessionScope(config=config, gpu_options=gpu_options, use_horovod=use_horovod)
 
 
 def get_gpu_count():

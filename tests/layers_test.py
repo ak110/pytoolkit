@@ -5,6 +5,35 @@ import pytest
 import pytoolkit as tk
 
 
+@pytest.mark.parametrize('color', ['rgb', 'lab', 'hsv', 'yuv', 'ycbcr', 'hed', 'yiq'])
+def test_convert_color(dl_session, color):
+    import skimage.color
+
+    rgb = np.array([
+        [[0, 0, 0], [128, 128, 128], [255, 255, 255]],
+        [[192, 0, 0], [0, 192, 0], [0, 0, 192]],
+        [[64, 64, 0], [0, 64, 64], [64, 0, 64]],
+    ], dtype=np.uint8)
+
+    expected = {
+        'rgb': lambda rgb: rgb / 127.5 - 1,
+        'lab': lambda rgb: skimage.color.rgb2lab(rgb) / 100,
+        'hsv': skimage.color.rgb2hsv,
+        'yuv': skimage.color.rgb2yuv,
+        'ycbcr': lambda rgb: skimage.color.rgb2ycbcr(rgb) / 255,
+        'hed': skimage.color.rgb2hed,
+        'yiq': skimage.color.rgb2yiq,
+    }[color](rgb)
+
+    layer = tk.layers.ConvertColor(f'rgb_to_{color}')
+    actual = dl_session.session.run(layer(tk.K.constant(np.expand_dims(rgb, 0))))[0]
+
+    actual, expected = np.round(actual, 3), np.round(expected, 3)  # 丸めちゃう
+    assert actual.dtype == np.float32
+    assert actual.shape == expected.shape
+    assert actual == pytest.approx(expected, 1e-3)
+
+
 def test_depth_to_space(dl_session):
     X = np.array([[
         [[11, 21, 12, 22], [31, 41, 32, 42]],

@@ -22,7 +22,9 @@ def load(path, custom_objects=None, compile=False) -> keras.models.Model:  # pyl
         from . import get_custom_objects
         custom_objects = custom_objects.copy() if custom_objects else dict()
         custom_objects.update(get_custom_objects())
-        return keras.models.load_model(str(path), custom_objects=custom_objects, compile=compile)
+        model = keras.models.load_model(str(path), custom_objects=custom_objects, compile=compile)
+    hvd.barrier()  # 無くてもいいけどログをきれいにしたいので
+    return model
 
 
 def load_weights(model: keras.models.Model, path, by_name=False, skip_not_exist=False):
@@ -31,6 +33,7 @@ def load_weights(model: keras.models.Model, path, by_name=False, skip_not_exist=
     if path.exists():
         with log.trace_scope(f'load_weights({path})'):
             model.load_weights(str(path), by_name=by_name)
+        hvd.barrier()  # 無くてもいいけどログをきれいにしたいので
     elif skip_not_exist:
         log.get(__name__).info(f'{path} is not found.')
     else:
