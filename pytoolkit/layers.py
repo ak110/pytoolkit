@@ -72,6 +72,7 @@ class ConvertColor(keras.layers.Layer):
         mode (str):
             'rgb_to_rgb'
             'rgb_to_lab'
+            'rgb_to_hsv'
             'rgb_to_yuv'
             'rgb_to_ycbcr'
             'rgb_to_hed'
