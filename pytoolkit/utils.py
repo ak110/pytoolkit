@@ -9,6 +9,14 @@ import numpy as np
 _logger = logging.getLogger(__name__)
 
 
+def find_by_name(arr, name):
+    """__name__から要素を検索して返す。"""
+    for x in arr:
+        if x.__name__ == name:
+            return x
+    raise ValueError(f'"{name}" is not exist in [{arr}]')
+
+
 def normalize_tuple(value, n):
     """n個の要素を持つtupleにして返す。ただしNoneならNoneのまま。"""
     if value is None:

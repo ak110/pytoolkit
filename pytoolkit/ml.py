@@ -96,6 +96,24 @@ def _listup_files(dirpath, recurse, use_tqdm, check_image):
     return result, errors
 
 
+def extract1000(X, y, num_classes):
+    """クラスごとに均等に合計1000件を取得する。
+
+    References:
+        <https://github.com/mastnk/train1000>
+
+    """
+    num_data = 1000
+    num_per_class = num_data // num_classes
+
+    index_list = []
+    for c in range(num_classes):
+        index_list.extend(np.where(y == c)[0][:num_per_class])
+    assert len(index_list) == num_data
+
+    return X[index_list], y[index_list]
+
+
 def cv_indices(X, y, cv_count, cv_index, split_seed, stratify=None):
     """Cross validationのインデックスを返す。
 
@@ -161,13 +179,8 @@ def top_k_accuracy(y_true, proba_pred, k=5):
     return np.mean([y in best_k[i, :] for i, y in enumerate(y_true)])
 
 
-def print_classification_metrics(y_true, proba_pred, average='micro', print_fn=None):
-    """分類の指標色々を表示する。
-
-    Args:
-        average: 'micro' ならF値などをサンプルごとに計算。'macro'ならクラスごとの重み無し平均。
-
-    """
+def print_classification_metrics(y_true, proba_pred, average='macro', print_fn=None):
+    """分類の指標色々を表示する。"""
     try:
         print_fn = print_fn or _logger.info
         true_type = sklearn.utils.multiclass.type_of_target(y_true)

@@ -45,6 +45,7 @@ def save(model: keras.models.Model, path, include_optimizer=False):
     path = pathlib.Path(path)
     if hvd.is_master():
         with log.trace_scope(f'save({path})'):
+            path.parent.mkdir(parents=True, exist_ok=True)
             model.save(str(path), include_optimizer=include_optimizer)
     hvd.barrier()
 
@@ -54,11 +55,12 @@ def summary(model: keras.models.Model):
     model.summary(print_fn=log.get(__name__).info if hvd.is_master() else lambda x: None)
 
 
-def plot_model(model: keras.models.Model, to_file='model.svg', show_shapes=True, show_layer_names=True, rankdir='TB'):
+def plot(model: keras.models.Model, to_file='model.svg', show_shapes=True, show_layer_names=True, rankdir='TB'):
     """モデルのグラフのplot。"""
     path = pathlib.Path(to_file)
     if hvd.is_master():
-        with log.trace_scope(f'plot_model({path})'):
+        with log.trace_scope(f'plot({path})'):
+            path.parent.mkdir(parents=True, exist_ok=True)
             keras.utils.plot_model(model, str(path), show_shapes=show_shapes, show_layer_names=show_layer_names, rankdir=rankdir)
     hvd.barrier()
 
