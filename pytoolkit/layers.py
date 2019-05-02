@@ -475,10 +475,39 @@ class ChannelPair2D(keras.layers.Layer):
         return K.concatenate([inputs[..., i:i + 1] * inputs[..., i + 1:] for i in range(ch - 1)], axis=-1)
 
 
+class StocasticAdd(keras.layers.Layer):
+    """Stochastic Depth <http://arxiv.org/abs/1603.09382>"""
+
+    def __init__(self, drop_rate, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.drop_rate = drop_rate
+
+    def compute_output_shape(self, input_shape):
+        assert len(input_shape) == 2
+        assert input_shape[0] == input_shape[1]
+        return input_shape[0]
+
+    def call(self, inputs, training=None, **kwargs):  # pylint: disable=arguments-differ
+        _ = kwargs  # noqa
+        base, residual = inputs
+
+        def _train():
+            drop = K.random_binomial((), p=self.drop_rate)
+            return K.switch(drop,
+                            lambda: base,
+                            lambda: base + residual / self.drop_rate)
+
+        def _test():
+            return base + residual
+
+        return K.in_train_phase(_train, _test, training)
+
+
 class BatchNormalization(keras.layers.BatchNormalization):
     """Sync BN。基本的には互換性があるように元のを継承＆同名で。"""
 
-    def call(self, inputs, training=None):  # pylint: disable=W0221
+    def call(self, inputs, training=None, **kwargs):  # pylint: disable=arguments-differ
+        _ = kwargs  # noqa
         return K.in_train_phase(
             lambda: self._bn_train(inputs),
             lambda: self._bn_test(inputs),
