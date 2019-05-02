@@ -493,12 +493,10 @@ class StocasticAdd(keras.layers.Layer):
 
         def _train():
             drop = K.random_binomial((), p=self.drop_rate)
-            return K.switch(drop,
-                            lambda: base,
-                            lambda: base + residual / self.drop_rate)
+            return K.switch(drop, lambda: base, lambda: base + residual)
 
         def _test():
-            return base + residual
+            return base + residual * self.drop_rate
 
         return K.in_train_phase(_train, _test, training)
 
