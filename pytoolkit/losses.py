@@ -103,38 +103,6 @@ def lovasz_hinge(y_true, y_pred, from_logits=False, per_sample=True, activation=
     return loss
 
 
-def symmetric_lovasz_hinge(y_true, y_pred, from_logits=False, per_sample=False, activation='elu+1'):
-    """Lovasz hinge lossの0, 1対称版。"""
-    if not from_logits:
-        y_pred = backend.logit(y_pred)
-    loss1 = lovasz_hinge(y_true, y_pred, from_logits=True, per_sample=per_sample, activation=activation)
-    loss2 = lovasz_hinge(1 - y_true, -y_pred, from_logits=True, per_sample=per_sample, activation=activation)
-    return (loss1 + loss2) / 2
-
-
-def lovasz_sigmoid(y_true, y_pred, per_sample=True):
-    """Lovasz hinge lossのhingeじゃない版。"""
-    if per_sample:
-        def loss_per_sample(elems):
-            label, logit = elems
-            return lovasz_sigmoid(label, logit, per_sample=False)
-        return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=tf.float32)
-
-    y_true = K.reshape(y_true, (-1,))
-    y_pred = K.reshape(y_pred, (-1,))
-    errors = K.abs(y_true - y_pred)
-    errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
-    gt_sorted = K.gather(y_true, perm)
-    gts = K.sum(gt_sorted)
-    inter = gts - tf.cumsum(gt_sorted)
-    union = gts + tf.cumsum(1.0 - gt_sorted)
-    iou = 1.0 - inter / union
-    grad = tf.concat((iou[:1], iou[1:] - iou[:-1]), 0)
-    loss = tf.tensordot(errors_sorted, tf.stop_gradient(grad), 1)
-    assert K.ndim(loss) == 0
-    return loss
-
-
 def lovasz_softmax(y_true, y_pred, per_sample=True):
     """Lovasz softmax loss。"""
     if per_sample:
@@ -159,6 +127,35 @@ def lovasz_softmax(y_true, y_pred, per_sample=True):
         loss = tf.tensordot(errors_sorted, tf.stop_gradient(grad), 1)
         losses.append(loss)
     return K.mean(tf.stack(losses))
+
+
+def lovasz_binary_crossentropy(y_true, y_pred, per_sample=True, epsilon=0.01):
+    """Lovasz hinge lossのhingeじゃない版。
+
+    Args:
+        epsilon (float): sigmoidの値をclipする値。 sigmoid=0.01のときlogit=-4.6くらい。
+
+    """
+    if per_sample:
+        def loss_per_sample(elems):
+            label, logit = elems
+            return lovasz_binary_crossentropy(label, logit, per_sample=False)
+        return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=tf.float32)
+
+    y_true = K.reshape(y_true, (-1,))
+    y_pred = K.reshape(y_pred, (-1,))
+    p_t = y_true * y_pred + (1 - y_true) * (1 - y_pred)
+    errors = -K.log(K.maximum(p_t, 0.01))
+    errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
+    gt_sorted = K.gather(y_true, perm)
+    gts = K.sum(gt_sorted)
+    inter = gts - tf.cumsum(gt_sorted)
+    union = gts + tf.cumsum(1.0 - gt_sorted)
+    iou = 1.0 - inter / union
+    grad = tf.concat((iou[:1], iou[1:] - iou[:-1]), 0)
+    loss = tf.tensordot(errors_sorted, tf.stop_gradient(grad), 1)
+    assert K.ndim(loss) == 0
+    return loss
 
 
 def mixed_lovasz_softmax(y_true, y_pred):

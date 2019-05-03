@@ -25,6 +25,7 @@ if True:
     from . import layers
     from . import log
     from . import losses
+    from . import math
     from . import metrics
     from . import ml
     from . import models
