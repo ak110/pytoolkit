@@ -89,7 +89,7 @@ def fit(model: keras.models.Model,
         model: モデル。
         training_data (tk.data.Dataset): 訓練データ。
         validation_data (tk.data.Dataset): 検証データ。Noneなら省略。
-        validation_freq (int or list): 検証を行うエポック数の間隔、またはエポック数のリスト。
+        validation_freq (int or list): 検証を行うエポック数の間隔、またはエポック数のリスト。0ならvalidationしない(独自仕様)。
         batch_size (int): バッチサイズ。
         epochs (int): エポック数。
         callbacks (list): コールバック。EpochLoggerとErrorOnNaNは自動追加。
@@ -101,6 +101,10 @@ def fit(model: keras.models.Model,
         max_queue_size (int): キューの最大サイズ。
 
     """
+    # validation_freq == 0ならvalidationしない(独自仕様)
+    if validation_freq == 0:
+        validation_data = None
+
     train_data_loader = data.DataLoader(training_data, batch_size, shuffle=True, mixup=mixup, use_horovod=True)
     val_data_loader = data.DataLoader(validation_data, batch_size, shuffle=True, use_horovod=True) if validation_data is not None else None
 
@@ -113,12 +117,11 @@ def fit(model: keras.models.Model,
         callbacks.append(hvd.get().callbacks.MetricAverageCallback())
         callbacks.append(hvd.get().callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1))
 
-    # TODO: TensorFlowに合わせて対応予定
-    _ = validation_freq
+    # TODO: validation_freqはTensorFlowに合わせて対応予定
 
     # TensorFlowのバグ対策
     if tf.__version__ == '1.13.1':
-        from tensorflow.python.keras.engine import training_generator
+        from tensorflow.python.keras.engine import training_generator  # pylint: disable=no-name-in-module
         original = training_generator.model_iteration
         training_generator.model_iteration = lambda *args, verbose=0, **kwargs: original(*args, verbose=verbose, **kwargs)  # pylint: disable=unnecessary-lambda
     try:
@@ -158,7 +161,7 @@ def predict(model: keras.models.Model, dataset: data.Dataset, batch_size, verbos
 
 
 @log.trace()
-def evaluate(model: keras.models.Model, dataset: data.Dataset, batch_size=32, verbose=1, log_results=True):
+def evaluate(model: keras.models.Model, dataset: data.Dataset, batch_size=32, verbose=1):
     """評価。
 
     Horovod使用時は全ワーカーで分担して処理する。
@@ -167,7 +170,6 @@ def evaluate(model: keras.models.Model, dataset: data.Dataset, batch_size=32, ve
         model: モデル。
         dataset (tk.data.Dataset): データ。
         verbose (int): 1ならプログレスバー表示。
-        log_results (bool): ログ出力するならTrue。
 
     Returns:
         dict: metricsの文字列と値のdict
@@ -178,13 +180,6 @@ def evaluate(model: keras.models.Model, dataset: data.Dataset, batch_size=32, ve
     values = model.evaluate_generator(data_loader, verbose=verbose if hvd.is_master() else 0)
     values = hvd.allreduce(values)
     evals = dict(zip(model.metrics_names, values))
-
-    if log_results and hvd.is_master():
-        max_len = max([len(n) for n in evals])
-        for n, v in evals.items():
-            _logger.info(f'{n}:{" " * (max_len - len(n))} {v:.3f}')
-    hvd.barrier()
-
     return evals
 
 

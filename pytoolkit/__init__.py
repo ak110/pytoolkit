@@ -32,6 +32,7 @@ if True:
     from . import ndimage
     from . import od
     from . import optimizers
+    from . import training
     from . import utils
     from . import vis
     from . import web

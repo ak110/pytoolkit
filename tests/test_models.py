@@ -5,7 +5,7 @@ import numpy as np
 import pytoolkit as tk
 
 
-def test_xor(dl_session, tmpdir):
+def test_xor(session, tmpdir):
     models_dir = pathlib.Path(str(tmpdir))
     X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]], dtype=np.float32)
     y = np.array([0, 1, 1, 0], dtype=np.int32)

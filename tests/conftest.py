@@ -13,10 +13,10 @@ def global_setup():
 
 
 @pytest.fixture()
-def dl_session():
-    """関数ごとにsessionするfixture。"""
-    with tk.dl.session() as sess:
-        yield sess
+def session():
+    """関数ごとにtf.sessionするfixture。"""
+    with tk.dl.session() as s:
+        yield s.session
 
 
 @pytest.fixture()

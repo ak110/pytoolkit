@@ -6,7 +6,7 @@ import pytoolkit as tk
 
 
 @pytest.mark.parametrize('color', ['rgb', 'lab', 'hsv', 'yuv', 'ycbcr', 'hed', 'yiq'])
-def test_convert_color(dl_session, color):
+def test_convert_color(session, color):
     import skimage.color
 
     rgb = np.array([
@@ -26,7 +26,7 @@ def test_convert_color(dl_session, color):
     }[color](rgb)
 
     layer = tk.layers.ConvertColor(f'rgb_to_{color}')
-    actual = dl_session.session.run(layer(tk.K.constant(np.expand_dims(rgb, 0))))[0]
+    actual = session.run(layer(tk.K.constant(np.expand_dims(rgb, 0))))[0]
 
     actual, expected = np.round(actual, 3), np.round(expected, 3)  # 丸めちゃう
     assert actual.dtype == np.float32
@@ -34,7 +34,8 @@ def test_convert_color(dl_session, color):
     assert actual == pytest.approx(expected, 1e-3)
 
 
-def test_depth_to_space(dl_session):
+@pytest.mark.usefixtures('session')
+def test_depth_to_space():
     X = np.array([[
         [[11, 21, 12, 22], [31, 41, 32, 42]],
         [[13, 23, 14, 24], [33, 43, 34, 44]],
@@ -52,7 +53,8 @@ def test_depth_to_space(dl_session):
     assert model.predict(X) == pytest.approx(y)
 
 
-def test_coord_channel_2d(dl_session):
+@pytest.mark.usefixtures('session')
+def test_coord_channel_2d():
     x = inputs = tk.keras.layers.Input(shape=(4, 4, 1))
     x = tk.layers.CoordChannel2D()(x)
     model = tk.keras.models.Model(inputs, x)
@@ -85,7 +87,8 @@ def test_coord_channel_2d(dl_session):
     ]]))
 
 
-def test_mixfeat(dl_session):
+@pytest.mark.usefixtures('session')
+def test_mixfeat():
     X = np.array([
         [1, 2],
         [3, 4],

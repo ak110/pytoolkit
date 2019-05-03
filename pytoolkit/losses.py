@@ -145,7 +145,7 @@ def lovasz_binary_crossentropy(y_true, y_pred, per_sample=True, epsilon=0.01):
     y_true = K.reshape(y_true, (-1,))
     y_pred = K.reshape(y_pred, (-1,))
     p_t = y_true * y_pred + (1 - y_true) * (1 - y_pred)
-    errors = -K.log(K.maximum(p_t, 0.01))
+    errors = -K.log(K.maximum(p_t, epsilon))
     errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
     gt_sorted = K.gather(y_true, perm)
     gts = K.sum(gt_sorted)

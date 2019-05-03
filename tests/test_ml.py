@@ -17,7 +17,7 @@ def test_top_k_accuracy():
 
 
 def test_print_classification_metrics_multi():
-    y_true = np.array([0, 1, 1, 1, 9])
+    y_true = np.array([0, 1, 1, 1, 2])
     prob_pred = np.array([
         [0.75, 0.00, 0.25],
         [0.25, 0.75, 0.00],
