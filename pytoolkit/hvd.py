@@ -48,6 +48,20 @@ def is_local_master():
     return get().local_rank() == 0
 
 
+def allgather(value):
+    """全ワーカーからデータを集める。"""
+    if not initialized():
+        return value
+    return get().allgather(value)
+
+
+def allreduce(value, average=True):
+    """全ワーカーからデータを集める。"""
+    if not initialized():
+        return value
+    return get().allreduce(value, average=average)
+
+
 def barrier():
     """全員が揃うまで待つ。"""
     if not initialized():
@@ -76,3 +90,18 @@ def get_file(name, url, **kwargs):
         keras.utils.get_file(name, url, **kwargs)
     barrier()
     return pathlib.Path(keras.utils.get_file(name, url, **kwargs))
+
+
+def split(dataset):
+    """Datasetを各ワーカーで分割処理する。
+
+    処理結果は hvd.allgather() や hvd.allreduce() で集めることができる。
+
+    Args:
+        dataset (tk.data.Dataset): 分割元のデータセット
+
+    """
+    from . import data
+    if not initialized():
+        return dataset
+    return data.split(dataset, get().size())[get().rank()]

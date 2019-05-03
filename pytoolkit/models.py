@@ -150,14 +150,10 @@ def predict(model: keras.models.Model, dataset: data.Dataset, batch_size, verbos
         np.ndarray: 予測結果。
 
     """
-    if hvd.initialized():
-        dataset = data.split(dataset, hvd.get().size())[hvd.get().rank()]
-
+    dataset = hvd.split(dataset)
     data_loader = data.DataLoader(dataset, batch_size)
     values = model.predict_generator(data_loader, verbose=verbose if hvd.is_master() else 0)
-
-    if hvd.initialized():
-        values = hvd.get().allgather(values)
+    values = hvd.allgather(values)
     return values
 
 
@@ -177,14 +173,10 @@ def evaluate(model: keras.models.Model, dataset: data.Dataset, batch_size=32, ve
         dict: metricsの文字列と値のdict
 
     """
-    if hvd.initialized():
-        dataset = data.split(dataset, hvd.get().size())[hvd.get().rank()]
-
+    dataset = hvd.split(dataset)
     data_loader = data.DataLoader(dataset, batch_size)
     values = model.evaluate_generator(data_loader, verbose=verbose if hvd.is_master() else 0)
-
-    if hvd.initialized():
-        values = hvd.get().allreduce(values)
+    values = hvd.allreduce(values)
     evals = dict(zip(model.metrics_names, values))
 
     if log_results and hvd.is_master():
