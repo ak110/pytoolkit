@@ -3,31 +3,29 @@
 import numpy as np
 import tensorflow as tf
 
-from . import K, backend
+from . import K, backend, math
 
 
-def binary_crossentropy(y_true, y_pred, alpha=None):
+def binary_crossentropy(y_true, y_pred, from_logits=False, alpha=None):
     """クラス間のバランス補正ありのbinary_crossentropy。
 
-    Focal lossの論文ではα=0.75が良いとされていた。(class 0の重みが0.25)
+    Args:
+        alpha (float or None): class 1の重み。
+
     """
-    a_t = (y_true * alpha + (1 - y_true) * (1 - alpha)) * 2 if alpha is not None else 1
-    p_t = y_true * y_pred + (1 - y_true) * (1 - y_pred)
-    p_t = K.clip(p_t, K.epsilon(), 1 - K.epsilon())
-    return -K.sum(a_t * K.log(p_t), axis=list(range(1, K.ndim(y_true))))
+    loss = backend.binary_crossentropy(y_true, y_pred, from_logits=from_logits, alpha=alpha)
+    return K.sum(loss, axis=list(range(1, K.ndim(y_true))))
 
 
-def binary_focal_loss(y_true, y_pred, gamma=2.0, alpha=None):
-    """2クラス分類用focal loss (https://arxiv.org/abs/1708.02002)。
+def binary_focal_loss(y_true, y_pred, gamma=2.0, from_logits=False, alpha=None):
+    """2クラス分類用Focal Loss <https://arxiv.org/abs/1708.02002>。
 
     Args:
         alpha (float or None): class 1の重み。論文では0.25。
 
     """
-    a_t = (y_true * alpha + (1 - y_true) * (1 - alpha)) * 2 if alpha is not None else 1
-    p_t = y_true * y_pred + (1 - y_true) * (1 - y_pred)
-    p_t = K.clip(p_t, K.epsilon(), 1 - K.epsilon())
-    return -K.sum(a_t * K.pow(1 - p_t, gamma) * K.log(p_t), axis=list(range(1, K.ndim(y_true))))
+    loss = backend.binary_focal_loss(y_true, y_pred, gamma=gamma, from_logits=from_logits, alpha=alpha)
+    return K.sum(loss, axis=list(range(1, K.ndim(y_true))))
 
 
 def categorical_crossentropy(y_true, y_pred, alpha=None, class_weights=None):
@@ -53,7 +51,7 @@ def categorical_crossentropy(y_true, y_pred, alpha=None, class_weights=None):
 
 
 def categorical_focal_loss(y_true, y_pred, gamma=2.0, alpha=None):
-    """多クラス分類用focal loss (https://arxiv.org/abs/1708.02002)。
+    """多クラス分類用Focal Loss <https://arxiv.org/abs/1708.02002>。
 
     Args:
         alpha (float or None): class 0以外の重み。論文では0.25。
@@ -77,28 +75,52 @@ def lovasz_hinge(y_true, y_pred, from_logits=False, per_sample=True, activation=
         y_pred = backend.logit(y_pred)
     if per_sample:
         def loss_per_sample(elems):
-            label, logit = elems
-            return lovasz_hinge(label, logit, from_logits=True, per_sample=False, activation=activation)
+            yt, yp = elems
+            return lovasz_hinge(yt, yp, from_logits=True, per_sample=False, activation=activation)
         return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=tf.float32)
 
     y_true = K.reshape(y_true, (-1,))
     y_pred = K.reshape(y_pred, (-1,))
     signs = y_true * 2.0 - 1.0  # -1 ～ +1
-    errors = 1.0 - y_pred * tf.stop_gradient(signs)
+    errors = 1.0 - y_pred * signs
     errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
-    gt_sorted = K.gather(y_true, perm)
-    gts = K.sum(gt_sorted)
-    inter = gts - tf.cumsum(gt_sorted)
-    union = gts + tf.cumsum(1.0 - gt_sorted)
-    iou = 1.0 - inter / union
-    grad = tf.concat((iou[:1], iou[1:] - iou[:-1]), 0)
+    weights = backend.lovasz_weights(y_true, perm)
     if activation == 'relu':
         errors_sorted = tf.nn.relu(errors_sorted)
     elif activation == 'elu+1':
         errors_sorted = tf.nn.elu(errors_sorted) + 1
     else:
         raise ValueError(f'Invalid activation: {activation}')
-    loss = tf.tensordot(errors_sorted, tf.stop_gradient(grad), 1)
+    loss = tf.tensordot(errors_sorted, tf.stop_gradient(weights), 1)
+    assert K.ndim(loss) == 0
+    return loss
+
+
+def lovasz_binary_crossentropy(y_true, y_pred, from_logits=False, per_sample=True, epsilon=0.01):
+    """Lovasz hinge lossのhingeじゃない版。
+
+    Args:
+        epsilon (float): sigmoidの値をclipする値。 sigmoid=0.01のときlogit=-4.6くらい。
+
+    """
+    if per_sample:
+        def loss_per_sample(elems):
+            yt, yp = elems
+            return lovasz_binary_crossentropy(yt, yp, from_logits=from_logits, per_sample=False)
+        return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=tf.float32)
+
+    y_true = K.reshape(y_true, (-1,))
+    y_pred = K.reshape(y_pred, (-1,))
+    y_true = K.clip(y_true, epsilon, 1 - epsilon)
+    if from_logits:
+        lpsilon = math.logit(epsilon)
+        y_pred = K.clip(y_pred, lpsilon, 1 - lpsilon)
+    else:
+        y_pred = K.clip(y_pred, epsilon, 1 - epsilon)
+    errors = backend.binary_crossentropy(y_true, y_pred, from_logits=from_logits)
+    errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
+    weights = backend.lovasz_weights(y_true, perm)
+    loss = tf.tensordot(errors_sorted, tf.stop_gradient(weights), 1)
     assert K.ndim(loss) == 0
     return loss
 
@@ -107,8 +129,8 @@ def lovasz_softmax(y_true, y_pred, per_sample=True):
     """Lovasz softmax loss。"""
     if per_sample:
         def loss_per_sample(elems):
-            label, proba = elems
-            return lovasz_softmax(label, proba, per_sample=False)
+            yt, yp = elems
+            return lovasz_softmax(yt, yp, per_sample=False)
         return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=tf.float32)
 
     num_classes = K.int_shape(y_true)[-1]
@@ -118,51 +140,10 @@ def lovasz_softmax(y_true, y_pred, per_sample=True):
     for c in range(num_classes):
         errors = K.abs(y_true[:, c] - y_pred[:, c])
         errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
-        gt_sorted = K.gather(y_true[:, c], perm)
-        gts = K.sum(gt_sorted)
-        inter = gts - tf.cumsum(gt_sorted)
-        union = gts + tf.cumsum(1.0 - gt_sorted)
-        iou = 1.0 - inter / union
-        grad = tf.concat((iou[:1], iou[1:] - iou[:-1]), 0)
-        loss = tf.tensordot(errors_sorted, tf.stop_gradient(grad), 1)
+        weights = backend.lovasz_weights(y_true[:, c], perm)
+        loss = tf.tensordot(errors_sorted, tf.stop_gradient(weights), 1)
         losses.append(loss)
-    return K.mean(tf.stack(losses))
-
-
-def lovasz_binary_crossentropy(y_true, y_pred, per_sample=True, epsilon=0.01):
-    """Lovasz hinge lossのhingeじゃない版。
-
-    Args:
-        epsilon (float): sigmoidの値をclipする値。 sigmoid=0.01のときlogit=-4.6くらい。
-
-    """
-    if per_sample:
-        def loss_per_sample(elems):
-            label, logit = elems
-            return lovasz_binary_crossentropy(label, logit, per_sample=False)
-        return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=tf.float32)
-
-    y_true = K.reshape(y_true, (-1,))
-    y_pred = K.reshape(y_pred, (-1,))
-    p_t = y_true * y_pred + (1 - y_true) * (1 - y_pred)
-    errors = -K.log(K.maximum(p_t, epsilon))
-    errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
-    gt_sorted = K.gather(y_true, perm)
-    gts = K.sum(gt_sorted)
-    inter = gts - tf.cumsum(gt_sorted)
-    union = gts + tf.cumsum(1.0 - gt_sorted)
-    iou = 1.0 - inter / union
-    grad = tf.concat((iou[:1], iou[1:] - iou[:-1]), 0)
-    loss = tf.tensordot(errors_sorted, tf.stop_gradient(grad), 1)
-    assert K.ndim(loss) == 0
-    return loss
-
-
-def mixed_lovasz_softmax(y_true, y_pred):
-    """Lovasz softmax loss + CE。"""
-    loss1 = lovasz_softmax(y_true, y_pred)
-    loss2 = K.categorical_crossentropy(y_true, y_pred)
-    return loss1 * 0.9 + loss2 * 0.1
+    return tf.reduce_mean(losses)
 
 
 def l1_smooth_loss(y_true, y_pred):
