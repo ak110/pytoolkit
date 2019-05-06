@@ -32,8 +32,8 @@ def test_lovasz_binary_crossentropy(session):
     y_pred = K.constant([[0.0, 0.3, 0.7, 1.0], [0.0, 0.3, 0.7, 1.0]])
     loss1 = session.run(tk.losses.lovasz_binary_crossentropy(y_true, y_true))
     loss2 = session.run(tk.losses.lovasz_binary_crossentropy(y_true, y_pred))
-    assert loss1 == pytest.approx([0.056002, 0.056002], abs=1e-6), 'loss(y_true, y_true) == zeros'
-    assert (loss2 > np.array([0.056002, 0.056002])).all(), 'loss(y_true, y_pred) > zeros'
+    assert loss1 == pytest.approx([0.0100503, 0.0100503], abs=1e-6), 'loss(y_true, y_true) == zeros'
+    assert (loss2 > np.array([0.0100503, 0.0100503])).all(), 'loss(y_true, y_pred) > zeros'
 
 
 def test_lovasz_softmax(session):
