@@ -15,7 +15,7 @@ from . import callbacks as cb, dl, data, hvd, keras, log, utils
 _logger = log.get(__name__)
 
 
-def load(path, custom_objects=None, compile=False) -> keras.models.Model:  # pylint: disable=redefined-outer-name
+def load(path, custom_objects=None, compile=False, gpus=None) -> keras.models.Model:  # pylint: disable=redefined-outer-name
     """モデルの読み込み。"""
     path = pathlib.Path(path)
     with log.trace_scope(f'load({path})'):
@@ -23,7 +23,8 @@ def load(path, custom_objects=None, compile=False) -> keras.models.Model:  # pyl
         custom_objects = custom_objects.copy() if custom_objects else dict()
         custom_objects.update(get_custom_objects())
         model = keras.models.load_model(str(path), custom_objects=custom_objects, compile=compile)
-    hvd.barrier()  # 無くてもいいけどログをきれいにしたいので
+        if gpus is not None:
+            model, _ = multi_gpu_model(model, batch_size=0, gpus=gpus)
     return model
 
 
@@ -33,7 +34,6 @@ def load_weights(model: keras.models.Model, path, by_name=False, skip_not_exist=
     if path.exists():
         with log.trace_scope(f'load_weights({path})'):
             model.load_weights(str(path), by_name=by_name)
-        hvd.barrier()  # 無くてもいいけどログをきれいにしたいので
     elif skip_not_exist:
         log.get(__name__).info(f'{path} is not found.')
     else:
@@ -65,6 +65,7 @@ def plot(model: keras.models.Model, to_file='model.svg', show_shapes=True, show_
     hvd.barrier()
 
 
+@log.trace()
 def compile(model: keras.models.Model, optimizer, loss, metrics=None, loss_weights=None):  # pylint: disable=redefined-builtin
     """compileするだけ。"""
     if hvd.initialized():
@@ -138,56 +139,54 @@ def fit(model: keras.models.Model,
 
 
 @log.trace()
-def predict(model: keras.models.Model, dataset: data.Dataset, batch_size, verbose=1):
+def predict(model: keras.models.Model, dataset: data.Dataset, batch_size, verbose=1, use_horovod=False):
     """予測。
-
-    Horovod使用時は全ワーカーで分担して処理する。
 
     Args:
         model: モデル。
         dataset: 予測したい入力データ。
         batch_size (int): バッチサイズ
         verbose (int): プログレスバー(tqdm)を表示するか否か。
+        use_horovod (bool): MPIによる分散処理をするか否か。
 
     Returns:
         np.ndarray: 予測結果。
 
     """
-    dataset = hvd.split(dataset)
+    dataset = hvd.split(dataset) if use_horovod else dataset
     data_loader = data.DataLoader(dataset, batch_size)
     values = model.predict_generator(data_loader, verbose=verbose if hvd.is_master() else 0)
-    values = hvd.allgather(values)
+    values = hvd.allgather(values) if use_horovod else dataset
     return values
 
 
 @log.trace()
-def evaluate(model: keras.models.Model, dataset: data.Dataset, batch_size=32, verbose=1):
+def evaluate(model: keras.models.Model, dataset: data.Dataset, batch_size=32, verbose=1, use_horovod=False):
     """評価。
-
-    Horovod使用時は全ワーカーで分担して処理する。
 
     Args:
         model: モデル。
         dataset (tk.data.Dataset): データ。
         verbose (int): 1ならプログレスバー表示。
+        use_horovod (bool): MPIによる分散処理をするか否か。
 
     Returns:
         dict: metricsの文字列と値のdict
 
     """
-    dataset = hvd.split(dataset)
+    dataset = hvd.split(dataset) if use_horovod else dataset
     data_loader = data.DataLoader(dataset, batch_size)
     values = model.evaluate_generator(data_loader, verbose=verbose if hvd.is_master() else 0)
-    values = hvd.allreduce(values)
+    values = hvd.allreduce(values) if use_horovod else dataset
     evals = dict(zip(model.metrics_names, values))
     return evals
 
 
 @log.trace()
-def custom_predict(model: keras.models.Model, dataset: data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None):
+def custom_predict(model: keras.models.Model, dataset: data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None, use_horovod=False):
     """予測。
 
-    TTAなど用。Horovodでの分散処理機能は無し。(複数GPUで処理したい場合はmulti_gpu_modelを使用。)
+    TTAなど用。
 
     Args:
         model: モデル。
@@ -196,18 +195,22 @@ def custom_predict(model: keras.models.Model, dataset: data.Dataset, batch_size,
         verbose (int): プログレスバー(tqdm)を表示するか否か。
         desc (str): プログレスバーの説明。
         on_batch_fn (callable): モデルとミニバッチ分の入力データを受け取り、予測結果を返す処理。(TTA用)
+        use_horovod (bool): MPIによる分散処理をするか否か。
 
     Returns:
         np.ndarray: 予測結果。
 
     """
-    return np.array(list(custom_predict_flow(model, dataset, batch_size, verbose, desc, on_batch_fn)))
+    dataset = hvd.split(dataset) if use_horovod else dataset
+    values = np.array(list(custom_predict_flow(model, dataset, batch_size, verbose, desc, on_batch_fn)))
+    dataset = hvd.allreduce(dataset) if use_horovod else dataset
+    return values
 
 
 def custom_predict_flow(model: keras.models.Model, dataset: data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None):
     """予測。(yieldバージョン)
 
-    TTAなど用。Horovodでの分散処理機能は無し。(複数GPUで処理したい場合はmulti_gpu_modelを使用。)
+    TTAなど用。Horovodでの分散処理機能は無し。(複数GPUで処理したい場合はmulti_gpu_modelを使用するか呼ぶ側でsplitする。処理順に注意が必要。)
 
     Args:
         model: モデル。

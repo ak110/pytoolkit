@@ -111,7 +111,6 @@ def lovasz_binary_crossentropy(y_true, y_pred, from_logits=False, per_sample=Tru
 
     y_true = K.reshape(y_true, (-1,))
     y_pred = K.reshape(y_pred, (-1,))
-    y_true = K.clip(y_true, epsilon, 1 - epsilon)
     if from_logits:
         lpsilon = math.logit(epsilon)
         y_pred = K.clip(y_pred, lpsilon, 1 - lpsilon)
