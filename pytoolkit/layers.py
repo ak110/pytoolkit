@@ -25,6 +25,7 @@ def get_custom_objects():
         SubpixelConv2D,
         WSConv2D,
         OctaveConv2D,
+        BlurPooling2D,
     ]
     return {c.__name__: c for c in classes}
 
@@ -962,6 +963,47 @@ class OctaveConv2D(keras.layers.Layer):
             'filters': self.filters,
             'strides': self.strides,
             'alpha': self.alpha,
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
+class BlurPooling2D(keras.layers.Layer):
+    """Blur Pooling Layer <https://arxiv.org/abs/1904.11486>"""
+
+    def __init__(self, taps=5, strides=2, **kwargs):
+        super().__init__(**kwargs)
+        self.taps = taps
+        self.strides = strides if isinstance(strides, tuple) else (strides, strides)
+
+    def compute_output_shape(self, input_shape):
+        assert len(input_shape) == 4
+        input_shape = list(input_shape)
+        input_shape[1] = (input_shape[1] + int(input_shape[1]) % self.strides[0]) // self.strides[0]
+        input_shape[2] = (input_shape[2] + int(input_shape[2]) % self.strides[1]) // self.strides[1]
+        return input_shape
+
+    def call(self, inputs, **kwargs):
+        _ = kwargs  # noqa
+        in_filters = K.int_shape(inputs)[-1]
+
+        pascals_tr = np.zeros((self.taps, self.taps))
+        pascals_tr[0, 0] = 1
+        for i in range(1, self.taps):
+            pascals_tr[i, :] = pascals_tr[i - 1, :]
+            pascals_tr[i, 1:] += pascals_tr[i - 1, :-1]
+        filter1d = pascals_tr[self.taps - 1, :self.taps]
+        filter2d = filter1d[np.newaxis, :] * filter1d[:, np.newaxis]
+        filter2d = filter2d * (self.taps ** 2 / filter2d.sum())
+        kernel = np.tile(filter2d[:, :, np.newaxis, np.newaxis], (1, 1, in_filters, 1))
+        kernel = K.constant(kernel)
+
+        return tf.nn.depthwise_conv2d(inputs, kernel, strides=(1,) + self.strides + (1,), padding='SAME')
+
+    def get_config(self):
+        config = {
+            'taps': self.taps,
+            'strides': self.strides,
         }
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
