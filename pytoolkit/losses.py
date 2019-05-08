@@ -96,7 +96,7 @@ def lovasz_hinge(y_true, y_pred, from_logits=False, per_sample=True, activation=
     return loss
 
 
-def lovasz_binary_crossentropy(y_true, y_pred, from_logits=False, per_sample=True, epsilon=0.01):
+def lovasz_binary_crossentropy(y_true, y_pred, from_logits=False, per_sample=True, epsilon=0.01, alpha=None):
     """Lovasz hinge lossのhingeじゃない版。
 
     Args:
@@ -106,7 +106,7 @@ def lovasz_binary_crossentropy(y_true, y_pred, from_logits=False, per_sample=Tru
     if per_sample:
         def loss_per_sample(elems):
             yt, yp = elems
-            return lovasz_binary_crossentropy(yt, yp, from_logits=from_logits, per_sample=False)
+            return lovasz_binary_crossentropy(yt, yp, from_logits=from_logits, per_sample=False, epsilon=epsilon, alpha=alpha)
         return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=tf.float32)
 
     y_true = K.reshape(y_true, (-1,))
@@ -116,7 +116,7 @@ def lovasz_binary_crossentropy(y_true, y_pred, from_logits=False, per_sample=Tru
         y_pred = K.clip(y_pred, lpsilon, 1 - lpsilon)
     else:
         y_pred = K.clip(y_pred, epsilon, 1 - epsilon)
-    errors = backend.binary_crossentropy(y_true, y_pred, from_logits=from_logits)
+    errors = backend.binary_crossentropy(y_true, y_pred, from_logits=from_logits, alpha=alpha)
     errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
     weights = backend.lovasz_weights(y_true, perm)
     loss = tf.tensordot(errors_sorted, tf.stop_gradient(weights), 1)
