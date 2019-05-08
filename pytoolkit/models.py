@@ -156,7 +156,7 @@ def predict(model: keras.models.Model, dataset: data.Dataset, batch_size, verbos
     dataset = hvd.split(dataset) if use_horovod else dataset
     data_loader = data.DataLoader(dataset, batch_size)
     values = model.predict_generator(data_loader, verbose=verbose if hvd.is_master() else 0)
-    values = hvd.allgather(values) if use_horovod else dataset
+    values = hvd.allgather(values) if use_horovod else values
     return values
 
 
@@ -177,7 +177,7 @@ def evaluate(model: keras.models.Model, dataset: data.Dataset, batch_size=32, ve
     dataset = hvd.split(dataset) if use_horovod else dataset
     data_loader = data.DataLoader(dataset, batch_size)
     values = model.evaluate_generator(data_loader, verbose=verbose if hvd.is_master() else 0)
-    values = hvd.allreduce(values) if use_horovod else dataset
+    values = hvd.allreduce(values) if use_horovod else values
     evals = dict(zip(model.metrics_names, values))
     return evals
 
@@ -202,8 +202,9 @@ def custom_predict(model: keras.models.Model, dataset: data.Dataset, batch_size,
 
     """
     dataset = hvd.split(dataset) if use_horovod else dataset
+    verbose = 0 if use_horovod and not hvd.is_master() else verbose
     values = np.array(list(custom_predict_flow(model, dataset, batch_size, verbose, desc, on_batch_fn)))
-    dataset = hvd.allreduce(dataset) if use_horovod else dataset
+    values = hvd.allgather(values) if use_horovod else values
     return values
 
 
