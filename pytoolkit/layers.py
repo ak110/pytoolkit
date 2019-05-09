@@ -992,7 +992,7 @@ class BlurPooling2D(keras.layers.Layer):
         for i in range(1, self.taps):
             pascals_tr[i, :] = pascals_tr[i - 1, :]
             pascals_tr[i, 1:] += pascals_tr[i - 1, :-1]
-        filter1d = pascals_tr[self.taps - 1, :self.taps]
+        filter1d = pascals_tr[self.taps - 1, :]
         filter2d = filter1d[np.newaxis, :] * filter1d[:, np.newaxis]
         filter2d = filter2d * (self.taps ** 2 / filter2d.sum())
         kernel = np.tile(filter2d[:, :, np.newaxis, np.newaxis], (1, 1, in_filters, 1))
