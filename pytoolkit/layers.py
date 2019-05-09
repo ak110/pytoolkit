@@ -981,7 +981,7 @@ class BlurPooling2D(keras.layers.Layer):
         input_shape = list(input_shape)
         input_shape[1] = (input_shape[1] + int(input_shape[1]) % self.strides[0]) // self.strides[0]
         input_shape[2] = (input_shape[2] + int(input_shape[2]) % self.strides[1]) // self.strides[1]
-        return input_shape
+        return tuple(input_shape)
 
     def call(self, inputs, **kwargs):
         _ = kwargs  # noqa
