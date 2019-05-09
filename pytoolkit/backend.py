@@ -74,7 +74,7 @@ def binary_focal_loss(y_true, y_pred, gamma=2.0, from_logits=False, alpha=None):
     return loss
 
 
-def lovasz_weights(y_true, perm):
+def lovasz_weights(y_true, perm, alpha=None):
     """Lovasz hingeなどの損失の重み付け部分。"""
     y_true_sorted = K.gather(y_true, perm)
     y_true_total = K.sum(y_true_sorted)
@@ -82,4 +82,6 @@ def lovasz_weights(y_true, perm):
     union = y_true_total + tf.cumsum(1.0 - y_true_sorted)
     iou = 1.0 - inter / union
     weights = tf.concat((iou[:1], iou[1:] - iou[:-1]), 0)
+    if alpha is not None:
+        weights *= 2 * (y_true_sorted * alpha + (1 - y_true_sorted) * (1 - alpha))
     return weights

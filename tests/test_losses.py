@@ -10,12 +10,16 @@ K = tk.K
 def test_binary_crossentropy(session):
     # 通常の動作確認
     _binary_loss_test(session, tk.losses.binary_crossentropy, symmetric=True)
-    # alpha = 0.5の一致確認
+    # alpha
     y_true = K.constant([[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]])
     y_pred = K.constant([[0.0, 0.3, 0.7, 1.0], [0.0, 0.3, 0.7, 1.0]])
     loss_na = session.run(tk.losses.binary_crossentropy(y_true, y_pred))
-    loss_a = session.run(tk.losses.binary_crossentropy(y_true, y_pred, alpha=0.5))
-    assert loss_na == pytest.approx(loss_a, abs=1e-6)
+    loss_a3 = session.run(tk.losses.binary_crossentropy(y_true, y_pred, alpha=0.3))
+    loss_a5 = session.run(tk.losses.binary_crossentropy(y_true, y_pred, alpha=0.5))
+    loss_a7 = session.run(tk.losses.binary_crossentropy(y_true, y_pred, alpha=0.7))
+    assert loss_na == pytest.approx(loss_a5, abs=1e-6)
+    assert loss_a3[0] > loss_a3[1]
+    assert loss_a7[0] < loss_a7[1]
 
 
 def test_binary_focal_loss(session):
@@ -34,6 +38,16 @@ def test_lovasz_binary_crossentropy(session):
     loss2 = session.run(tk.losses.lovasz_binary_crossentropy(y_true, y_pred))
     assert loss1 == pytest.approx([0.0100503, 0.0100503], abs=1e-6), 'loss(y_true, y_true) == zeros'
     assert (loss2 > np.array([0.0100503, 0.0100503])).all(), 'loss(y_true, y_pred) > zeros'
+    # alpha
+    y_true = K.constant([[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]])
+    y_pred = K.constant([[0.0, 0.3, 0.7, 1.0], [0.0, 0.3, 0.7, 1.0]])
+    loss_na = session.run(tk.losses.lovasz_binary_crossentropy(y_true, y_pred))
+    loss_a3 = session.run(tk.losses.lovasz_binary_crossentropy(y_true, y_pred, alpha=0.3))
+    loss_a5 = session.run(tk.losses.lovasz_binary_crossentropy(y_true, y_pred, alpha=0.5))
+    loss_a7 = session.run(tk.losses.lovasz_binary_crossentropy(y_true, y_pred, alpha=0.7))
+    assert loss_na == pytest.approx(loss_a5, abs=1e-6)
+    assert loss_a3[0] > loss_a7[0]
+    assert loss_a3[1] < loss_a7[1]
 
 
 def test_lovasz_softmax(session):
