@@ -176,7 +176,12 @@ class Conv2DEx(keras.layers.Layer):
         self.moving_variance = None
 
     def compute_output_shape(self, input_shape):
-        return input_shape
+        assert len(input_shape) == 4
+        input_shape = list(input_shape)
+        input_shape[1] = (input_shape[1] + input_shape[1] % self.strides[0]) // self.strides[0]
+        input_shape[2] = (input_shape[2] + input_shape[2] % self.strides[1]) // self.strides[1]
+        input_shape[-1] = self.filters
+        return tuple(input_shape)
 
     def build(self, input_shape):
         if input_shape[-1] is None:
@@ -612,7 +617,7 @@ class GroupNormalization(keras.layers.Layer):
         self.beta = None
 
     def build(self, input_shape):
-        dim = input_shape[-1]
+        dim = int(input_shape[-1])
         assert dim is None or dim % self.groups == 0
         shape = (dim,)
         if self.scale:
@@ -661,6 +666,9 @@ class GroupNormalization(keras.layers.Layer):
             x = x * self.gamma
         if self.center:
             x = x + self.beta
+        # tf.keras用workaround
+        if hasattr(x, 'set_shape'):
+            x.set_shape(K.int_shape(inputs))
         return x
 
     def get_config(self):
@@ -783,10 +791,13 @@ class ParallelGridPooling2D(keras.layers.Layer):
         int_shape = K.int_shape(inputs)
         rh, rw = self.pool_size
         b, h, w, c = shape[0], shape[1], shape[2], int_shape[3]
-        inputs = K.reshape(inputs, (b, h // rh, rh, w // rw, rw, c))
-        inputs = tf.transpose(a=inputs, perm=(2, 4, 0, 1, 3, 5))
-        inputs = K.reshape(inputs, (rh * rw * b, h // rh, w // rw, c))
-        return inputs
+        outputs = K.reshape(inputs, (b, h // rh, rh, w // rw, rw, c))
+        outputs = tf.transpose(a=outputs, perm=(2, 4, 0, 1, 3, 5))
+        outputs = K.reshape(outputs, (rh * rw * b, h // rh, w // rw, c))
+        # tf.keras用workaround
+        if hasattr(outputs, 'set_shape'):
+            outputs.set_shape(self.compute_output_shape(int_shape))
+        return outputs
 
     def get_config(self):
         config = {'pool_size': self.pool_size}
@@ -809,9 +820,12 @@ class ParallelGridGather(keras.layers.Layer):
         shape = K.shape(inputs)
         b = shape[0]
         gather_shape = K.concatenate([[self.r, b // self.r], shape[1:]], axis=0)
-        inputs = K.reshape(inputs, gather_shape)
-        inputs = K.mean(inputs, axis=0)
-        return inputs
+        outputs = K.reshape(inputs, gather_shape)
+        outputs = K.mean(outputs, axis=0)
+        # tf.keras用workaround
+        if hasattr(outputs, 'set_shape'):
+            outputs.set_shape(K.int_shape(inputs))
+        return outputs
 
     def get_config(self):
         config = {'r': self.r}
@@ -861,7 +875,11 @@ class WSConv2D(keras.layers.Layer):
 
     def compute_output_shape(self, input_shape):
         assert len(input_shape) == 4
-        return input_shape
+        input_shape = list(input_shape)
+        input_shape[1] = (input_shape[1] + input_shape[1] % self.strides[0]) // self.strides[0]
+        input_shape[2] = (input_shape[2] + input_shape[2] % self.strides[1]) // self.strides[1]
+        input_shape[-1] = self.filters
+        return tuple(input_shape)
 
     def build(self, input_shape):
         in_filters = int(input_shape[-1])
@@ -956,7 +974,7 @@ class OctaveConv2D(keras.layers.Layer):
 
         output_l = ll + hl
         output_h = hh + lh
-        return output_l, output_h
+        return [output_l, output_h]
 
     def get_config(self):
         config = {

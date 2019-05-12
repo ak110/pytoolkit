@@ -5,8 +5,15 @@ import pytest
 import pytoolkit as tk
 
 
+@pytest.mark.usefixtures('session')
+def test_Preprocess():
+    X = np.array([[[[0, 127.5, 255]]]])
+    y = np.array([[[[-1, 0, +1]]]])
+    assert _predict_layer(tk.layers.Preprocess(), X) == pytest.approx(y)
+
+
 @pytest.mark.parametrize('color', ['rgb', 'lab', 'hsv', 'yuv', 'ycbcr', 'hed', 'yiq'])
-def test_convert_color(session, color):
+def test_ConvertColor(session, color):
     import skimage.color
 
     rgb = np.array([
@@ -35,31 +42,24 @@ def test_convert_color(session, color):
 
 
 @pytest.mark.usefixtures('session')
-def test_depth_to_space():
-    X = np.array([[
-        [[11, 21, 12, 22], [31, 41, 32, 42]],
-        [[13, 23, 14, 24], [33, 43, 34, 44]],
-    ]], dtype=np.float32)
-    y = np.array([[
-        [[11], [21], [31], [41]],
-        [[12], [22], [32], [42]],
-        [[13], [23], [33], [43]],
-        [[14], [24], [34], [44]],
-    ]], dtype=np.float32)
+def test_Conv2DEx():
+    _predict_layer(tk.layers.Conv2DEx(4), np.zeros((1, 8, 8, 3)))
 
-    x = inputs = tk.keras.layers.Input(shape=(2, 2, 4))
-    x = tk.layers.SubpixelConv2D(scale=2)(x)
-    model = tk.keras.models.Model(inputs, x)
-    assert model.predict(X) == pytest.approx(y)
+
+@pytest.mark.usefixtures('session')
+def test_Pad2D():
+    assert _predict_layer(tk.layers.Pad2D(1), np.zeros((1, 8, 8, 3))).shape == (1, 10, 10, 3)
+
+
+@pytest.mark.usefixtures('session')
+def test_PadChannel2D():
+    assert _predict_layer(tk.layers.PadChannel2D(filters=4), np.zeros((1, 8, 8, 3))).shape == (1, 8, 8, 3 + 4)
 
 
 @pytest.mark.usefixtures('session')
 def test_coord_channel_2d():
-    x = inputs = tk.keras.layers.Input(shape=(4, 4, 1))
-    x = tk.layers.CoordChannel2D()(x)
-    model = tk.keras.models.Model(inputs, x)
-    assert model.output_shape == (None, 4, 4, 3)
-    assert model.predict(np.zeros((1, 4, 4, 1))) == pytest.approx(np.array([[
+    X = np.zeros((1, 4, 4, 1))
+    y = np.array([[
         [
             [0, 0.00, 0.00],
             [0, 0.25, 0.00],
@@ -84,7 +84,21 @@ def test_coord_channel_2d():
             [0, 0.50, 0.75],
             [0, 0.75, 0.75],
         ],
-    ]]))
+    ]])
+    assert _predict_layer(tk.layers.CoordChannel2D(), X) == pytest.approx(y)
+
+
+@pytest.mark.usefixtures('session')
+def test_ChannelPair2D():
+    _predict_layer(tk.layers.ChannelPair2D(), np.zeros((1, 8, 8, 3)))
+
+
+@pytest.mark.usefixtures('session')
+def test_GroupNormalization():
+    _predict_layer(tk.layers.GroupNormalization(), np.zeros((1, 8, 8, 32)))
+    _predict_layer(tk.layers.GroupNormalization(), np.zeros((1, 8, 8, 64)))
+    _predict_layer(tk.layers.GroupNormalization(), np.zeros((1, 8, 8, 8, 32)))
+    _predict_layer(tk.layers.GroupNormalization(), np.zeros((1, 8, 8, 8, 64)))
 
 
 @pytest.mark.usefixtures('session')
@@ -101,3 +115,66 @@ def test_mixfeat():
     assert model.predict(X) == pytest.approx(X)
     model.compile('sgd', loss='mse')
     model.fit(X, X, batch_size=3, epochs=1)
+
+
+@pytest.mark.usefixtures('session')
+def test_DropActivation():
+    _predict_layer(tk.layers.DropActivation(), np.zeros((1, 8, 8, 3)))
+
+
+@pytest.mark.usefixtures('session')
+def test_ParallelGridPooling2D():
+    layer = tk.keras.models.Sequential([
+        tk.layers.ParallelGridPooling2D(),
+        tk.layers.ParallelGridGather(r=2 * 2),
+    ])
+    assert _predict_layer(layer, np.zeros((1, 8, 8, 3))).shape == (1, 4, 4, 3)
+
+
+@pytest.mark.usefixtures('session')
+def test_SubpixelConv2D():
+    X = np.array([[
+        [[11, 21, 12, 22], [31, 41, 32, 42]],
+        [[13, 23, 14, 24], [33, 43, 34, 44]],
+    ]], dtype=np.float32)
+    y = np.array([[
+        [[11], [21], [31], [41]],
+        [[12], [22], [32], [42]],
+        [[13], [23], [33], [43]],
+        [[14], [24], [34], [44]],
+    ]], dtype=np.float32)
+
+    assert _predict_layer(tk.layers.SubpixelConv2D(scale=2), X) == pytest.approx(y)
+
+
+@pytest.mark.usefixtures('session')
+def test_WSConv2D():
+    _predict_layer(tk.layers.WSConv2D(filters=2), np.zeros((1, 8, 8, 3)))
+
+
+@pytest.mark.usefixtures('session')
+def test_OctaveConv2D():
+    X = [np.zeros((1, 4, 4, 8)), np.zeros((1, 8, 8, 8))]
+    _predict_layer(tk.layers.OctaveConv2D(filters=4), X)
+
+
+@pytest.mark.usefixtures('session')
+def test_BlurPooling2D():
+    _predict_layer(tk.layers.BlurPooling2D(), np.zeros((1, 8, 8, 3)))
+
+
+def _predict_layer(layer, X):
+    """単一のレイヤーのModelを作って予測を行う。"""
+    if isinstance(X, list):
+        inputs = [tk.keras.layers.Input(shape=x.shape[1:]) for x in X]
+    else:
+        inputs = tk.keras.layers.Input(shape=X.shape[1:])
+    model = tk.keras.models.Model(inputs=inputs, outputs=layer(inputs))
+    outputs = model.predict(X)
+    if isinstance(outputs, list):
+        assert isinstance(model.output_shape, list)
+        for o, os in zip(outputs, model.output_shape):
+            assert o.shape == (1,) + os[1:]
+    else:
+        assert outputs.shape == (1,) + model.output_shape[1:]
+    return outputs
