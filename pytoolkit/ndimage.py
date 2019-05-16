@@ -108,11 +108,14 @@ def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], 
             assert img.dtype == np.uint8, f'{suffix} dtype error: {img.dtype}'
         else:
             # PILで読み込む
-            with PIL.Image.open(path_or_array) as pil_img:
-                target_mode = 'L' if grayscale else 'RGB'
-                if pil_img.mode != target_mode:
-                    pil_img = pil_img.convert(target_mode)
-                img = np.asarray(pil_img, dtype=np.uint8)
+            try:
+                with PIL.Image.open(path_or_array) as pil_img:
+                    target_mode = 'L' if grayscale else 'RGB'
+                    if pil_img.mode != target_mode:
+                        pil_img = pil_img.convert(target_mode)
+                    img = np.asarray(pil_img, dtype=np.uint8)
+            except BaseException as e:
+                raise ValueError(f'Image load failed: {path_or_array}') from e
 
     if img is None:
         raise ValueError(f'Image load failed: {path_or_array}')
