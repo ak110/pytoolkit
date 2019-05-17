@@ -1,18 +1,33 @@
 # pylint: skip-file
 
-
-import sys
 import tensorflow as tf
 
-# kerasがimport済みならkeras、でなくばtf.kerasを使用
-if 'keras' in sys.modules:
-    import keras
-else:
-    keras = tf.keras
-K = keras.backend
 
-# その他のimport
+def _use_tf_keras():
+    """Trueならtf.keras、Falseならkerasを使う。"""
+    import os
+    backend = os.environ.get('PYTOOLKIT_BACKEND', None)
+    if backend == 'tf':
+        return True
+    elif backend == 'keras':
+        return False
+    else:
+        import sys
+        if 'keras' in sys.modules:
+            return False
+        return True
+
+
 if True:
+    # tf.keras or keras
+    if _use_tf_keras():
+        keras = tf.keras
+    else:
+        print('Using native Keras.')
+        import keras
+    K = keras.backend
+
+    # その他のimport
     from . import autoaugment
     from . import backend
     from . import cache

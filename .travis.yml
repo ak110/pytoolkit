@@ -2,7 +2,7 @@ language: python
 cache: pip
 
 python:
-  - "3.6"
+  - "3.7"
 
 env:
   global:
@@ -18,3 +18,4 @@ script:
   - test "$(autopep8 --recursive --diff .)" = ""
   - pylint --jobs=4 pytoolkit *.py
   - pytest
+  - env PYTOOLKIT_BACKEND=keras pytest

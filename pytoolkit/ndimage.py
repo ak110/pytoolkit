@@ -16,6 +16,7 @@ import cv2
 import numpy as np
 import PIL.Image
 import scipy.stats
+import sklearn.utils
 
 from . import log, utils
 
@@ -609,6 +610,31 @@ def erase_random(rgb, rand: np.random.RandomState, bboxes=None, scale_low=0.02, 
         break
 
     return rgb
+
+
+def mixup(sample1, sample2, rand=None):
+    """mixup。 <https://arxiv.org/abs/1710.09412>"""
+    rand = sklearn.utils.check_random_state(rand)
+    r = np.float32(rand.beta(0.2, 0.2))
+    return mix_data(sample1, sample2, r)
+
+
+def mix_data(sample1, sample2, r):
+    """mixup用に入力や出力を混ぜる処理。rはsample1側に掛ける率。"""
+    if isinstance(sample1, tuple):
+        assert isinstance(sample2, tuple)
+        assert len(sample1) == len(sample2)
+        return tuple(mix_data(s1, s2, r) for s1, s2 in zip(sample1, sample2))
+    elif isinstance(sample1, list):
+        assert isinstance(sample2, list)
+        assert len(sample1) == len(sample2)
+        return [mix_data(s1, s2, r) for s1, s2 in zip(sample1, sample2)]
+    elif isinstance(sample1, dict):
+        assert isinstance(sample2, dict)
+        assert tuple(sample1.keys()) == tuple(sample2.keys())
+        return {k: mix_data(sample1[k], sample2[k], r) for k in sample1}
+    else:
+        return sample1 * r + sample2 * (1 - r)
 
 
 def mask_to_onehot(rgb, class_colors, append_bg=False):
