@@ -868,8 +868,8 @@ class WSConv2D(keras.layers.Layer):
     def __init__(self, filters, kernel_size=3, strides=1, activation=None, **kwargs):
         super().__init__(**kwargs)
         self.filters = filters
-        self.kernel_size = kernel_size if isinstance(kernel_size, tuple) else (kernel_size, kernel_size)
-        self.strides = strides if isinstance(strides, tuple) else (strides, strides)
+        self.kernel_size = _normalize_tuple(kernel_size, 2)
+        self.strides = _normalize_tuple(strides, 2)
         self.activation = keras.activations.get(activation)
         self.kernel = None
 
@@ -919,7 +919,7 @@ class OctaveConv2D(keras.layers.Layer):
         super().__init__(**kwargs)
         self.filters = filters
         self.alpha = alpha
-        self.strides = strides if isinstance(strides, tuple) else (strides, strides)
+        self.strides = _normalize_tuple(strides, 2)
         self.filters_l = int(self.filters * self.alpha)
         self.filters_h = self.filters - self.filters_l
         self.kernel_ll = None
@@ -992,7 +992,7 @@ class BlurPooling2D(keras.layers.Layer):
     def __init__(self, taps=5, strides=2, **kwargs):
         super().__init__(**kwargs)
         self.taps = taps
-        self.strides = strides if isinstance(strides, tuple) else (strides, strides)
+        self.strides = _normalize_tuple(strides, 2)
 
     def compute_output_shape(self, input_shape):
         assert len(input_shape) == 4
@@ -1025,3 +1025,8 @@ class BlurPooling2D(keras.layers.Layer):
         }
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
+
+
+def _normalize_tuple(value, n):
+    """keras.utils.normalize_tupleのようなもの。(バージョンにより場所が変わったりするので自作しといちゃう)"""
+    return (value,) * n if isinstance(value, int) else tuple(value)
