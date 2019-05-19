@@ -3,7 +3,7 @@ import pathlib
 import typing
 
 import numpy as np
-import sklearn.externals.joblib as joblib
+import joblib
 
 from . import hvd, layers, losses, metrics, models, networks
 from .. import applications, image, jsonex, log, math, ndimage, utils

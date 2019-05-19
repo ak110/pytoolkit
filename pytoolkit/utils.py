@@ -129,15 +129,6 @@ def trange(*args, **kwargs):
     return tqdm(list(range(*args)), **kwargs)
 
 
-def delayed(fn):
-    """joblib.delayedのDeprecationWarning対策。"""
-    import sklearn.externals.joblib as joblib
-    if distutils.version.LooseVersion(joblib.__version__) >= distutils.version.LooseVersion('0.12'):
-        return joblib.delayed(fn)
-    else:
-        return joblib.delayed(fn, check_pickle=False)
-
-
 def better_exceptions():
     """better_exceptionsを有効にする。"""
     try:

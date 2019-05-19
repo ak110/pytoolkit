@@ -3,7 +3,7 @@ import abc
 import pathlib
 
 import numpy as np
-import sklearn.externals.joblib as joblib
+import joblib
 
 from . import dl, log, ml, utils
 

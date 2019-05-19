@@ -1,7 +1,7 @@
 import pathlib
 
 import numpy as np
-import sklearn.externals.joblib as joblib
+import joblib
 
 import pytoolkit as tk
 

@@ -5,7 +5,7 @@ import os
 import time
 
 import numpy as np
-import sklearn.externals.joblib as joblib
+import joblib
 import sklearn.utils
 
 from . import data_utils, utils
@@ -160,7 +160,7 @@ class Generator(SimpleGenerator):
         cpu_count = os.cpu_count()
         worker_count = min(ctx.batch_size, cpu_count * 3)
         with joblib.Parallel(n_jobs=worker_count, backend='threading') as parallel:
-            _work = utils.delayed(self._work)
+            _work = joblib.delayed(self._work)
             for indices, seeds in self._flow_batch(ctx):
                 batch = [_work(ix, seed, ctx) for ix, seed in zip(indices, seeds)]
                 rx, ry, rw = zip(*parallel(batch))
