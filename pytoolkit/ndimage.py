@@ -434,6 +434,7 @@ def posterize(rgb: np.ndarray, bits) -> np.ndarray:
 def geometric_transform(rgb, output_width, output_height,
                         flip_h=False, flip_v=False, degrees=0,
                         scale_h=1.0, scale_v=1.0, pos_h=0.5, pos_v=0.5,
+                        translate_h=0.0, translate_v=0.0,
                         interp='lanczos', border_mode='edge'):
     """透視変換。
 
@@ -448,6 +449,8 @@ def geometric_transform(rgb, output_width, output_height,
         scale_v (float, optional): Defaults to 1.0. 垂直方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
         pos_h (float, optional): Defaults to 0.5. スケール変換に伴う水平位置。0で左端、0.5で中央、1で右端。
         pos_v (float, optional): Defaults to 0.5. スケール変換に伴う垂直位置。0で上端、0.5で中央、1で下端。
+        translate_h (float, optional): Defaults to 0.0. 変形元を水平にずらす量。-0.125なら12.5%左にずらし、+0.125なら12.5%右にずらす。
+        translate_v (float, optional): Defaults to 0.0. 変形元を垂直にずらす量。-0.125なら12.5%上にずらし、+0.125なら12.5%下にずらす。
         interp (str, optional): Defaults to 'lanczos'. 補間方法。'nearest', 'bilinear', 'bicubic', 'lanczos'。縮小時は自動的にcv2.INTER_AREA。
         border_mode (str, optional): Defaults to 'edge'. パディング方法。'edge', 'reflect', 'wrap'
 
@@ -457,14 +460,16 @@ def geometric_transform(rgb, output_width, output_height,
     """
     m = compute_perspective(rgb.shape[1], rgb.shape[0], output_width, output_height,
                             flip_h=flip_h, flip_v=flip_v, degrees=degrees,
-                            scale_h=scale_h, scale_v=scale_v, pos_h=pos_h, pos_v=pos_v)
+                            scale_h=scale_h, scale_v=scale_v, pos_h=pos_h, pos_v=pos_v,
+                            translate_h=translate_h, translate_v=translate_v)
     rgb = perspective_transform(rgb, output_width, output_height, m, interp=interp, border_mode=border_mode)
     return rgb
 
 
 def compute_perspective(input_width, input_height, output_width, output_height,
                         flip_h=False, flip_v=False, degrees=0,
-                        scale_h=1.0, scale_v=1.0, pos_h=0.5, pos_v=0.5):
+                        scale_h=1.0, scale_v=1.0, pos_h=0.5, pos_v=0.5,
+                        translate_h=0.0, translate_v=0.0):
     """透視変換の変換行列を作成。
 
     Args:
@@ -479,6 +484,8 @@ def compute_perspective(input_width, input_height, output_width, output_height,
         scale_v (float, optional): Defaults to 1.0. 垂直方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
         pos_h (float, optional): Defaults to 0.5. スケール変換に伴う水平位置。0で左端、0.5で中央、1で右端。
         pos_v (float, optional): Defaults to 0.5. スケール変換に伴う垂直位置。0で上端、0.5で中央、1で下端。
+        translate_h (float, optional): Defaults to 0.0. 変形元を水平にずらす量。-0.125なら12.5%左にずらし、+0.125なら12.5%右にずらす。
+        translate_v (float, optional): Defaults to 0.0. 変形元を垂直にずらす量。-0.125なら12.5%上にずらし、+0.125なら12.5%下にずらす。
 
     Returns:
         tuple: rgb, m 変換後画像と変換行列
@@ -492,6 +499,9 @@ def compute_perspective(input_width, input_height, output_width, output_height,
         dst_points = dst_points[[1, 0, 3, 2]]
     if flip_v:
         dst_points = dst_points[[3, 2, 1, 0]]
+    # 移動
+    src_points[:, 0] -= translate_h
+    src_points[:, 1] -= translate_v
     # 回転
     theta = degrees * np.pi * 2 / 360
     c, s = np.cos(theta), np.sin(theta)

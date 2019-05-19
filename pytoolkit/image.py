@@ -175,7 +175,7 @@ class RandomTransform(DualTransform):
     """Flip, Scale, Resize, Rotateをまとめて処理。"""
 
     def __init__(self, width, height, flip_h=True, flip_v=False,
-                 translate_h=0.25, translate_v=0.25,
+                 translate_h=0.125, translate_v=0.125,
                  scale_prob=0.5, scale_range=(2 / 3, 3 / 2), base_scale=1.0,
                  aspect_prob=0.5, aspect_range=(3 / 4, 4 / 3),
                  rotate_prob=0.25, rotate_range=(-15, +15),
@@ -198,33 +198,37 @@ class RandomTransform(DualTransform):
         self.interp = interp
         self.border_mode = border_mode
 
-    def apply(self, image, flip_h, flip_v, scale_h, scale_v, degrees, pos_h, pos_v, **params):
+    def apply(self, image, flip_h, flip_v, scale_h, scale_v, degrees, pos_h, pos_v, translate_h, translate_v, **params):
         m = ndimage.compute_perspective(image.shape[1], image.shape[0], self.width, self.height,
                                         flip_h=flip_h, flip_v=flip_v,
                                         scale_h=scale_h, scale_v=scale_v,
-                                        degrees=degrees, pos_h=pos_h, pos_v=pos_v)
+                                        degrees=degrees, pos_h=pos_h, pos_v=pos_v,
+                                        translate_h=translate_h, translate_v=translate_v)
         return ndimage.perspective_transform(image, self.width, self.height, m,
                                              interp=self.interp, border_mode=self.border_mode)
 
-    def apply_to_bbox(self, bbox, image, flip_h, flip_v, scale_h, scale_v, degrees, pos_h, pos_v, **params):
+    def apply_to_bbox(self, bbox, image, flip_h, flip_v, scale_h, scale_v, degrees, pos_h, pos_v, translate_h, translate_v, **params):
         m = ndimage.compute_perspective(image.shape[1], image.shape[0], self.width, self.height,
                                         flip_h=flip_h, flip_v=flip_v,
                                         scale_h=scale_h, scale_v=scale_v,
-                                        degrees=degrees, pos_h=pos_h, pos_v=pos_v)
+                                        degrees=degrees, pos_h=pos_h, pos_v=pos_v,
+                                        translate_h=translate_h, translate_v=translate_v)
         raise ndimage.transform_points(bbox, m)
 
-    def apply_to_keypoint(self, keypoint, image, flip_h, flip_v, scale_h, scale_v, degrees, pos_h, pos_v, **params):
+    def apply_to_keypoint(self, keypoint, image, flip_h, flip_v, scale_h, scale_v, degrees, pos_h, pos_v, translate_h, translate_v, **params):
         m = ndimage.compute_perspective(image.shape[1], image.shape[0], self.width, self.height,
                                         flip_h=flip_h, flip_v=flip_v,
                                         scale_h=scale_h, scale_v=scale_v,
-                                        degrees=degrees, pos_h=pos_h, pos_v=pos_v)
+                                        degrees=degrees, pos_h=pos_h, pos_v=pos_v,
+                                        translate_h=translate_h, translate_v=translate_v)
         raise ndimage.transform_points(keypoint, m)
 
     def get_params(self, **data):
         scale = self.base_scale * np.exp(data['rand'].uniform(np.log(self.scale_range[0]), np.log(self.scale_range[1]))) if data['rand'].rand() <= self.scale_prob else self.base_scale
         ar = np.exp(data['rand'].uniform(np.log(self.aspect_range[0]), np.log(self.aspect_range[1]))) if data['rand'].rand() <= self.aspect_prob else 1.0
-        pos_h = data['rand'].uniform(0 - self.translate_h / 2, 1 + self.translate_h / 2)
-        pos_v = data['rand'].uniform(0 - self.translate_v / 2, 1 + self.translate_v / 2)
+        pos_h, pos_v = data['rand'].uniform(0, 1, size=2)
+        translate_h = data['rand'].uniform(-self.translate_h, self.translate_h)
+        translate_v = data['rand'].uniform(-self.translate_v, self.translate_v)
         return {
             'flip_h': self.flip_h and data['rand'].rand() <= 0.5,
             'flip_v': self.flip_v and data['rand'].rand() <= 0.5,
@@ -233,6 +237,8 @@ class RandomTransform(DualTransform):
             'degrees': data['rand'].uniform(self.rotate_range[0], self.rotate_range[1]) if data['rand'].rand() <= self.rotate_prob else 0,
             'pos_h': pos_h,
             'pos_v': pos_v,
+            'translate_h': translate_h,
+            'translate_v': translate_v,
         }
 
 
