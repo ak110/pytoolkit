@@ -4,7 +4,7 @@ import hashlib
 import inspect
 import pathlib
 
-import sklearn.externals.joblib as joblib
+import joblib
 
 from . import hvd, log
 
