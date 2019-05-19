@@ -145,7 +145,7 @@ class RandomRotate(DualTransform):
     """回転。"""
 
     def __init__(self, degrees=15, expand=True, border_mode='edge', always_apply=False, p=.5):
-        super().__init__(always_apply, p)
+        super().__init__(always_apply=always_apply, p=p)
         self.degrees = degrees
         self.expand = expand
         self.border_mode = border_mode
@@ -175,16 +175,19 @@ class RandomTransform(DualTransform):
     """Flip, Scale, Resize, Rotateをまとめて処理。"""
 
     def __init__(self, width, height, flip_h=True, flip_v=False,
+                 translate_h=0.25, translate_v=0.25,
                  scale_prob=0.5, scale_range=(2 / 3, 3 / 2),
                  aspect_prob=0.5, aspect_range=(3 / 4, 4 / 3),
                  rotate_prob=0.25, rotate_range=(-15, +15),
                  interp='lanczos', border_mode='edge',
                  always_apply=False, p=1):
-        super().__init__(always_apply, p)
+        super().__init__(always_apply=always_apply, p=p)
         self.width = width
         self.height = height
         self.flip_h = flip_h
         self.flip_v = flip_v
+        self.translate_h = translate_h
+        self.translate_v = translate_v
         self.scale_prob = scale_prob
         self.scale_range = scale_range
         self.aspect_prob = aspect_prob
@@ -219,7 +222,8 @@ class RandomTransform(DualTransform):
     def get_params(self, **data):
         scale = np.exp(data['rand'].uniform(np.log(self.scale_range[0]), np.log(self.scale_range[1]))) if data['rand'].rand() <= self.scale_prob else 1.0
         ar = np.exp(data['rand'].uniform(np.log(self.aspect_range[0]), np.log(self.aspect_range[1]))) if data['rand'].rand() <= self.aspect_prob else 1.0
-        pos_h, pos_v = data['rand'].uniform(0, 1, size=2)
+        pos_h = data['rand'].uniform(0 - self.translate_h / 2, 1 + self.translate_h / 2)
+        pos_v = data['rand'].uniform(0 - self.translate_v / 2, 1 + self.translate_v / 2)
         return {
             'flip_h': self.flip_h and data['rand'].rand() <= 0.5,
             'flip_v': self.flip_v and data['rand'].rand() <= 0.5,
@@ -273,7 +277,7 @@ class GaussNoise(ImageOnlyTransform):
     """ガウシアンノイズ。"""
 
     def __init__(self, scale=5, always_apply=False, p=.5):
-        super().__init__(always_apply, p)
+        super().__init__(always_apply=always_apply, p=p)
         self.scale = scale
 
     def apply(self, image, **params):
@@ -284,7 +288,7 @@ class RandomBlur(ImageOnlyTransform):
     """ぼかし。"""
 
     def __init__(self, radius=0.75, always_apply=False, p=.5):
-        super().__init__(always_apply, p)
+        super().__init__(always_apply=always_apply, p=p)
         self.radius = radius
 
     def apply(self, image, **params):
@@ -295,7 +299,7 @@ class RandomUnsharpMask(ImageOnlyTransform):
     """シャープ化。"""
 
     def __init__(self, sigma=0.5, min_alpha=1, max_alpha=2, always_apply=False, p=.5):
-        super().__init__(always_apply, p)
+        super().__init__(always_apply=always_apply, p=p)
         self.sigma = sigma
         self.min_alpha = min_alpha
         self.max_alpha = max_alpha
@@ -308,7 +312,7 @@ class RandomBrightness(ImageOnlyTransform):
     """明度の変更。"""
 
     def __init__(self, shift=32, always_apply=False, p=.5):
-        super().__init__(always_apply, p)
+        super().__init__(always_apply=always_apply, p=p)
         self.shift = shift
 
     def apply(self, image, **params):
@@ -319,7 +323,7 @@ class RandomContrast(ImageOnlyTransform):
     """コントラストの変更。"""
 
     def __init__(self, var=0.25, always_apply=False, p=.5):
-        super().__init__(always_apply, p)
+        super().__init__(always_apply=always_apply, p=p)
         self.var = var
 
     def apply(self, image, **params):
@@ -330,7 +334,7 @@ class RandomSaturation(ImageOnlyTransform):
     """彩度の変更。"""
 
     def __init__(self, var=0.5, always_apply=False, p=.5):
-        super().__init__(always_apply, p)
+        super().__init__(always_apply=always_apply, p=p)
         self.var = var
 
     def apply(self, image, **params):
@@ -341,7 +345,7 @@ class RandomHue(ImageOnlyTransform):
     """色相の変更。"""
 
     def __init__(self, var=1 / 16, shift=8, always_apply=False, p=.5):
-        super().__init__(always_apply, p)
+        super().__init__(always_apply=always_apply, p=p)
         self.var = var
         self.shift = shift
 
@@ -403,7 +407,7 @@ class RandomAlpha(ImageOnlyTransform):
     """画像の一部にランダムな色の半透明の矩形を描画する。"""
 
     def __init__(self, alpha=0.125, scale_low=0.02, scale_high=0.4, rate_1=1 / 3, rate_2=3, max_tries=30, always_apply=False, p=.5):
-        super().__init__(always_apply, p)
+        super().__init__(always_apply=always_apply, p=p)
         assert scale_low <= scale_high
         assert rate_1 <= rate_2
         self.alpha = alpha
@@ -431,7 +435,7 @@ class RandomErasing(ImageOnlyTransform):
     """
 
     def __init__(self, scale_low=0.02, scale_high=0.4, rate_1=1 / 3, rate_2=3, object_aware=False, object_aware_prob=0.5, max_tries=30, always_apply=False, p=.5):
-        super().__init__(always_apply, p)
+        super().__init__(always_apply=always_apply, p=p)
         assert scale_low <= scale_high
         assert rate_1 <= rate_2
         self.scale_low = scale_low
@@ -497,7 +501,7 @@ class RandomBinarize(ImageOnlyTransform):
     """ランダム2値化(白黒化)。"""
 
     def __init__(self, threshold_min=128 - 32, threshold_max=128 + 32, always_apply=False, p=.5):
-        super().__init__(always_apply, p)
+        super().__init__(always_apply=always_apply, p=p)
         assert 0 < threshold_min < 255
         assert 0 < threshold_max < 255
         assert threshold_min < threshold_max

@@ -134,8 +134,8 @@ class Affine(A.ImageOnlyTransform):
     def apply(self, image, **params):
         shear_x = float_parameter(self.shear_x_mag, 0.3, flip_sign=True)
         shear_y = float_parameter(self.shear_y_mag, 0.3, flip_sign=True)
-        translate_x = float_parameter(self.translate_x_mag, 150 / 331, flip_sign=True)
-        translate_y = float_parameter(self.translate_y_mag, 150 / 331, flip_sign=True)
+        translate_x = float_parameter(self.translate_x_mag, 150 / 331, flip_sign=True) * image.shape[1]
+        translate_y = float_parameter(self.translate_y_mag, 150 / 331, flip_sign=True) * image.shape[0]
         image = PIL.Image.fromarray(image, mode='RGB')
         data = (1, shear_x, translate_x, shear_y, 1, translate_y)
         return np.asarray(image.transform(image.size, PIL.Image.AFFINE, data, PIL.Image.BICUBIC, fillcolor=(128, 128, 128)), dtype=np.uint8)
@@ -302,6 +302,7 @@ class Sharpness(A.ImageOnlyTransform):
 
 def float_parameter(level, maxval, flip_sign=False):
     """0～maxvalへの変換。"""
+    assert 0 <= level <= 9
     value = float(level) * maxval / 10
     if flip_sign and np.random.random() < 0.5:
         value = -value
@@ -310,6 +311,7 @@ def float_parameter(level, maxval, flip_sign=False):
 
 def int_parameter(level, maxval, flip_sign=False):
     """0～maxvalへの変換。"""
+    assert 0 <= level <= 9
     value = int(level * maxval / 10)
     if flip_sign and np.random.random() < 0.5:
         value = -value
