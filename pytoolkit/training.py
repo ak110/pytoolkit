@@ -41,9 +41,9 @@ def train(model: keras.models.Model, train_dataset: data.Dataset, val_dataset: d
     models.fit(model, train_dataset, validation_data=val_dataset, batch_size=batch_size, **kwargs)
     try:
         # 評価
-        evaluate(model, train_dataset, batch_size=batch_size * 2, prefix='', use_horovod=True)
+        evaluate(model, train_dataset, batch_size=batch_size, prefix='', use_horovod=True)
         if val_dataset:
-            evaluate(model, val_dataset, batch_size=batch_size * 2, prefix='val_', use_horovod=True)
+            evaluate(model, val_dataset, batch_size=batch_size, prefix='val_', use_horovod=True)
     finally:
         # モデルを保存
         models.save(model, model_path)
