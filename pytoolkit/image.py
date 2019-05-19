@@ -176,7 +176,7 @@ class RandomTransform(DualTransform):
 
     def __init__(self, width, height, flip_h=True, flip_v=False,
                  translate_h=0.25, translate_v=0.25,
-                 scale_prob=0.5, scale_range=(2 / 3, 3 / 2),
+                 scale_prob=0.5, scale_range=(2 / 3, 3 / 2), base_scale=1.0,
                  aspect_prob=0.5, aspect_range=(3 / 4, 4 / 3),
                  rotate_prob=0.25, rotate_range=(-15, +15),
                  interp='lanczos', border_mode='edge',
@@ -189,6 +189,7 @@ class RandomTransform(DualTransform):
         self.translate_h = translate_h
         self.translate_v = translate_v
         self.scale_prob = scale_prob
+        self.base_scale = base_scale
         self.scale_range = scale_range
         self.aspect_prob = aspect_prob
         self.aspect_range = aspect_range
@@ -220,7 +221,7 @@ class RandomTransform(DualTransform):
         raise ndimage.transform_points(keypoint, m)
 
     def get_params(self, **data):
-        scale = np.exp(data['rand'].uniform(np.log(self.scale_range[0]), np.log(self.scale_range[1]))) if data['rand'].rand() <= self.scale_prob else 1.0
+        scale = self.base_scale * np.exp(data['rand'].uniform(np.log(self.scale_range[0]), np.log(self.scale_range[1]))) if data['rand'].rand() <= self.scale_prob else self.base_scale
         ar = np.exp(data['rand'].uniform(np.log(self.aspect_range[0]), np.log(self.aspect_range[1]))) if data['rand'].rand() <= self.aspect_prob else 1.0
         pos_h = data['rand'].uniform(0 - self.translate_h / 2, 1 + self.translate_h / 2)
         pos_v = data['rand'].uniform(0 - self.translate_v / 2, 1 + self.translate_v / 2)
