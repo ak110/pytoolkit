@@ -876,8 +876,8 @@ class WSConv2D(keras.layers.Layer):
     def compute_output_shape(self, input_shape):
         assert len(input_shape) == 4
         input_shape = list(input_shape)
-        input_shape[1] = (input_shape[1] + input_shape[1] % self.strides[0]) // self.strides[0]
-        input_shape[2] = (input_shape[2] + input_shape[2] % self.strides[1]) // self.strides[1]
+        input_shape[1] = None if input_shape[1] is None else (input_shape[1] + input_shape[1] % self.strides[0]) // self.strides[0]
+        input_shape[2] = None if input_shape[2] is None else (input_shape[2] + input_shape[2] % self.strides[1]) // self.strides[1]
         input_shape[-1] = self.filters
         return tuple(input_shape)
 
