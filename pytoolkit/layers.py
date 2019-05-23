@@ -26,6 +26,7 @@ def get_custom_objects():
         WSConv2D,
         OctaveConv2D,
         BlurPooling2D,
+        ScaleGradient,
     ]
     return {c.__name__: c for c in classes}
 
@@ -399,8 +400,8 @@ class PadChannel2D(keras.layers.Layer):
     """チャンネルに対してtf.padするレイヤー。"""
 
     def __init__(self, filters, mode='constant', constant_values=0, **kwargs):
-        assert mode in ('constant', 'reflect', 'symmetric')
         super().__init__(**kwargs)
+        assert mode in ('constant', 'reflect', 'symmetric')
         self.filters = filters
         self.mode = mode
         self.constant_values = constant_values
@@ -692,8 +693,8 @@ class MixFeat(keras.layers.Layer):
     """MixFeat <https://openreview.net/forum?id=HygT9oRqFX>"""
 
     def __init__(self, sigma=0.2, **kargs):
-        self.sigma = sigma
         super().__init__(**kargs)
+        self.sigma = sigma
 
     def compute_output_shape(self, input_shape):
         return input_shape
@@ -735,9 +736,9 @@ class DropActivation(keras.layers.Layer):
     """Drop-Activation <https://arxiv.org/abs/1811.05850>"""
 
     def __init__(self, keep_rate=0.95, **kargs):
+        super().__init__(**kargs)
         assert 0 <= keep_rate < 1
         self.keep_rate = keep_rate
-        super().__init__(**kargs)
 
     def compute_output_shape(self, input_shape):
         return input_shape
@@ -1023,6 +1024,33 @@ class BlurPooling2D(keras.layers.Layer):
             'taps': self.taps,
             'strides': self.strides,
         }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
+class ScaleGradient(keras.layers.Layer):
+    """勾配だけをスケーリングするレイヤー。転移学習するときとかに。"""
+
+    def __init__(self, scale, **kargs):
+        super().__init__(**kargs)
+        self.scale = np.float32(scale)
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
+
+    def call(self, inputs, **kwargs):
+        _ = kwargs  # noqa
+
+        @tf.custom_gradient
+        def _forward(x):
+            def _backword(dx):
+                return dx * self.scale
+            return x, _backword
+
+        return _forward(inputs)
+
+    def get_config(self):
+        config = {'scale': self.scale}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
 

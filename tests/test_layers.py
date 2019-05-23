@@ -163,6 +163,12 @@ def test_BlurPooling2D():
     _predict_layer(tk.layers.BlurPooling2D(), np.zeros((1, 8, 8, 3)))
 
 
+@pytest.mark.usefixtures('session')
+def test_ScaleGradient():
+    x = np.array([[1, 2], [3, 4]])
+    assert _predict_layer(tk.layers.ScaleGradient(scale=0.1), x) == pytest.approx(x)
+
+
 def _predict_layer(layer, X):
     """単一のレイヤーのModelを作って予測を行う。"""
     if isinstance(X, list):
@@ -174,7 +180,7 @@ def _predict_layer(layer, X):
     if isinstance(outputs, list):
         assert isinstance(model.output_shape, list)
         for o, os in zip(outputs, model.output_shape):
-            assert o.shape == (1,) + os[1:]
+            assert o.shape == (len(X[0]),) + os[1:]
     else:
-        assert outputs.shape == (1,) + model.output_shape[1:]
+        assert outputs.shape == (len(X),) + model.output_shape[1:]
     return outputs
