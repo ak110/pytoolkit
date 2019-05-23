@@ -411,11 +411,11 @@ def rot90(rgb: np.ndarray, k) -> np.ndarray:
     """90度回転。"""
     assert 0 <= k <= 3
     if k == 1:
-        rgb = np.swapaxes(rgb, 0, 1)[::-1, :, :]
+        rgb = rgb.transpose(1, 0, 2)[::-1, :, :]
     elif k == 2:
         rgb = rgb[::-1, ::-1, :]
     elif k == 3:
-        rgb = np.swapaxes(rgb, 0, 1)[:, ::-1, :]
+        rgb = rgb.transpose(1, 0, 2)[:, ::-1, :]
     return rgb
 
 
