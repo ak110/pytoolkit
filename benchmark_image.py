@@ -76,7 +76,7 @@ class MyDataset(tk.data.Dataset):
     def __getitem__(self, index):
         X = tk.ndimage.load(self.X[index])
         y = tk.ndimage.load(self.y[index])
-        a = self.aug(image=X, mask=y)
+        a = self.aug(image=X, mask=y, rand=np.random.RandomState(index))
         X = a['image']
         y = a['mask']
         return X, y

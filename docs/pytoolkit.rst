@@ -24,12 +24,14 @@ Submodules
    pytoolkit.layers
    pytoolkit.log
    pytoolkit.losses
+   pytoolkit.math
    pytoolkit.metrics
    pytoolkit.ml
    pytoolkit.models
    pytoolkit.ndimage
    pytoolkit.od
    pytoolkit.optimizers
+   pytoolkit.training
    pytoolkit.utils
    pytoolkit.vis
    pytoolkit.web

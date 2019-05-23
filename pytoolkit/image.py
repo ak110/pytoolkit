@@ -1,4 +1,8 @@
-"""画像処理関連"""
+"""画像処理関連。
+
+Albumentations風インターフェースだが、seedの固定とかがしたいので独自実装。
+
+"""
 # pylint: disable=signature-differs,arguments-differ,unused-argument
 import abc
 import warnings

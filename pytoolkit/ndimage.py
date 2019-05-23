@@ -14,8 +14,8 @@ import warnings
 
 import cv2
 import numpy as np
+import numba
 import PIL.Image
-import scipy.stats
 import sklearn.utils
 
 from . import log, utils
@@ -250,6 +250,7 @@ def pad_ltrb(rgb: np.ndarray, x1: int, y1: int, x2: int, y2: int, padding='edge'
     return rgb
 
 
+@numba.njit(fastmath=True, nogil=True)
 def crop(rgb: np.ndarray, x: int, y: int, width: int, height: int) -> np.ndarray:
     """切り抜き。"""
     assert 0 <= x < rgb.shape[1]
@@ -261,11 +262,13 @@ def crop(rgb: np.ndarray, x: int, y: int, width: int, height: int) -> np.ndarray
     return rgb[y:y + height, x:x + width, :]
 
 
+@numba.njit(fastmath=True, nogil=True)
 def flip_lr(rgb: np.ndarray) -> np.ndarray:
     """左右反転。"""
     return rgb[:, ::-1, :]
 
 
+@numba.njit(fastmath=True, nogil=True)
 def flip_tb(rgb: np.ndarray) -> np.ndarray:
     """上下反転。"""
     return rgb[::-1, :, :]
@@ -346,53 +349,64 @@ def median(rgb: np.ndarray, size: int) -> np.ndarray:
 
 
 @_float_to_uint8
+@numba.njit(fastmath=True, nogil=True)
 def brightness(rgb: np.ndarray, beta: float) -> np.ndarray:
     """明度の変更。betaの例：np.random.uniform(-32, +32)"""
-    return rgb + np.float32(beta)
+    return rgb.astype(np.float32) + np.float32(beta)
 
 
 @_float_to_uint8
+@numba.njit(fastmath=True, nogil=True)
 def contrast(rgb: np.ndarray, alpha: float) -> np.ndarray:
     """コントラストの変更。alphaの例：np.random.uniform(0.75, 1.25)"""
-    return rgb * alpha
+    return rgb.astype(np.float32) * np.float32(alpha)
 
 
 @_float_to_uint8
 def saturation(rgb: np.ndarray, alpha: float) -> np.ndarray:
     """彩度の変更。alphaの例：np.random.uniform(0.5, 1.5)"""
-    gs = rgb.dot(np.array([0.299, 0.587, 0.114], dtype=np.float32))
+    rgb = rgb.astype(np.float32)
+    gs = rgb @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
     return alpha * rgb + (1 - alpha) * np.expand_dims(gs, axis=-1)
 
 
 @_float_to_uint8
+@numba.njit(fastmath=True, nogil=True)
 def hue_lite(rgb: np.ndarray, alpha: np.ndarray, beta: np.ndarray) -> np.ndarray:
     """色相の変更の適当バージョン。"""
     assert alpha.shape == (3,)
     assert beta.shape == (3,)
     assert (alpha > 0).all()
-    return rgb * (alpha / scipy.stats.hmean(alpha, dtype=np.float32)) + (beta - np.mean(beta, dtype=np.float32))
+    ma = 3 / (1 / (alpha + 1e-7)).sum()
+    mb = np.mean(beta.astype(np.float32))
+    return rgb.astype(np.float32) * (alpha / ma) + (beta - mb)
 
 
 @_float_to_uint8
+# @numba.njit(fastmath=True, nogil=True)
 def to_grayscale(rgb: np.ndarray) -> np.ndarray:
     """グレースケール化。"""
-    return rgb.dot(np.array([0.299, 0.587, 0.114], dtype=np.float32))
+    return rgb.astype(np.float32) @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
 
 
 @_float_to_uint8
+@numba.njit(fastmath=True, nogil=True)
 def standardize(rgb: np.ndarray) -> np.ndarray:
     """標準化。0～255に適当に収める。"""
-    rgb = (rgb - np.mean(rgb, dtype=np.float32)) / (np.std(rgb, dtype=np.float32) + 1e-5)
+    rgb = rgb.astype(np.float32)
+    rgb = (rgb - np.mean(rgb)) / (np.std(rgb) + 1e-5)
     rgb = rgb * 64 + 127
     return rgb
 
 
+@numba.njit(fastmath=True, nogil=True)
 def binarize(rgb: np.ndarray, threshold) -> np.ndarray:
     """二値化(白黒化)。"""
     assert 0 < threshold < 255
     return np.where(rgb >= threshold, np.uint8(255), np.uint8(0))
 
 
+@numba.njit(fastmath=True, nogil=True)
 def rot90(rgb: np.ndarray, k) -> np.ndarray:
     """90度回転。"""
     assert 0 <= k <= 3
@@ -406,16 +420,20 @@ def rot90(rgb: np.ndarray, k) -> np.ndarray:
 
 
 @_float_to_uint8
+# @numba.njit(fastmath=True, nogil=True)
 def equalize(rgb: np.ndarray) -> np.ndarray:
     """ヒストグラム平坦化。"""
-    gray = np.mean(rgb, axis=-1, keepdims=True, dtype=np.float32)
+    rgb = rgb.astype(np.float32)
+    gray = np.mean(rgb, axis=-1, keepdims=True)
     eq = np.expand_dims(cv2.equalizeHist(gray.astype(np.uint8)), axis=-1)
     return rgb + (eq - gray)
 
 
 @_float_to_uint8
+# @numba.njit(fastmath=True, nogil=True)
 def auto_contrast(rgb: np.ndarray, scale=255) -> np.ndarray:
     """オートコントラスト。"""
+    rgb = rgb.astype(np.float32)
     gray = np.mean(rgb, axis=-1)
     b, w = gray.min(), gray.max()
     if b < w:
@@ -424,11 +442,12 @@ def auto_contrast(rgb: np.ndarray, scale=255) -> np.ndarray:
 
 
 @_float_to_uint8
+# @numba.njit(fastmath=True, nogil=True)
 def posterize(rgb: np.ndarray, bits) -> np.ndarray:
     """ポスタリゼーション。"""
     assert bits in range(1, 8 + 1)
-    t = 2 ** (8 - bits) / 255
-    return np.round(rgb * t) / t
+    t = np.float32(2 ** (8 - bits) / 255)
+    return np.round(rgb.astype(np.float32) * t) / t
 
 
 def geometric_transform(rgb, output_width, output_height,
@@ -650,6 +669,7 @@ def mix_data(sample1, sample2, r):
         return sample1 * r + sample2 * (1 - r)
 
 
+@numba.njit(fastmath=True, nogil=True)
 def mask_to_onehot(rgb, class_colors, append_bg=False):
     """RGBのマスク画像をone-hot形式に変換する。
 
@@ -672,6 +692,7 @@ def mask_to_onehot(rgb, class_colors, append_bg=False):
     return result
 
 
+@numba.njit(fastmath=True, nogil=True)
 def mask_to_class(rgb, class_colors, void_class=None):
     """RGBのマスク画像をクラスIDの配列に変換する。
 
@@ -692,6 +713,7 @@ def mask_to_class(rgb, class_colors, void_class=None):
     return result
 
 
+@numba.njit(fastmath=True, nogil=True)
 def class_to_mask(classes, class_colors):
     """クラスIDの配列をRGBのマスク画像に変換する。
 

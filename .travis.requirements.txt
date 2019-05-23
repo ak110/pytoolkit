@@ -10,6 +10,7 @@ git+https://github.com/cocodataset/cocoapi.git#egg=pycocotools&subdirectory=Pyth
 h5py
 keras
 matplotlib
+numba
 numpy
 opencv-python
 pep8

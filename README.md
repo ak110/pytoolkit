@@ -13,6 +13,7 @@
 
 - Pillow
 - numpy
+- numba
 - opencv-python
 - scikit-learn
 - scipy
