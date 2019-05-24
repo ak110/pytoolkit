@@ -9,7 +9,8 @@ import pytoolkit as tk
 def test_Preprocess():
     X = np.array([[[[0, 127.5, 255]]]])
     y = np.array([[[[-1, 0, +1]]]])
-    assert _predict_layer(tk.layers.Preprocess(), X) == pytest.approx(y)
+    pred = _predict_layer(tk.layers.Preprocess(), X)
+    assert pred == pytest.approx(y)
 
 
 @pytest.mark.parametrize('color', ['rgb', 'lab', 'hsv', 'yuv', 'ycbcr', 'hed', 'yiq'])
@@ -48,12 +49,14 @@ def test_Conv2DEx():
 
 @pytest.mark.usefixtures('session')
 def test_Pad2D():
-    assert _predict_layer(tk.layers.Pad2D(1), np.zeros((1, 8, 8, 3))).shape == (1, 10, 10, 3)
+    pred = _predict_layer(tk.layers.Pad2D(1), np.zeros((1, 8, 8, 3)))
+    assert pred.shape == (1, 10, 10, 3)
 
 
 @pytest.mark.usefixtures('session')
 def test_PadChannel2D():
-    assert _predict_layer(tk.layers.PadChannel2D(filters=4), np.zeros((1, 8, 8, 3))).shape == (1, 8, 8, 3 + 4)
+    pred = _predict_layer(tk.layers.PadChannel2D(filters=4), np.zeros((1, 8, 8, 3)))
+    assert pred.shape == (1, 8, 8, 3 + 4)
 
 
 @pytest.mark.usefixtures('session')
@@ -85,7 +88,8 @@ def test_coord_channel_2d():
             [0, 0.75, 0.75],
         ],
     ]])
-    assert _predict_layer(tk.layers.CoordChannel2D(), X) == pytest.approx(y)
+    pred = _predict_layer(tk.layers.CoordChannel2D(), X)
+    assert pred == pytest.approx(y)
 
 
 @pytest.mark.usefixtures('session')
@@ -128,7 +132,8 @@ def test_ParallelGridPooling2D():
         tk.layers.ParallelGridPooling2D(),
         tk.layers.ParallelGridGather(r=2 * 2),
     ])
-    assert _predict_layer(layer, np.zeros((1, 8, 8, 3))).shape == (1, 4, 4, 3)
+    pred = _predict_layer(layer, np.zeros((1, 8, 8, 3)))
+    assert pred.shape == (1, 4, 4, 3)
 
 
 @pytest.mark.usefixtures('session')
@@ -143,8 +148,8 @@ def test_SubpixelConv2D():
         [[13], [23], [33], [43]],
         [[14], [24], [34], [44]],
     ]], dtype=np.float32)
-
-    assert _predict_layer(tk.layers.SubpixelConv2D(scale=2), X) == pytest.approx(y)
+    pred = _predict_layer(tk.layers.SubpixelConv2D(scale=2), X)
+    assert pred == pytest.approx(y)
 
 
 @pytest.mark.usefixtures('session')
@@ -160,7 +165,15 @@ def test_OctaveConv2D():
 
 @pytest.mark.usefixtures('session')
 def test_BlurPooling2D():
-    _predict_layer(tk.layers.BlurPooling2D(), np.zeros((1, 8, 8, 3)))
+    X = np.zeros((1, 5, 5, 2))
+    X[0, 2, 2, 0] = 1
+    y = np.array([[
+        [[0.09765625, 0.], [0.58593750, 0.], [0.09765625, 0.]],
+        [[0.58593750, 0.], [3.51562500, 0.], [0.58593750, 0.]],
+        [[0.09765625, 0.], [0.58593750, 0.], [0.09765625, 0.]]
+    ]])
+    pred = _predict_layer(tk.layers.BlurPooling2D(taps=5), X)
+    assert pred == pytest.approx(y, abs=1e-5)
 
 
 @pytest.mark.usefixtures('session')
