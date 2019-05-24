@@ -22,9 +22,12 @@ def load(path, custom_objects=None, compile=False, gpus=None) -> keras.models.Mo
         from . import get_custom_objects
         custom_objects = custom_objects.copy() if custom_objects else dict()
         custom_objects.update(get_custom_objects())
-        model = keras.models.load_model(str(path), custom_objects=custom_objects, compile=compile)
-        if gpus is not None:
+        if gpus is not None and gpus > 1:
+            with tf.device('/cpu:0'):
+                model = keras.models.load_model(str(path), custom_objects=custom_objects, compile=compile)
             model, _ = multi_gpu_model(model, batch_size=0, gpus=gpus)
+        else:
+            model = keras.models.load_model(str(path), custom_objects=custom_objects, compile=compile)
     return model
 
 
