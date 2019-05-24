@@ -644,10 +644,27 @@ def erase_random(rgb, rand: np.random.RandomState, bboxes=None, scale_low=0.02, 
     return rgb
 
 
-def mixup(sample1, sample2, rand=None):
-    """mixup。 <https://arxiv.org/abs/1710.09412>"""
+def mixup(sample1, sample2, rand=None, mode='beta'):
+    """mixup。 <https://arxiv.org/abs/1710.09412>
+
+    Args:
+        sample1 (tuple, list, dict or ndarray): データその1
+        sample2 (tuple, list, dict or ndarray): データその2
+        rand (None, int, or RandomState): 乱数シード
+        mode (str): 混ぜる割合の乱数の種類。'beta'ならβ分布、'uniform'なら[0, 1]の一様分布、'uniform_ex'なら[-0.366, 1.366]くらいの一様分布。
+
+    Returns:
+        tuple, list, dict or ndarray: 混ぜられたデータ。
+
+    """
     rand = sklearn.utils.check_random_state(rand)
-    r = np.float32(rand.beta(0.2, 0.2))
+    if mode == 'beta':
+        r = np.float32(rand.beta(0.2, 0.2))
+    elif mode == 'uniform':
+        r = np.float32(rand.uniform(0, 1))
+    else:
+        b = (np.sqrt(12) / 2 - 1) / 2
+        r = np.float32(rand.uniform(-b, 1 + b))
     return mix_data(sample1, sample2, r)
 
 
