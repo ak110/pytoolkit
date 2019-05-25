@@ -28,6 +28,7 @@ if True:
     K = keras.backend
 
     # その他のimport
+    from . import log
     from . import autoaugment
     from . import backend
     from . import cache
@@ -38,7 +39,6 @@ if True:
     from . import hvd
     from . import image
     from . import layers
-    from . import log
     from . import losses
     from . import math
     from . import metrics

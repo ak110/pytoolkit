@@ -6,9 +6,9 @@ import pathlib
 
 import joblib
 
-from . import hvd, log
+from .. import pytoolkit as tk
 
-_logger = log.get(__name__)
+_logger = tk.log.get(__name__)
 
 
 def memorize(cache_dir, compress=0, verbose=True):
@@ -25,14 +25,14 @@ def memorize(cache_dir, compress=0, verbose=True):
                     _logger.info(f'Cache is found: {cache_path}')
                 return joblib.load(cache_path)
             # 無ければ実処理
-            if hvd.is_local_master():
+            if tk.hvd.is_local_master():
                 if verbose:
                     _logger.info(f'Cache is not found: {cache_path}')
                 result = func(*args, **kwargs)
                 cache_path.parent.mkdir(parents=True, exist_ok=True)
                 joblib.dump(result, cache_path, compress=compress)
-            hvd.barrier()
-            if not hvd.is_local_master():
+            tk.hvd.barrier()
+            if not tk.hvd.is_local_master():
                 result = joblib.load(cache_path)
             return result
 

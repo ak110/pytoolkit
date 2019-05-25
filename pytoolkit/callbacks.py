@@ -5,9 +5,10 @@ import time
 
 import numpy as np
 
-from . import K, hvd, keras, log
+from .. import pytoolkit as tk
+from . import K, keras
 
-_logger = log.get(__name__)
+_logger = tk.log.get(__name__)
 
 
 class LearningRateStepDecay(keras.callbacks.Callback):
@@ -73,7 +74,7 @@ class TSVLogger(keras.callbacks.Callback):
         super().__init__()
         self.filename = pathlib.Path(filename)
         self.append = append
-        self.enabled = enabled if enabled is not None else hvd.is_master()
+        self.enabled = enabled if enabled is not None else tk.hvd.is_master()
         self.log_file = None
         self.log_writer = None
         self.epoch_start_time = None
@@ -119,7 +120,7 @@ class EpochLogger(keras.callbacks.Callback):
 
     def __init__(self, enabled=None):
         super().__init__()
-        self.enabled = enabled if enabled is not None else hvd.is_master()
+        self.enabled = enabled if enabled is not None else tk.hvd.is_master()
         self.train_start_time = None
         self.epoch_start_time = None
 
@@ -259,7 +260,7 @@ class Checkpoint(keras.callbacks.Callback):
 
     def on_epoch_begin(self, epoch, logs=None):
         if epoch in self.target_epochs:
-            if hvd.is_master():
+            if tk.hvd.is_master():
                 _logger.info(f'Epoch {epoch}: Saving model to {self.checkpoint_path}')
                 # 保存の真っ最中に死んだときに大丈夫なように少し気を使った処理をする。
                 # 一度.tmpに保存してから元のを.bkにリネームして.tmpを外して.bkを削除。
@@ -276,7 +277,7 @@ class Checkpoint(keras.callbacks.Callback):
                 temp_path.rename(self.checkpoint_path)
                 if backup_path.exists():
                     backup_path.unlink()
-            hvd.barrier()
+            tk.hvd.barrier()
 
 
 class ErrorOnNaN(keras.callbacks.Callback):

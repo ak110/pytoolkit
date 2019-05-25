@@ -4,7 +4,8 @@ import concurrent.futures
 
 import numpy as np
 
-from . import keras, hvd
+from .. import pytoolkit as tk
+from . import keras
 
 _THREAD_POOL = concurrent.futures.ThreadPoolExecutor()
 
@@ -80,11 +81,11 @@ class DataLoader(keras.utils.Sequence):
         self.shuffle = shuffle
         self.parallel = parallel
         self.mixup = mixup
-        self.use_horovod = use_horovod and hvd.initialized()
+        self.use_horovod = use_horovod and tk.hvd.initialized()
 
         if self.shuffle:
             # シャッフル時は常に同じバッチサイズを返せるようにする (学習時の安定性のため)
-            mp_size = hvd.get().size() if self.use_horovod else 1
+            mp_size = tk.hvd.get().size() if self.use_horovod else 1
             mp_batch_size = self.batch_size * mp_size
             self.steps_per_epoch = (len(self.dataset) + mp_batch_size - 1) // mp_batch_size
             self.index_generator = _generate_shuffled_indices(len(self.dataset))

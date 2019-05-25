@@ -10,7 +10,7 @@ import warnings
 import numpy as np
 import sklearn.utils
 
-from . import ndimage, od
+from .. import pytoolkit as tk
 
 
 class BasicTransform(metaclass=abc.ABCMeta):
@@ -162,7 +162,7 @@ class RandomRotate(DualTransform):
                 'keypoints': self.apply_to_keypoints}
 
     def apply(self, image, degrees, **params):
-        return ndimage.rotate(image, degrees, expand=self.expand, border_mode=self.border_mode)
+        return tk.ndimage.rotate(image, degrees, expand=self.expand, border_mode=self.border_mode)
 
     def apply_to_bbox(self, bbox, **params):
         raise NotImplementedError()
@@ -203,29 +203,29 @@ class RandomTransform(DualTransform):
         self.border_mode = border_mode
 
     def apply(self, image, flip_h, flip_v, scale_h, scale_v, degrees, pos_h, pos_v, translate_h, translate_v, **params):
-        m = ndimage.compute_perspective(image.shape[1], image.shape[0], self.width, self.height,
-                                        flip_h=flip_h, flip_v=flip_v,
-                                        scale_h=scale_h, scale_v=scale_v,
-                                        degrees=degrees, pos_h=pos_h, pos_v=pos_v,
-                                        translate_h=translate_h, translate_v=translate_v)
-        return ndimage.perspective_transform(image, self.width, self.height, m,
-                                             interp=self.interp, border_mode=self.border_mode)
+        m = tk.ndimage.compute_perspective(image.shape[1], image.shape[0], self.width, self.height,
+                                           flip_h=flip_h, flip_v=flip_v,
+                                           scale_h=scale_h, scale_v=scale_v,
+                                           degrees=degrees, pos_h=pos_h, pos_v=pos_v,
+                                           translate_h=translate_h, translate_v=translate_v)
+        return tk.ndimage.perspective_transform(image, self.width, self.height, m,
+                                                interp=self.interp, border_mode=self.border_mode)
 
     def apply_to_bbox(self, bbox, image, flip_h, flip_v, scale_h, scale_v, degrees, pos_h, pos_v, translate_h, translate_v, **params):
-        m = ndimage.compute_perspective(image.shape[1], image.shape[0], self.width, self.height,
-                                        flip_h=flip_h, flip_v=flip_v,
-                                        scale_h=scale_h, scale_v=scale_v,
-                                        degrees=degrees, pos_h=pos_h, pos_v=pos_v,
-                                        translate_h=translate_h, translate_v=translate_v)
-        raise ndimage.transform_points(bbox, m)
+        m = tk.ndimage.compute_perspective(image.shape[1], image.shape[0], self.width, self.height,
+                                           flip_h=flip_h, flip_v=flip_v,
+                                           scale_h=scale_h, scale_v=scale_v,
+                                           degrees=degrees, pos_h=pos_h, pos_v=pos_v,
+                                           translate_h=translate_h, translate_v=translate_v)
+        raise tk.ndimage.transform_points(bbox, m)
 
     def apply_to_keypoint(self, keypoint, image, flip_h, flip_v, scale_h, scale_v, degrees, pos_h, pos_v, translate_h, translate_v, **params):
-        m = ndimage.compute_perspective(image.shape[1], image.shape[0], self.width, self.height,
-                                        flip_h=flip_h, flip_v=flip_v,
-                                        scale_h=scale_h, scale_v=scale_v,
-                                        degrees=degrees, pos_h=pos_h, pos_v=pos_v,
-                                        translate_h=translate_h, translate_v=translate_v)
-        raise ndimage.transform_points(keypoint, m)
+        m = tk.ndimage.compute_perspective(image.shape[1], image.shape[0], self.width, self.height,
+                                           flip_h=flip_h, flip_v=flip_v,
+                                           scale_h=scale_h, scale_v=scale_v,
+                                           degrees=degrees, pos_h=pos_h, pos_v=pos_v,
+                                           translate_h=translate_h, translate_v=translate_v)
+        raise tk.ndimage.transform_points(keypoint, m)
 
     def get_params(self, **data):
         scale = self.base_scale * np.exp(data['rand'].uniform(np.log(self.scale_range[0]), np.log(self.scale_range[1]))) if data['rand'].rand() <= self.scale_prob else self.base_scale
@@ -255,7 +255,7 @@ class Resize(DualTransform):
         self.height = height
 
     def apply(self, image, **params):
-        return ndimage.resize(image, width=self.width, height=self.height)
+        return tk.ndimage.resize(image, width=self.width, height=self.height)
 
     def apply_to_bbox(self, bbox, **params):
         raise bbox
@@ -292,7 +292,7 @@ class GaussNoise(ImageOnlyTransform):
         self.scale = scale
 
     def apply(self, image, **params):
-        return ndimage.gaussian_noise(image, params['rand'], self.scale)
+        return tk.ndimage.gaussian_noise(image, params['rand'], self.scale)
 
 
 class RandomBlur(ImageOnlyTransform):
@@ -303,7 +303,7 @@ class RandomBlur(ImageOnlyTransform):
         self.radius = radius
 
     def apply(self, image, **params):
-        return ndimage.blur(image, self.radius * params['rand'].rand())
+        return tk.ndimage.blur(image, self.radius * params['rand'].rand())
 
 
 class RandomUnsharpMask(ImageOnlyTransform):
@@ -316,7 +316,7 @@ class RandomUnsharpMask(ImageOnlyTransform):
         self.max_alpha = max_alpha
 
     def apply(self, image, **params):
-        return ndimage.unsharp_mask(image, self.sigma, params['rand'].uniform(self.min_alpha, self.max_alpha))
+        return tk.ndimage.unsharp_mask(image, self.sigma, params['rand'].uniform(self.min_alpha, self.max_alpha))
 
 
 class RandomBrightness(ImageOnlyTransform):
@@ -327,7 +327,7 @@ class RandomBrightness(ImageOnlyTransform):
         self.shift = shift
 
     def apply(self, image, **params):
-        return ndimage.brightness(image, params['rand'].uniform(-self.shift, self.shift))
+        return tk.ndimage.brightness(image, params['rand'].uniform(-self.shift, self.shift))
 
 
 class RandomContrast(ImageOnlyTransform):
@@ -338,7 +338,7 @@ class RandomContrast(ImageOnlyTransform):
         self.var = var
 
     def apply(self, image, **params):
-        return ndimage.contrast(image, params['rand'].uniform(1 - self.var, 1 + self.var))
+        return tk.ndimage.contrast(image, params['rand'].uniform(1 - self.var, 1 + self.var))
 
 
 class RandomSaturation(ImageOnlyTransform):
@@ -349,7 +349,7 @@ class RandomSaturation(ImageOnlyTransform):
         self.var = var
 
     def apply(self, image, **params):
-        return ndimage.saturation(image, params['rand'].uniform(1 - self.var, 1 + self.var))
+        return tk.ndimage.saturation(image, params['rand'].uniform(1 - self.var, 1 + self.var))
 
 
 class RandomHue(ImageOnlyTransform):
@@ -363,7 +363,7 @@ class RandomHue(ImageOnlyTransform):
     def apply(self, image, **params):
         alpha = params['rand'].uniform(1 - self.var, 1 + self.var, (3,))
         beta = params['rand'].uniform(- self.shift, + self.shift, (3,))
-        return ndimage.hue_lite(image, alpha, beta)
+        return tk.ndimage.hue_lite(image, alpha, beta)
 
 
 class RandomEqualize(ImageOnlyTransform):
@@ -377,7 +377,7 @@ class RandomEqualize(ImageOnlyTransform):
     """
 
     def apply(self, image, **params):
-        return ndimage.equalize(image)
+        return tk.ndimage.equalize(image)
 
 
 class RandomAutoContrast(ImageOnlyTransform):
@@ -391,7 +391,7 @@ class RandomAutoContrast(ImageOnlyTransform):
     """
 
     def apply(self, image, **params):
-        return ndimage.auto_contrast(image)
+        return tk.ndimage.auto_contrast(image)
 
 
 class RandomPosterize(ImageOnlyTransform):
@@ -411,7 +411,7 @@ class RandomPosterize(ImageOnlyTransform):
 
     def apply(self, image, **params):
         bits = params['rand'].randint(self.min_bits, self.max_bits + 1)
-        return ndimage.posterize(image, bits)
+        return tk.ndimage.posterize(image, bits)
 
 
 class RandomAlpha(ImageOnlyTransform):
@@ -429,7 +429,7 @@ class RandomAlpha(ImageOnlyTransform):
         self.max_tries = max_tries
 
     def apply(self, image, **params):
-        return ndimage.erase_random(
+        return tk.ndimage.erase_random(
             image, params['rand'], bboxes=None,
             scale_low=self.scale_low, scale_high=self.scale_high,
             rate_1=self.rate_1, rate_2=self.rate_2,
@@ -463,7 +463,7 @@ class RandomErasing(ImageOnlyTransform):
         if self.object_aware:
             assert bboxes is not None
             # bboxes同士の重なり判定
-            inter = od.is_intersection(bboxes, bboxes)
+            inter = tk.od.is_intersection(bboxes, bboxes)
             inter[range(len(bboxes)), range(len(bboxes))] = False  # 自分同士は重なってないことにする
             # 各box内でrandom erasing。
             for i, b in enumerate(bboxes):
@@ -476,13 +476,13 @@ class RandomErasing(ImageOnlyTransform):
                     inter_boxes = np.copy(bboxes[inter[i]])
                     inter_boxes -= np.expand_dims(np.tile(b[:2], 2), axis=0)  # bに合わせて平行移動
                     # random erasing
-                    image[b[1]:b[3], b[0]:b[2], :] = ndimage.erase_random(
+                    image[b[1]:b[3], b[0]:b[2], :] = tk.ndimage.erase_random(
                         image[b[1]:b[3], b[0]:b[2], :], params['rand'], bboxes=inter_boxes,
                         scale_low=self.scale_low, scale_high=self.scale_high,
                         rate_1=self.rate_1, rate_2=self.rate_2, max_tries=self.max_tries)
         else:
             # 画像全体でrandom erasing。
-            image = ndimage.erase_random(
+            image = tk.ndimage.erase_random(
                 image, params['rand'], bboxes=None,
                 scale_low=self.scale_low, scale_high=self.scale_high,
                 rate_1=self.rate_1, rate_2=self.rate_2, max_tries=self.max_tries)
@@ -493,7 +493,7 @@ class Standardize(ImageOnlyTransform):
     """標準化。0～255に適当に収める。"""
 
     def apply(self, image, **params):
-        return ndimage.standardize(image)
+        return tk.ndimage.standardize(image)
 
 
 class ToGrayScale(ImageOnlyTransform):
@@ -502,7 +502,7 @@ class ToGrayScale(ImageOnlyTransform):
     def apply(self, image, **params):
         assert len(image.shape) == 3
         start_shape = image.shape
-        image = ndimage.to_grayscale(image)
+        image = tk.ndimage.to_grayscale(image)
         image = np.tile(np.expand_dims(image, axis=-1), (1, 1, start_shape[-1]))
         assert image.shape == start_shape
         return image
@@ -521,4 +521,4 @@ class RandomBinarize(ImageOnlyTransform):
 
     def apply(self, image, **params):
         threshold = params['rand'].uniform(self.threshold_min, self.threshold_max)
-        return ndimage.binarize(image, threshold)
+        return tk.ndimage.binarize(image, threshold)

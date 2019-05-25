@@ -18,9 +18,9 @@ import numba
 import PIL.Image
 import sklearn.utils
 
-from . import log, utils
+from .. import pytoolkit as tk
 
-_logger = log.get(__name__)
+_logger = tk.log.get(__name__)
 _load_cache = None
 _diskcache_load_failed = False
 
@@ -53,7 +53,7 @@ def load_with_cache(path_or_array: typing.Union[np.ndarray, io.IOBase, str, path
         読み込み結果のndarray。
 
     """
-    max_size = utils.normalize_tuple(max_size, 2)
+    max_size = tk.utils.normalize_tuple(max_size, 2)
 
     def _load():
         img = load(path_or_array, grayscale=grayscale)

@@ -7,9 +7,9 @@ import sklearn.metrics
 import sklearn.model_selection
 import sklearn.utils
 
-from . import log, ndimage, utils
+from .. import pytoolkit as tk
 
-_logger = log.get(__name__)
+_logger = tk.log.get(__name__)
 
 
 def listup_classification(dirpath, class_names=None, use_tqdm=True, check_image=False):
@@ -39,7 +39,7 @@ def listup_classification(dirpath, class_names=None, use_tqdm=True, check_image=
 
     # 各クラスのデータを列挙
     X, y, errors = [], [], []
-    for class_id, class_name in enumerate(utils.tqdm(class_names, desc='listup', disable=not use_tqdm)):
+    for class_id, class_name in enumerate(tk.utils.tqdm(class_names, desc='listup', disable=not use_tqdm)):
         class_dir = dirpath / class_name
         if class_dir.is_dir():
             t, err = _listup_files(class_dir, recurse=False, use_tqdm=False, check_image=check_image)
@@ -84,14 +84,14 @@ def _listup_files(dirpath, recurse, use_tqdm, check_image):
             return False
         if check_image:
             try:
-                ndimage.load(p)
+                tk.ndimage.load(p)
             except BaseException:
                 errors.append(f'Load error: {p}')
                 return False
         return True
 
     result = [p for p
-              in utils.tqdm(list(it), desc='listup', disable=not use_tqdm)
+              in tk.utils.tqdm(list(it), desc='listup', disable=not use_tqdm)
               if _is_valid_file(p)]
     return result, errors
 

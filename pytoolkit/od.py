@@ -4,7 +4,7 @@ import pathlib
 import cv2
 import numpy as np
 
-from . import ndimage
+from .. import pytoolkit as tk
 
 
 class ObjectsAnnotation:
@@ -178,10 +178,10 @@ class ObjectsPrediction:
 
     def crop(self, img, conf_threshold=0):
         """Bounding boxで切り出した画像を返す。"""
-        img = ndimage.load(img, grayscale=False)
+        img = tk.ndimage.load(img, grayscale=False)
         height, width = img.shape[:2]
         return [
-            ndimage.crop(img, x1, y1, x2 - x1, y2 - y1)
+            tk.ndimage.crop(img, x1, y1, x2 - x1, y2 - y1)
             for (x1, y1, x2, y2), cf
             in zip(self.get_real_bboxes(width, height), self.confs)
             if cf >= conf_threshold
@@ -380,9 +380,9 @@ def plot_objects(base_image, classes, confs, bboxes, class_names, conf_threshold
         assert 0 <= np.min(classes) < len(class_names)
         assert 0 <= np.max(classes) < len(class_names)
 
-    img = ndimage.load(base_image, grayscale=False)
+    img = tk.ndimage.load(base_image, grayscale=False)
     if max_long_side is not None and max(*img.shape[:2]) > max_long_side:
-        img = ndimage.resize_long_side(img, max_long_side)
+        img = tk.ndimage.resize_long_side(img, max_long_side)
     num_classes = len(class_names) if class_names is not None else 1
     import matplotlib.cm
     colors = matplotlib.cm.get_cmap(name='hsv')(np.linspace(0, 1, num_classes + 1)[:num_classes]) * 255

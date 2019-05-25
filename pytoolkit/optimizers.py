@@ -1,9 +1,9 @@
 """Kerasのoptimizer関連。"""
-import logging
 
+from .. import pytoolkit as tk
 from . import K, keras
 
-_logger = logging.getLogger(__name__)
+_logger = tk.log.get(__name__)
 
 
 def get_custom_objects():

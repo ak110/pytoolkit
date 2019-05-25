@@ -10,18 +10,18 @@ import pathlib
 import numpy as np
 import tensorflow as tf
 
-from . import callbacks as cb, dl, data, hvd, keras, log, utils
+from .. import pytoolkit as tk
+from . import keras
 
-_logger = log.get(__name__)
+_logger = tk.log.get(__name__)
 
 
 def load(path, custom_objects=None, compile=False, gpus=None) -> keras.models.Model:  # pylint: disable=redefined-outer-name
     """モデルの読み込み。"""
     path = pathlib.Path(path)
-    with log.trace_scope(f'load({path})'):
-        from . import get_custom_objects
+    with tk.log.trace_scope(f'load({path})'):
         custom_objects = custom_objects.copy() if custom_objects else dict()
-        custom_objects.update(get_custom_objects())
+        custom_objects.update(tk.get_custom_objects())
         if gpus is not None and gpus > 1:
             with tf.device('/cpu:0'):
                 model = keras.models.load_model(str(path), custom_objects=custom_objects, compile=compile)
@@ -35,10 +35,10 @@ def load_weights(model: keras.models.Model, path, by_name=False, skip_not_exist=
     """モデルの重みの読み込み。"""
     path = pathlib.Path(path)
     if path.exists():
-        with log.trace_scope(f'load_weights({path})'):
+        with tk.log.trace_scope(f'load_weights({path})'):
             model.load_weights(str(path), by_name=by_name)
     elif skip_not_exist:
-        log.get(__name__).info(f'{path} is not found.')
+        tk.log.get(__name__).info(f'{path} is not found.')
     else:
         raise RuntimeError(f'{path} is not found.')
 
@@ -46,41 +46,41 @@ def load_weights(model: keras.models.Model, path, by_name=False, skip_not_exist=
 def save(model: keras.models.Model, path, include_optimizer=False):
     """モデルの保存。"""
     path = pathlib.Path(path)
-    if hvd.is_master():
-        with log.trace_scope(f'save({path})'):
+    if tk.hvd.is_master():
+        with tk.log.trace_scope(f'save({path})'):
             path.parent.mkdir(parents=True, exist_ok=True)
             model.save(str(path), include_optimizer=include_optimizer)
-    hvd.barrier()
+    tk.hvd.barrier()
 
 
 def summary(model: keras.models.Model):
     """summaryを実行するだけ。"""
-    model.summary(print_fn=log.get(__name__).info if hvd.is_master() else lambda x: None)
+    model.summary(print_fn=tk.log.get(__name__).info if tk.hvd.is_master() else lambda x: None)
 
 
 def plot(model: keras.models.Model, to_file='model.svg', show_shapes=True, show_layer_names=True, rankdir='TB'):
     """モデルのグラフのplot。"""
     path = pathlib.Path(to_file)
-    if hvd.is_master():
-        with log.trace_scope(f'plot({path})'):
+    if tk.hvd.is_master():
+        with tk.log.trace_scope(f'plot({path})'):
             path.parent.mkdir(parents=True, exist_ok=True)
             keras.utils.plot_model(model, str(path), show_shapes=show_shapes, show_layer_names=show_layer_names, rankdir=rankdir)
-    hvd.barrier()
+    tk.hvd.barrier()
 
 
-@log.trace()
+@tk.log.trace()
 def compile(model: keras.models.Model, optimizer, loss, metrics=None, loss_weights=None):  # pylint: disable=redefined-builtin
     """compileするだけ。"""
-    if hvd.initialized():
+    if tk.hvd.initialized():
         optimizer = keras.optimizers.get(optimizer)
-        optimizer = hvd.get().DistributedOptimizer(optimizer, compression=hvd.get().Compression.fp16)
+        optimizer = tk.hvd.get().DistributedOptimizer(optimizer, compression=tk.hvd.get().Compression.fp16)
     model.compile(optimizer, loss, metrics, loss_weights=loss_weights)
 
 
-@log.trace()
+@tk.log.trace()
 def fit(model: keras.models.Model,
-        training_data: data.Dataset,
-        validation_data: data.Dataset = None,
+        training_data: tk.data.Dataset,
+        validation_data: tk.data.Dataset = None,
         validation_freq: int = 1,
         batch_size=32, epochs=1800,
         callbacks=None, verbose=1,
@@ -111,17 +111,17 @@ def fit(model: keras.models.Model,
     if validation_freq == 0:
         validation_data = None
 
-    train_data_loader = data.DataLoader(training_data, batch_size, shuffle=True, parallel=data_parallel, mixup=mixup, use_horovod=True)
-    val_data_loader = data.DataLoader(validation_data, batch_size, shuffle=True, parallel=data_parallel, use_horovod=True) if validation_data is not None else None
+    train_data_loader = tk.data.DataLoader(training_data, batch_size, shuffle=True, parallel=data_parallel, mixup=mixup, use_horovod=True)
+    val_data_loader = tk.data.DataLoader(validation_data, batch_size, shuffle=True, parallel=data_parallel, use_horovod=True) if validation_data is not None else None
 
     callbacks = (callbacks or []) + [
-        cb.EpochLogger(),
-        cb.ErrorOnNaN(),
+        tk.callbacks.EpochLogger(),
+        tk.callbacks.ErrorOnNaN(),
     ]
-    if hvd.initialized():
-        callbacks.append(hvd.get().callbacks.BroadcastGlobalVariablesCallback(0))
-        callbacks.append(hvd.get().callbacks.MetricAverageCallback())
-        callbacks.append(hvd.get().callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1))
+    if tk.hvd.initialized():
+        callbacks.append(tk.hvd.get().callbacks.BroadcastGlobalVariablesCallback(0))
+        callbacks.append(tk.hvd.get().callbacks.MetricAverageCallback())
+        callbacks.append(tk.hvd.get().callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1))
 
     # TODO: validation_freqはTensorFlowに合わせて対応予定
 
@@ -134,7 +134,7 @@ def fit(model: keras.models.Model,
         model.fit_generator(
             train_data_loader, validation_data=val_data_loader,
             epochs=epochs, callbacks=callbacks,
-            verbose=verbose if hvd.is_master() else 0,
+            verbose=verbose if tk.hvd.is_master() else 0,
             initial_epoch=initial_epoch,
             use_multiprocessing=use_multiprocessing,
             workers=workers, max_queue_size=max_queue_size)
@@ -143,8 +143,8 @@ def fit(model: keras.models.Model,
             training_generator.model_iteration = original
 
 
-@log.trace()
-def predict(model: keras.models.Model, dataset: data.Dataset, batch_size, verbose=1, use_horovod=False):
+@tk.log.trace()
+def predict(model: keras.models.Model, dataset: tk.data.Dataset, batch_size, verbose=1, use_horovod=False):
     """予測。
 
     Args:
@@ -158,15 +158,15 @@ def predict(model: keras.models.Model, dataset: data.Dataset, batch_size, verbos
         np.ndarray: 予測結果。
 
     """
-    dataset = hvd.split(dataset) if use_horovod else dataset
-    data_loader = data.DataLoader(dataset, batch_size)
-    values = model.predict_generator(data_loader, verbose=verbose if hvd.is_master() else 0)
-    values = hvd.allgather(values) if use_horovod else values
+    dataset = tk.hvd.split(dataset) if use_horovod else dataset
+    data_loader = tk.data.DataLoader(dataset, batch_size)
+    values = model.predict_generator(data_loader, verbose=verbose if tk.hvd.is_master() else 0)
+    values = tk.hvd.allgather(values) if use_horovod else values
     return values
 
 
-@log.trace()
-def evaluate(model: keras.models.Model, dataset: data.Dataset, batch_size=32, verbose=1, use_horovod=False):
+@tk.log.trace()
+def evaluate(model: keras.models.Model, dataset, batch_size=32, verbose=1, use_horovod=False):
     """評価。
 
     Args:
@@ -179,23 +179,23 @@ def evaluate(model: keras.models.Model, dataset: data.Dataset, batch_size=32, ve
         dict: metricsの文字列と値のdict
 
     """
-    dataset = hvd.split(dataset) if use_horovod else dataset
-    data_loader = data.DataLoader(dataset, batch_size)
-    values = model.evaluate_generator(data_loader, verbose=verbose if hvd.is_master() else 0)
-    values = hvd.allreduce(values) if use_horovod else values
+    dataset = tk.hvd.split(dataset) if use_horovod else dataset
+    data_loader = tk.data.DataLoader(dataset, batch_size)
+    values = model.evaluate_generator(data_loader, verbose=verbose if tk.hvd.is_master() else 0)
+    values = tk.hvd.allreduce(values) if use_horovod else values
     evals = dict(zip(model.metrics_names, values))
     return evals
 
 
-@log.trace()
-def custom_predict(model: keras.models.Model, dataset: data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None, use_horovod=False):
+@tk.log.trace()
+def custom_predict(model: keras.models.Model, dataset: tk.data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None, use_horovod=False):
     """予測。
 
     TTAなど用。
 
     Args:
         model: モデル。
-        dataset: 予測したい入力データ。
+        dataset (tk.data.Dataset): 予測したい入力データ。
         batch_size (int): バッチサイズ
         verbose (int): プログレスバー(tqdm)を表示するか否か。
         desc (str): プログレスバーの説明。
@@ -206,21 +206,21 @@ def custom_predict(model: keras.models.Model, dataset: data.Dataset, batch_size,
         np.ndarray: 予測結果。
 
     """
-    dataset = hvd.split(dataset) if use_horovod else dataset
-    verbose = 0 if use_horovod and not hvd.is_master() else verbose
+    dataset = tk.hvd.split(dataset) if use_horovod else dataset
+    verbose = 0 if use_horovod and not tk.hvd.is_master() else verbose
     values = np.array(list(custom_predict_flow(model, dataset, batch_size, verbose, desc, on_batch_fn)))
-    values = hvd.allgather(values) if use_horovod else values
+    values = tk.hvd.allgather(values) if use_horovod else values
     return values
 
 
-def custom_predict_flow(model: keras.models.Model, dataset: data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None):
+def custom_predict_flow(model: keras.models.Model, dataset: tk.data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None):
     """予測。(yieldバージョン)
 
     TTAなど用。Horovodでの分散処理機能は無し。(複数GPUで処理したい場合はmulti_gpu_modelを使用するか呼ぶ側でsplitする。処理順に注意が必要。)
 
     Args:
         model: モデル。
-        dataset: 予測したい入力データ。
+        dataset (tk.data.Dataset): 予測したい入力データ。
         batch_size (int): バッチサイズ
         verbose (int): プログレスバー(tqdm)を表示するか否か。
         desc (str): プログレスバーの説明。
@@ -232,8 +232,8 @@ def custom_predict_flow(model: keras.models.Model, dataset: data.Dataset, batch_
     """
     if on_batch_fn is None:
         on_batch_fn = _predict_on_batch
-    data_loader = data.DataLoader(dataset, batch_size)
-    for X, _ in utils.tqdm(data_loader, desc=desc, total=len(data_loader), disable=verbose < 1):
+    data_loader = tk.data.DataLoader(dataset, batch_size)
+    for X, _ in tk.utils.tqdm(data_loader, desc=desc, total=len(data_loader), disable=verbose < 1):
         pred_batch = on_batch_fn(model, X)
         yield from pred_batch
 
@@ -242,7 +242,7 @@ def _predict_on_batch(model: keras.models.Model, X):
     return model.predict_on_batch(X)
 
 
-@log.trace()
+@tk.log.trace()
 def multi_gpu_model(model, batch_size, gpus=None):
     """複数GPUでデータ並列するモデルを作成する。
 
@@ -252,8 +252,8 @@ def multi_gpu_model(model, batch_size, gpus=None):
 
     """
     if gpus is None:
-        gpus = dl.get_gpu_count()
-        log.get(__name__).info(f'gpu count = {gpus}')
+        gpus = tk.dl.get_gpu_count()
+        tk.log.get(__name__).info(f'gpu count = {gpus}')
     if gpus <= 1:
         return model, batch_size
 

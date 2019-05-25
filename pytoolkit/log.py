@@ -11,7 +11,7 @@ import logging.handlers
 import pathlib
 import time
 
-from . import hvd
+from .. import pytoolkit as tk
 
 
 def init(output_path, append=False, rotate=False, max_bytes=1048576, backup_count=10,
@@ -26,7 +26,7 @@ def init(output_path, append=False, rotate=False, max_bytes=1048576, backup_coun
     logger.setLevel(logging.DEBUG)
     close(logger)
     logger.addHandler(stream_handler(level=stream_level, fmt=stream_fmt))
-    if output_path is not None and hvd.is_master():
+    if output_path is not None and tk.hvd.is_master():
         logger.addHandler(file_handler(output_path, append, rotate, max_bytes, backup_count,
                                        level=file_level, fmt=file_fmt))
     if matplotlib_level is not None:

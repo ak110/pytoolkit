@@ -7,7 +7,8 @@ import subprocess
 import numpy as np
 import tensorflow as tf
 
-from . import K, hvd
+from .. import pytoolkit as tk
+from . import K
 
 
 def wrap_session(config=None, gpu_options=None, use_horovod=False):
@@ -31,7 +32,7 @@ def session(config=None, gpu_options=None, use_horovod=False):
 
 
     Args:
-        use_horovod: hvd.init()と、visible_device_listの指定を行う。
+        use_horovod: tk.hvd.init()と、visible_device_listの指定を行う。
 
     """
     class SessionScope:  # pylint: disable=R0903
@@ -44,12 +45,12 @@ def session(config=None, gpu_options=None, use_horovod=False):
 
         def __enter__(self):
             if self.use_horovod:
-                if hvd.initialized():
-                    hvd.barrier()  # 初期化済みなら初期化はしない。念のためタイミングだけ合わせる。
+                if tk.hvd.initialized():
+                    tk.hvd.barrier()  # 初期化済みなら初期化はしない。念のためタイミングだけ合わせる。
                 else:
-                    hvd.init()
-                if hvd.initialized() and get_gpu_count() > 0:
-                    self.gpu_options['visible_device_list'] = str(hvd.get().local_rank())
+                    tk.hvd.init()
+                if tk.hvd.initialized() and get_gpu_count() > 0:
+                    self.gpu_options['visible_device_list'] = str(tk.hvd.get().local_rank())
             if K.backend() == 'tensorflow':
                 self.config['allow_soft_placement'] = True
                 self.gpu_options['allow_growth'] = True

@@ -3,7 +3,8 @@
 import numpy as np
 import tensorflow as tf
 
-from . import K, backend, math
+from .. import pytoolkit as tk
+from . import K
 
 
 def binary_crossentropy(y_true, y_pred, from_logits=False, alpha=None):
@@ -13,7 +14,7 @@ def binary_crossentropy(y_true, y_pred, from_logits=False, alpha=None):
         alpha (float or None): class 1の重み。
 
     """
-    loss = backend.binary_crossentropy(y_true, y_pred, from_logits=from_logits, alpha=alpha)
+    loss = tk.backend.binary_crossentropy(y_true, y_pred, from_logits=from_logits, alpha=alpha)
     return K.sum(loss, axis=list(range(1, K.ndim(y_true))))
 
 
@@ -24,7 +25,7 @@ def binary_focal_loss(y_true, y_pred, gamma=2.0, from_logits=False, alpha=None):
         alpha (float or None): class 1の重み。論文では0.25。
 
     """
-    loss = backend.binary_focal_loss(y_true, y_pred, gamma=gamma, from_logits=from_logits, alpha=alpha)
+    loss = tk.backend.binary_focal_loss(y_true, y_pred, gamma=gamma, from_logits=from_logits, alpha=alpha)
     return K.sum(loss, axis=list(range(1, K.ndim(y_true))))
 
 
@@ -72,7 +73,7 @@ def categorical_focal_loss(y_true, y_pred, gamma=2.0, alpha=None):
 def lovasz_hinge(y_true, y_pred, from_logits=False, per_sample=True, activation='elu+1'):
     """Lovasz hinge loss。"""
     if not from_logits:
-        y_pred = backend.logit(y_pred)
+        y_pred = tk.backend.logit(y_pred)
     if per_sample:
         def loss_per_sample(elems):
             yt, yp = elems
@@ -84,7 +85,7 @@ def lovasz_hinge(y_true, y_pred, from_logits=False, per_sample=True, activation=
     signs = y_true * 2.0 - 1.0  # -1 ～ +1
     errors = 1.0 - y_pred * signs
     errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
-    weights = backend.lovasz_weights(y_true, perm)
+    weights = tk.backend.lovasz_weights(y_true, perm)
     if activation == 'relu':
         errors_sorted = tf.nn.relu(errors_sorted)
     elif activation == 'elu+1':
@@ -112,13 +113,13 @@ def lovasz_binary_crossentropy(y_true, y_pred, from_logits=False, per_sample=Tru
     y_true = K.reshape(y_true, (-1,))
     y_pred = K.reshape(y_pred, (-1,))
     if from_logits:
-        lpsilon = math.logit(epsilon)
+        lpsilon = tk.math.logit(epsilon)
         y_pred = K.clip(y_pred, lpsilon, -lpsilon)
     else:
         y_pred = K.clip(y_pred, epsilon, 1 - epsilon)
-    errors = backend.binary_crossentropy(y_true, y_pred, from_logits=from_logits)
+    errors = tk.backend.binary_crossentropy(y_true, y_pred, from_logits=from_logits)
     errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
-    weights = backend.lovasz_weights(y_true, perm, alpha=alpha)
+    weights = tk.backend.lovasz_weights(y_true, perm, alpha=alpha)
     loss = tf.tensordot(errors_sorted, tf.stop_gradient(weights), 1)
     assert K.ndim(loss) == 0
     return loss
@@ -139,7 +140,7 @@ def lovasz_softmax(y_true, y_pred, per_sample=True):
     for c in range(num_classes):
         errors = K.abs(y_true[:, c] - y_pred[:, c])
         errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
-        weights = backend.lovasz_weights(y_true[:, c], perm)
+        weights = tk.backend.lovasz_weights(y_true[:, c], perm)
         loss = tf.tensordot(errors_sorted, tf.stop_gradient(weights), 1)
         losses.append(loss)
     return tf.reduce_mean(losses)

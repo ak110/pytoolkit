@@ -3,7 +3,8 @@
 import numpy as np
 import tensorflow as tf
 
-from . import K, hvd, keras
+from .. import pytoolkit as tk
+from . import K, keras
 
 
 def get_custom_objects():
@@ -255,7 +256,7 @@ class Conv2DEx(keras.layers.Layer):
         mean = K.mean(inputs32, axis=[0, 1, 2])
         squared_mean = K.mean(K.square(inputs32), axis=[0, 1, 2])
         # Sync BN
-        if hvd.initialized():
+        if tk.hvd.initialized():
             import horovod.tensorflow as _hvd
             mean = _hvd.allreduce(mean, average=True)
             squared_mean = _hvd.allreduce(squared_mean, average=True)
@@ -531,7 +532,7 @@ class BatchNormalization(keras.layers.BatchNormalization):
         mean = K.mean(x, axis=stat_axes)
         squared_mean = K.mean(K.square(x), axis=stat_axes)
         # Sync BN
-        if hvd.initialized():
+        if tk.hvd.initialized():
             import horovod.tensorflow as _hvd
             mean = _hvd.allreduce(mean, average=True)
             squared_mean = _hvd.allreduce(squared_mean, average=True)
@@ -869,8 +870,8 @@ class WSConv2D(keras.layers.Layer):
     def __init__(self, filters, kernel_size=3, strides=1, activation=None, **kwargs):
         super().__init__(**kwargs)
         self.filters = filters
-        self.kernel_size = _normalize_tuple(kernel_size, 2)
-        self.strides = _normalize_tuple(strides, 2)
+        self.kernel_size = tk.utils.normalize_tuple(kernel_size, 2)
+        self.strides = tk.utils.normalize_tuple(strides, 2)
         self.activation = keras.activations.get(activation)
         self.kernel = None
 
@@ -920,7 +921,7 @@ class OctaveConv2D(keras.layers.Layer):
         super().__init__(**kwargs)
         self.filters = filters
         self.alpha = alpha
-        self.strides = _normalize_tuple(strides, 2)
+        self.strides = tk.utils.normalize_tuple(strides, 2)
         self.filters_l = int(self.filters * self.alpha)
         self.filters_h = self.filters - self.filters_l
         self.kernel_ll = None
@@ -993,7 +994,7 @@ class BlurPooling2D(keras.layers.Layer):
     def __init__(self, taps=5, strides=2, **kwargs):
         super().__init__(**kwargs)
         self.taps = taps
-        self.strides = _normalize_tuple(strides, 2)
+        self.strides = tk.utils.normalize_tuple(strides, 2)
 
     def compute_output_shape(self, input_shape):
         assert len(input_shape) == 4
@@ -1053,8 +1054,3 @@ class ScaleGradient(keras.layers.Layer):
         config = {'scale': self.scale}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
-
-
-def _normalize_tuple(value, n):
-    """keras.utils.normalize_tupleのようなもの。(バージョンにより場所が変わったりするので自作しといちゃう)"""
-    return (value,) * n if isinstance(value, int) else tuple(value)
