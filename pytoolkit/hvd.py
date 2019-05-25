@@ -35,32 +35,39 @@ def initialized():
     return _initialized
 
 
+def size() -> int:
+    """hvd.size。"""
+    return get().size() if initialized() else 1
+
+
+def rank() -> int:
+    """hvd.rank。"""
+    return get().rank() if initialized() else 0
+
+
+def local_rank() -> int:
+    """hvd.local_rank。"""
+    return get().local_rank() if initialized() else 0
+
+
 def is_master():
     """Horovod未使用 or hvd.rank() == 0ならTrue。"""
-    if not initialized():
-        return True
-    return get().rank() == 0
+    return rank() == 0
 
 
 def is_local_master():
     """Horovod未使用 or hvd.local_rank() == 0ならTrue。"""
-    if not initialized():
-        return True
-    return get().local_rank() == 0
+    return local_rank() == 0
 
 
 def allgather(value):
     """全ワーカーからデータを集める。"""
-    if not initialized():
-        return value
-    return get().allgather(value)
+    return get().allgather(value) if initialized() else value
 
 
 def allreduce(value, average=True):
     """全ワーカーからデータを集める。"""
-    if not initialized():
-        return value
-    return get().allreduce(value, average=average)
+    return get().allreduce(value, average=average) if initialized() else value
 
 
 def barrier():

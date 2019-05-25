@@ -84,10 +84,10 @@ def fit(model: keras.models.Model,
         validation_freq: int = 1,
         batch_size=32, epochs=1800,
         callbacks=None, verbose=1,
-        mixup=False,
         data_parallel=True,
         initial_epoch=0,
-        use_multiprocessing=False, workers=1, max_queue_size=10):
+        use_multiprocessing=False, workers=1, max_queue_size=10,
+        warmup=True):
     """独自のtraining loopになる予定の関数。
 
     Args:
@@ -99,20 +99,20 @@ def fit(model: keras.models.Model,
         epochs (int): エポック数。
         callbacks (list): コールバック。EpochLoggerとErrorOnNaNは自動追加。
         verbose (int): 1ならプログレスバー表示、2ならepoch毎の結果だけ表示。
-        mixup (bool): mixupするのか否か。
         data_parallel (bool): DataLoaderで並列化するのか否か。
         initial_epoch (int): 学習を開始するエポック数 - 1。
         use_multiprocessing (bool): Trueならマルチプロセス。
         workers (int): ワーカー数。
         max_queue_size (int): キューの最大サイズ。
+        warmup (bool): HorovodのLearningRateWarmupCallbackを使うか否か。
 
     """
     # validation_freq == 0ならvalidationしない(独自仕様)
     if validation_freq == 0:
         validation_data = None
 
-    train_data_loader = tk.data.DataLoader(training_data, batch_size, shuffle=True, parallel=data_parallel, mixup=mixup, use_horovod=True)
-    val_data_loader = tk.data.DataLoader(validation_data, batch_size, shuffle=True, parallel=data_parallel, use_horovod=True) if validation_data is not None else None
+    train_data_loader = tk.data.DataLoader(training_data, batch_size, shuffle=True, parallel=data_parallel)
+    val_data_loader = tk.data.DataLoader(validation_data, batch_size, shuffle=True, parallel=data_parallel) if validation_data is not None else None
 
     callbacks = (callbacks or []) + [
         tk.callbacks.EpochLogger(),
@@ -121,7 +121,8 @@ def fit(model: keras.models.Model,
     if tk.hvd.initialized():
         callbacks.append(tk.hvd.get().callbacks.BroadcastGlobalVariablesCallback(0))
         callbacks.append(tk.hvd.get().callbacks.MetricAverageCallback())
-        callbacks.append(tk.hvd.get().callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1))
+        if warmup:
+            callbacks.append(tk.hvd.get().callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1))
 
     # TODO: validation_freqはTensorFlowに合わせて対応予定
 
@@ -132,7 +133,10 @@ def fit(model: keras.models.Model,
         training_generator.model_iteration = lambda *args, verbose=0, **kwargs: original(*args, verbose=verbose, **kwargs)  # pylint: disable=unnecessary-lambda
     try:
         model.fit_generator(
-            train_data_loader, validation_data=val_data_loader,
+            train_data_loader,
+            steps_per_epoch=-(-len(train_data_loader) // tk.hvd.size()),  # ceiling
+            validation_data=val_data_loader,
+            validation_steps=-(-len(val_data_loader) // tk.hvd.size()) if val_data_loader is not None else None,  # ceiling
             epochs=epochs, callbacks=callbacks,
             verbose=verbose if tk.hvd.is_master() else 0,
             initial_epoch=initial_epoch,
@@ -141,6 +145,11 @@ def fit(model: keras.models.Model,
     finally:
         if tf.__version__ == '1.13.1':
             training_generator.model_iteration = original
+
+    # DataLoaderの処理時間を表示
+    _logger.info(f'train_data_loader: {train_data_loader.seconds_per_step * 1000:4.0f}ms/step')
+    if val_data_loader is not None:
+        _logger.info(f'val_data_loader:   {train_data_loader.seconds_per_step * 1000:4.0f}ms/step')
 
 
 @tk.log.trace()

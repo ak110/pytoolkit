@@ -26,7 +26,7 @@ def _main():
     X = np.array([data_dir / '9ab919332a1dceff9a252b43c0fb34a0_m.jpg'] * _BATCH_SIZE)
     y = X
     dataset = MyDataset(X, y, None, data_augmentation=True)
-    data_loader = tk.data.DataLoader(dataset, _BATCH_SIZE, shuffle=True, mixup=False, parallel=not args.profile)
+    data_loader = tk.data.DataLoader(dataset, _BATCH_SIZE, shuffle=True, parallel=not args.profile)
 
     # 適当にループして速度を見る
     if args.profile:

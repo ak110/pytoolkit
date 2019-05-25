@@ -47,6 +47,7 @@ if True:
     from . import ndimage
     from . import od
     from . import optimizers
+    from . import threading
     from . import training
     from . import utils
     from . import vis

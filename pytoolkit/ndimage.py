@@ -647,11 +647,16 @@ def erase_random(rgb, rand: np.random.RandomState, bboxes=None, scale_low=0.02, 
 def mixup(sample1, sample2, rand=None, mode='beta'):
     """mixup。 <https://arxiv.org/abs/1710.09412>
 
+    常に「sample1の重み >= sample2の重み」となるようにしている。
+
     Args:
         sample1 (tuple, list, dict or ndarray): データその1
         sample2 (tuple, list, dict or ndarray): データその2
         rand (None, int, or RandomState): 乱数シード
-        mode (str): 混ぜる割合の乱数の種類。'beta'ならβ分布、'uniform'なら[0, 1]の一様分布、'uniform_ex'なら[-0.366, 1.366]くらいの一様分布。
+        mode (str): 混ぜる割合の乱数の種類。
+            - 'beta': β分布を0.5以上にした分布
+            - 'uniform': [0.5, 1]の一様分布
+            - 'uniform_ex': [0.5, √2]の一様分布
 
     Returns:
         tuple, list, dict or ndarray: 混ぜられたデータ。
@@ -659,12 +664,14 @@ def mixup(sample1, sample2, rand=None, mode='beta'):
     """
     rand = sklearn.utils.check_random_state(rand)
     if mode == 'beta':
-        r = np.float32(rand.beta(0.2, 0.2))
+        r = np.float32(np.abs(rand.beta(0.2, 0.2) - 0.5) + 0.5)
     elif mode == 'uniform':
-        r = np.float32(rand.uniform(0, 1))
+        r = np.float32(rand.uniform(0.5, 1))
+    elif mode == 'uniform_ex':
+        r = np.float32(rand.uniform(0.5, np.sqrt(2)))
     else:
-        b = (np.sqrt(12) / 2 - 1) / 2
-        r = np.float32(rand.uniform(-b, 1 + b))
+        raise ValueError(f'Invalid mode: {mode}')
+    assert r >= 0.5
     return mix_data(sample1, sample2, r)
 
 
@@ -683,7 +690,7 @@ def mix_data(sample1, sample2, r):
         assert tuple(sample1.keys()) == tuple(sample2.keys())
         return {k: mix_data(sample1[k], sample2[k], r) for k in sample1}
     else:
-        return sample1 * r + sample2 * (1 - r)
+        return np.float32(sample1) * r + np.float32(sample2) * (1 - r)
 
 
 @numba.njit(fastmath=True, nogil=True)
