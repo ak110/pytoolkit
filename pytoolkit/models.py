@@ -85,6 +85,7 @@ def fit(model: keras.models.Model,
         batch_size=32, epochs=1800,
         callbacks=None, verbose=1,
         mixup=False,
+        data_parallel=True,
         initial_epoch=0,
         use_multiprocessing=False, workers=1, max_queue_size=10):
     """独自のtraining loopになる予定の関数。
@@ -99,6 +100,7 @@ def fit(model: keras.models.Model,
         callbacks (list): コールバック。EpochLoggerとErrorOnNaNは自動追加。
         verbose (int): 1ならプログレスバー表示、2ならepoch毎の結果だけ表示。
         mixup (bool): mixupするのか否か。
+        data_parallel (bool): DataLoaderで並列化するのか否か。
         initial_epoch (int): 学習を開始するエポック数 - 1。
         use_multiprocessing (bool): Trueならマルチプロセス。
         workers (int): ワーカー数。
@@ -109,8 +111,8 @@ def fit(model: keras.models.Model,
     if validation_freq == 0:
         validation_data = None
 
-    train_data_loader = data.DataLoader(training_data, batch_size, shuffle=True, mixup=mixup, use_horovod=True)
-    val_data_loader = data.DataLoader(validation_data, batch_size, shuffle=True, use_horovod=True) if validation_data is not None else None
+    train_data_loader = data.DataLoader(training_data, batch_size, shuffle=True, parallel=data_parallel, mixup=mixup, use_horovod=True)
+    val_data_loader = data.DataLoader(validation_data, batch_size, shuffle=True, parallel=data_parallel, use_horovod=True) if validation_data is not None else None
 
     callbacks = (callbacks or []) + [
         cb.EpochLogger(),

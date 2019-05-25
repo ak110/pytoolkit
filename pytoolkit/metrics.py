@@ -21,7 +21,7 @@ def binary_iou(y_true, y_pred, target_classes=None, threshold=0.5):
     if target_classes is not None:
         y_true = y_true[..., target_classes]
         y_pred = y_pred[..., target_classes]
-    axes = list(range(1, K.ndim(y_true) - 1))
+    axes = list(range(1, K.ndim(y_true)))
     t = y_true >= 0.5
     p = y_pred >= threshold
     inter = K.sum(K.cast(tf.math.logical_and(t, p), 'float32'), axis=axes)
@@ -37,7 +37,7 @@ def categorical_iou(y_true, y_pred, target_classes=None, strict=True):
         strict: ラベルに無いクラスを予測してしまった場合に減点されるようにするならTrue、ラベルにあるクラスのみ対象にするならFalse。
 
     """
-    axes = list(range(1, K.ndim(y_true) - 1))
+    axes = list(range(1, K.ndim(y_true)))
     y_classes = K.argmax(y_true, axis=-1)
     p_classes = K.argmax(y_pred, axis=-1)
     active_list = []
@@ -56,33 +56,29 @@ def categorical_iou(y_true, y_pred, target_classes=None, strict=True):
 
 
 def tpr(y_true, y_pred):
-    """True positive rate。(真陽性率、再現率、Recall)
-
-    バッチごとのtrue/falseの数が一定でない限り正しく算出されないため要注意。
-    """
-    mask = K.cast(K.greater_equal(y_true, 0.5), K.floatx())  # true
-    pred = K.cast(K.greater_equal(y_pred, 0.5), K.floatx())  # positive
-    return K.sum(pred * mask) / K.sum(mask)
+    """True positive rate。(真陽性率、再現率、Recall)"""
+    axes = list(range(1, K.ndim(y_true)))
+    mask = K.cast(K.greater_equal(y_true, 0.5), K.floatx())  # true == 1
+    pred = K.cast(K.greater_equal(y_pred, 0.5), K.floatx())  # pred == 1
+    return K.sum(pred * mask, axis=axes) / K.sum(mask, axis=axes)
 
 
-def fpr(y_true, y_pred):
-    """False positive rate。(偽陽性率)
-
-    バッチごとのtrue/falseの数が一定でない限り正しく算出されないため要注意。
-    """
-    mask = K.cast(K.less(y_true, 0.5), K.floatx())  # false
-    pred = K.cast(K.greater_equal(y_pred, 0.5), K.floatx())  # positive
-    return K.sum(pred * mask) / K.sum(mask)
+def tnr(y_true, y_pred):
+    """True negative rate。(真陰性率)"""
+    axes = list(range(1, K.ndim(y_true)))
+    mask = K.cast(K.less(y_true, 0.5), K.floatx())  # true == 0
+    pred = K.cast(K.less(y_pred, 0.5), K.floatx())  # pred == 0
+    return K.sum(pred * mask, axis=axes) / K.sum(mask, axis=axes)
 
 
 def fbeta_score(y_true, y_pred, beta=1):
     """Fβ-score。"""
     y_true = K.round(y_true)
     y_pred = K.round(y_pred)
-    axis = list(range(1, K.ndim(y_true)))
-    tp = K.sum(y_true * y_pred, axis=axis)
-    p = K.sum(y_pred, axis=axis)
-    t = K.sum(y_true, axis=axis)
+    axes = list(range(1, K.ndim(y_true)))
+    tp = K.sum(y_true * y_pred, axis=axes)
+    p = K.sum(y_pred, axis=axes)
+    t = K.sum(y_true, axis=axes)
     prec = tp / (p + K.epsilon())
     rec = tp / (t + K.epsilon())
     return ((1 + beta ** 2) * prec * rec) / ((beta ** 2) * prec + rec + K.epsilon())
