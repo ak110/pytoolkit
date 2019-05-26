@@ -59,6 +59,7 @@ class DataLoader(keras.utils.Sequence):
         batch_size (int): バッチサイズ。
         shuffle (bool): データをシャッフルするか否か。
         parallel (bool): 並列処理を行うか否か。
+        use_horovod (bool): 1エポックあたりのミニバッチ数(__len__の戻り値)の算出にHorovodを考慮するか否か。
         collate_fn (callable): 集約処理
 
     Attributes:
@@ -66,22 +67,25 @@ class DataLoader(keras.utils.Sequence):
 
     """
 
-    def __init__(self, dataset, batch_size, shuffle=False, parallel=True, collate_fn=None):
+    def __init__(self, dataset, batch_size, shuffle=False, parallel=True, use_horovod=False, collate_fn=None):
         assert len(dataset) > 0
         self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.parallel = parallel
+        self.use_horovod = use_horovod
         self.collate_fn = collate_fn or default_collate
-        self.steps_per_epoch = -(-len(self.dataset) // self.batch_size)  # ceiling
         self.seconds_per_step = 0
 
         if self.shuffle:
             # シャッフル時は常に同じバッチサイズを返せるようにする (学習時の安定性のため)
+            mp_batch_size = self.batch_size * tk.hvd.size() if self.use_horovod else self.batch_size
+            self.steps_per_epoch = -(-len(self.dataset) // mp_batch_size)  # ceiling
             self.index_generator = _generate_shuffled_indices(len(self.dataset))
             self.indices = [next(self.index_generator) for _ in range(self.steps_per_epoch * self.batch_size)]
         else:
             # シャッフル無しの場合はそのまま順に返す。
+            self.steps_per_epoch = -(-len(self.dataset) // self.batch_size)  # ceiling
             self.index_generator = None
             self.indices = np.arange(len(self.dataset))
 

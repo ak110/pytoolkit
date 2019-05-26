@@ -82,6 +82,7 @@ def fit(model: keras.models.Model,
         training_data: tk.data.Dataset,
         validation_data: tk.data.Dataset = None,
         validation_freq: int = 1,
+        class_weight=None,
         batch_size=32, epochs=1800,
         callbacks=None, verbose=1,
         data_parallel=True,
@@ -95,6 +96,7 @@ def fit(model: keras.models.Model,
         training_data (tk.data.Dataset): 訓練データ。
         validation_data (tk.data.Dataset): 検証データ。Noneなら省略。
         validation_freq (int or list): 検証を行うエポック数の間隔、またはエポック数のリスト。0ならvalidationしない(独自仕様)。
+        class_weight (dict): クラスごとの重みのdict。
         batch_size (int): バッチサイズ。
         epochs (int): エポック数。
         callbacks (list): コールバック。EpochLoggerとErrorOnNaNは自動追加。
@@ -111,8 +113,8 @@ def fit(model: keras.models.Model,
     if validation_freq == 0:
         validation_data = None
 
-    train_data_loader = tk.data.DataLoader(training_data, batch_size, shuffle=True, parallel=data_parallel)
-    val_data_loader = tk.data.DataLoader(validation_data, batch_size, shuffle=True, parallel=data_parallel) if validation_data is not None else None
+    train_data_loader = tk.data.DataLoader(training_data, batch_size, shuffle=True, parallel=data_parallel, use_horovod=True)
+    val_data_loader = tk.data.DataLoader(validation_data, batch_size, shuffle=True, parallel=data_parallel, use_horovod=True) if validation_data is not None else None
 
     callbacks = (callbacks or []) + [
         tk.callbacks.EpochLogger(),
@@ -137,6 +139,7 @@ def fit(model: keras.models.Model,
             steps_per_epoch=-(-len(train_data_loader) // tk.hvd.size()),  # ceiling
             validation_data=val_data_loader,
             validation_steps=-(-len(val_data_loader) // tk.hvd.size()) if val_data_loader is not None else None,  # ceiling
+            class_weight=class_weight,
             epochs=epochs, callbacks=callbacks,
             verbose=verbose if tk.hvd.is_master() else 0,
             initial_epoch=initial_epoch,

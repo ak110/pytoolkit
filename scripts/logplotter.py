@@ -5,12 +5,15 @@ import base64
 import io
 import re
 import pathlib
+import sys
 
 import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
 
-import pytoolkit as tk
+if True:
+    sys.path.append('..')
+    import pytoolkit as tk
 
 
 def _main():

@@ -3,10 +3,13 @@
 import argparse
 import cProfile
 import pathlib
+import sys
 
 import numpy as np
 
-import pytoolkit as tk
+if True:
+    sys.path.append('..')
+    import pytoolkit as tk
 
 _BATCH_SIZE = 16
 _IMAGE_SIZE = (1024, 1024)
@@ -18,7 +21,7 @@ def _main():
     args = parser.parse_args()
 
     tk.utils.better_exceptions()
-    base_dir = pathlib.Path(__file__).resolve().parent
+    base_dir = pathlib.Path(__file__).resolve().parent.parent
     data_dir = base_dir / 'tests' / 'data'
     save_dir = base_dir / '___check' / 'bench'
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -36,6 +39,9 @@ def _main():
                         sort='cumulative')  # 累積:cumulative 内部:time
     else:
         _run(data_loader, iterations=16)
+
+    print(f'{data_loader.seconds_per_step * 1000:.0f}ms/step')
+
     # 1バッチ分を保存
     for ix, x in enumerate(data_loader[0][0]):
         tk.ndimage.save(save_dir / f'{ix}.png', np.clip(x, 0, 255).astype(np.uint8))

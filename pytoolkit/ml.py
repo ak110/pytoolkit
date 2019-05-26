@@ -6,6 +6,7 @@ import sklearn.base
 import sklearn.metrics
 import sklearn.model_selection
 import sklearn.utils
+import joblib
 
 from .. import pytoolkit as tk
 
@@ -233,3 +234,48 @@ def print_regression_metrics(y_true, y_pred, print_fn=None):
         print_fn(f'MAE:  {mae:.3f} (base: {maeb:.3f})')
     except BaseException:
         _logger.warning('Error: print_regression_metrics', exc_info=True)
+
+
+@tk.log.trace()
+def search_threshold(y_true, y_pred, thresholds, score_fn, direction, cv=10):
+    """閾値探索。
+
+    Args:
+        y_true (np.ndarray): 答え。
+        y_pred (np.ndarray): 予測結果。
+        thresholds (np.ndarray): 閾値の配列。
+        score_fn (callable): 答えと予測結果と閾値を受け取り、スコアを返す関数。
+        direction (str): 'minimize' or 'maximize'
+        cv (int): cross validationの分割数。
+
+    Returns:
+        tuple: スコアと閾値
+
+    """
+    assert direction in ('minimize', 'maximize')
+
+    @joblib.delayed
+    def _search(fold):
+        tr_indices, val_indices = cv_indices(y_true, y_true, cv, fold, split_seed=123, stratify=False)
+        tr_t, tr_p = y_true[tr_indices], y_pred[tr_indices]
+        val_t, val_p = y_true[val_indices], y_pred[val_indices]
+
+        best_score = np.inf if direction == 'minimize' else -np.inf
+        best_th = None
+        for th in thresholds:
+            s = score_fn(tr_t, tr_p, th)
+            if (direction == 'minimize' and s < best_score) or (direction == 'maximize' and s > best_score):
+                best_score = s
+                best_th = th
+
+        val_score = score_fn(val_t, val_p, best_th)
+        _logger.info(f'fold#{fold}: score={best_score:.4f} val_score={val_score:.4f} threshold={best_th:.4f}')
+        return val_score, best_th
+
+    with joblib.Parallel(n_jobs=-1, backend='threading') as parallel:
+        scores, ths = zip(*parallel([_search(fold) for fold in range(cv)]))
+
+    score = np.mean(scores)
+    th = np.mean(ths)
+    _logger.info(f'mean: score={score:.4f} threshold={th:.4f}')
+    return score, th
