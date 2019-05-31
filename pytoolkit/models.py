@@ -120,7 +120,7 @@ def fit(model: keras.models.Model,
         tk.callbacks.EpochLogger(),
         tk.callbacks.ErrorOnNaN(),
     ]
-    if tk.hvd.initialized():
+    if tk.hvd.initialized() and tk.hvd.size() > 1:
         callbacks.append(tk.hvd.get().callbacks.BroadcastGlobalVariablesCallback(0))
         callbacks.append(tk.hvd.get().callbacks.MetricAverageCallback())
         if warmup:

@@ -71,7 +71,7 @@ def categorical_focal_loss(y_true, y_pred, gamma=2.0, alpha=None):
 
 
 def lovasz_hinge(y_true, y_pred, from_logits=False, per_sample=True, activation='elu+1'):
-    """Lovasz hinge loss。"""
+    """Lovasz hinge loss。<https://arxiv.org/abs/1512.07797>"""
     if not from_logits:
         y_pred = tk.backend.logit(y_pred)
     if per_sample:
@@ -126,7 +126,7 @@ def lovasz_binary_crossentropy(y_true, y_pred, from_logits=False, per_sample=Tru
 
 
 def lovasz_softmax(y_true, y_pred, per_sample=True):
-    """Lovasz softmax loss。"""
+    """Lovasz softmax loss。<https://arxiv.org/abs/1705.08790>"""
     if per_sample:
         def loss_per_sample(elems):
             yt, yp = elems

@@ -114,7 +114,7 @@ class ImageNetPolicy(A.OneOf):
 
 def subpolicy(a1, p1, mag1, a2, p2, mag2):
     """サブポリシー。"""
-    return A.Compose([a1(mag=mag1, p=p1), a2(mag=mag2, p=p2)])
+    return A.Compose([a1(mag=mag1, p=p1), a2(mag=mag2, p=p2)], p=1)
 
 
 class Affine(A.ImageOnlyTransform):
@@ -183,7 +183,10 @@ class Rotate(A.ImageOnlyTransform):
     def apply(self, image, **params):
         degrees = int_parameter(self.mag, 30, flip_sign=True)
         image = PIL.Image.fromarray(image, mode='RGB')
-        return np.asarray(image.rotate(degrees), dtype=np.uint8)
+        image = image.convert('RGBA').rotate(degrees)
+        bg = PIL.Image.new('RGBA', image.size, (128, 128, 128, 255))
+        image = PIL.Image.composite(image, bg, image).convert('RGB')
+        return np.asarray(image, dtype=np.uint8)
 
 
 class AutoContrast(A.ImageOnlyTransform):
