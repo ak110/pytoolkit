@@ -159,12 +159,12 @@ class RemoveMask(keras.layers.Layer):
         super().__init__(**kwargs)
         self.supports_masking = True
 
-    def compute_mask(self, input, input_mask=None):
-        _ = self, input, input_mask
+    def compute_mask(self, inputs, mask=None):  # pylint: disable=useless-return
+        _ = inputs, mask
         return None
 
-    def call(self, inputs, mask=None):
-        _ = self, mask
+    def call(self, inputs, **kwargs):
+        _ = kwargs
         return inputs
 
 
