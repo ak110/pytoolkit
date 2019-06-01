@@ -12,6 +12,7 @@ def get_custom_objects():
     classes = [
         Preprocess,
         ConvertColor,
+        RemoveMask,
         Conv2DEx,
         Resize2D,
         Pad2D,
@@ -149,6 +150,22 @@ class ConvertColor(keras.layers.Layer):
         config = {'mode': self.mode}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
+
+
+class RemoveMask(keras.layers.Layer):
+    """マスクを取り除く。"""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.supports_masking = True
+
+    def compute_mask(self, input, input_mask=None):
+        _ = self, input, input_mask
+        return None
+
+    def call(self, inputs, mask=None):
+        _ = self, mask
+        return inputs
 
 
 class Conv2DEx(keras.layers.Layer):
