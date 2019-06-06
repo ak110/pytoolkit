@@ -190,7 +190,7 @@ autodoc_default_options = {
     'members': None,
     'member-order': 'bysource',
     'undoc-members': True,
-    'special-members': None,
+    'special-members': '__len__,__getitem__,__iter__,__repr__',
     'show-inheritance': None,
 }
 
