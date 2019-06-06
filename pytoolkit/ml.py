@@ -1,14 +1,14 @@
 """機械学習関連。"""
 import pathlib
 
+import joblib
 import numpy as np
 import sklearn.base
 import sklearn.metrics
 import sklearn.model_selection
 import sklearn.utils
-import joblib
 
-from .. import pytoolkit as tk
+import pytoolkit as tk
 
 _logger = tk.log.get(__name__)
 

@@ -3,7 +3,8 @@
 import numpy as np
 import tensorflow as tf
 
-from .. import pytoolkit as tk
+import pytoolkit as tk
+
 from . import K
 
 

@@ -13,12 +13,12 @@ import typing
 import warnings
 
 import cv2
-import numpy as np
 import numba
+import numpy as np
 import PIL.Image
 import sklearn.utils
 
-from .. import pytoolkit as tk
+import pytoolkit as tk
 
 _logger = tk.log.get(__name__)
 _load_cache = None

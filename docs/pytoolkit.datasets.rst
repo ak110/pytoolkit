@@ -13,6 +13,6 @@ Module contents
 ---------------
 
 .. automodule:: pytoolkit.datasets
-    :members:
-    :undoc-members:
-    :show-inheritance:
+   :members:
+   :undoc-members:
+   :show-inheritance:

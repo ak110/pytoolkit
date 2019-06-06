@@ -1,7 +1,7 @@
-pytoolkit.callbacks module
+pytoolkit.threading module
 ==========================
 
-.. automodule:: pytoolkit.callbacks
+.. automodule:: pytoolkit.threading
    :members:
    :undoc-members:
    :show-inheritance:

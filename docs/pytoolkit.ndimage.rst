@@ -2,6 +2,6 @@ pytoolkit.ndimage module
 ========================
 
 .. automodule:: pytoolkit.ndimage
-    :members:
-    :undoc-members:
-    :show-inheritance:
+   :members:
+   :undoc-members:
+   :show-inheritance:

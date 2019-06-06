@@ -1,6 +1,7 @@
 """Kerasのoptimizer関連。"""
 
-from .. import pytoolkit as tk
+import pytoolkit as tk
+
 from . import K, keras
 
 _logger = tk.log.get(__name__)

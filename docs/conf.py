@@ -186,7 +186,13 @@ epub_exclude_files = ['search.html']
 
 autosummary_generate = True
 
-autodoc_default_flags = ['members', 'undoc-members', 'special-members', 'show-inheritance']
+autodoc_default_options = {
+    'members': None,
+    'member-order': 'bysource',
+    'undoc-members': True,
+    'special-members': None,
+    'show-inheritance': None,
+}
 
 # -- Options for todo extension ----------------------------------------------
 

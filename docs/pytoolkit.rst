@@ -6,7 +6,7 @@ Subpackages
 
 .. toctree::
 
-    pytoolkit.datasets
+   pytoolkit.datasets
 
 Submodules
 ----------
@@ -31,6 +31,7 @@ Submodules
    pytoolkit.ndimage
    pytoolkit.od
    pytoolkit.optimizers
+   pytoolkit.threading
    pytoolkit.training
    pytoolkit.utils
    pytoolkit.vis
@@ -40,6 +41,6 @@ Module contents
 ---------------
 
 .. automodule:: pytoolkit
-    :members:
-    :undoc-members:
-    :show-inheritance:
+   :members:
+   :undoc-members:
+   :show-inheritance:

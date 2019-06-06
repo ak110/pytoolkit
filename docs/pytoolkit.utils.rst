@@ -2,6 +2,6 @@ pytoolkit.utils module
 ======================
 
 .. automodule:: pytoolkit.utils
-    :members:
-    :undoc-members:
-    :show-inheritance:
+   :members:
+   :undoc-members:
+   :show-inheritance:

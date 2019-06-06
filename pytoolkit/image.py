@@ -10,7 +10,7 @@ import warnings
 import numpy as np
 import sklearn.utils
 
-from .. import pytoolkit as tk
+import pytoolkit as tk
 
 
 class BasicTransform(metaclass=abc.ABCMeta):

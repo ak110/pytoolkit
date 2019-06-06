@@ -5,7 +5,8 @@ import time
 
 import numpy as np
 
-from .. import pytoolkit as tk
+import pytoolkit as tk
+
 from . import K, keras
 
 _logger = tk.log.get(__name__)

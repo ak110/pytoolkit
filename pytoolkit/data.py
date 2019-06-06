@@ -4,7 +4,8 @@ import time
 
 import numpy as np
 
-from .. import pytoolkit as tk
+import pytoolkit as tk
+
 from . import keras
 
 

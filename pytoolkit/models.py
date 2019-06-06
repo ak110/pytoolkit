@@ -10,7 +10,8 @@ import pathlib
 import numpy as np
 import tensorflow as tf
 
-from .. import pytoolkit as tk
+import pytoolkit as tk
+
 from . import keras
 
 _logger = tk.log.get(__name__)

@@ -4,7 +4,7 @@ import pathlib
 import cv2
 import numpy as np
 
-from .. import pytoolkit as tk
+import pytoolkit as tk
 
 
 class ObjectsAnnotation:

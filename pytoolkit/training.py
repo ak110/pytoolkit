@@ -1,6 +1,7 @@
 """Kerasでの学習周りの便利関数など。"""
 
-from .. import pytoolkit as tk
+import pytoolkit as tk
+
 from . import keras
 
 _logger = tk.log.get(__name__)
@@ -50,7 +51,7 @@ def train(model: keras.models.Model, train_dataset: tk.data.Dataset, val_dataset
         tk.models.save(model, model_path)
 
 
-def evaluate(model: keras.models.Model, dataset: tk.data.Dataset, batch_size, prefix, use_horovod=False):
+def evaluate(model: keras.models.Model, dataset: tk.data.Dataset, batch_size, prefix='', use_horovod=False):
     """評価して結果をINFOログ出力する。
 
     Args:

@@ -2,6 +2,6 @@ pytoolkit.layers module
 =======================
 
 .. automodule:: pytoolkit.layers
-    :members:
-    :undoc-members:
-    :show-inheritance:
+   :members:
+   :undoc-members:
+   :show-inheritance:

@@ -6,7 +6,7 @@ import pathlib
 
 import joblib
 
-from .. import pytoolkit as tk
+import pytoolkit as tk
 
 _logger = tk.log.get(__name__)
 

@@ -11,7 +11,7 @@ import logging.handlers
 import pathlib
 import time
 
-from .. import pytoolkit as tk
+import pytoolkit as tk
 
 
 def init(output_path, append=False, rotate=False, max_bytes=1048576, backup_count=10,
