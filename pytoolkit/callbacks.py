@@ -60,6 +60,10 @@ class CosineAnnealing(keras.callbacks.Callback):
         lr = lr_min + 0.5 * (lr_max - lr_min) * (1 + np.cos(np.pi * r))
         K.set_value(self.model.optimizer.lr, float(lr))
 
+    def on_train_end(self, logs=None):
+        # 終わったら戻しておく
+        K.set_value(self.model.optimizer.lr, self.start_lr)
+
 
 class TSVLogger(keras.callbacks.Callback):
     """ログを保存するコールバック。Horovod使用時はrank() == 0のみ有効。

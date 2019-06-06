@@ -42,11 +42,9 @@ class TupleDataset(Dataset):
         assert all([len(d) == len(datasets[0]) for d in datasets])
         self.datasets = datasets
 
-    @abc.abstractmethod
     def __len__(self):
-        return self.datasets[0]
+        return len(self.datasets[0])
 
-    @abc.abstractmethod
     def __getitem__(self, index):
         return tuple([d[index] for d in self.datasets])
 

@@ -28,5 +28,6 @@
 - horovod
 - matplotlib
 - mpi4py
+- onnxmltools
 - pydensecrf
 - tqdm

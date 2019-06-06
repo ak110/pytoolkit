@@ -53,6 +53,18 @@ def save(model: keras.models.Model, path, include_optimizer=False):
     tk.hvd.barrier()
 
 
+def save_onnx(model: keras.models.Model, path, **kwargs):
+    """ONNX形式で保存。"""
+    import onnxmltools
+    path = pathlib.Path(path)
+    if tk.hvd.is_master():
+        with tk.log.trace_scope(f'save_onnx({path})'):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            onnx_model = onnxmltools.convert_keras(model, **kwargs)
+            onnxmltools.utils.save_model(onnx_model, str(path))
+    tk.hvd.barrier()
+
+
 def summary(model: keras.models.Model):
     """summaryを実行するだけ。"""
     model.summary(print_fn=tk.log.get(__name__).info if tk.hvd.is_master() else lambda x: None)
@@ -156,7 +168,7 @@ def fit(model: keras.models.Model,
 
 
 @tk.log.trace()
-def predict(model: keras.models.Model, dataset: tk.data.Dataset, batch_size, verbose=1, use_horovod=False):
+def predict(model: keras.models.Model, dataset: tk.data.Dataset, batch_size=32, verbose=1, use_horovod=False):
     """予測。
 
     Args:
