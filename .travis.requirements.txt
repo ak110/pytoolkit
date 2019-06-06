@@ -12,6 +12,7 @@ keras
 matplotlib
 numba
 numpy
+onnxmltools
 opencv-python
 pep8
 pydot
