@@ -3,11 +3,10 @@
 import pytoolkit as tk
 
 from . import keras
+from . import log as tk_log
 
-_logger = tk.log.get(__name__)
 
-
-@tk.log.trace()
+@tk_log.trace()
 def check(model: keras.models.Model, plot_path=None):
     """モデルの動作確認など。
 
@@ -23,8 +22,8 @@ def check(model: keras.models.Model, plot_path=None):
         tk.models.plot(model, plot_path)
 
 
-@tk.log.trace()
-def train(model: keras.models.Model, train_dataset: tk.data.Dataset, val_dataset: tk.data.Dataset = None,
+@tk_log.trace()
+def train(model: keras.models.Model, train_dataset, val_dataset=None,
           batch_size=16, model_path=None, **kwargs):
     """学習。
 
@@ -51,7 +50,7 @@ def train(model: keras.models.Model, train_dataset: tk.data.Dataset, val_dataset
         tk.models.save(model, model_path)
 
 
-def evaluate(model: keras.models.Model, dataset: tk.data.Dataset, batch_size, prefix='', use_horovod=False):
+def evaluate(model: keras.models.Model, dataset, batch_size, prefix='', use_horovod=False):
     """評価して結果をINFOログ出力する。
 
     Args:
@@ -66,5 +65,5 @@ def evaluate(model: keras.models.Model, dataset: tk.data.Dataset, batch_size, pr
     if tk.hvd.is_master():
         max_len = max([len(n) for n in evals]) + max(len(prefix), 4)
         for n, v in evals.items():
-            _logger.info(f'{prefix}{n}:{" " * (max_len - len(prefix) - len(n))} {v:.3f}')
+            tk_log.get(__name__).info(f'{prefix}{n}:{" " * (max_len - len(prefix) - len(n))} {v:.3f}')
     tk.hvd.barrier()

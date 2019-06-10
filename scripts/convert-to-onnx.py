@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """*.h5 を読んで *.onnx で保存するスクリプト。"""
 import argparse
-import os
 import pathlib
 import sys
 

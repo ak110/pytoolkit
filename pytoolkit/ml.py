@@ -10,7 +10,7 @@ import sklearn.utils
 
 import pytoolkit as tk
 
-_logger = tk.log.get(__name__)
+from . import log as tk_log
 
 
 def listup_classification(dirpath, class_names=None, use_tqdm=True, check_image=False):
@@ -156,7 +156,7 @@ def print_scores(precisions, recalls, fscores, supports, class_names=None, print
     assert len(precisions) == len(supports)
     if class_names is None:
         class_names = [f'class{i:02d}' for i in range(len(precisions))]
-    print_fn = print_fn or _logger.info
+    print_fn = print_fn or tk.log.get(__name__).info
 
     print_fn('                   適合率  再現率  F値    件数')
     # .......'0123456789abcdef:  0.123   0.123   0.123  0123456'
@@ -183,7 +183,7 @@ def top_k_accuracy(y_true, proba_pred, k=5):
 def print_classification_metrics(y_true, proba_pred, average='macro', print_fn=None):
     """分類の指標色々を表示する。"""
     try:
-        print_fn = print_fn or _logger.info
+        print_fn = print_fn or tk.log.get(__name__).info
         true_type = sklearn.utils.multiclass.type_of_target(y_true)
         pred_type = sklearn.utils.multiclass.type_of_target(proba_pred)
         if true_type == 'binary':  # binary
@@ -224,13 +224,13 @@ def print_classification_metrics(y_true, proba_pred, average='macro', print_fn=N
             print_fn(f'Rec-{average:5s}:  {rec:.3f}')
             print_fn(f'Logloss:    {logloss:.3f}')
     except BaseException:
-        _logger.warning('Error: print_classification_metrics', exc_info=True)
+        tk.log.get(__name__).warning('Error: print_classification_metrics', exc_info=True)
 
 
 def print_regression_metrics(y_true, y_pred, print_fn=None):
     """回帰の指標色々を表示する。"""
     try:
-        print_fn = print_fn or _logger.info
+        print_fn = print_fn or tk.log.get(__name__).info
         y_mean = np.tile(np.mean(y_pred), len(y_true))
         r2 = sklearn.metrics.r2_score(y_true, y_pred)
         rmse = np.sqrt(sklearn.metrics.mean_squared_error(y_true, y_pred))
@@ -244,10 +244,10 @@ def print_regression_metrics(y_true, y_pred, print_fn=None):
         # https://funatsu-lab.github.io/open-course-ware/basic-theory/accuracy-index/#how-to-check-rmse-mae-summary
         print_fn(f'RMSE/MAE: {rmse / mae:.3f}')
     except BaseException:
-        _logger.warning('Error: print_regression_metrics', exc_info=True)
+        tk.log.get(__name__).warning('Error: print_regression_metrics', exc_info=True)
 
 
-@tk.log.trace()
+@tk_log.trace()
 def search_threshold(y_true, y_pred, thresholds, score_fn, direction, cv=10):
     """閾値探索。
 
@@ -280,7 +280,7 @@ def search_threshold(y_true, y_pred, thresholds, score_fn, direction, cv=10):
                 best_th = th
 
         val_score = score_fn(val_t, val_p, best_th)
-        _logger.info(f'fold#{fold}: score={best_score:.4f} val_score={val_score:.4f} threshold={best_th:.4f}')
+        tk.log.get(__name__).info(f'fold#{fold}: score={best_score:.4f} val_score={val_score:.4f} threshold={best_th:.4f}')
         return val_score, best_th
 
     with joblib.Parallel(n_jobs=-1, backend='threading') as parallel:
@@ -288,5 +288,5 @@ def search_threshold(y_true, y_pred, thresholds, score_fn, direction, cv=10):
 
     score = np.mean(scores)
     th = np.mean(ths)
-    _logger.info(f'mean: score={score:.4f} threshold={th:.4f}')
+    tk.log.get(__name__).info(f'mean: score={score:.4f} threshold={th:.4f}')
     return score, th

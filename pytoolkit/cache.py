@@ -8,8 +8,6 @@ import joblib
 
 import pytoolkit as tk
 
-_logger = tk.log.get(__name__)
-
 
 def memorize(cache_dir, compress=0, verbose=True):
     """関数の戻り値をファイルにキャッシュするデコレーター。"""
@@ -22,12 +20,12 @@ def memorize(cache_dir, compress=0, verbose=True):
             # キャッシュがあれば読む
             if cache_path.is_file():
                 if verbose:
-                    _logger.info(f'Cache is found: {cache_path}')
+                    tk.log.get(__name__).info(f'Cache is found: {cache_path}')
                 return joblib.load(cache_path)
             # 無ければ実処理
             if tk.hvd.is_local_master():
                 if verbose:
-                    _logger.info(f'Cache is not found: {cache_path}')
+                    tk.log.get(__name__).info(f'Cache is not found: {cache_path}')
                 result = func(*args, **kwargs)
                 cache_path.parent.mkdir(parents=True, exist_ok=True)
                 joblib.dump(result, cache_path, compress=compress)

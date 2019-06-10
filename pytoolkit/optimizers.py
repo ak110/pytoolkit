@@ -4,8 +4,6 @@ import pytoolkit as tk
 
 from . import K, keras
 
-_logger = tk.log.get(__name__)
-
 
 def get_custom_objects():
     """独自オブジェクトのdictを返す。"""
@@ -76,7 +74,7 @@ class NSGD(keras.optimizers.SGD):
 
             self.updates.append(K.update(p, new_p))
 
-        _logger.info(f'lr_multipliers: applied = {applied_lr_multipliers}')
+        tk.log.get(__name__).info(f'lr_multipliers: applied = {applied_lr_multipliers}')
         return self.updates
 
     def get_config(self):

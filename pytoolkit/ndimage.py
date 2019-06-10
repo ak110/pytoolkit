@@ -20,7 +20,6 @@ import sklearn.utils
 
 import pytoolkit as tk
 
-_logger = tk.log.get(__name__)
 _load_cache = None
 _diskcache_load_failed = False
 
@@ -76,7 +75,7 @@ def load_with_cache(path_or_array: typing.Union[np.ndarray, io.IOBase, str, path
             except BaseException:
                 pathlib.Path(temp_dir).rmdir()
                 _diskcache_load_failed = True
-                _logger.warning('diskcache load failed.', exc_info=True)
+                tk.log.get(__name__).warning('diskcache load failed.', exc_info=True)
         if _load_cache is not None:
             key = f'{path_or_array}::{max_size}'
             img = _load_cache.get(key)

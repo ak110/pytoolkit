@@ -9,8 +9,6 @@ import pytoolkit as tk
 
 from . import K, keras
 
-_logger = tk.log.get(__name__)
-
 
 class LearningRateStepDecay(keras.callbacks.Callback):
     """よくある150epoch目と225epoch目に学習率を1/10するコールバック。"""
@@ -31,7 +29,7 @@ class LearningRateStepDecay(keras.callbacks.Callback):
             lr1 = K.get_value(self.model.optimizer.lr)
             lr2 = lr1 * self.factor
             K.set_value(self.model.optimizer.lr, lr2)
-            _logger.info(f'Epoch {epoch + 1}: Learning rate {lr1:.1e} -> {lr2:.1e}')
+            tk.log.get(__name__).info(f'Epoch {epoch + 1}: Learning rate {lr1:.1e} -> {lr2:.1e}')
 
 
 class CosineAnnealing(keras.callbacks.Callback):
@@ -143,7 +141,7 @@ class EpochLogger(keras.callbacks.Callback):
         eta = time_per_epoch * (self.params['epochs'] - epoch - 1)
         metrics = ' '.join([f'{k}={logs.get(k):.4f}' for k in self.params['metrics'] if k in logs])
         if self.enabled:
-            _logger.debug(f'Epoch {epoch + 1:3d}: lr={lr:.1e} {metrics} time={int(np.ceil(elapsed_time))} ETA={int(np.ceil(eta))}')
+            tk.log.get(__name__).debug(f'Epoch {epoch + 1:3d}: lr={lr:.1e} {metrics} time={int(np.ceil(elapsed_time))} ETA={int(np.ceil(eta))}')
 
 
 class FreezeBNCallback(keras.callbacks.Callback):
@@ -172,7 +170,7 @@ class FreezeBNCallback(keras.callbacks.Callback):
             freezed_count = self._freeze_layers(self.model)
             if freezed_count > 0:
                 self._recompile()
-            _logger.info(f'Epoch {epoch + 1}: {freezed_count} BNs was frozen.')
+            tk.log.get(__name__).info(f'Epoch {epoch + 1}: {freezed_count} BNs was frozen.')
 
     def _freeze_layers(self, container):
         freezed_count = 0
@@ -220,7 +218,7 @@ class UnfreezeCallback(keras.callbacks.Callback):
             unfreeze_count = self._unfreeze_layers(self.model)
             if unfreeze_count > 0:
                 self._recompile()
-            _logger.info(f'Epoch {epoch + 1}: Unfreezed layers: {unfreeze_count}')
+            tk.log.get(__name__).info(f'Epoch {epoch + 1}: Unfreezed layers: {unfreeze_count}')
 
     def _unfreeze_layers(self, container):
         count = 0
@@ -266,7 +264,7 @@ class Checkpoint(keras.callbacks.Callback):
     def on_epoch_begin(self, epoch, logs=None):
         if epoch in self.target_epochs:
             if tk.hvd.is_master():
-                _logger.info(f'Epoch {epoch}: Saving model to {self.checkpoint_path}')
+                tk.log.get(__name__).info(f'Epoch {epoch}: Saving model to {self.checkpoint_path}')
                 # 保存の真っ最中に死んだときに大丈夫なように少し気を使った処理をする。
                 # 一度.tmpに保存してから元のを.bkにリネームして.tmpを外して.bkを削除。
                 self.checkpoint_path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,8 +1,7 @@
 """各種ユーティリティ"""
-import logging
 import os
 
-_logger = logging.getLogger(__name__)
+import pytoolkit as tk
 
 
 def find_by_name(arr, name):
@@ -45,4 +44,4 @@ def better_exceptions():
         import better_exceptions as be
         be.hook()
     except BaseException:
-        _logger.warning('better_exceptions error', exc_info=True)
+        tk.log.get(__name__).warning('better_exceptions error', exc_info=True)

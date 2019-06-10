@@ -13,8 +13,7 @@ import tensorflow as tf
 import pytoolkit as tk
 
 from . import keras
-
-_logger = tk.log.get(__name__)
+from . import log as tk_log
 
 
 def load(path, custom_objects=None, compile=False, gpus=None) -> keras.models.Model:  # pylint: disable=redefined-outer-name
@@ -81,7 +80,7 @@ def plot(model: keras.models.Model, to_file='model.svg', show_shapes=True, show_
     tk.hvd.barrier()
 
 
-@tk.log.trace()
+@tk_log.trace()
 def compile(model: keras.models.Model, optimizer, loss, metrics=None, loss_weights=None):  # pylint: disable=redefined-builtin
     """compileするだけ。"""
     if tk.hvd.initialized():
@@ -90,10 +89,10 @@ def compile(model: keras.models.Model, optimizer, loss, metrics=None, loss_weigh
     model.compile(optimizer, loss, metrics, loss_weights=loss_weights)
 
 
-@tk.log.trace()
+@tk_log.trace()
 def fit(model: keras.models.Model,
-        training_data: tk.data.Dataset,
-        validation_data: tk.data.Dataset = None,
+        training_data,
+        validation_data=None,
         validation_freq: int = 1,
         class_weight=None,
         batch_size=32, epochs=1800,
@@ -163,13 +162,13 @@ def fit(model: keras.models.Model,
             training_generator.model_iteration = original
 
     # DataLoaderの処理時間を表示
-    _logger.info(f'train_data_loader: {train_data_loader.seconds_per_step * 1000:4.0f}ms/step')
+    tk.log.get(__name__).info(f'train_data_loader: {train_data_loader.seconds_per_step * 1000:4.0f}ms/step')
     if val_data_loader is not None:
-        _logger.info(f'val_data_loader:   {train_data_loader.seconds_per_step * 1000:4.0f}ms/step')
+        tk.log.get(__name__).info(f'val_data_loader:   {train_data_loader.seconds_per_step * 1000:4.0f}ms/step')
 
 
-@tk.log.trace()
-def predict(model: keras.models.Model, dataset: tk.data.Dataset, batch_size=32, verbose=1, use_horovod=False):
+@tk_log.trace()
+def predict(model: keras.models.Model, dataset, batch_size=32, verbose=1, use_horovod=False):
     """予測。
 
     Args:
@@ -190,7 +189,7 @@ def predict(model: keras.models.Model, dataset: tk.data.Dataset, batch_size=32, 
     return values
 
 
-@tk.log.trace()
+@tk_log.trace()
 def evaluate(model: keras.models.Model, dataset, batch_size=32, verbose=1, use_horovod=False):
     """評価。
 
@@ -212,8 +211,8 @@ def evaluate(model: keras.models.Model, dataset, batch_size=32, verbose=1, use_h
     return evals
 
 
-@tk.log.trace()
-def custom_predict(model: keras.models.Model, dataset: tk.data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None, use_horovod=False):
+@tk_log.trace()
+def custom_predict(model: keras.models.Model, dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None, use_horovod=False):
     """予測。
 
     TTAなど用。
@@ -238,7 +237,7 @@ def custom_predict(model: keras.models.Model, dataset: tk.data.Dataset, batch_si
     return values
 
 
-def custom_predict_flow(model: keras.models.Model, dataset: tk.data.Dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None):
+def custom_predict_flow(model: keras.models.Model, dataset, batch_size, verbose=1, desc='predict', on_batch_fn=None):
     """予測。(yieldバージョン)
 
     TTAなど用。Horovodでの分散処理機能は無し。(複数GPUで処理したい場合はmulti_gpu_modelを使用するか呼ぶ側でsplitする。処理順に注意が必要。)
@@ -267,7 +266,7 @@ def _predict_on_batch(model: keras.models.Model, X):
     return model.predict_on_batch(X)
 
 
-@tk.log.trace()
+@tk_log.trace()
 def multi_gpu_model(model, batch_size, gpus=None):
     """複数GPUでデータ並列するモデルを作成する。
 
