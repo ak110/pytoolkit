@@ -8,7 +8,7 @@ import sys
 import numpy as np
 
 if True:
-    sys.path.append('..')
+    sys.path.append(str(pathlib.Path(__file__).parent.parent))
     import pytoolkit as tk
 
 _BATCH_SIZE = 16

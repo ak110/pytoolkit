@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 if True:
-    sys.path.append('..')
+    sys.path.append(str(pathlib.Path(__file__).parent.parent))
     import pytoolkit as tk
 
 
