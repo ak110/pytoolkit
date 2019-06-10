@@ -35,6 +35,7 @@ def test_filters(data_dir, check_dir):
     save_dir = check_dir / 'ndimage'
     rand = np.random.RandomState(1234)
     filters = [
+        # fmt: off
         (0, 'original', lambda rgb: rgb),
         (0, 'pad_edge', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='edge')),
         (0, 'pad_zero', lambda rgb: tk.ndimage.pad(rgb, 300, 300, padding='zero')),
@@ -105,6 +106,7 @@ def test_filters(data_dir, check_dir):
         (0, 'gt_mixed_2', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, flip_h=True, degrees=-15, scale_h=2.0, scale_v=1.75, pos_h=-0.25, pos_v=0.125)),
         (0, 'gt_mixed_3', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, flip_v=True, degrees=-15, scale_h=0.5, scale_v=0.75, pos_h=-0.25, pos_v=0.125)),
         (0, 'gt_mixed_4', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, flip_v=True, degrees=-15, scale_h=2.0, scale_v=1.5, pos_h=-0.25, pos_v=0.125)),
+        # fmt: on
     ]
 
     rgb = tk.ndimage.load(data_dir / 'Lenna.png')  # 256x256の某有名画像
