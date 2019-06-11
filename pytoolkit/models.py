@@ -6,6 +6,7 @@ Horovodに対応した簡単なwrapperなど。
 
 """
 import pathlib
+import shutil
 
 import numpy as np
 import tensorflow as tf
@@ -53,15 +54,55 @@ def save(model: keras.models.Model, path, include_optimizer=False):
     tk.hvd.barrier()
 
 
-def save_onnx(model: keras.models.Model, path, **kwargs):
+def save_saved_model(model: keras.models.Model, path):
+    """SavedModel形式で保存。(pathはディレクトリ名)"""
+    path = pathlib.Path(path)
+    if tk.hvd.is_master():
+        with tk.log.trace_scope(f'save_saved_model({path})'):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if path.is_dir():
+                shutil.rmtree(path)
+            tk.log.get(__name__).info(f'inpus={model.inputs} outputs={model.outputs}')
+            tf.saved_model.simple_save(
+                keras.backend.get_session(), str(path),
+                inputs={x.name: x for x in model.inputs},
+                outputs={x.name: x for x in model.outputs})
+    tk.hvd.barrier()
+
+
+def save_onnx(model: keras.models.Model, path):
     """ONNX形式で保存。"""
     import onnxmltools
+    import tf2onnx
+
     path = pathlib.Path(path)
     if tk.hvd.is_master():
         with tk.log.trace_scope(f'save_onnx({path})'):
+            input_names = [x.name for x in model.inputs]
+            output_names = [x.name for x in model.outputs]
+            tk.log.get(__name__).info(f'input_names={input_names} output_names={output_names}')
+            onnx_graph = tf2onnx.tfonnx.process_tf_graph(
+                keras.backend.get_session().graph,
+                input_names=input_names, output_names=output_names)
+            onnx_model = onnx_graph.make_model('test')
             path.parent.mkdir(parents=True, exist_ok=True)
-            onnx_model = onnxmltools.convert_keras(model, **kwargs)
             onnxmltools.utils.save_model(onnx_model, str(path))
+    tk.hvd.barrier()
+
+
+def save_tflite(model: keras.models.Model, path, **kwargs):
+    """tflite形式で保存。"""
+    path = pathlib.Path(path)
+    if tk.hvd.is_master():
+        with tk.log.trace_scope(f'save_tflite({path})'):
+            tk.log.get(__name__).info(f'inpus={model.inputs} outputs={model.outputs}')
+            tflite_model = tf.lite.TFLiteConverter.from_session(
+                keras.backend.get_session(),
+                input_tensors=model.inputs,
+                output_tensors=model.outputs).convert()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open('wb') as f:
+                f.write(tflite_model)
     tk.hvd.barrier()
 
 
