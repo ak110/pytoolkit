@@ -21,4 +21,5 @@ scikit-image
 scikit-learn
 scipy
 tensorflow
+tf2onnx
 tqdm
