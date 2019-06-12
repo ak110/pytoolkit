@@ -27,6 +27,7 @@ def normalize_tuple(value, n):
 def tqdm(iterable=None, desc=None, total=None, leave=True, **kwargs):
     """ascii=Trueでncols=100なtqdm。"""
     from tqdm import tqdm as t
+
     return t(iterable, desc, total, leave, ascii=True, ncols=100, **kwargs)
 
 
@@ -39,9 +40,10 @@ def better_exceptions():
     """better_exceptionsを有効にする。"""
     try:
         # サブプロセスとか用に環境変数を設定
-        os.environ['BETTER_EXCEPTIONS'] = '1'
+        os.environ["BETTER_EXCEPTIONS"] = "1"
         # 今のスレッドでアクティブにする
         import better_exceptions as be
+
         be.hook()
     except BaseException:
-        tk.log.get(__name__).warning('better_exceptions error', exc_info=True)
+        tk.log.get(__name__).warning("better_exceptions error", exc_info=True)

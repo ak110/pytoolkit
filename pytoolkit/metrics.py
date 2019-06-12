@@ -24,8 +24,8 @@ def binary_iou(y_true, y_pred, target_classes=None, threshold=0.5):
     axes = list(range(1, K.ndim(y_true)))
     t = y_true >= 0.5
     p = y_pred >= threshold
-    inter = K.sum(K.cast(tf.math.logical_and(t, p), 'float32'), axis=axes)
-    union = K.sum(K.cast(tf.math.logical_or(t, p), 'float32'), axis=axes)
+    inter = K.sum(K.cast(tf.math.logical_and(t, p), "float32"), axis=axes)
+    union = K.sum(K.cast(tf.math.logical_or(t, p), "float32"), axis=axes)
     return inter / K.maximum(union, 1)
 
 
@@ -43,14 +43,14 @@ def categorical_iou(y_true, y_pred, target_classes=None, strict=True):
     active_list = []
     iou_list = []
     for c in target_classes or range(K.int_shape(y_true)[-1]):
-        with tf.name_scope(f'class_{c}'):
+        with tf.name_scope(f"class_{c}"):
             y_c = K.equal(y_classes, c)
             p_c = K.equal(p_classes, c)
-            inter = K.sum(K.cast(tf.math.logical_and(y_c, p_c), 'float32'), axis=axes)
-            union = K.sum(K.cast(tf.math.logical_or(y_c, p_c), 'float32'), axis=axes)
+            inter = K.sum(K.cast(tf.math.logical_and(y_c, p_c), "float32"), axis=axes)
+            union = K.sum(K.cast(tf.math.logical_or(y_c, p_c), "float32"), axis=axes)
             active = union > 0 if strict else K.any(y_c, axis=axes)
             iou = inter / (union + K.epsilon())
-            active_list.append(K.cast(active, 'float32'))
+            active_list.append(K.cast(active, "float32"))
             iou_list.append(iou)
     return K.sum(iou_list, axis=0) / (K.sum(active_list, axis=0) + K.epsilon())
 
@@ -88,6 +88,6 @@ def fbeta_score(y_true, y_pred, beta=1):
 recall = tpr
 
 # 長いので名前変えちゃう
-binary_accuracy.__name__ = 'acc'
-binary_iou.__name__ = 'iou'
-categorical_iou.__name__ = 'iou'
+binary_accuracy.__name__ = "acc"
+binary_iou.__name__ = "iou"
+categorical_iou.__name__ = "iou"

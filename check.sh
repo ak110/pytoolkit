@@ -1,11 +1,11 @@
 #!/bin/bash
 set -eux
 
+black --check .
+
 flake8
 
-test "$(autopep8 --recursive --diff .)" = ""
-
-pylint -j0 pytoolkit *.py
+pylint -j0 pytoolkit scripts
 
 pytest
 

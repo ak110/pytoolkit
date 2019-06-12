@@ -1,4 +1,3 @@
-
 import numpy as np
 import pytest
 
@@ -6,33 +5,33 @@ import pytoolkit as tk
 
 
 def test_saveload_alpha(data_dir, tmpdir):
-    img = tk.ndimage.load(data_dir / 'Alpha.png')
+    img = tk.ndimage.load(data_dir / "Alpha.png")
     assert img.shape[-1] == 3
-    tk.ndimage.save(str(tmpdir.join('output.png')), img)
+    tk.ndimage.save(str(tmpdir.join("output.png")), img)
 
 
 def test_saveload_grayscale(data_dir, tmpdir):
-    img = tk.ndimage.load(data_dir / 'Lenna.png', grayscale=True)
+    img = tk.ndimage.load(data_dir / "Lenna.png", grayscale=True)
     assert img.shape[-1] == 1
-    tk.ndimage.save(str(tmpdir.join('output.png')), img)
+    tk.ndimage.save(str(tmpdir.join("output.png")), img)
 
 
 def test_saveload_gif(data_dir, tmpdir):
-    img = tk.ndimage.load(data_dir / 'Lenna.gif')
+    img = tk.ndimage.load(data_dir / "Lenna.gif")
     assert img is not None
     assert img.shape[-1] == 3
-    tk.ndimage.save(str(tmpdir.join('output.bmp')), img)
-    assert (tk.ndimage.load(str(tmpdir.join('output.bmp'))) == img).all()
+    tk.ndimage.save(str(tmpdir.join("output.bmp")), img)
+    assert (tk.ndimage.load(str(tmpdir.join("output.bmp"))) == img).all()
 
 
 def test_load_text_failed(data_dir):
     with pytest.raises(BaseException):
-        tk.ndimage.load(data_dir / 'text.txt')
+        tk.ndimage.load(data_dir / "text.txt")
 
 
 def test_filters(data_dir, check_dir):
     """画像の変換のテスト。目視したいので結果を`../___check/ndimage/`に保存しちゃう。"""
-    save_dir = check_dir / 'ndimage'
+    save_dir = check_dir / "ndimage"
     rand = np.random.RandomState(1234)
     filters = [
         # fmt: off
@@ -109,7 +108,7 @@ def test_filters(data_dir, check_dir):
         # fmt: on
     ]
 
-    rgb = tk.ndimage.load(data_dir / 'Lenna.png')  # 256x256の某有名画像
+    rgb = tk.ndimage.load(data_dir / "Lenna.png")  # 256x256の某有名画像
     save_dir.mkdir(parents=True, exist_ok=True)
     for cp in save_dir.iterdir():
         cp.unlink()
@@ -127,4 +126,4 @@ def test_filters(data_dir, check_dir):
             x[64:-64, 64:-64, :] = t
         else:
             x = t
-        tk.ndimage.save(save_dir / f'{i:02d}_{name}.png', x)
+        tk.ndimage.save(save_dir / f"{i:02d}_{name}.png", x)

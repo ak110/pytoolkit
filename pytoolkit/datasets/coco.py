@@ -29,8 +29,8 @@ def load_od(coco_dir, year=2017):
         - class_names
 
     """
-    X_train, y_train, class_names = load_od_data(coco_dir, f'train{year}')
-    X_val, y_val, class_names_val = load_od_data(coco_dir, f'val{year}')
+    X_train, y_train, class_names = load_od_data(coco_dir, f"train{year}")
+    X_val, y_val, class_names_val = load_od_data(coco_dir, f"val{year}")
     assert class_names == class_names_val
     return (X_train, y_train), (X_val, y_val), class_names
 
@@ -38,39 +38,47 @@ def load_od(coco_dir, year=2017):
 def load_od_data(coco_dir, data_name):
     """物体検出のデータの読み込み。"""
     from pycocotools import coco
-    coco_dir = pathlib.Path(coco_dir)
-    coco = coco.COCO(str(coco_dir / 'annotations' / f'instances_{data_name}.json'))
 
-    class_names = [c['name'] for c in coco.loadCats(coco.getCatIds())]
-    jsonclassid_to_index = {c['id']: class_names.index(c['name']) for c in coco.loadCats(coco.getCatIds())}
+    coco_dir = pathlib.Path(coco_dir)
+    coco = coco.COCO(str(coco_dir / "annotations" / f"instances_{data_name}.json"))
+
+    class_names = [c["name"] for c in coco.loadCats(coco.getCatIds())]
+    jsonclassid_to_index = {
+        c["id"]: class_names.index(c["name"]) for c in coco.loadCats(coco.getCatIds())
+    }
 
     annotations = []
     for entry in coco.loadImgs(coco.getImgIds()):
-        dirname, filename = entry['coco_url'].split('/')[-2:]
-        objs = coco.loadAnns(coco.getAnnIds(imgIds=entry['id'], iscrowd=None))
+        dirname, filename = entry["coco_url"].split("/")[-2:]
+        objs = coco.loadAnns(coco.getAnnIds(imgIds=entry["id"], iscrowd=None))
 
         bboxes, classes, areas, crowdeds = [], [], [], []
-        width, height = entry['width'], entry['height']
+        width, height = entry["width"], entry["height"]
         for obj in objs:
-            if obj.get('ignore', 0) == 1:
+            if obj.get("ignore", 0) == 1:
                 continue
-            x, y, w, h = obj['bbox']
-            bbox = np.array([x, y, x + w, y + h]) / np.array([width, height, width, height])
+            x, y, w, h = obj["bbox"]
+            bbox = np.array([x, y, x + w, y + h]) / np.array(
+                [width, height, width, height]
+            )
             bbox = np.clip(bbox, 0, 1)
             if (bbox[:2] < bbox[2:]).all():
                 bboxes.append(bbox)
-                classes.append(jsonclassid_to_index[obj['category_id']])
-                areas.append(obj['area'])
-                crowdeds.append(obj['iscrowd'])
+                classes.append(jsonclassid_to_index[obj["category_id"]])
+                areas.append(obj["area"])
+                crowdeds.append(obj["iscrowd"])
 
-        annotations.append(od.ObjectsAnnotation(
-            path=coco_dir / dirname / filename,
-            width=width,
-            height=height,
-            classes=classes,
-            bboxes=bboxes,
-            areas=areas,
-            crowdeds=crowdeds))
+        annotations.append(
+            od.ObjectsAnnotation(
+                path=coco_dir / dirname / filename,
+                width=width,
+                height=height,
+                classes=classes,
+                bboxes=bboxes,
+                areas=areas,
+                crowdeds=crowdeds,
+            )
+        )
 
     return np.array([t.path for t in annotations]), np.array(annotations), class_names
 
@@ -92,8 +100,12 @@ def load_ss(coco_dir, cache_dir, input_size=None, year=2017):
         - class_names: クラス名の配列
 
     """
-    X_train, y_train, class_names = load_ss_data(coco_dir, f'train{year}', cache_dir, input_size)
-    X_val, y_val, class_names_val = load_ss_data(coco_dir, f'val{year}', cache_dir, input_size)
+    X_train, y_train, class_names = load_ss_data(
+        coco_dir, f"train{year}", cache_dir, input_size
+    )
+    X_val, y_val, class_names_val = load_ss_data(
+        coco_dir, f"val{year}", cache_dir, input_size
+    )
     assert class_names == class_names_val
     return (X_train, y_train), (X_val, y_val), class_names
 
@@ -101,32 +113,39 @@ def load_ss(coco_dir, cache_dir, input_size=None, year=2017):
 def load_ss_data(coco_dir, data_name, cache_dir, input_size=None):
     """セマンティックセグメンテーションのデータの読み込み。"""
     from pycocotools import coco, mask as cocomask
+
     coco_dir = pathlib.Path(coco_dir)
     cache_dir = pathlib.Path(cache_dir)
     if isinstance(input_size, int):
         input_size = (input_size, input_size)
 
-    coco = coco.COCO(str(coco_dir / 'annotations' / f'instances_{data_name}.json'))
+    coco = coco.COCO(str(coco_dir / "annotations" / f"instances_{data_name}.json"))
 
-    class_names = [c['name'] for c in coco.loadCats(coco.getCatIds())]
-    jsonclassid_to_index = {c['id']: class_names.index(c['name']) for c in coco.loadCats(coco.getCatIds())}
+    class_names = [c["name"] for c in coco.loadCats(coco.getCatIds())]
+    jsonclassid_to_index = {
+        c["id"]: class_names.index(c["name"]) for c in coco.loadCats(coco.getCatIds())
+    }
 
     X, y = [], []
-    for entry in utils.tqdm(coco.loadImgs(coco.getImgIds()), desc='load_ss_data'):
-        dirname, filename = entry['coco_url'].split('/')[-2:]
-        save_path = cache_dir / dirname / (filename + '.npy')
+    for entry in utils.tqdm(coco.loadImgs(coco.getImgIds()), desc="load_ss_data"):
+        dirname, filename = entry["coco_url"].split("/")[-2:]
+        save_path = cache_dir / dirname / (filename + ".npy")
         X.append(coco_dir / dirname / filename)
         y.append(save_path)
         if not save_path.exists():
             # 読み込み
-            objs = coco.loadAnns(coco.getAnnIds(imgIds=entry['id'], iscrowd=None))
-            mask = np.zeros((entry['height'], entry['width'], len(class_names)), dtype=np.uint8)
+            objs = coco.loadAnns(coco.getAnnIds(imgIds=entry["id"], iscrowd=None))
+            mask = np.zeros(
+                (entry["height"], entry["width"], len(class_names)), dtype=np.uint8
+            )
             for obj in objs:
-                if obj.get('ignore', 0) == 1:
+                if obj.get("ignore", 0) == 1:
                     continue
-                rle = cocomask.frPyObjects(obj['segmentation'], entry['height'], entry['width'])
+                rle = cocomask.frPyObjects(
+                    obj["segmentation"], entry["height"], entry["width"]
+                )
                 m = cocomask.decode(rle)
-                class_id = jsonclassid_to_index[obj['category_id']]
+                class_id = jsonclassid_to_index[obj["category_id"]]
                 mask[:, :, class_id] |= m
             mask = np.where(mask, np.uint8(255), np.uint8(0))
             # リサイズ
@@ -155,13 +174,22 @@ def evaluate(y_true, y_pred):
 
     """
     import chainercv
+
     gt_classes_list = np.array([y.classes for y in y_true])
     gt_bboxes_list = np.array([y.real_bboxes for y in y_true])
     gt_areas_list = np.array([y.areas for y in y_true])
     gt_crowdeds_list = np.array([y.crowdeds for y in y_true])
     pred_classes_list = np.array([p.classes for p in y_pred])
     pred_confs_list = np.array([p.confs for p in y_pred])
-    pred_bboxes_list = np.array([p.get_real_bboxes(y.width, y.height) for (p, y) in zip(y_pred, y_true)])
+    pred_bboxes_list = np.array(
+        [p.get_real_bboxes(y.width, y.height) for (p, y) in zip(y_pred, y_true)]
+    )
     return chainercv.evaluations.eval_detection_coco(
-        pred_bboxes_list, pred_classes_list, pred_confs_list,
-        gt_bboxes_list, gt_classes_list, gt_areas_list, gt_crowdeds_list)
+        pred_bboxes_list,
+        pred_classes_list,
+        pred_confs_list,
+        gt_bboxes_list,
+        gt_classes_list,
+        gt_areas_list,
+        gt_crowdeds_list,
+    )

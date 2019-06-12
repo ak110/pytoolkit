@@ -13,5 +13,5 @@ def data_url(data: bytes, mime_type: str) -> str:
         str: data URL。
 
     """
-    b64 = base64.b64encode(data).decode('ascii')
-    return f'data:{mime_type};base64,{b64}'
+    b64 = base64.b64encode(data).decode("ascii")
+    return f"data:{mime_type};base64,{b64}"

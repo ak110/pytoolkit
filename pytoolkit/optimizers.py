@@ -7,10 +7,7 @@ from . import K, keras
 
 def get_custom_objects():
     """独自オブジェクトのdictを返す。"""
-    classes = [
-        NSGD,
-        SAdam,
-    ]
+    classes = [NSGD, SAdam]
     return {c.__name__: c for c in classes}
 
 
@@ -26,8 +23,18 @@ class NSGD(keras.optimizers.SGD):
 
     """
 
-    def __init__(self, lr=0.1, lr_multipliers=None, momentum=0.9, decay=0., nesterov=True, **kwargs):
-        super().__init__(lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, **kwargs)
+    def __init__(
+        self,
+        lr=0.1,
+        lr_multipliers=None,
+        momentum=0.9,
+        decay=0.0,
+        nesterov=True,
+        **kwargs,
+    ):
+        super().__init__(
+            lr=lr, momentum=momentum, decay=decay, nesterov=nesterov, **kwargs
+        )
         # {レイヤー: multiplier} or {重みの名前: multiplier}
         # model.save()時に前者はそのまま保存できないので、後者に統一する。
         self.lr_multipliers = {}
@@ -48,7 +55,7 @@ class NSGD(keras.optimizers.SGD):
 
         lr = self.lr
         if self.initial_decay > 0:
-            lr = lr * (1. / (1. + self.decay * self.iterations))
+            lr = lr * (1.0 / (1.0 + self.decay * self.iterations))
 
         # momentum
         shapes = [K.int_shape(p) for p in params]
@@ -69,16 +76,16 @@ class NSGD(keras.optimizers.SGD):
                 new_p = p + v
 
             # Apply constraints.
-            if getattr(p, 'constraint', None) is not None:
+            if getattr(p, "constraint", None) is not None:
                 new_p = p.constraint(new_p)
 
             self.updates.append(K.update(p, new_p))
 
-        tk.log.get(__name__).info(f'lr_multipliers: applied = {applied_lr_multipliers}')
+        tk.log.get(__name__).info(f"lr_multipliers: applied = {applied_lr_multipliers}")
         return self.updates
 
     def get_config(self):
-        config = {'lr_multipliers': self.lr_multipliers}
+        config = {"lr_multipliers": self.lr_multipliers}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
@@ -117,12 +124,14 @@ class SAdam(keras.optimizers.Adam):
 
         lr = self.lr
         if self.initial_decay > 0:
-            lr = lr * (1. / (1. + self.decay * K.cast(self.iterations, K.dtype(self.decay))))
+            lr = lr * (
+                1.0 / (1.0 + self.decay * K.cast(self.iterations, K.dtype(self.decay)))
+            )
 
         t = K.cast(self.iterations, K.floatx()) + 1
         # lr_t = lr * (K.sqrt(1. - K.pow(self.beta_2, t)) / 1. - K.pow(self.beta_1, t))
         # あえてbeta_1の方は削除してみる (怪)
-        lr_t = lr * K.sqrt(1. - K.pow(self.beta_2, t))
+        lr_t = lr * K.sqrt(1.0 - K.pow(self.beta_2, t))
 
         ms = [K.zeros(K.int_shape(p), dtype=K.dtype(p)) for p in params]
         vs = [K.zeros(K.int_shape(p), dtype=K.dtype(p)) for p in params]
@@ -133,8 +142,8 @@ class SAdam(keras.optimizers.Adam):
         self.weights = [self.iterations] + ms + vs + vhats
 
         for p, g, m, v, vhat in zip(params, grads, ms, vs, vhats):
-            m_t = (self.beta_1 * m) + (1. - self.beta_1) * g
-            v_t = (self.beta_2 * v) + (1. - self.beta_2) * K.square(g)
+            m_t = (self.beta_1 * m) + (1.0 - self.beta_1) * g
+            v_t = (self.beta_2 * v) + (1.0 - self.beta_2) * K.square(g)
 
             # 学習率の個別調整
             if p.name in self.lr_multipliers:
@@ -162,13 +171,13 @@ class SAdam(keras.optimizers.Adam):
             new_p = p_t
 
             # Apply constraints.
-            if getattr(p, 'constraint', None) is not None:
+            if getattr(p, "constraint", None) is not None:
                 new_p = p.constraint(new_p)
 
             self.updates.append(K.update(p, new_p))
         return self.updates
 
     def get_config(self):
-        config = {'lr_multipliers': self.lr_multipliers}
+        config = {"lr_multipliers": self.lr_multipliers}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))

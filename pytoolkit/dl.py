@@ -14,12 +14,17 @@ from . import K
 
 def wrap_session(config=None, gpu_options=None, use_horovod=False):
     """session()のデコレーター版。"""
+
     def _decorator(func):
         @functools.wraps(func)
         def _decorated_func(*args, **kwargs):
-            with session(config=config, gpu_options=gpu_options, use_horovod=use_horovod):
+            with session(
+                config=config, gpu_options=gpu_options, use_horovod=use_horovod
+            ):
                 return func(*args, **kwargs)
+
         return _decorated_func
+
     return _decorator
 
 
@@ -36,8 +41,8 @@ def session(config=None, gpu_options=None, use_horovod=False):
         use_horovod: tk.hvd.init()と、visible_device_listの指定を行う。
 
     """
-    class SessionScope:  # pylint: disable=R0903
 
+    class SessionScope:  # pylint: disable=R0903
         def __init__(self, config=None, gpu_options=None, use_horovod=False):
             self.config = config or {}
             self.gpu_options = gpu_options or {}
@@ -51,12 +56,19 @@ def session(config=None, gpu_options=None, use_horovod=False):
                 else:
                     tk.hvd.init()
                 if tk.hvd.initialized() and get_gpu_count() > 0:
-                    self.gpu_options['visible_device_list'] = str(tk.hvd.get().local_rank())
-            if K.backend() == 'tensorflow':
-                self.config['allow_soft_placement'] = True
-                self.gpu_options['allow_growth'] = True
-                if 'OMP_NUM_THREADS' in os.environ and 'intra_op_parallelism_threads' not in self.config:
-                    self.config['intra_op_parallelism_threads'] = int(os.environ['OMP_NUM_THREADS'])
+                    self.gpu_options["visible_device_list"] = str(
+                        tk.hvd.get().local_rank()
+                    )
+            if K.backend() == "tensorflow":
+                self.config["allow_soft_placement"] = True
+                self.gpu_options["allow_growth"] = True
+                if (
+                    "OMP_NUM_THREADS" in os.environ
+                    and "intra_op_parallelism_threads" not in self.config
+                ):
+                    self.config["intra_op_parallelism_threads"] = int(
+                        os.environ["OMP_NUM_THREADS"]
+                    )
                 config = tf.ConfigProto(**self.config)
                 for k, v in self.gpu_options.items():
                     setattr(config.gpu_options, k, v)
@@ -65,7 +77,7 @@ def session(config=None, gpu_options=None, use_horovod=False):
             return self
 
         def __exit__(self, *exc_info):
-            if K.backend() == 'tensorflow':
+            if K.backend() == "tensorflow":
                 self.session = None
                 K.clear_session()
 
@@ -74,24 +86,31 @@ def session(config=None, gpu_options=None, use_horovod=False):
 
 def get_gpu_count():
     """GPU数の取得。"""
-    if 'CUDA_VISIBLE_DEVICES' in os.environ:
-        gpus = os.environ['CUDA_VISIBLE_DEVICES'].strip()
-        if gpus in ('-1', 'none'):
+    if "CUDA_VISIBLE_DEVICES" in os.environ:
+        gpus = os.environ["CUDA_VISIBLE_DEVICES"].strip()
+        if gpus in ("-1", "none"):
             return 0
-        return len(np.unique(gpus.split(',')))
+        return len(np.unique(gpus.split(",")))
     try:
-        result_text = nvidia_smi('--list-gpus').strip()
-        if 'No devices found' in result_text:
+        result_text = nvidia_smi("--list-gpus").strip()
+        if "No devices found" in result_text:
             return 0
-        return len([l for l in result_text.split('\n') if len(l) > 0])
+        return len([l for l in result_text.split("\n") if len(l) > 0])
     except FileNotFoundError:
         return 0
 
 
 def nvidia_smi(*args):
     """nvidia-smiコマンドを実行する。"""
-    path = pathlib.Path(os.environ.get('ProgramFiles', '')) / 'NVIDIA Corporation' / 'NVSMI' / 'nvidia-smi.exe'
+    path = (
+        pathlib.Path(os.environ.get("ProgramFiles", ""))
+        / "NVIDIA Corporation"
+        / "NVSMI"
+        / "nvidia-smi.exe"
+    )
     if not path.is_file():
-        path = 'nvidia-smi'
+        path = "nvidia-smi"
     command = [str(path)] + list(args)
-    return subprocess.check_output(command, stderr=subprocess.STDOUT, universal_newlines=True)
+    return subprocess.check_output(
+        command, stderr=subprocess.STDOUT, universal_newlines=True
+    )

@@ -6,14 +6,16 @@ import tensorflow as tf
 def _use_tf_keras():
     """Trueならtf.keras、Falseならkerasを使う。"""
     import os
-    backend = os.environ.get('PYTOOLKIT_BACKEND', None)
-    if backend == 'tf':
+
+    backend = os.environ.get("PYTOOLKIT_BACKEND", None)
+    if backend == "tf":
         return True
-    elif backend == 'keras':
+    elif backend == "keras":
         return False
     else:
         import sys
-        if 'keras' in sys.modules:
+
+        if "keras" in sys.modules:
             return False
         return True
 
@@ -23,7 +25,7 @@ if True:
     if _use_tf_keras():
         keras = tf.keras
     else:
-        print('Using native Keras.')
+        print("Using native Keras.")
         import keras
     K = keras.backend
 

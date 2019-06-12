@@ -29,7 +29,7 @@ class GradCamVisualizer:
         mask = mask / (K.max(mask) + 1e-3)  # [0, 1)
         self.get_mask_func = K.function(model.inputs + [K.learning_phase()], [mask])
 
-    def draw(self, source_image, model_inputs, alpha=0.5, interpolation='nearest'):
+    def draw(self, source_image, model_inputs, alpha=0.5, interpolation="nearest"):
         """ヒートマップ画像を作成して返す。
 
         Args:
@@ -45,18 +45,22 @@ class GradCamVisualizer:
         assert source_image.shape[2:] == (3,)
         assert 0 < alpha < 1
         cv2_interp = {
-            'nearest': cv2.INTER_NEAREST,
-            'bilinear': cv2.INTER_LINEAR,
-            'bicubic': cv2.INTER_CUBIC,
-            'lanczos': cv2.INTER_LANCZOS4,
+            "nearest": cv2.INTER_NEAREST,
+            "bilinear": cv2.INTER_LINEAR,
+            "bicubic": cv2.INTER_CUBIC,
+            "lanczos": cv2.INTER_LANCZOS4,
         }[interpolation]
 
         mask = self.get_mask(model_inputs)
-        mask = cv2.resize(mask, (source_image.shape[1], source_image.shape[0]), interpolation=cv2_interp)
+        mask = cv2.resize(
+            mask,
+            (source_image.shape[1], source_image.shape[0]),
+            interpolation=cv2_interp,
+        )
         mask = np.uint8(256 * mask)  # [0-255]
 
         heatmap = cv2.applyColorMap(mask, cv2.COLORMAP_JET)
-        heatmap = heatmap[..., ::-1]    # BGR to RGB
+        heatmap = heatmap[..., ::-1]  # BGR to RGB
 
         result_image = np.uint8(heatmap * alpha + source_image * (1 - alpha))
         return result_image

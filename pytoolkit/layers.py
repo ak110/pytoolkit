@@ -37,9 +37,9 @@ def get_custom_objects():
 class Preprocess(keras.layers.Layer):
     """前処理レイヤー。"""
 
-    def __init__(self, mode='tf', **kwargs):
+    def __init__(self, mode="tf", **kwargs):
         super().__init__(**kwargs)
-        assert mode in ('caffe', 'tf', 'torch', 'div255', 'std')
+        assert mode in ("caffe", "tf", "torch", "div255", "std")
         self.mode = mode
 
     def compute_output_shape(self, input_shape):
@@ -47,23 +47,29 @@ class Preprocess(keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         _ = kwargs  # noqa
-        if self.mode == 'caffe':
-            return K.bias_add(inputs[..., ::-1], K.constant(np.array([-103.939, -116.779, -123.68])))
-        elif self.mode == 'tf':
+        if self.mode == "caffe":
+            return K.bias_add(
+                inputs[..., ::-1], K.constant(np.array([-103.939, -116.779, -123.68]))
+            )
+        elif self.mode == "tf":
             return (inputs / 127.5) - 1
-        elif self.mode == 'torch':
-            return K.bias_add((inputs / 255.), K.constant(np.array([-0.485, -0.456, -0.406]))) / np.array([0.229, 0.224, 0.225])
-        elif self.mode == 'div255':
-            return inputs / 255.
-        elif self.mode == 'std':
+        elif self.mode == "torch":
+            return K.bias_add(
+                (inputs / 255.0), K.constant(np.array([-0.485, -0.456, -0.406]))
+            ) / np.array([0.229, 0.224, 0.225])
+        elif self.mode == "div255":
+            return inputs / 255.0
+        elif self.mode == "std":
             axes = tuple(range(1, K.ndim(inputs)))
-            return (inputs - K.mean(inputs, axis=axes, keepdims=True)) / (K.std(inputs, axis=axes, keepdims=True) + K.epsilon())
+            return (inputs - K.mean(inputs, axis=axes, keepdims=True)) / (
+                K.std(inputs, axis=axes, keepdims=True) + K.epsilon()
+            )
         else:
             assert False
             return None
 
     def get_config(self):
-        config = {'mode': self.mode}
+        config = {"mode": self.mode}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
@@ -94,21 +100,27 @@ class ConvertColor(keras.layers.Layer):
         return input_shape
 
     def call(self, inputs, **kwargs):
-        if self.mode == 'rgb_to_rgb':
+        if self.mode == "rgb_to_rgb":
             outputs = inputs / 127.5 - 1
-        elif self.mode == 'rgb_to_lab':
+        elif self.mode == "rgb_to_lab":
             x = inputs / 255
-            mask = K.cast(x > 0.04045, 'float32')
+            mask = K.cast(x > 0.04045, "float32")
             t = mask * K.pow((x + 0.055) / 1.055, 2.4) + (1 - mask) * (x / 12.92)
-            m = K.constant(np.transpose([
-                [0.412453, 0.357580, 0.180423],
-                [0.212671, 0.715160, 0.072169],
-                [0.019334, 0.119193, 0.950227],
-            ]))
+            m = K.constant(
+                np.transpose(
+                    [
+                        [0.412453, 0.357580, 0.180423],
+                        [0.212671, 0.715160, 0.072169],
+                        [0.019334, 0.119193, 0.950227],
+                    ]
+                )
+            )
             xyz = K.dot(t, m)
 
-            t = xyz / K.constant(np.reshape([0.95047, 1.0, 1.08883], (1,) * (K.ndim(inputs) - 1) + (3,)))
-            mask = K.cast(t > 0.008856, 'float32')
+            t = xyz / K.constant(
+                np.reshape([0.95047, 1.0, 1.08883], (1,) * (K.ndim(inputs) - 1) + (3,))
+            )
+            mask = K.cast(t > 0.008856, "float32")
             fxfyfz = mask * K.pow(t, 1 / 3) + (1 - mask) * (7.787 * t + 16 / 116)
 
             x, y, z = fxfyfz[..., 0], fxfyfz[..., 1], fxfyfz[..., 2]
@@ -116,39 +128,49 @@ class ConvertColor(keras.layers.Layer):
             a = 5 * (x - y)
             b = 2 * (y - z)
             outputs = K.stack([L, a, b], axis=-1)
-        elif self.mode == 'rgb_to_hsv':
+        elif self.mode == "rgb_to_hsv":
             outputs = tf.image.rgb_to_hsv(inputs / 255)
-        elif self.mode == 'rgb_to_yuv':
+        elif self.mode == "rgb_to_yuv":
             outputs = tf.image.rgb_to_yuv(inputs / 255)
-        elif self.mode == 'rgb_to_ycbcr':
-            m = K.constant(np.transpose([
-                [65.481, 128.553, 24.966],
-                [-37.797, -74.203, 112.0],
-                [112.0, -93.786, -18.214],
-            ]))
+        elif self.mode == "rgb_to_ycbcr":
+            m = K.constant(
+                np.transpose(
+                    [
+                        [65.481, 128.553, 24.966],
+                        [-37.797, -74.203, 112.0],
+                        [112.0, -93.786, -18.214],
+                    ]
+                )
+            )
             b = np.array([16, 128, 128]).reshape((1,) * (K.ndim(inputs) - 1) + (3,))
             outputs = (K.dot(inputs / 255, m) + K.constant(b)) / 255
-        elif self.mode == 'rgb_to_hed':
+        elif self.mode == "rgb_to_hed":
             t = inputs / 255 + 2
-            m = K.constant([
-                [1.87798274, -1.00767869, -0.55611582],
-                [-0.06590806, 1.13473037, -0.1355218],
-                [-0.60190736, -0.48041419, 1.57358807],
-            ])
+            m = K.constant(
+                [
+                    [1.87798274, -1.00767869, -0.55611582],
+                    [-0.06590806, 1.13473037, -0.1355218],
+                    [-0.60190736, -0.48041419, 1.57358807],
+                ]
+            )
             outputs = K.dot(-K.log(t) / K.constant(np.log(10)), m)
-        elif self.mode == 'rgb_to_yiq':
-            m = K.constant(np.transpose([
-                [0.299, 0.587, 0.114],
-                [0.59590059, -0.27455667, -0.32134392],
-                [0.21153661, -0.52273617, 0.31119955],
-            ]))
+        elif self.mode == "rgb_to_yiq":
+            m = K.constant(
+                np.transpose(
+                    [
+                        [0.299, 0.587, 0.114],
+                        [0.59590059, -0.27455667, -0.32134392],
+                        [0.21153661, -0.52273617, 0.31119955],
+                    ]
+                )
+            )
             outputs = K.dot(inputs / 255, m)
         else:
-            raise ValueError(f'Mode error: {self.mode}')
+            raise ValueError(f"Mode error: {self.mode}")
         return outputs
 
     def get_config(self):
-        config = {'mode': self.mode}
+        config = {"mode": self.mode}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
@@ -172,20 +194,26 @@ class RemoveMask(keras.layers.Layer):
 class Conv2DEx(keras.layers.Layer):
     """float16なConv2D+BN+Act。"""
 
-    def __init__(self,
-                 filters,
-                 kernel_size=3,
-                 strides=1,
-                 dilation_rate=1,
-                 center=True,
-                 scale=True,
-                 activation='relu',
-                 **kwargs):
+    def __init__(
+        self,
+        filters,
+        kernel_size=3,
+        strides=1,
+        dilation_rate=1,
+        center=True,
+        scale=True,
+        activation="relu",
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.filters = filters
-        self.kernel_size = (kernel_size,) * 2 if isinstance(kernel_size, int) else kernel_size
+        self.kernel_size = (
+            (kernel_size,) * 2 if isinstance(kernel_size, int) else kernel_size
+        )
         self.strides = (strides,) * 2 if isinstance(strides, int) else strides
-        self.dilation_rate = (dilation_rate,) * 2 if isinstance(dilation_rate, int) else dilation_rate
+        self.dilation_rate = (
+            (dilation_rate,) * 2 if isinstance(dilation_rate, int) else dilation_rate
+        )
         self.center = center
         self.scale = scale
         self.activation = keras.activations.get(activation)
@@ -198,52 +226,68 @@ class Conv2DEx(keras.layers.Layer):
     def compute_output_shape(self, input_shape):
         assert len(input_shape) == 4
         input_shape = list(input_shape)
-        input_shape[1] = (input_shape[1] + input_shape[1] % self.strides[0]) // self.strides[0]
-        input_shape[2] = (input_shape[2] + input_shape[2] % self.strides[1]) // self.strides[1]
+        input_shape[1] = (
+            input_shape[1] + input_shape[1] % self.strides[0]
+        ) // self.strides[0]
+        input_shape[2] = (
+            input_shape[2] + input_shape[2] % self.strides[1]
+        ) // self.strides[1]
         input_shape[-1] = self.filters
         return tuple(input_shape)
 
     def build(self, input_shape):
         if input_shape[-1] is None:
-            raise ValueError('The channel dimension of the inputs should be defined. Found `None`.')
+            raise ValueError(
+                "The channel dimension of the inputs should be defined. Found `None`."
+            )
 
         kernel_shape = self.kernel_size + (int(input_shape[-1]), self.filters)
-        self.kernel = self.add_weight(shape=kernel_shape,
-                                      initializer=keras.initializers.he_uniform(),
-                                      name='kernel',
-                                      regularizer=keras.regularizers.l2(1e-4),
-                                      constraint=None,
-                                      dtype='float32')
+        self.kernel = self.add_weight(
+            shape=kernel_shape,
+            initializer=keras.initializers.he_uniform(),
+            name="kernel",
+            regularizer=keras.regularizers.l2(1e-4),
+            constraint=None,
+            dtype="float32",
+        )
 
         bn_shape = (self.filters,)
         if self.scale:
-            self.gamma = self.add_weight(shape=bn_shape,
-                                         name='gamma',
-                                         initializer=keras.initializers.ones(),
-                                         regularizer=keras.regularizers.l2(1e-4),
-                                         constraint=None,
-                                         dtype='float32')
+            self.gamma = self.add_weight(
+                shape=bn_shape,
+                name="gamma",
+                initializer=keras.initializers.ones(),
+                regularizer=keras.regularizers.l2(1e-4),
+                constraint=None,
+                dtype="float32",
+            )
         else:
-            self.gamma = K.constant(1.0, dtype='float32')
+            self.gamma = K.constant(1.0, dtype="float32")
         if self.center:
-            self.beta = self.add_weight(shape=bn_shape,
-                                        name='beta',
-                                        initializer=keras.initializers.zeros(),
-                                        regularizer=keras.regularizers.l2(1e-4),
-                                        constraint=None,
-                                        dtype='float32')
+            self.beta = self.add_weight(
+                shape=bn_shape,
+                name="beta",
+                initializer=keras.initializers.zeros(),
+                regularizer=keras.regularizers.l2(1e-4),
+                constraint=None,
+                dtype="float32",
+            )
         else:
-            self.beta = K.constant(0.0, dtype='float32')
-        self.moving_mean = self.add_weight(shape=bn_shape,
-                                           name='moving_mean',
-                                           initializer=keras.initializers.zeros(),
-                                           trainable=False,
-                                           dtype='float32')
-        self.moving_variance = self.add_weight(shape=bn_shape,
-                                               name='moving_variance',
-                                               initializer=keras.initializers.ones(),
-                                               trainable=False,
-                                               dtype='float32')
+            self.beta = K.constant(0.0, dtype="float32")
+        self.moving_mean = self.add_weight(
+            shape=bn_shape,
+            name="moving_mean",
+            initializer=keras.initializers.zeros(),
+            trainable=False,
+            dtype="float32",
+        )
+        self.moving_variance = self.add_weight(
+            shape=bn_shape,
+            name="moving_variance",
+            initializer=keras.initializers.ones(),
+            trainable=False,
+            dtype="float32",
+        )
 
         super().build(input_shape)
 
@@ -255,14 +299,14 @@ class Conv2DEx(keras.layers.Layer):
             inputs,
             K.cast(self.kernel, K.dtype(inputs)),
             strides=self.strides,
-            padding='same',
-            data_format='channels_last',
-            dilation_rate=self.dilation_rate)
+            padding="same",
+            data_format="channels_last",
+            dilation_rate=self.dilation_rate,
+        )
         # bn
         outputs = K.in_train_phase(
-            lambda: self._bn_train(outputs),
-            lambda: self._bn_test(outputs),
-            training)
+            lambda: self._bn_train(outputs), lambda: self._bn_test(outputs), training
+        )
         # act
         if self.activation is not None:
             outputs = self.activation(outputs)
@@ -270,12 +314,13 @@ class Conv2DEx(keras.layers.Layer):
 
     def _bn_train(self, inputs):
         """学習時のBN。"""
-        inputs32 = K.cast(inputs, 'float32')
+        inputs32 = K.cast(inputs, "float32")
         mean = K.mean(inputs32, axis=[0, 1, 2])
         squared_mean = K.mean(K.square(inputs32), axis=[0, 1, 2])
         # Sync BN
         if tk.hvd.initialized():
             import horovod.tensorflow as _hvd
+
             mean = _hvd.allreduce(mean, average=True)
             squared_mean = _hvd.allreduce(squared_mean, average=True)
         var = squared_mean - K.square(mean)
@@ -284,7 +329,9 @@ class Conv2DEx(keras.layers.Layer):
         # m_new = m_old * 0.99 + x * 0.01
         # m_new - m_old = (x - m_old) * 0.01
         update1 = tf.assign_add(self.moving_mean, (mean - self.moving_mean) * 0.01)
-        update2 = tf.assign_add(self.moving_variance, (var - self.moving_variance) * 0.01)
+        update2 = tf.assign_add(
+            self.moving_variance, (var - self.moving_variance) * 0.01
+        )
         self.add_update([update1, update2], inputs)
 
         # y = (x - mean) / (sqrt(var) + epsilon) * gamma
@@ -301,13 +348,13 @@ class Conv2DEx(keras.layers.Layer):
 
     def get_config(self):
         config = {
-            'filters': self.filters,
-            'kernel_size': self.kernel_size,
-            'strides': self.strides,
-            'dilation_rate': self.dilation_rate,
-            'center': self.center,
-            'scale': self.scale,
-            'activation': keras.activations.serialize(self.activation),
+            "filters": self.filters,
+            "kernel_size": self.kernel_size,
+            "strides": self.strides,
+            "dilation_rate": self.dilation_rate,
+            "center": self.center,
+            "scale": self.scale,
+            "activation": keras.activations.serialize(self.activation),
         }
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
@@ -323,10 +370,17 @@ class Resize2D(keras.layers.Layer):
 
     """
 
-    def __init__(self, size=None, scale=None, interpolation='bilinear', align_corners=False, **kwargs):
+    def __init__(
+        self,
+        size=None,
+        scale=None,
+        interpolation="bilinear",
+        align_corners=False,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         assert (size is None) != (scale is None)
-        assert interpolation in ('bilinear', 'nearest', 'bicubic', 'area')
+        assert interpolation in ("bilinear", "nearest", "bicubic", "area")
         self.size = None if size is None else tuple(size)
         self.scale = None if scale is None else float(scale)
         self.interpolation = interpolation
@@ -344,27 +398,27 @@ class Resize2D(keras.layers.Layer):
     def call(self, inputs, **kwargs):
         _ = kwargs  # noqa
         method = {
-            'bilinear': tf.image.ResizeMethod.BILINEAR,
-            'nearest': tf.image.ResizeMethod.NEAREST_NEIGHBOR,
-            'bicubic': tf.image.ResizeMethod.BICUBIC,
-            'area': tf.image.ResizeMethod.AREA,
+            "bilinear": tf.image.ResizeMethod.BILINEAR,
+            "nearest": tf.image.ResizeMethod.NEAREST_NEIGHBOR,
+            "bicubic": tf.image.ResizeMethod.BICUBIC,
+            "area": tf.image.ResizeMethod.AREA,
         }[self.interpolation]
         if self.size is not None:
             size = self.size
         else:
             shape = K.shape(inputs)
-            scale = K.constant(self.scale, dtype='float32')
-            new_h = K.cast(K.cast(shape[1], 'float32') * scale, 'int32')
-            new_w = K.cast(K.cast(shape[2], 'float32') * scale, 'int32')
+            scale = K.constant(self.scale, dtype="float32")
+            new_h = K.cast(K.cast(shape[1], "float32") * scale, "int32")
+            new_w = K.cast(K.cast(shape[2], "float32") * scale, "int32")
             size = (new_h, new_w)
         return tf.image.resize_images(inputs, size, method, self.align_corners)
 
     def get_config(self):
         config = {
-            'size': self.size,
-            'scale': self.scale,
-            'interpolation': self.interpolation,
-            'align_corners': self.align_corners,
+            "size": self.size,
+            "scale": self.scale,
+            "interpolation": self.interpolation,
+            "align_corners": self.align_corners,
         }
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
@@ -373,10 +427,10 @@ class Resize2D(keras.layers.Layer):
 class Pad2D(keras.layers.Layer):
     """tf.padするレイヤー。"""
 
-    def __init__(self, padding=(1, 1), mode='constant', constant_values=0, **kwargs):
+    def __init__(self, padding=(1, 1), mode="constant", constant_values=0, **kwargs):
         super().__init__(**kwargs)
 
-        assert mode in ('constant', 'reflect', 'symmetric')
+        assert mode in ("constant", "reflect", "symmetric")
 
         if isinstance(padding, int):
             padding = ((padding, padding), (padding, padding))
@@ -402,14 +456,20 @@ class Pad2D(keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         _ = kwargs  # noqa
-        padding = K.constant(((0, 0),) + self.padding + ((0, 0),), dtype='int32')
-        return tf.pad(tensor=inputs, paddings=padding, mode=self.mode, constant_values=self.constant_values, name=self.name)
+        padding = K.constant(((0, 0),) + self.padding + ((0, 0),), dtype="int32")
+        return tf.pad(
+            tensor=inputs,
+            paddings=padding,
+            mode=self.mode,
+            constant_values=self.constant_values,
+            name=self.name,
+        )
 
     def get_config(self):
         config = {
-            'padding': self.padding,
-            'mode': self.mode,
-            'constant_values': self.constant_values,
+            "padding": self.padding,
+            "mode": self.mode,
+            "constant_values": self.constant_values,
         }
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
@@ -418,9 +478,9 @@ class Pad2D(keras.layers.Layer):
 class PadChannel2D(keras.layers.Layer):
     """チャンネルに対してtf.padするレイヤー。"""
 
-    def __init__(self, filters, mode='constant', constant_values=0, **kwargs):
+    def __init__(self, filters, mode="constant", constant_values=0, **kwargs):
         super().__init__(**kwargs)
-        assert mode in ('constant', 'reflect', 'symmetric')
+        assert mode in ("constant", "reflect", "symmetric")
         self.filters = filters
         self.mode = mode
         self.constant_values = constant_values
@@ -432,14 +492,20 @@ class PadChannel2D(keras.layers.Layer):
         return tuple(input_shape)
 
     def call(self, inputs, **kwargs):
-        padding = K.constant(((0, 0), (0, 0), (0, 0), (0, self.filters)), dtype='int32')
-        return tf.pad(tensor=inputs, paddings=padding, mode=self.mode, constant_values=self.constant_values, name=self.name)
+        padding = K.constant(((0, 0), (0, 0), (0, 0), (0, self.filters)), dtype="int32")
+        return tf.pad(
+            tensor=inputs,
+            paddings=padding,
+            mode=self.mode,
+            constant_values=self.constant_values,
+            name=self.name,
+        )
 
     def get_config(self):
         config = {
-            'filters': self.filters,
-            'mode': self.mode,
-            'constant_values': self.constant_values,
+            "filters": self.filters,
+            "mode": self.mode,
+            "constant_values": self.constant_values,
         }
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
@@ -473,18 +539,19 @@ class CoordChannel2D(keras.layers.Layer):
         ones = tf.ones(pad_shape, K.floatx())
         pad_channels = []
         if self.x_channel:
-            gradation = K.cast(K.arange(0, input_shape[2]), K.floatx()) / K.cast(input_shape[2], K.floatx())
+            gradation = K.cast(K.arange(0, input_shape[2]), K.floatx()) / K.cast(
+                input_shape[2], K.floatx()
+            )
             pad_channels.append(ones * K.reshape(gradation, (1, 1, input_shape[2], 1)))
         if self.y_channel:
-            gradation = K.cast(K.arange(0, input_shape[1]), K.floatx()) / K.cast(input_shape[1], K.floatx())
+            gradation = K.cast(K.arange(0, input_shape[1]), K.floatx()) / K.cast(
+                input_shape[1], K.floatx()
+            )
             pad_channels.append(ones * K.reshape(gradation, (1, input_shape[1], 1, 1)))
         return K.concatenate([inputs] + pad_channels, axis=-1)
 
     def get_config(self):
-        config = {
-            'x_channel': self.x_channel,
-            'y_channel': self.y_channel,
-        }
+        config = {"x_channel": self.x_channel, "y_channel": self.y_channel}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
@@ -498,7 +565,10 @@ class ChannelPair2D(keras.layers.Layer):
     def call(self, inputs, **kwargs):
         _ = kwargs  # noqa
         ch = K.int_shape(inputs)[-1]
-        return K.concatenate([inputs[..., i:i + 1] * inputs[..., i + 1:] for i in range(ch - 1)], axis=-1)
+        return K.concatenate(
+            [inputs[..., i : i + 1] * inputs[..., i + 1 :] for i in range(ch - 1)],
+            axis=-1,
+        )
 
 
 class StocasticAdd(keras.layers.Layer):
@@ -533,9 +603,8 @@ class BatchNormalization(keras.layers.BatchNormalization):
     def call(self, inputs, training=None, **kwargs):  # pylint: disable=arguments-differ
         _ = kwargs  # noqa
         return K.in_train_phase(
-            lambda: self._bn_train(inputs),
-            lambda: self._bn_test(inputs),
-            training)
+            lambda: self._bn_train(inputs), lambda: self._bn_test(inputs), training
+        )
 
     def _bn_train(self, inputs):
         """学習時のBN。"""
@@ -546,12 +615,13 @@ class BatchNormalization(keras.layers.BatchNormalization):
         stat_axes = [a for a in range(K.ndim(inputs)) if a not in target_axis]
 
         # 平均・分散の算出
-        x = inputs if K.dtype(inputs) == 'float32' else K.cast(inputs, 'float32')
+        x = inputs if K.dtype(inputs) == "float32" else K.cast(inputs, "float32")
         mean = K.mean(x, axis=stat_axes)
         squared_mean = K.mean(K.square(x), axis=stat_axes)
         # Sync BN
         if tk.hvd.initialized():
             import horovod.tensorflow as _hvd
+
             mean = _hvd.allreduce(mean, average=True)
             squared_mean = _hvd.allreduce(squared_mean, average=True)
         var = squared_mean - K.square(mean)
@@ -561,7 +631,9 @@ class BatchNormalization(keras.layers.BatchNormalization):
         # m_new - m_old = (x - m_old) * 0.01
         decay = 1 - self.momentum
         update1 = tf.assign_add(self.moving_mean, (mean - self.moving_mean) * decay)
-        update2 = tf.assign_add(self.moving_variance, (var - self.moving_variance) * decay)
+        update2 = tf.assign_add(
+            self.moving_variance, (var - self.moving_variance) * decay
+        )
         self.add_update([update1, update2], inputs)
 
         # y = (x - mean) / (sqrt(var) + epsilon) * gamma
@@ -609,18 +681,20 @@ class GroupNormalization(keras.layers.Layer):
 
     """
 
-    def __init__(self,
-                 groups=32,
-                 epsilon=1e-5,
-                 center=True,
-                 scale=True,
-                 beta_initializer='zeros',
-                 gamma_initializer='ones',
-                 beta_regularizer=None,
-                 gamma_regularizer=None,
-                 beta_constraint=None,
-                 gamma_constraint=None,
-                 **kwargs):
+    def __init__(
+        self,
+        groups=32,
+        epsilon=1e-5,
+        center=True,
+        scale=True,
+        beta_initializer="zeros",
+        gamma_initializer="ones",
+        beta_regularizer=None,
+        gamma_regularizer=None,
+        beta_constraint=None,
+        gamma_constraint=None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.supports_masking = True
         self.groups = groups
@@ -641,19 +715,23 @@ class GroupNormalization(keras.layers.Layer):
         assert dim is None or dim % self.groups == 0
         shape = (dim,)
         if self.scale:
-            self.gamma = self.add_weight(shape=shape,
-                                         name='gamma',
-                                         initializer=self.gamma_initializer,
-                                         regularizer=self.gamma_regularizer,
-                                         constraint=self.gamma_constraint)
+            self.gamma = self.add_weight(
+                shape=shape,
+                name="gamma",
+                initializer=self.gamma_initializer,
+                regularizer=self.gamma_regularizer,
+                constraint=self.gamma_constraint,
+            )
         else:
             self.gamma = None
         if self.center:
-            self.beta = self.add_weight(shape=shape,
-                                        name='beta',
-                                        initializer=self.beta_initializer,
-                                        regularizer=self.beta_regularizer,
-                                        constraint=self.beta_constraint)
+            self.beta = self.add_weight(
+                shape=shape,
+                name="beta",
+                initializer=self.beta_initializer,
+                regularizer=self.beta_regularizer,
+                constraint=self.beta_constraint,
+            )
         else:
             self.beta = None
         super().build(input_shape)
@@ -670,14 +748,18 @@ class GroupNormalization(keras.layers.Layer):
             N, H, W, C = shape[0], shape[1], shape[2], shape[3]
             g = K.minimum(self.groups, C)
             x = K.reshape(x, [N, H, W, g, C // g])
-            mean, var = tf.nn.moments(x=x, axes=[1, 2, 4], keep_dims=True)  # TODO: tf v2からkeepdims
+            mean, var = tf.nn.moments(
+                x=x, axes=[1, 2, 4], keep_dims=True
+            )  # TODO: tf v2からkeepdims
             x = (x - mean) / K.sqrt(var + self.epsilon)
             x = K.reshape(x, [N, H, W, C])
         elif ndim == 5:  # 3D
             N, T, H, W, C = shape[0], shape[1], shape[2], shape[3], shape[4]
             g = K.minimum(self.groups, C)
             x = K.reshape(x, [N, T, H, W, g, C // g])
-            mean, var = tf.nn.moments(x=x, axes=[1, 2, 3, 5], keep_dims=True)  # TODO: tf v2からkeepdims
+            mean, var = tf.nn.moments(
+                x=x, axes=[1, 2, 3, 5], keep_dims=True
+            )  # TODO: tf v2からkeepdims
             x = (x - mean) / K.sqrt(var + self.epsilon)
             x = K.reshape(x, [N, T, H, W, C])
         else:
@@ -687,22 +769,22 @@ class GroupNormalization(keras.layers.Layer):
         if self.center:
             x = x + self.beta
         # tf.keras用workaround
-        if hasattr(x, 'set_shape'):
+        if hasattr(x, "set_shape"):
             x.set_shape(K.int_shape(inputs))
         return x
 
     def get_config(self):
         config = {
-            'groups': self.groups,
-            'epsilon': self.epsilon,
-            'center': self.center,
-            'scale': self.scale,
-            'beta_initializer': keras.initializers.serialize(self.beta_initializer),
-            'gamma_initializer': keras.initializers.serialize(self.gamma_initializer),
-            'beta_regularizer': keras.regularizers.serialize(self.beta_regularizer),
-            'gamma_regularizer': keras.regularizers.serialize(self.gamma_regularizer),
-            'beta_constraint': keras.constraints.serialize(self.beta_constraint),
-            'gamma_constraint': keras.constraints.serialize(self.gamma_constraint)
+            "groups": self.groups,
+            "epsilon": self.epsilon,
+            "center": self.center,
+            "scale": self.scale,
+            "beta_initializer": keras.initializers.serialize(self.beta_initializer),
+            "gamma_initializer": keras.initializers.serialize(self.gamma_initializer),
+            "beta_regularizer": keras.regularizers.serialize(self.beta_regularizer),
+            "gamma_regularizer": keras.regularizers.serialize(self.gamma_regularizer),
+            "beta_constraint": keras.constraints.serialize(self.beta_constraint),
+            "gamma_constraint": keras.constraints.serialize(self.gamma_constraint),
         }
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
@@ -728,16 +810,20 @@ class MixFeat(keras.layers.Layer):
                 shape = K.shape(x)
                 indices = K.arange(start=0, stop=shape[0])
                 indices = tf.random.shuffle(indices)
-                rs = K.concatenate([K.constant([1], dtype='int32'), shape[1:]])
-                r = K.random_normal(rs, 0, self.sigma, dtype='float16')
-                theta = K.random_uniform(rs, -np.pi, +np.pi, dtype='float16')
+                rs = K.concatenate([K.constant([1], dtype="int32"), shape[1:]])
+                r = K.random_normal(rs, 0, self.sigma, dtype="float16")
+                theta = K.random_uniform(rs, -np.pi, +np.pi, dtype="float16")
                 a = 1 + r * K.cos(theta)
                 b = r * K.sin(theta)
-                y = x * K.cast(a, K.floatx()) + K.gather(x, indices) * K.cast(b, K.floatx())
+                y = x * K.cast(a, K.floatx()) + K.gather(x, indices) * K.cast(
+                    b, K.floatx()
+                )
 
                 def _backword(dx):
                     inv = tf.math.invert_permutation(indices)
-                    return dx * K.cast(a, K.floatx()) + K.gather(dx, inv) * K.cast(b, K.floatx())
+                    return dx * K.cast(a, K.floatx()) + K.gather(dx, inv) * K.cast(
+                        b, K.floatx()
+                    )
 
                 return y, _backword
 
@@ -746,7 +832,7 @@ class MixFeat(keras.layers.Layer):
         return K.in_train_phase(_mixfeat, _passthru, training=training)
 
     def get_config(self):
-        config = {'sigma': self.sigma}
+        config = {"sigma": self.sigma}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
@@ -774,7 +860,7 @@ class DropActivation(keras.layers.Layer):
         return K.in_train_phase(_train, _test, training=training)
 
     def get_config(self):
-        config = {'keep_rate': self.keep_rate}
+        config = {"keep_rate": self.keep_rate}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
@@ -815,12 +901,12 @@ class ParallelGridPooling2D(keras.layers.Layer):
         outputs = tf.transpose(a=outputs, perm=(2, 4, 0, 1, 3, 5))
         outputs = K.reshape(outputs, (rh * rw * b, h // rh, w // rw, c))
         # tf.keras用workaround
-        if hasattr(outputs, 'set_shape'):
+        if hasattr(outputs, "set_shape"):
             outputs.set_shape(self.compute_output_shape(int_shape))
         return outputs
 
     def get_config(self):
-        config = {'pool_size': self.pool_size}
+        config = {"pool_size": self.pool_size}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
@@ -843,12 +929,12 @@ class ParallelGridGather(keras.layers.Layer):
         outputs = K.reshape(inputs, gather_shape)
         outputs = K.mean(outputs, axis=0)
         # tf.keras用workaround
-        if hasattr(outputs, 'set_shape'):
+        if hasattr(outputs, "set_shape"):
             outputs.set_shape(K.int_shape(inputs))
         return outputs
 
     def get_config(self):
-        config = {'r': self.r}
+        config = {"r": self.r}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
@@ -877,7 +963,7 @@ class SubpixelConv2D(keras.layers.Layer):
         return tf.depth_to_space(input=inputs, block_size=self.scale)
 
     def get_config(self):
-        config = {'scale': self.scale}
+        config = {"scale": self.scale}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
@@ -896,17 +982,27 @@ class WSConv2D(keras.layers.Layer):
     def compute_output_shape(self, input_shape):
         assert len(input_shape) == 4
         input_shape = list(input_shape)
-        input_shape[1] = None if input_shape[1] is None else (input_shape[1] + input_shape[1] % self.strides[0]) // self.strides[0]
-        input_shape[2] = None if input_shape[2] is None else (input_shape[2] + input_shape[2] % self.strides[1]) // self.strides[1]
+        input_shape[1] = (
+            None
+            if input_shape[1] is None
+            else (input_shape[1] + input_shape[1] % self.strides[0]) // self.strides[0]
+        )
+        input_shape[2] = (
+            None
+            if input_shape[2] is None
+            else (input_shape[2] + input_shape[2] % self.strides[1]) // self.strides[1]
+        )
         input_shape[-1] = self.filters
         return tuple(input_shape)
 
     def build(self, input_shape):
         in_filters = int(input_shape[-1])
-        self.kernel = self.add_weight(shape=(self.kernel_size[0], self.kernel_size[1], in_filters, self.filters),
-                                      initializer=keras.initializers.he_uniform(),
-                                      regularizer=keras.regularizers.l2(1e-4),
-                                      name='kernel')
+        self.kernel = self.add_weight(
+            shape=(self.kernel_size[0], self.kernel_size[1], in_filters, self.filters),
+            initializer=keras.initializers.he_uniform(),
+            regularizer=keras.regularizers.l2(1e-4),
+            name="kernel",
+        )
         super().build(input_shape)
 
     def call(self, inputs, **kwargs):
@@ -916,17 +1012,17 @@ class WSConv2D(keras.layers.Layer):
         kernel_std = K.std(self.kernel, axis=[0, 1, 2])
         kernel = (self.kernel - kernel_mean) / (kernel_std + 1e-5)
 
-        outputs = K.conv2d(inputs, kernel, padding='same', strides=self.strides)
+        outputs = K.conv2d(inputs, kernel, padding="same", strides=self.strides)
         if self.activation is not None:
             outputs = self.activation(outputs)
         return outputs
 
     def get_config(self):
         config = {
-            'filters': self.filters,
-            'kernel_size': self.kernel_size,
-            'strides': self.strides,
-            'activation': keras.activations.serialize(self.activation),
+            "filters": self.filters,
+            "kernel_size": self.kernel_size,
+            "strides": self.strides,
+            "activation": keras.activations.serialize(self.activation),
         }
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
@@ -960,48 +1056,54 @@ class OctaveConv2D(keras.layers.Layer):
     def build(self, input_shape):
         in_filters_l = int(input_shape[0][-1])
         in_filters_h = int(input_shape[1][-1])
-        self.kernel_ll = self.add_weight(shape=(3, 3, in_filters_l, self.filters_l),
-                                         initializer=keras.initializers.he_uniform(),
-                                         regularizer=keras.regularizers.l2(1e-4),
-                                         name='kernel_ll')
-        self.kernel_hl = self.add_weight(shape=(3, 3, in_filters_h, self.filters_l),
-                                         initializer=keras.initializers.he_uniform(),
-                                         regularizer=keras.regularizers.l2(1e-4),
-                                         name='kernel_hl')
-        self.kernel_lh = self.add_weight(shape=(3, 3, in_filters_l, self.filters_h),
-                                         initializer=keras.initializers.he_uniform(),
-                                         regularizer=keras.regularizers.l2(1e-4),
-                                         name='kernel_lh')
-        self.kernel_hh = self.add_weight(shape=(3, 3, in_filters_h, self.filters_h),
-                                         initializer=keras.initializers.he_uniform(),
-                                         regularizer=keras.regularizers.l2(1e-4),
-                                         name='kernel_hh')
+        self.kernel_ll = self.add_weight(
+            shape=(3, 3, in_filters_l, self.filters_l),
+            initializer=keras.initializers.he_uniform(),
+            regularizer=keras.regularizers.l2(1e-4),
+            name="kernel_ll",
+        )
+        self.kernel_hl = self.add_weight(
+            shape=(3, 3, in_filters_h, self.filters_l),
+            initializer=keras.initializers.he_uniform(),
+            regularizer=keras.regularizers.l2(1e-4),
+            name="kernel_hl",
+        )
+        self.kernel_lh = self.add_weight(
+            shape=(3, 3, in_filters_l, self.filters_h),
+            initializer=keras.initializers.he_uniform(),
+            regularizer=keras.regularizers.l2(1e-4),
+            name="kernel_lh",
+        )
+        self.kernel_hh = self.add_weight(
+            shape=(3, 3, in_filters_h, self.filters_h),
+            initializer=keras.initializers.he_uniform(),
+            regularizer=keras.regularizers.l2(1e-4),
+            name="kernel_hh",
+        )
         super().build(input_shape)
 
     def call(self, inputs, **kwargs):
         _ = kwargs  # noqa
         input_l, input_h = inputs
 
-        ll = K.conv2d(input_l, self.kernel_ll, padding='same', strides=self.strides)
+        ll = K.conv2d(input_l, self.kernel_ll, padding="same", strides=self.strides)
 
-        hl = K.pool2d(input_h, (2, 2), (2, 2), padding='same', pool_mode='avg')
-        hl = K.conv2d(hl, self.kernel_hl, padding='same', strides=self.strides)
+        hl = K.pool2d(input_h, (2, 2), (2, 2), padding="same", pool_mode="avg")
+        hl = K.conv2d(hl, self.kernel_hl, padding="same", strides=self.strides)
 
-        lh = K.conv2d(input_l, self.kernel_lh, padding='same', strides=self.strides)
-        lh = K.resize_images(lh, 2, 2, data_format='channels_last', interpolation='bilinear')
+        lh = K.conv2d(input_l, self.kernel_lh, padding="same", strides=self.strides)
+        lh = K.resize_images(
+            lh, 2, 2, data_format="channels_last", interpolation="bilinear"
+        )
 
-        hh = K.conv2d(input_h, self.kernel_hh, padding='same', strides=self.strides)
+        hh = K.conv2d(input_h, self.kernel_hh, padding="same", strides=self.strides)
 
         output_l = ll + hl
         output_h = hh + lh
         return [output_l, output_h]
 
     def get_config(self):
-        config = {
-            'filters': self.filters,
-            'strides': self.strides,
-            'alpha': self.alpha,
-        }
+        config = {"filters": self.filters, "strides": self.strides, "alpha": self.alpha}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
@@ -1017,8 +1119,12 @@ class BlurPooling2D(keras.layers.Layer):
     def compute_output_shape(self, input_shape):
         assert len(input_shape) == 4
         input_shape = list(input_shape)
-        input_shape[1] = (input_shape[1] + int(input_shape[1]) % self.strides[0]) // self.strides[0]
-        input_shape[2] = (input_shape[2] + int(input_shape[2]) % self.strides[1]) // self.strides[1]
+        input_shape[1] = (
+            input_shape[1] + int(input_shape[1]) % self.strides[0]
+        ) // self.strides[0]
+        input_shape[2] = (
+            input_shape[2] + int(input_shape[2]) % self.strides[1]
+        ) // self.strides[1]
         return tuple(input_shape)
 
     def call(self, inputs, **kwargs):
@@ -1036,13 +1142,12 @@ class BlurPooling2D(keras.layers.Layer):
         kernel = np.tile(filter2d[:, :, np.newaxis, np.newaxis], (1, 1, in_filters, 1))
         kernel = K.constant(kernel)
 
-        return tf.nn.depthwise_conv2d(inputs, kernel, strides=(1,) + self.strides + (1,), padding='SAME')
+        return tf.nn.depthwise_conv2d(
+            inputs, kernel, strides=(1,) + self.strides + (1,), padding="SAME"
+        )
 
     def get_config(self):
-        config = {
-            'taps': self.taps,
-            'strides': self.strides,
-        }
+        config = {"taps": self.taps, "strides": self.strides}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
@@ -1064,11 +1169,12 @@ class ScaleGradient(keras.layers.Layer):
         def _forward(x):
             def _backword(dx):
                 return dx * self.scale
+
             return x, _backword
 
         return _forward(inputs)
 
     def get_config(self):
-        config = {'scale': self.scale}
+        config = {"scale": self.scale}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))

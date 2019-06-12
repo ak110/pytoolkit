@@ -22,7 +22,17 @@ class ObjectsAnnotation:
 
     """
 
-    def __init__(self, path, width, height, classes, bboxes, difficults=None, areas=None, crowdeds=None):
+    def __init__(
+        self,
+        path,
+        width,
+        height,
+        classes,
+        bboxes,
+        difficults=None,
+        areas=None,
+        crowdeds=None,
+    ):
         assert len(classes) == len(bboxes)
         assert difficults is None or len(classes) == len(difficults)
         self.path = pathlib.Path(path)
@@ -32,9 +42,15 @@ class ObjectsAnnotation:
         self.bboxes = np.asarray(bboxes, dtype=np.float32)
         if self.num_objects == 0:
             self.bboxes = self.bboxes.reshape((self.num_objects, 4))
-        self.difficults = np.asarray(difficults, dtype=np.bool) if difficults is not None else np.zeros(len(classes), dtype=np.bool)
+        self.difficults = (
+            np.asarray(difficults, dtype=np.bool)
+            if difficults is not None
+            else np.zeros(len(classes), dtype=np.bool)
+        )
         self.areas = np.asarray(areas, dtype=np.float32) if areas is not None else None
-        self.crowdeds = np.asarray(crowdeds, dtype=np.bool) if crowdeds is not None else None
+        self.crowdeds = (
+            np.asarray(crowdeds, dtype=np.bool) if crowdeds is not None else None
+        )
         assert self.width >= 1
         assert self.height >= 1
         assert (self.bboxes >= 0).all()
@@ -54,7 +70,9 @@ class ObjectsAnnotation:
     @property
     def real_bboxes(self):
         """実ピクセル数換算のbboxesを返す。"""
-        return np.round(self.bboxes * [self.width, self.height, self.width, self.height]).astype(np.int32)
+        return np.round(
+            self.bboxes * [self.width, self.height, self.width, self.height]
+        ).astype(np.int32)
 
     @property
     def bboxes_ar_fixed(self):
@@ -71,25 +89,37 @@ class ObjectsAnnotation:
 
     def __repr__(self):
         """文字列化。"""
-        return f'{type(self).__module__}.{type(self).__name__}(' \
-            f'path={repr(self.path)},' \
-            f' width={repr(self.width)},' \
-            f' height={repr(self.height)},' \
-            f' classes={repr(self.classes)},' \
-            f' bboxes={repr(self.bboxes)},' \
-            f' difficults={repr(self.difficults)})'
+        return (
+            f"{type(self).__module__}.{type(self).__name__}("
+            f"path={repr(self.path)},"
+            f" width={repr(self.width)},"
+            f" height={repr(self.height)},"
+            f" classes={repr(self.classes)},"
+            f" bboxes={repr(self.bboxes)},"
+            f" difficults={repr(self.difficults)})"
+        )
 
     def to_str(self, class_names):
         """表示用の文字列化"""
-        a = [f'({x1}, {y1}) [{x2 - x1} x {y2 - y1}]: {class_names[c]}'
-             for (x1, y1, x2, y2), c
-             in sorted(zip(self.real_bboxes, self.classes), key=lambda x: _rbb_sortkey(x[0]))]
-        return '\n'.join(a)
+        a = [
+            f"({x1}, {y1}) [{x2 - x1} x {y2 - y1}]: {class_names[c]}"
+            for (x1, y1, x2, y2), c in sorted(
+                zip(self.real_bboxes, self.classes), key=lambda x: _rbb_sortkey(x[0])
+            )
+        ]
+        return "\n".join(a)
 
     def plot(self, img, class_names, conf_threshold=0, max_long_side=None):
         """ワクを描画した画像を作って返す。"""
-        return plot_objects(img, self.classes, None, self.bboxes, class_names,
-                            conf_threshold=conf_threshold, max_long_side=max_long_side)
+        return plot_objects(
+            img,
+            self.classes,
+            None,
+            self.bboxes,
+            class_names,
+            conf_threshold=conf_threshold,
+            max_long_side=max_long_side,
+        )
 
     def rot90(self, k):
         """90度回転。"""
@@ -129,23 +159,36 @@ class ObjectsPrediction:
 
     def __repr__(self):
         """文字列化。"""
-        return f'{type(self).__module__}.{type(self).__name__}(' \
-            f'classes={repr(self.classes)},' \
-            f' confs={repr(self.confs)},' \
-            f' bboxes={repr(self.bboxes)})'
+        return (
+            f"{type(self).__module__}.{type(self).__name__}("
+            f"classes={repr(self.classes)},"
+            f" confs={repr(self.confs)},"
+            f" bboxes={repr(self.bboxes)})"
+        )
 
     def to_str(self, width, height, class_names, conf_threshold=0):
         """表示用の文字列化"""
-        a = [f'({x1}, {y1}) [{x2 - x1} x {y2 - y1}]: {class_names[c]}'
-             for (x1, y1, x2, y2), c, cf
-             in sorted(zip(self.get_real_bboxes(width, height), self.classes, self.confs), key=lambda x: _rbb_sortkey(x[0]))
-             if cf >= conf_threshold]
-        return '\n'.join(a)
+        a = [
+            f"({x1}, {y1}) [{x2 - x1} x {y2 - y1}]: {class_names[c]}"
+            for (x1, y1, x2, y2), c, cf in sorted(
+                zip(self.get_real_bboxes(width, height), self.classes, self.confs),
+                key=lambda x: _rbb_sortkey(x[0]),
+            )
+            if cf >= conf_threshold
+        ]
+        return "\n".join(a)
 
     def plot(self, img, class_names, conf_threshold=0, max_long_side=None):
         """ワクを描画した画像を作って返す。"""
-        return plot_objects(img, self.classes, self.confs, self.bboxes, class_names,
-                            conf_threshold=conf_threshold, max_long_side=max_long_side)
+        return plot_objects(
+            img,
+            self.classes,
+            self.confs,
+            self.bboxes,
+            class_names,
+            conf_threshold=conf_threshold,
+            max_long_side=max_long_side,
+        )
 
     def is_match(self, classes, bboxes, conf_threshold=0, iou_threshold=0.5):
         """classes/bboxesと過不足なく一致していたらTrueを返す。"""
@@ -182,8 +225,9 @@ class ObjectsPrediction:
         height, width = img.shape[:2]
         return [
             tk.ndimage.crop(img, x1, y1, x2 - x1, y2 - y1)
-            for (x1, y1, x2, y2), cf
-            in zip(self.get_real_bboxes(width, height), self.confs)
+            for (x1, y1, x2, y2), cf in zip(
+                self.get_real_bboxes(width, height), self.confs
+            )
             if cf >= conf_threshold
         ]
 
@@ -208,8 +252,14 @@ def od_accuracy(gt, pred, conf_threshold=0, iou_threshold=0.5):
     assert len(gt) == len(pred)
     assert 0 < iou_threshold < 1
     assert 0 <= conf_threshold < 1
-    return np.mean([y_pred.is_match(y_true.classes, y_true.bboxes, conf_threshold, iou_threshold)
-                    for y_true, y_pred in zip(gt, pred)])
+    return np.mean(
+        [
+            y_pred.is_match(
+                y_true.classes, y_true.bboxes, conf_threshold, iou_threshold
+            )
+            for y_true, y_pred in zip(gt, pred)
+        ]
+    )
 
 
 def compute_scores(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=None):
@@ -228,7 +278,9 @@ def compute_scores(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=No
         # conf_threshold以上をいったんすべて対象とする
         pred_enabled = y_pred.confs >= conf_threshold
         # 各正解が予測結果に含まれるか否か: true positive/negative
-        for gt_class, gt_bbox, gt_difficult in zip(y_true.classes, y_true.bboxes, y_true.difficults):
+        for gt_class, gt_bbox, gt_difficult in zip(
+            y_true.classes, y_true.bboxes, y_true.difficults
+        ):
             pred_mask = np.logical_and(pred_enabled, y_pred.classes == gt_class)
             if pred_mask.any():
                 pred_bboxes = y_pred.bboxes[pred_mask]
@@ -236,7 +288,7 @@ def compute_scores(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=No
                 pred_ix = iou.argmax()
                 pred_iou = iou[pred_ix]
             else:
-                pred_iou = -1   # 検出失敗
+                pred_iou = -1  # 検出失敗
             if pred_iou >= iou_threshold:
                 # 検出成功
                 if not gt_difficult:
@@ -280,7 +332,9 @@ def confusion_matrix(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=
                 pred_iou_mask = iou.max(axis=0) >= iou_threshold
                 # 正解毎にループ
                 for gt_ix, gt_class in enumerate(y_true.classes):
-                    m = np.logical_and(pred_enabled, pred_iou_mask)  # まだ使用済みでなく、IoUが大きく、
+                    m = np.logical_and(
+                        pred_enabled, pred_iou_mask
+                    )  # まだ使用済みでなく、IoUが大きく、
                     m = np.logical_and(m, pred_gt == gt_ix)  # IoUの対象がgt_ixなものが対象
                     pred_targets = y_pred.confs.argsort()[::-1][m]  # 対象のindexを確信度順で
                     found = False
@@ -302,7 +356,9 @@ def confusion_matrix(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=
                             if found:
                                 cm[-1, pc] += 1  # 誤検出(重複&クラス違い)
                             else:
-                                found = True   # ここでFound=Trueは微妙だが、gt_classの数が合わなくなるので1個だけにする。。
+                                found = (
+                                    True
+                                )  # ここでFound=Trueは微妙だが、gt_classの数が合わなくなるので1個だけにする。。
                                 cm[gt_class, pc] += 1  # 誤検出(クラス違い)
                         # 一度カウントしたものは次から無視
                         pred_enabled[pred_ix] = False
@@ -359,7 +415,15 @@ def is_in_box(boxes_a, boxes_b):
     return np.logical_and(lt, rb).all(axis=-1)
 
 
-def plot_objects(base_image, classes, confs, bboxes, class_names, conf_threshold=0, max_long_side=None):
+def plot_objects(
+    base_image,
+    classes,
+    confs,
+    bboxes,
+    class_names,
+    conf_threshold=0,
+    max_long_side=None,
+):
     """画像＋オブジェクト([class_id + confidence + xmin/ymin/xmax/ymax]×n)を画像化する。
 
     Args:
@@ -385,7 +449,13 @@ def plot_objects(base_image, classes, confs, bboxes, class_names, conf_threshold
         img = tk.ndimage.resize_long_side(img, max_long_side)
     num_classes = len(class_names) if class_names is not None else 1
     import matplotlib.cm
-    colors = matplotlib.cm.get_cmap(name='hsv')(np.linspace(0, 1, num_classes + 1)[:num_classes]) * 255
+
+    colors = (
+        matplotlib.cm.get_cmap(name="hsv")(
+            np.linspace(0, 1, num_classes + 1)[:num_classes]
+        )
+        * 255
+    )
 
     for classid, conf, bbox in zip(classes, confs, bboxes):
         if conf is not None and conf < conf_threshold:
@@ -394,15 +464,25 @@ def plot_objects(base_image, classes, confs, bboxes, class_names, conf_threshold
         ymin = max(int(round(bbox[1] * img.shape[0])), 0)
         xmax = min(int(round(bbox[2] * img.shape[1])), img.shape[1])
         ymax = min(int(round(bbox[3] * img.shape[0])), img.shape[0])
-        label = class_names[classid] if class_names is not None else f'class{classid:02d}'
+        label = (
+            class_names[classid] if class_names is not None else f"class{classid:02d}"
+        )
         color = colors[classid % len(colors)][-2::-1]  # RGBA → BGR
-        text = label if conf is None else f'{conf:0.2f}, {label}'
+        text = label if conf is None else f"{conf:0.2f}, {label}"
 
         cv2.rectangle(img, (xmin, ymin), (xmax, ymax), color, thickness=2)
 
         tw = 6 * len(text)
         cv2.rectangle(img, (xmin - 1, ymin), (xmin + tw + 15, ymin + 15), color, -1)
-        cv2.putText(img, text, (xmin + 5, ymin + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 0), 1)
+        cv2.putText(
+            img,
+            text,
+            (xmin + 5, ymin + 10),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.35,
+            (0, 0, 0),
+            1,
+        )
 
     return img
 
@@ -410,4 +490,4 @@ def plot_objects(base_image, classes, confs, bboxes, class_names, conf_threshold
 def _rbb_sortkey(bb):
     """real_bboxesのソートキーを作って返す。"""
     x1, y1, x2, y2 = bb
-    return f'{y1:05d}-{x1:05d}-{y2:05d}-{x2:05d}'
+    return f"{y1:05d}-{x1:05d}-{y2:05d}-{x2:05d}"

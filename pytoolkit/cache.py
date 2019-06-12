@@ -20,12 +20,12 @@ def memorize(cache_dir, compress=0, verbose=True):
             # キャッシュがあれば読む
             if cache_path.is_file():
                 if verbose:
-                    tk.log.get(__name__).info(f'Cache is found: {cache_path}')
+                    tk.log.get(__name__).info(f"Cache is found: {cache_path}")
                 return joblib.load(cache_path)
             # 無ければ実処理
             if tk.hvd.is_local_master():
                 if verbose:
-                    tk.log.get(__name__).info(f'Cache is not found: {cache_path}')
+                    tk.log.get(__name__).info(f"Cache is not found: {cache_path}")
                 result = func(*args, **kwargs)
                 cache_path.parent.mkdir(parents=True, exist_ok=True)
                 joblib.dump(result, cache_path, compress=compress)
@@ -43,7 +43,7 @@ def get_cache_path(cache_dir, func, args, kwargs):
     """キャッシュのパスを作って返す。"""
     bound_args = inspect.signature(func).bind(*args, **kwargs).arguments
     args_list = sorted(dict(bound_args).items())
-    args_str = ','.join([f'{repr(k)}:{repr(v)}' for k, v in args_list])
-    args_hash = hashlib.md5(args_str.encode('utf-8')).hexdigest()[:8]
-    cache_path = cache_dir / f'{func.__name__}_{args_hash}.pkl'
+    args_str = ",".join([f"{repr(k)}:{repr(v)}" for k, v in args_list])
+    args_hash = hashlib.md5(args_str.encode("utf-8")).hexdigest()[:8]
+    cache_path = cache_dir / f"{func.__name__}_{args_hash}.pkl"
     return cache_path

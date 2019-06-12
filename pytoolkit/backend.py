@@ -7,7 +7,7 @@ from . import K
 
 def clip64(x, epsilon=1e-7):
     """float64にキャストして[epsilon, 1 - epsilon]にclip。"""
-    return tf.clip_by_value(K.cast(x, 'float64'), epsilon, 1 - epsilon)
+    return tf.clip_by_value(K.cast(x, "float64"), epsilon, 1 - epsilon)
 
 
 def logit(x, epsilon=1e-7):
@@ -18,7 +18,7 @@ def logit(x, epsilon=1e-7):
 
     """
     x = clip64(x, epsilon)
-    return K.log(K.cast(x / (1 - x), 'float32'))
+    return K.log(K.cast(x / (1 - x), "float32"))
 
 
 def binary_crossentropy(y_true, y_pred, from_logits=False, alpha=None):
@@ -53,7 +53,7 @@ def binary_focal_loss(y_true, y_pred, gamma=2.0, from_logits=False, alpha=None):
     else:
         y_logit = logit(y_pred)
 
-    y_pred_inv = K.cast(1 - clip64(y_pred), 'float32')
+    y_pred_inv = K.cast(1 - clip64(y_pred), "float32")
 
     # 前提知識:
     # -log(sigmoid(x)) = log(1 + exp(-x))

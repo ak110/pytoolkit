@@ -33,13 +33,20 @@ def _clear_cache(dc):
 
 def _float_to_uint8(func):
     """floatからnp.uint8への変換。"""
+
     @functools.wraps(func)
     def _decorated(*args, **kwargs):
         return np.clip(func(*args, **kwargs), 0, 255).astype(np.uint8)
+
     return _decorated
 
 
-def load_with_cache(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], grayscale=False, use_cache=True, max_size=None) -> np.ndarray:
+def load_with_cache(
+    path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path],
+    grayscale=False,
+    use_cache=True,
+    max_size=None,
+) -> np.ndarray:
     """画像の読み込み。
 
     Args:
@@ -56,28 +63,33 @@ def load_with_cache(path_or_array: typing.Union[np.ndarray, io.IOBase, str, path
 
     def _load():
         img = load(path_or_array, grayscale=grayscale)
-        if max_size is not None and (img.shape[0] > max_size[0] or img.shape[1] > max_size[1]):
+        if max_size is not None and (
+            img.shape[0] > max_size[0] or img.shape[1] > max_size[1]
+        ):
             r0 = max_size[0] / img.shape[0]
             r1 = max_size[1] / img.shape[1]
             r = min(r0, r1)
-            img = resize(img, int(round(img.shape[1] * r)), int(round(img.shape[0] * r)))
+            img = resize(
+                img, int(round(img.shape[1] * r)), int(round(img.shape[0] * r))
+            )
         return img
 
     if use_cache and isinstance(path_or_array, (str, pathlib.Path)):
         global _load_cache
         global _diskcache_load_failed
         if _load_cache is None and not _diskcache_load_failed:
-            temp_dir = tempfile.mkdtemp(suffix='pytoolkit')
+            temp_dir = tempfile.mkdtemp(suffix="pytoolkit")
             try:
                 import diskcache
+
                 _load_cache = diskcache.Cache(temp_dir)
                 atexit.register(_clear_cache, _load_cache)
             except BaseException:
                 pathlib.Path(temp_dir).rmdir()
                 _diskcache_load_failed = True
-                tk.log.get(__name__).warning('diskcache load failed.', exc_info=True)
+                tk.log.get(__name__).warning("diskcache load failed.", exc_info=True)
         if _load_cache is not None:
-            key = f'{path_or_array}::{max_size}'
+            key = f"{path_or_array}::{max_size}"
             img = _load_cache.get(key)
             if img is None:
                 img = _load()
@@ -87,41 +99,50 @@ def load_with_cache(path_or_array: typing.Union[np.ndarray, io.IOBase, str, path
     return _load()
 
 
-def load(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path], grayscale=False) -> np.ndarray:
+def load(
+    path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path],
+    grayscale=False,
+) -> np.ndarray:
     """画像の読み込みの実装。"""
     assert path_or_array is not None
 
     if isinstance(path_or_array, np.ndarray):
         # ndarrayならそのまま画像扱い
         img = np.copy(path_or_array)  # 念のためコピー
-        assert img.dtype == np.uint8, f'ndarray dtype error: {img.dtype}'
+        assert img.dtype == np.uint8, f"ndarray dtype error: {img.dtype}"
     else:
-        suffix = pathlib.Path(path_or_array).suffix.lower() if isinstance(path_or_array, (str, pathlib.Path)) else None
-        if suffix in ('.npy', '.npz'):
+        suffix = (
+            pathlib.Path(path_or_array).suffix.lower()
+            if isinstance(path_or_array, (str, pathlib.Path))
+            else None
+        )
+        if suffix in (".npy", ".npz"):
             # .npyなら読み込んでそのまま画像扱い
             img = np.load(str(path_or_array))
             if isinstance(img, np.lib.npyio.NpzFile):
                 if len(img.files) != 1:
-                    raise ValueError(f'Image load failed: "{path_or_array}"" has multiple keys. ({img.files})')
+                    raise ValueError(
+                        f'Image load failed: "{path_or_array}"" has multiple keys. ({img.files})'
+                    )
                 img = img[img.files[0]]
-            assert img.dtype == np.uint8, f'{suffix} dtype error: {img.dtype}'
+            assert img.dtype == np.uint8, f"{suffix} dtype error: {img.dtype}"
         else:
             # PILで読み込む
             try:
                 with PIL.Image.open(path_or_array) as pil_img:
-                    target_mode = 'L' if grayscale else 'RGB'
+                    target_mode = "L" if grayscale else "RGB"
                     if pil_img.mode != target_mode:
                         pil_img = pil_img.convert(target_mode)
                     img = np.asarray(pil_img, dtype=np.uint8)
             except BaseException as e:
-                raise ValueError(f'Image load failed: {path_or_array}') from e
+                raise ValueError(f"Image load failed: {path_or_array}") from e
 
     if img is None:
-        raise ValueError(f'Image load failed: {path_or_array}')
+        raise ValueError(f"Image load failed: {path_or_array}")
     if len(img.shape) == 2:
         img = np.expand_dims(img, axis=-1)
     if len(img.shape) != 3:
-        raise ValueError(f'Image load failed: shape={path_or_array}')
+        raise ValueError(f"Image load failed: shape={path_or_array}")
 
     return img
 
@@ -138,7 +159,7 @@ def save(path: typing.Union[str, pathlib.Path], img: np.ndarray):
     """
     assert len(img.shape) == 3
     if img.dtype != np.uint8:
-        warnings.warn(f'Invalid dtype: {img.dtype} (shape={img.shape})')
+        warnings.warn(f"Invalid dtype: {img.dtype} (shape={img.shape})")
 
     path = pathlib.Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -146,35 +167,37 @@ def save(path: typing.Union[str, pathlib.Path], img: np.ndarray):
     img = np.clip(img, 0, 255).astype(np.uint8)
 
     suffix = path.suffix.lower()
-    if suffix == '.npy':
+    if suffix == ".npy":
         np.save(str(path), img)
-    elif suffix == '.npz':
+    elif suffix == ".npz":
         np.savez_compressed(str(path), img)
     else:
         assert img.shape[-1] in (1, 3, 4)
         if img.shape[-1] == 1:
-            pil_img = PIL.Image.fromarray(np.squeeze(img, axis=-1), 'L')
+            pil_img = PIL.Image.fromarray(np.squeeze(img, axis=-1), "L")
         elif img.shape[2] == 3:
-            pil_img = PIL.Image.fromarray(img, 'RGB')
+            pil_img = PIL.Image.fromarray(img, "RGB")
         elif img.shape[2] == 4:
-            pil_img = PIL.Image.fromarray(img, 'RGBA')
+            pil_img = PIL.Image.fromarray(img, "RGBA")
         else:
-            raise RuntimeError(f'Unknown format: shape={img.shape}')
+            raise RuntimeError(f"Unknown format: shape={img.shape}")
         pil_img.save(path)
 
 
-def rotate(rgb: np.ndarray, degrees: float, expand=True, interp='lanczos', border_mode='edge') -> np.ndarray:
+def rotate(
+    rgb: np.ndarray, degrees: float, expand=True, interp="lanczos", border_mode="edge"
+) -> np.ndarray:
     """回転。"""
     cv2_interp = {
-        'nearest': cv2.INTER_NEAREST,
-        'bilinear': cv2.INTER_LINEAR,
-        'bicubic': cv2.INTER_CUBIC,
-        'lanczos': cv2.INTER_LANCZOS4,
+        "nearest": cv2.INTER_NEAREST,
+        "bilinear": cv2.INTER_LINEAR,
+        "bicubic": cv2.INTER_CUBIC,
+        "lanczos": cv2.INTER_LANCZOS4,
     }[interp]
     cv2_border = {
-        'edge': cv2.BORDER_REPLICATE,
-        'reflect': cv2.BORDER_REFLECT_101,
-        'wrap': cv2.BORDER_WRAP,
+        "edge": cv2.BORDER_REPLICATE,
+        "reflect": cv2.BORDER_REFLECT_101,
+        "wrap": cv2.BORDER_WRAP,
     }[border_mode]
     m, w, h = compute_rotate(rgb.shape[1], rgb.shape[0], degrees=degrees, expand=expand)
     if rgb.shape[-1] in (1, 3):
@@ -182,7 +205,12 @@ def rotate(rgb: np.ndarray, degrees: float, expand=True, interp='lanczos', borde
         if len(rgb.shape) == 2:
             rgb = np.expand_dims(rgb, axis=-1)
     else:
-        rotated_list = [cv2.warpAffine(rgb[:, :, ch], m, (w, h), flags=cv2_interp, borderMode=cv2_border) for ch in range(rgb.shape[-1])]
+        rotated_list = [
+            cv2.warpAffine(
+                rgb[:, :, ch], m, (w, h), flags=cv2_interp, borderMode=cv2_border
+            )
+            for ch in range(rgb.shape[-1])
+        ]
         rgb = np.transpose(rotated_list, (1, 2, 0))
     return rgb
 
@@ -213,7 +241,7 @@ def compute_rotate(width, height, degrees, expand=False):
     return m, width, height
 
 
-def pad(rgb: np.ndarray, width: int, height: int, padding='edge') -> np.ndarray:
+def pad(rgb: np.ndarray, width: int, height: int, padding="edge") -> np.ndarray:
     """パディング。width/heightはpadding後のサイズ。(左右/上下均等、端数は右と下につける)"""
     assert width >= 0
     assert height >= 0
@@ -226,22 +254,22 @@ def pad(rgb: np.ndarray, width: int, height: int, padding='edge') -> np.ndarray:
     return rgb
 
 
-def pad_ltrb(rgb: np.ndarray, x1: int, y1: int, x2: int, y2: int, padding='edge'):
+def pad_ltrb(rgb: np.ndarray, x1: int, y1: int, x2: int, y2: int, padding="edge"):
     """パディング。x1/y1/x2/y2は左/上/右/下のパディング量。"""
     assert x1 >= 0 and y1 >= 0 and x2 >= 0 and y2 >= 0
-    assert padding in ('edge', 'zero', 'half', 'one', 'reflect', 'wrap', 'mean')
+    assert padding in ("edge", "zero", "half", "one", "reflect", "wrap", "mean")
     kwargs = {}
-    if padding == 'zero':
-        mode = 'constant'
-    elif padding == 'half':
-        mode = 'constant'
-        kwargs['constant_values'] = (np.uint8(127),)
-    elif padding == 'one':
-        mode = 'constant'
-        kwargs['constant_values'] = (np.uint8(255),)
-    elif padding == 'mean':
-        mode = 'constant'
-        kwargs['constant_values'] = (np.uint8(rgb.mean()),)
+    if padding == "zero":
+        mode = "constant"
+    elif padding == "half":
+        mode = "constant"
+        kwargs["constant_values"] = (np.uint8(127),)
+    elif padding == "one":
+        mode = "constant"
+        kwargs["constant_values"] = (np.uint8(255),)
+    elif padding == "mean":
+        mode = "constant"
+        kwargs["constant_values"] = (np.uint8(rgb.mean()),)
     else:
         mode = padding
 
@@ -258,7 +286,7 @@ def crop(rgb: np.ndarray, x: int, y: int, width: int, height: int) -> np.ndarray
     assert height >= 0
     assert 0 <= x + width <= rgb.shape[1]
     assert 0 <= y + height <= rgb.shape[0]
-    return rgb[y:y + height, x:x + width, :]
+    return rgb[y : y + height, x : x + width, :]
 
 
 @numba.njit(fastmath=True, nogil=True)
@@ -273,7 +301,9 @@ def flip_tb(rgb: np.ndarray) -> np.ndarray:
     return rgb[::-1, :, :]
 
 
-def resize_long_side(rgb: np.ndarray, long_side: int, expand=True, interp='lanczos') -> np.ndarray:
+def resize_long_side(
+    rgb: np.ndarray, long_side: int, expand=True, interp="lanczos"
+) -> np.ndarray:
     """長辺の長さを指定したアスペクト比維持のリサイズ。"""
     height, width = rgb.shape[:2]
     if not expand and max(width, height) <= long_side:
@@ -284,9 +314,11 @@ def resize_long_side(rgb: np.ndarray, long_side: int, expand=True, interp='lancz
         return resize(rgb, width * long_side // height, long_side, interp=interp)
 
 
-def resize(rgb: np.ndarray, width: int, height: int, padding=None, interp='lanczos') -> np.ndarray:
+def resize(
+    rgb: np.ndarray, width: int, height: int, padding=None, interp="lanczos"
+) -> np.ndarray:
     """リサイズ。"""
-    assert interp in ('nearest', 'bilinear', 'bicubic', 'lanczos')
+    assert interp in ("nearest", "bilinear", "bicubic", "lanczos")
     if rgb.shape[1] == width and rgb.shape[0] == height:
         return rgb
     # パディングしつつリサイズ (縦横比維持)
@@ -301,25 +333,30 @@ def resize(rgb: np.ndarray, width: int, height: int, padding=None, interp='lancz
     # パディングせずリサイズ (縦横比無視)
     if rgb.shape[1] < width and rgb.shape[0] < height:  # 拡大
         cv2_interp = {
-            'nearest': cv2.INTER_NEAREST,
-            'bilinear': cv2.INTER_LINEAR,
-            'bicubic': cv2.INTER_CUBIC,
-            'lanczos': cv2.INTER_LANCZOS4,
+            "nearest": cv2.INTER_NEAREST,
+            "bilinear": cv2.INTER_LINEAR,
+            "bicubic": cv2.INTER_CUBIC,
+            "lanczos": cv2.INTER_LANCZOS4,
         }[interp]
     else:  # 縮小
-        cv2_interp = cv2.INTER_NEAREST if interp == 'nearest' else cv2.INTER_AREA
+        cv2_interp = cv2.INTER_NEAREST if interp == "nearest" else cv2.INTER_AREA
     if rgb.shape[-1] in (1, 3):
         rgb = cv2.resize(rgb, (width, height), interpolation=cv2_interp)
         if len(rgb.shape) == 2:
             rgb = np.expand_dims(rgb, axis=-1)
     else:
-        resized_list = [cv2.resize(rgb[:, :, ch], (width, height), interpolation=cv2_interp) for ch in range(rgb.shape[-1])]
+        resized_list = [
+            cv2.resize(rgb[:, :, ch], (width, height), interpolation=cv2_interp)
+            for ch in range(rgb.shape[-1])
+        ]
         rgb = np.transpose(resized_list, (1, 2, 0))
     return rgb
 
 
 @_float_to_uint8
-def gaussian_noise(rgb: np.ndarray, rand: np.random.RandomState, scale: float) -> np.ndarray:
+def gaussian_noise(
+    rgb: np.ndarray, rand: np.random.RandomState, scale: float
+) -> np.ndarray:
     """ガウシアンノイズ。scaleは0～50くらい。小さいほうが色が壊れないかも。"""
     return rgb + rand.normal(0, scale, size=rgb.shape).astype(np.float32)
 
@@ -449,11 +486,22 @@ def posterize(rgb: np.ndarray, bits) -> np.ndarray:
     return np.round(rgb.astype(np.float32) * t) / t
 
 
-def geometric_transform(rgb, output_width, output_height,
-                        flip_h=False, flip_v=False, degrees=0,
-                        scale_h=1.0, scale_v=1.0, pos_h=0.5, pos_v=0.5,
-                        translate_h=0.0, translate_v=0.0,
-                        interp='lanczos', border_mode='edge'):
+def geometric_transform(
+    rgb,
+    output_width,
+    output_height,
+    flip_h=False,
+    flip_v=False,
+    degrees=0,
+    scale_h=1.0,
+    scale_v=1.0,
+    pos_h=0.5,
+    pos_v=0.5,
+    translate_h=0.0,
+    translate_v=0.0,
+    interp="lanczos",
+    border_mode="edge",
+):
     """透視変換。
 
     Args:
@@ -476,18 +524,42 @@ def geometric_transform(rgb, output_width, output_height,
         ndarray: 変換後画像
 
     """
-    m = compute_perspective(rgb.shape[1], rgb.shape[0], output_width, output_height,
-                            flip_h=flip_h, flip_v=flip_v, degrees=degrees,
-                            scale_h=scale_h, scale_v=scale_v, pos_h=pos_h, pos_v=pos_v,
-                            translate_h=translate_h, translate_v=translate_v)
-    rgb = perspective_transform(rgb, output_width, output_height, m, interp=interp, border_mode=border_mode)
+    m = compute_perspective(
+        rgb.shape[1],
+        rgb.shape[0],
+        output_width,
+        output_height,
+        flip_h=flip_h,
+        flip_v=flip_v,
+        degrees=degrees,
+        scale_h=scale_h,
+        scale_v=scale_v,
+        pos_h=pos_h,
+        pos_v=pos_v,
+        translate_h=translate_h,
+        translate_v=translate_v,
+    )
+    rgb = perspective_transform(
+        rgb, output_width, output_height, m, interp=interp, border_mode=border_mode
+    )
     return rgb
 
 
-def compute_perspective(input_width, input_height, output_width, output_height,
-                        flip_h=False, flip_v=False, degrees=0,
-                        scale_h=1.0, scale_v=1.0, pos_h=0.5, pos_v=0.5,
-                        translate_h=0.0, translate_v=0.0):
+def compute_perspective(
+    input_width,
+    input_height,
+    output_width,
+    output_height,
+    flip_h=False,
+    flip_v=False,
+    degrees=0,
+    scale_h=1.0,
+    scale_v=1.0,
+    pos_h=0.5,
+    pos_v=0.5,
+    translate_h=0.0,
+    translate_v=0.0,
+):
     """透視変換の変換行列を作成。
 
     Args:
@@ -539,7 +611,7 @@ def compute_perspective(input_width, input_height, output_width, output_height,
     return m
 
 
-def perspective_transform(rgb, width, height, m, interp='lanczos', border_mode='edge'):
+def perspective_transform(rgb, width, height, m, interp="lanczos", border_mode="edge"):
     """透視変換。
 
     Args:
@@ -552,15 +624,15 @@ def perspective_transform(rgb, width, height, m, interp='lanczos', border_mode='
 
     """
     cv2_interp = {
-        'nearest': cv2.INTER_NEAREST,
-        'bilinear': cv2.INTER_LINEAR,
-        'bicubic': cv2.INTER_CUBIC,
-        'lanczos': cv2.INTER_LANCZOS4,
+        "nearest": cv2.INTER_NEAREST,
+        "bilinear": cv2.INTER_LINEAR,
+        "bicubic": cv2.INTER_CUBIC,
+        "lanczos": cv2.INTER_LANCZOS4,
     }[interp]
     cv2_border = {
-        'edge': cv2.BORDER_REPLICATE,
-        'reflect': cv2.BORDER_REFLECT_101,
-        'wrap': cv2.BORDER_WRAP,
+        "edge": cv2.BORDER_REPLICATE,
+        "reflect": cv2.BORDER_REFLECT_101,
+        "wrap": cv2.BORDER_WRAP,
     }[border_mode]
 
     # 縮小ならINTER_AREA
@@ -572,11 +644,22 @@ def perspective_transform(rgb, width, height, m, interp='lanczos', border_mode='
         cv2_interp = cv2.INTER_AREA
 
     if rgb.shape[-1] in (1, 3):
-        rgb = cv2.warpPerspective(rgb, m, (width, height), flags=cv2_interp, borderMode=cv2_border)
+        rgb = cv2.warpPerspective(
+            rgb, m, (width, height), flags=cv2_interp, borderMode=cv2_border
+        )
         if len(rgb.shape) == 2:
             rgb = np.expand_dims(rgb, axis=-1)
     else:
-        resized_list = [cv2.warpPerspective(rgb[:, :, ch], m, (width, height), flags=cv2_interp, borderMode=cv2_border) for ch in range(rgb.shape[-1])]
+        resized_list = [
+            cv2.warpPerspective(
+                rgb[:, :, ch],
+                m,
+                (width, height),
+                flags=cv2_interp,
+                borderMode=cv2_border,
+            )
+            for ch in range(rgb.shape[-1])
+        ]
         rgb = np.transpose(resized_list, (1, 2, 0))
     return rgb
 
@@ -592,10 +675,22 @@ def transform_points(points, m):
         変換後の座標の配列。
 
     """
-    return cv2.perspectiveTransform(np.reshape(points, (-1, 1, 2)).astype(np.float32), m).reshape(-1, 2)
+    return cv2.perspectiveTransform(
+        np.reshape(points, (-1, 1, 2)).astype(np.float32), m
+    ).reshape(-1, 2)
 
 
-def erase_random(rgb, rand: np.random.RandomState, bboxes=None, scale_low=0.02, scale_high=0.4, rate_1=1 / 3, rate_2=3, alpha=None, max_tries=30):
+def erase_random(
+    rgb,
+    rand: np.random.RandomState,
+    bboxes=None,
+    scale_low=0.02,
+    scale_high=0.4,
+    rate_1=1 / 3,
+    rate_2=3,
+    alpha=None,
+    max_tries=30,
+):
     """Random erasing <https://arxiv.org/abs/1708.04896>"""
     if bboxes is not None:
         bb_lt = bboxes[:, :2]  # 左上
@@ -618,11 +713,13 @@ def erase_random(rgb, rand: np.random.RandomState, bboxes=None, scale_low=0.02, 
             box_lt = np.array([[ex, ey]])
             box_rb = np.array([[ex + ew, ey + eh]])
             # bboxの頂点および中央を1つでも含んでいたらNGとする
-            if np.logical_and(box_lt <= bb_lt, bb_lt <= box_rb).all(axis=-1).any() or \
-               np.logical_and(box_lt <= bb_rb, bb_rb <= box_rb).all(axis=-1).any() or \
-               np.logical_and(box_lt <= bb_lb, bb_lb <= box_rb).all(axis=-1).any() or \
-               np.logical_and(box_lt <= bb_rt, bb_rt <= box_rb).all(axis=-1).any() or \
-               np.logical_and(box_lt <= bb_c, bb_c <= box_rb).all(axis=-1).any():
+            if (
+                np.logical_and(box_lt <= bb_lt, bb_lt <= box_rb).all(axis=-1).any()
+                or np.logical_and(box_lt <= bb_rb, bb_rb <= box_rb).all(axis=-1).any()
+                or np.logical_and(box_lt <= bb_lb, bb_lb <= box_rb).all(axis=-1).any()
+                or np.logical_and(box_lt <= bb_rt, bb_rt <= box_rb).all(axis=-1).any()
+                or np.logical_and(box_lt <= bb_c, bb_c <= box_rb).all(axis=-1).any()
+            ):
                 continue
             # 面積チェック。塗りつぶされるのがbboxの面積の25%を超えていたらNGとする
             lt = np.maximum(bb_lt, box_lt)
@@ -635,15 +732,17 @@ def erase_random(rgb, rand: np.random.RandomState, bboxes=None, scale_low=0.02, 
         rgb = np.copy(rgb)
         rc = rand.randint(0, 256, size=rgb.shape[-1])
         if alpha:
-            rgb[ey:ey + eh, ex:ex + ew, :] = (rgb[ey:ey + eh, ex:ex + ew, :] * (1 - alpha) + rc * alpha).astype(np.uint8)
+            rgb[ey : ey + eh, ex : ex + ew, :] = (
+                rgb[ey : ey + eh, ex : ex + ew, :] * (1 - alpha) + rc * alpha
+            ).astype(np.uint8)
         else:
-            rgb[ey:ey + eh, ex:ex + ew, :] = rc[np.newaxis, np.newaxis, :]
+            rgb[ey : ey + eh, ex : ex + ew, :] = rc[np.newaxis, np.newaxis, :]
         break
 
     return rgb
 
 
-def mixup(sample1, sample2, rand=None, mode='beta'):
+def mixup(sample1, sample2, rand=None, mode="beta"):
     """mixup。 <https://arxiv.org/abs/1710.09412>
 
     常に「sample1の重み >= sample2の重み」となるようにしている。
@@ -662,14 +761,14 @@ def mixup(sample1, sample2, rand=None, mode='beta'):
 
     """
     rand = sklearn.utils.check_random_state(rand)
-    if mode == 'beta':
+    if mode == "beta":
         r = np.float32(np.abs(rand.beta(0.2, 0.2) - 0.5) + 0.5)
-    elif mode == 'uniform':
+    elif mode == "uniform":
         r = np.float32(rand.uniform(0.5, 1))
-    elif mode == 'uniform_ex':
+    elif mode == "uniform_ex":
         r = np.float32(rand.uniform(0.5, np.sqrt(2)))
     else:
-        raise ValueError(f'Invalid mode: {mode}')
+        raise ValueError(f"Invalid mode: {mode}")
     assert r >= 0.5
     return mix_data(sample1, sample2, r)
 
@@ -751,10 +850,16 @@ def class_to_mask(classes, class_colors):
     return np.asarray(class_colors)[classes]
 
 
-def dense_crf(rgb, pred,
-              gaussian_sxy=(1, 1), gaussian_compat=3,
-              bilateral_sxy=(4, 4), bilateral_srgb=(13, 13, 13), bilateral_compat=10,
-              num_iter=5):
+def dense_crf(
+    rgb,
+    pred,
+    gaussian_sxy=(1, 1),
+    gaussian_compat=3,
+    bilateral_sxy=(4, 4),
+    bilateral_srgb=(13, 13, 13),
+    bilateral_compat=10,
+    num_iter=5,
+):
     """Dense CRF <https://github.com/lucasb-eyer/pydensecrf>
 
     Args:
@@ -768,6 +873,7 @@ def dense_crf(rgb, pred,
     """
     import pydensecrf.densecrf as dcrf
     import pydensecrf.utils as du
+
     rgb = np.copy(rgb).astype(np.uint8)
     pred = pred.astype(np.float32)
     pred /= pred.sum(axis=-1, keepdims=True)
@@ -785,7 +891,9 @@ def dense_crf(rgb, pred,
     d = dcrf.DenseCRF2D(width, height, num_classes)
     d.setUnaryEnergy(np.ascontiguousarray(du.unary_from_softmax(U)))
     d.addPairwiseGaussian(sxy=gaussian_sxy, compat=gaussian_compat)
-    d.addPairwiseBilateral(sxy=bilateral_sxy, srgb=bilateral_srgb, rgbim=rgb, compat=bilateral_compat)
+    d.addPairwiseBilateral(
+        sxy=bilateral_sxy, srgb=bilateral_srgb, rgbim=rgb, compat=bilateral_compat
+    )
     Q = d.inference(num_iter)
     MAP = np.array(Q, dtype=np.float32)
 

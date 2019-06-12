@@ -27,7 +27,7 @@ def init():
             get().init()
             _initialized = True
         except ImportError:
-            tk.log.get(__name__).warning('Horovod読み込み失敗', exc_info=True)
+            tk.log.get(__name__).warning("Horovod読み込み失敗", exc_info=True)
 
 
 def initialized():
@@ -75,8 +75,10 @@ def barrier():
     if not initialized():
         return
     import mpi4py
+
     mpi4py.rc.initialize = False
     from mpi4py import MPI
+
     comm = MPI.COMM_WORLD
     comm.barrier()
 
@@ -86,8 +88,10 @@ def bcast(buf, root=0):
     if not initialized():
         return buf
     import mpi4py
+
     mpi4py.rc.initialize = False
     from mpi4py import MPI
+
     comm = MPI.COMM_WORLD
     return comm.bcast(buf, root)
 
@@ -110,6 +114,7 @@ def split(dataset):
 
     """
     from . import data
+
     if not initialized():
         return dataset
     return data.split(dataset, get().size())[get().rank()]

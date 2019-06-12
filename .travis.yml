@@ -14,8 +14,8 @@ install:
   - pip install -r .travis.requirements.txt
 
 script:
+  - black --check .
   - flake8
-  - test "$(autopep8 --recursive --diff .)" = ""
-  - pylint --jobs=4 pytoolkit *.py
-  - pytest
+  - pylint --jobs=4 pytoolkit scripts
+  - env PYTOOLKIT_BACKEND=tf pytest
   - env PYTOOLKIT_BACKEND=keras pytest

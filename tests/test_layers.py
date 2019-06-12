@@ -1,11 +1,10 @@
-
 import numpy as np
 import pytest
 
 import pytoolkit as tk
 
 
-@pytest.mark.usefixtures('session')
+@pytest.mark.usefixtures("session")
 def test_Preprocess():
     X = np.array([[[[0, 127.5, 255]]]])
     y = np.array([[[[-1, 0, +1]]]])
@@ -13,27 +12,30 @@ def test_Preprocess():
     assert pred == pytest.approx(y)
 
 
-@pytest.mark.parametrize('color', ['rgb', 'lab', 'hsv', 'yuv', 'ycbcr', 'hed', 'yiq'])
+@pytest.mark.parametrize("color", ["rgb", "lab", "hsv", "yuv", "ycbcr", "hed", "yiq"])
 def test_ConvertColor(session, color):
     import skimage.color
 
-    rgb = np.array([
-        [[0, 0, 0], [128, 128, 128], [255, 255, 255]],
-        [[192, 0, 0], [0, 192, 0], [0, 0, 192]],
-        [[64, 64, 0], [0, 64, 64], [64, 0, 64]],
-    ], dtype=np.uint8)
+    rgb = np.array(
+        [
+            [[0, 0, 0], [128, 128, 128], [255, 255, 255]],
+            [[192, 0, 0], [0, 192, 0], [0, 0, 192]],
+            [[64, 64, 0], [0, 64, 64], [64, 0, 64]],
+        ],
+        dtype=np.uint8,
+    )
 
     expected = {
-        'rgb': lambda rgb: rgb / 127.5 - 1,
-        'lab': lambda rgb: skimage.color.rgb2lab(rgb) / 100,
-        'hsv': skimage.color.rgb2hsv,
-        'yuv': skimage.color.rgb2yuv,
-        'ycbcr': lambda rgb: skimage.color.rgb2ycbcr(rgb) / 255,
-        'hed': skimage.color.rgb2hed,
-        'yiq': skimage.color.rgb2yiq,
+        "rgb": lambda rgb: rgb / 127.5 - 1,
+        "lab": lambda rgb: skimage.color.rgb2lab(rgb) / 100,
+        "hsv": skimage.color.rgb2hsv,
+        "yuv": skimage.color.rgb2yuv,
+        "ycbcr": lambda rgb: skimage.color.rgb2ycbcr(rgb) / 255,
+        "hed": skimage.color.rgb2hed,
+        "yiq": skimage.color.rgb2yiq,
     }[color](rgb)
 
-    layer = tk.layers.ConvertColor(f'rgb_to_{color}')
+    layer = tk.layers.ConvertColor(f"rgb_to_{color}")
     actual = session.run(layer(tk.K.constant(np.expand_dims(rgb, 0))))[0]
 
     actual, expected = np.round(actual, 3), np.round(expected, 3)  # 丸めちゃう
@@ -42,62 +44,46 @@ def test_ConvertColor(session, color):
     assert actual == pytest.approx(expected, 1e-3)
 
 
-@pytest.mark.usefixtures('session')
+@pytest.mark.usefixtures("session")
 def test_Conv2DEx():
     _predict_layer(tk.layers.Conv2DEx(4), np.zeros((1, 8, 8, 3)))
 
 
-@pytest.mark.usefixtures('session')
+@pytest.mark.usefixtures("session")
 def test_Pad2D():
     pred = _predict_layer(tk.layers.Pad2D(1), np.zeros((1, 8, 8, 3)))
     assert pred.shape == (1, 10, 10, 3)
 
 
-@pytest.mark.usefixtures('session')
+@pytest.mark.usefixtures("session")
 def test_PadChannel2D():
     pred = _predict_layer(tk.layers.PadChannel2D(filters=4), np.zeros((1, 8, 8, 3)))
     assert pred.shape == (1, 8, 8, 3 + 4)
 
 
-@pytest.mark.usefixtures('session')
+@pytest.mark.usefixtures("session")
 def test_coord_channel_2d():
     X = np.zeros((1, 4, 4, 1))
-    y = np.array([[
+    y = np.array(
         [
-            [0, 0.00, 0.00],
-            [0, 0.25, 0.00],
-            [0, 0.50, 0.00],
-            [0, 0.75, 0.00],
-        ],
-        [
-            [0, 0.00, 0.25],
-            [0, 0.25, 0.25],
-            [0, 0.50, 0.25],
-            [0, 0.75, 0.25],
-        ],
-        [
-            [0, 0.00, 0.50],
-            [0, 0.25, 0.50],
-            [0, 0.50, 0.50],
-            [0, 0.75, 0.50],
-        ],
-        [
-            [0, 0.00, 0.75],
-            [0, 0.25, 0.75],
-            [0, 0.50, 0.75],
-            [0, 0.75, 0.75],
-        ],
-    ]])
+            [
+                [[0, 0.00, 0.00], [0, 0.25, 0.00], [0, 0.50, 0.00], [0, 0.75, 0.00]],
+                [[0, 0.00, 0.25], [0, 0.25, 0.25], [0, 0.50, 0.25], [0, 0.75, 0.25]],
+                [[0, 0.00, 0.50], [0, 0.25, 0.50], [0, 0.50, 0.50], [0, 0.75, 0.50]],
+                [[0, 0.00, 0.75], [0, 0.25, 0.75], [0, 0.50, 0.75], [0, 0.75, 0.75]],
+            ]
+        ]
+    )
     pred = _predict_layer(tk.layers.CoordChannel2D(), X)
     assert pred == pytest.approx(y)
 
 
-@pytest.mark.usefixtures('session')
+@pytest.mark.usefixtures("session")
 def test_ChannelPair2D():
     _predict_layer(tk.layers.ChannelPair2D(), np.zeros((1, 8, 8, 3)))
 
 
-@pytest.mark.usefixtures('session')
+@pytest.mark.usefixtures("session")
 def test_GroupNormalization():
     _predict_layer(tk.layers.GroupNormalization(), np.zeros((1, 8, 8, 32)))
     _predict_layer(tk.layers.GroupNormalization(), np.zeros((1, 8, 8, 64)))
@@ -105,78 +91,82 @@ def test_GroupNormalization():
     _predict_layer(tk.layers.GroupNormalization(), np.zeros((1, 8, 8, 8, 64)))
 
 
-@pytest.mark.usefixtures('session')
+@pytest.mark.usefixtures("session")
 def test_mixfeat():
-    X = np.array([
-        [1, 2],
-        [3, 4],
-        [5, 6],
-    ], dtype=np.float32)
+    X = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
 
     x = inputs = tk.keras.layers.Input(shape=(2,))
     x = tk.layers.MixFeat()(x)
     model = tk.keras.models.Model(inputs, x)
     assert model.predict(X) == pytest.approx(X)
-    model.compile('sgd', loss='mse')
+    model.compile("sgd", loss="mse")
     model.fit(X, X, batch_size=3, epochs=1)
 
 
-@pytest.mark.usefixtures('session')
+@pytest.mark.usefixtures("session")
 def test_DropActivation():
     _predict_layer(tk.layers.DropActivation(), np.zeros((1, 8, 8, 3)))
 
 
-@pytest.mark.usefixtures('session')
+@pytest.mark.usefixtures("session")
 def test_ParallelGridPooling2D():
-    layer = tk.keras.models.Sequential([
-        tk.layers.ParallelGridPooling2D(),
-        tk.layers.ParallelGridGather(r=2 * 2),
-    ])
+    layer = tk.keras.models.Sequential(
+        [tk.layers.ParallelGridPooling2D(), tk.layers.ParallelGridGather(r=2 * 2)]
+    )
     pred = _predict_layer(layer, np.zeros((1, 8, 8, 3)))
     assert pred.shape == (1, 4, 4, 3)
 
 
-@pytest.mark.usefixtures('session')
+@pytest.mark.usefixtures("session")
 def test_SubpixelConv2D():
-    X = np.array([[
-        [[11, 21, 12, 22], [31, 41, 32, 42]],
-        [[13, 23, 14, 24], [33, 43, 34, 44]],
-    ]], dtype=np.float32)
-    y = np.array([[
-        [[11], [21], [31], [41]],
-        [[12], [22], [32], [42]],
-        [[13], [23], [33], [43]],
-        [[14], [24], [34], [44]],
-    ]], dtype=np.float32)
+    X = np.array(
+        [[[[11, 21, 12, 22], [31, 41, 32, 42]], [[13, 23, 14, 24], [33, 43, 34, 44]]]],
+        dtype=np.float32,
+    )
+    y = np.array(
+        [
+            [
+                [[11], [21], [31], [41]],
+                [[12], [22], [32], [42]],
+                [[13], [23], [33], [43]],
+                [[14], [24], [34], [44]],
+            ]
+        ],
+        dtype=np.float32,
+    )
     pred = _predict_layer(tk.layers.SubpixelConv2D(scale=2), X)
     assert pred == pytest.approx(y)
 
 
-@pytest.mark.usefixtures('session')
+@pytest.mark.usefixtures("session")
 def test_WSConv2D():
     _predict_layer(tk.layers.WSConv2D(filters=2), np.zeros((1, 8, 8, 3)))
 
 
-@pytest.mark.usefixtures('session')
+@pytest.mark.usefixtures("session")
 def test_OctaveConv2D():
     X = [np.zeros((1, 4, 4, 8)), np.zeros((1, 8, 8, 8))]
     _predict_layer(tk.layers.OctaveConv2D(filters=4), X)
 
 
-@pytest.mark.usefixtures('session')
+@pytest.mark.usefixtures("session")
 def test_BlurPooling2D():
     X = np.zeros((1, 5, 5, 2))
     X[0, 2, 2, 0] = 1
-    y = np.array([[
-        [[0.09765625, 0.], [0.58593750, 0.], [0.09765625, 0.]],
-        [[0.58593750, 0.], [3.51562500, 0.], [0.58593750, 0.]],
-        [[0.09765625, 0.], [0.58593750, 0.], [0.09765625, 0.]]
-    ]])
+    y = np.array(
+        [
+            [
+                [[0.09765625, 0.0], [0.58593750, 0.0], [0.09765625, 0.0]],
+                [[0.58593750, 0.0], [3.51562500, 0.0], [0.58593750, 0.0]],
+                [[0.09765625, 0.0], [0.58593750, 0.0], [0.09765625, 0.0]],
+            ]
+        ]
+    )
     pred = _predict_layer(tk.layers.BlurPooling2D(taps=5), X)
     assert pred == pytest.approx(y, abs=1e-5)
 
 
-@pytest.mark.usefixtures('session')
+@pytest.mark.usefixtures("session")
 def test_ScaleGradient():
     x = np.array([[1, 2], [3, 4]])
     assert _predict_layer(tk.layers.ScaleGradient(scale=0.1), x) == pytest.approx(x)

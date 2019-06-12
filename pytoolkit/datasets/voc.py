@@ -16,26 +16,26 @@ from .. import od
 
 # VOC2007のクラス名のリスト (20クラス)
 CLASS_NAMES = [
-    'aeroplane',
-    'bicycle',
-    'bird',
-    'boat',
-    'bottle',
-    'bus',
-    'car',
-    'cat',
-    'chair',
-    'cow',
-    'diningtable',
-    'dog',
-    'horse',
-    'motorbike',
-    'person',
-    'pottedplant',
-    'sheep',
-    'sofa',
-    'train',
-    'tvmonitor',
+    "aeroplane",
+    "bicycle",
+    "bird",
+    "boat",
+    "bottle",
+    "bus",
+    "car",
+    "cat",
+    "chair",
+    "cow",
+    "diningtable",
+    "dog",
+    "horse",
+    "motorbike",
+    "person",
+    "pottedplant",
+    "sheep",
+    "sofa",
+    "train",
+    "tvmonitor",
 ]
 
 # 0～19のIDへの変換
@@ -75,8 +75,12 @@ def load_0712_trainval(vocdevkit_dir, class_name_to_id=None):
         - y: tk.od.ObjectsAnnotationのndarray
 
     """
-    X1, y1 = load_set(vocdevkit_dir, 2007, 'trainval', class_name_to_id, without_difficult=True)
-    X2, y2 = load_set(vocdevkit_dir, 2012, 'trainval', class_name_to_id, without_difficult=True)
+    X1, y1 = load_set(
+        vocdevkit_dir, 2007, "trainval", class_name_to_id, without_difficult=True
+    )
+    X2, y2 = load_set(
+        vocdevkit_dir, 2012, "trainval", class_name_to_id, without_difficult=True
+    )
     return np.concatenate([X1, X2]), np.concatenate([y1, y2])
 
 
@@ -94,10 +98,12 @@ def load_07_test(vocdevkit_dir, class_name_to_id=None):
         - y: tk.od.ObjectsAnnotationのndarray
 
     """
-    return load_set(vocdevkit_dir, 2007, 'test', class_name_to_id)
+    return load_set(vocdevkit_dir, 2007, "test", class_name_to_id)
 
 
-def load_set(vocdevkit_dir, year, set_name, class_name_to_id=None, without_difficult=False):
+def load_set(
+    vocdevkit_dir, year, set_name, class_name_to_id=None, without_difficult=False
+):
     """PASCAL VOCデータセットの読み込み。
 
     Args:
@@ -115,12 +121,27 @@ def load_set(vocdevkit_dir, year, set_name, class_name_to_id=None, without_diffi
 
     """
     vocdevkit_dir = pathlib.Path(vocdevkit_dir)
-    names = (vocdevkit_dir / f'VOC{year}' / 'ImageSets' / 'Main' / f'{set_name}.txt').read_text().split('\n')
-    return load_annotations(vocdevkit_dir, vocdevkit_dir / f'VOC{year}' / 'Annotations',
-                            names, class_name_to_id, without_difficult)
+    names = (
+        (vocdevkit_dir / f"VOC{year}" / "ImageSets" / "Main" / f"{set_name}.txt")
+        .read_text()
+        .split("\n")
+    )
+    return load_annotations(
+        vocdevkit_dir,
+        vocdevkit_dir / f"VOC{year}" / "Annotations",
+        names,
+        class_name_to_id,
+        without_difficult,
+    )
 
 
-def load_annotations(vocdevkit_dir, annotations_dir, names=None, class_name_to_id=None, without_difficult=False):
+def load_annotations(
+    vocdevkit_dir,
+    annotations_dir,
+    names=None,
+    class_name_to_id=None,
+    without_difficult=False,
+):
     """VOC2007などのアノテーションデータの読み込み。
 
     Returns:
@@ -133,45 +154,52 @@ def load_annotations(vocdevkit_dir, annotations_dir, names=None, class_name_to_i
     """
     d = pathlib.Path(annotations_dir)
     if names is None:
-        names = [p.stem for p in d.glob('*.xml')]
-    y = [load_annotation(vocdevkit_dir, d / (name + '.xml'), class_name_to_id, without_difficult)
-         for name in names]
+        names = [p.stem for p in d.glob("*.xml")]
+    y = [
+        load_annotation(
+            vocdevkit_dir, d / (name + ".xml"), class_name_to_id, without_difficult
+        )
+        for name in names
+    ]
     return np.array([t.path for t in y]), np.array(y)
 
 
-def load_annotation(vocdevkit_dir, xml_path, class_name_to_id=None, without_difficult=False):
+def load_annotation(
+    vocdevkit_dir, xml_path, class_name_to_id=None, without_difficult=False
+):
     """VOC2007などのアノテーションデータの読み込み。"""
     vocdevkit_dir = pathlib.Path(vocdevkit_dir)
     class_name_to_id = class_name_to_id or CLASS_NAMES_TO_ID
     root = xml.etree.ElementTree.parse(str(xml_path)).getroot()
-    folder = root.find('folder').text
-    filename = root.find('filename').text
-    size_tree = root.find('size')
-    width = float(size_tree.find('width').text)
-    height = float(size_tree.find('height').text)
+    folder = root.find("folder").text
+    filename = root.find("filename").text
+    size_tree = root.find("size")
+    width = float(size_tree.find("width").text)
+    height = float(size_tree.find("height").text)
     classes = []
     bboxes = []
     difficults = []
-    for object_tree in root.findall('object'):
-        difficult = object_tree.find('difficult').text == '1'
+    for object_tree in root.findall("object"):
+        difficult = object_tree.find("difficult").text == "1"
         if without_difficult and difficult:
             continue
-        class_id = class_name_to_id[object_tree.find('name').text]
-        bndbox = object_tree.find('bndbox')
-        xmin = float(bndbox.find('xmin').text) / width
-        ymin = float(bndbox.find('ymin').text) / height
-        xmax = float(bndbox.find('xmax').text) / width
-        ymax = float(bndbox.find('ymax').text) / height
+        class_id = class_name_to_id[object_tree.find("name").text]
+        bndbox = object_tree.find("bndbox")
+        xmin = float(bndbox.find("xmin").text) / width
+        ymin = float(bndbox.find("ymin").text) / height
+        xmax = float(bndbox.find("xmax").text) / width
+        ymax = float(bndbox.find("ymax").text) / height
         classes.append(class_id)
         bboxes.append([xmin, ymin, xmax, ymax])
         difficults.append(difficult)
     annotation = od.ObjectsAnnotation(
-        path=vocdevkit_dir / folder / 'JPEGImages' / filename,
+        path=vocdevkit_dir / folder / "JPEGImages" / filename,
         width=width,
         height=height,
         classes=classes,
         bboxes=bboxes,
-        difficults=difficults)
+        difficults=difficults,
+    )
     return annotation
 
 
@@ -189,23 +217,36 @@ def evaluate(y_true, y_pred):
 
     """
     import chainercv
+
     gt_classes_list = np.array([y.classes for y in y_true])
     gt_bboxes_list = np.array([y.real_bboxes for y in y_true])
     gt_difficults_list = np.array([y.difficults for y in y_true])
     pred_classes_list = np.array([p.classes for p in y_pred])
     pred_confs_list = np.array([p.confs for p in y_pred])
-    pred_bboxes_list = np.array([p.get_real_bboxes(y.width, y.height) for (p, y) in zip(y_pred, y_true)])
+    pred_bboxes_list = np.array(
+        [p.get_real_bboxes(y.width, y.height) for (p, y) in zip(y_pred, y_true)]
+    )
     scores1 = chainercv.evaluations.eval_detection_voc(
-        pred_bboxes_list, pred_classes_list, pred_confs_list,
-        gt_bboxes_list, gt_classes_list, gt_difficults_list,
-        use_07_metric=False)
+        pred_bboxes_list,
+        pred_classes_list,
+        pred_confs_list,
+        gt_bboxes_list,
+        gt_classes_list,
+        gt_difficults_list,
+        use_07_metric=False,
+    )
     scores2 = chainercv.evaluations.eval_detection_voc(
-        pred_bboxes_list, pred_classes_list, pred_confs_list,
-        gt_bboxes_list, gt_classes_list, gt_difficults_list,
-        use_07_metric=True)
+        pred_bboxes_list,
+        pred_classes_list,
+        pred_confs_list,
+        gt_bboxes_list,
+        gt_classes_list,
+        gt_difficults_list,
+        use_07_metric=True,
+    )
     return {
-        'AP': scores1['ap'],
-        'mAP': scores1['map'],
-        'AP_VOC': scores2['ap'],
-        'mAP_VOC': scores2['map'],
+        "AP": scores1["ap"],
+        "mAP": scores1["map"],
+        "AP_VOC": scores2["ap"],
+        "mAP_VOC": scores2["map"],
     }

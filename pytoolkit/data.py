@@ -66,7 +66,15 @@ class DataLoader(keras.utils.Sequence):
 
     """
 
-    def __init__(self, dataset, batch_size, shuffle=False, parallel=True, use_horovod=False, collate_fn=None):
+    def __init__(
+        self,
+        dataset,
+        batch_size,
+        shuffle=False,
+        parallel=True,
+        use_horovod=False,
+        collate_fn=None,
+    ):
         assert len(dataset) > 0
         self.dataset = dataset
         self.batch_size = batch_size
@@ -78,10 +86,15 @@ class DataLoader(keras.utils.Sequence):
 
         if self.shuffle:
             # シャッフル時は常に同じバッチサイズを返せるようにする (学習時の安定性のため)
-            mp_batch_size = self.batch_size * tk.hvd.size() if self.use_horovod else self.batch_size
+            mp_batch_size = (
+                self.batch_size * tk.hvd.size() if self.use_horovod else self.batch_size
+            )
             self.steps_per_epoch = -(-len(self.dataset) // mp_batch_size)  # ceiling
             self.index_generator = _generate_shuffled_indices(len(self.dataset))
-            self.indices = [next(self.index_generator) for _ in range(self.steps_per_epoch * self.batch_size)]
+            self.indices = [
+                next(self.index_generator)
+                for _ in range(self.steps_per_epoch * self.batch_size)
+            ]
         else:
             # シャッフル無しの場合はそのまま順に返す。
             self.steps_per_epoch = -(-len(self.dataset) // self.batch_size)  # ceiling
@@ -91,7 +104,10 @@ class DataLoader(keras.utils.Sequence):
     def on_epoch_end(self):
         """1エポック完了時の処理。(シャッフルする)"""
         if self.shuffle:
-            self.indices = [next(self.index_generator) for _ in range(self.steps_per_epoch * self.batch_size)]
+            self.indices = [
+                next(self.index_generator)
+                for _ in range(self.steps_per_epoch * self.batch_size)
+            ]
 
     def __len__(self):
         """1エポックあたりのミニバッチ数を返す。"""
@@ -110,11 +126,14 @@ class DataLoader(keras.utils.Sequence):
         start_time = time.perf_counter()
 
         offset = self.batch_size * index
-        batch_indices = self.indices[offset:offset + self.batch_size]
+        batch_indices = self.indices[offset : offset + self.batch_size]
         assert not self.shuffle or len(batch_indices) == self.batch_size
 
         if self.parallel:
-            futures = [tk.threading.get_pool().submit(self.get_sample, i) for i in batch_indices]
+            futures = [
+                tk.threading.get_pool().submit(self.get_sample, i)
+                for i in batch_indices
+            ]
             results = [f.result() for f in futures]
         else:
             results = [self.get_sample(i) for i in batch_indices]
@@ -207,5 +226,7 @@ def split(dataset, count, shuffle=False):
     indices = np.arange(dataset_size)
     if shuffle:
         np.random.shuffle(indices)
-    return [SubDataset(dataset, indices[o:o + sub_size])
-            for o in range(0, dataset_size, sub_size)]
+    return [
+        SubDataset(dataset, indices[o : o + sub_size])
+        for o in range(0, dataset_size, sub_size)
+    ]

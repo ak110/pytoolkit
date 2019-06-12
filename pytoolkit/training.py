@@ -23,8 +23,14 @@ def check(model: keras.models.Model, plot_path=None):
 
 
 @tk_log.trace()
-def train(model: keras.models.Model, train_dataset, val_dataset=None,
-          batch_size=16, model_path=None, **kwargs):
+def train(
+    model: keras.models.Model,
+    train_dataset,
+    val_dataset=None,
+    batch_size=16,
+    model_path=None,
+    **kwargs,
+):
     """学習。
 
     Args:
@@ -39,18 +45,34 @@ def train(model: keras.models.Model, train_dataset, val_dataset=None,
     assert model_path is not None
     # 学習
     tk.hvd.barrier()
-    tk.models.fit(model, train_dataset, validation_data=val_dataset, batch_size=batch_size, **kwargs)
+    tk.models.fit(
+        model,
+        train_dataset,
+        validation_data=val_dataset,
+        batch_size=batch_size,
+        **kwargs,
+    )
     try:
         # 評価
-        evaluate(model, train_dataset, batch_size=batch_size, prefix='', use_horovod=True)
+        evaluate(
+            model, train_dataset, batch_size=batch_size, prefix="", use_horovod=True
+        )
         if val_dataset:
-            evaluate(model, val_dataset, batch_size=batch_size, prefix='val_', use_horovod=True)
+            evaluate(
+                model,
+                val_dataset,
+                batch_size=batch_size,
+                prefix="val_",
+                use_horovod=True,
+            )
     finally:
         # モデルを保存
         tk.models.save(model, model_path)
 
 
-def evaluate(model: keras.models.Model, dataset, batch_size, prefix='', use_horovod=False):
+def evaluate(
+    model: keras.models.Model, dataset, batch_size, prefix="", use_horovod=False
+):
     """評価して結果をINFOログ出力する。
 
     Args:
@@ -61,9 +83,13 @@ def evaluate(model: keras.models.Model, dataset, batch_size, prefix='', use_horo
         use_horovod (bool): MPIによる分散処理をするか否か。
 
     """
-    evals = tk.models.evaluate(model, dataset, batch_size=batch_size, use_horovod=use_horovod)
+    evals = tk.models.evaluate(
+        model, dataset, batch_size=batch_size, use_horovod=use_horovod
+    )
     if tk.hvd.is_master():
         max_len = max([len(n) for n in evals]) + max(len(prefix), 4)
         for n, v in evals.items():
-            tk_log.get(__name__).info(f'{prefix}{n}:{" " * (max_len - len(prefix) - len(n))} {v:.3f}')
+            tk_log.get(__name__).info(
+                f'{prefix}{n}:{" " * (max_len - len(prefix) - len(n))} {v:.3f}'
+            )
     tk.hvd.barrier()

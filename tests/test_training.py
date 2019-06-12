@@ -6,7 +6,7 @@ import pytest
 import pytoolkit as tk
 
 
-@pytest.mark.usefixtures('session')
+@pytest.mark.usefixtures("session")
 def test_xor(tmpdir):
     """XORを学習してみるコード。"""
     models_dir = pathlib.Path(str(tmpdir))
@@ -18,22 +18,27 @@ def test_xor(tmpdir):
     x = tk.keras.layers.Dense(16, use_bias=False)(x)
     x = tk.keras.layers.BatchNormalization()(x)
     x = tk.layers.DropActivation()(x)
-    x = tk.keras.layers.Dense(1, activation='sigmoid')(x)
+    x = tk.keras.layers.Dense(1, activation="sigmoid")(x)
     model = tk.keras.models.Model(inputs=inputs, outputs=x)
-    tk.models.compile(model, 'adam', 'binary_crossentropy', [tk.metrics.binary_accuracy])
+    tk.models.compile(
+        model, "adam", "binary_crossentropy", [tk.metrics.binary_accuracy]
+    )
     tk.training.check(model)
     tk.training.train(
         model,
-        train_dataset, epochs=8, verbose=2,
-        model_path=models_dir / 'model.h5',
+        train_dataset,
+        epochs=8,
+        verbose=2,
+        model_path=models_dir / "model.h5",
         callbacks=[
             tk.callbacks.LearningRateStepDecay(),
             tk.callbacks.CosineAnnealing(),
-            tk.callbacks.TSVLogger(models_dir / 'history.tsv'),
+            tk.callbacks.TSVLogger(models_dir / "history.tsv"),
             tk.callbacks.FreezeBNCallback(1),
             tk.callbacks.UnfreezeCallback(0.0001),
-            tk.callbacks.Checkpoint(models_dir / 'checkpoint.h5'),
-        ])
+            tk.callbacks.Checkpoint(models_dir / "checkpoint.h5"),
+        ],
+    )
 
     proba = tk.models.predict(model, tk.data.TupleDataset(X, y))
     tk.ml.print_classification_metrics(y, proba)

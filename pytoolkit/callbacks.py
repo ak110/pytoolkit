@@ -21,15 +21,19 @@ class LearningRateStepDecay(keras.callbacks.Callback):
         self.reduce_epochs = None
 
     def on_train_begin(self, logs=None):
-        epochs = self.epochs or self.params['epochs']
-        self.reduce_epochs = [min(max(int(epochs * r), 1), epochs) for r in self.reduce_epoch_rates]
+        epochs = self.epochs or self.params["epochs"]
+        self.reduce_epochs = [
+            min(max(int(epochs * r), 1), epochs) for r in self.reduce_epoch_rates
+        ]
 
     def on_epoch_begin(self, epoch, logs=None):
         if epoch + 1 in self.reduce_epochs:
             lr1 = K.get_value(self.model.optimizer.lr)
             lr2 = lr1 * self.factor
             K.set_value(self.model.optimizer.lr, lr2)
-            tk.log.get(__name__).info(f'Epoch {epoch + 1}: Learning rate {lr1:.1e} -> {lr2:.1e}')
+            tk.log.get(__name__).info(
+                f"Epoch {epoch + 1}: Learning rate {lr1:.1e} -> {lr2:.1e}"
+            )
 
 
 class CosineAnnealing(keras.callbacks.Callback):
@@ -48,14 +52,14 @@ class CosineAnnealing(keras.callbacks.Callback):
         assert factor < 1
 
     def on_train_begin(self, logs=None):
-        if not hasattr(self.model.optimizer, 'lr'):
+        if not hasattr(self.model.optimizer, "lr"):
             raise ValueError('Optimizer must have a "lr" attribute.')
         self.start_lr = float(K.get_value(self.model.optimizer.lr))
 
     def on_epoch_begin(self, epoch, logs=None):
         lr_max = self.start_lr
         lr_min = self.start_lr * self.factor
-        r = (epoch + 1) / (self.epochs or self.params['epochs'])
+        r = (epoch + 1) / (self.epochs or self.params["epochs"])
         lr = lr_min + 0.5 * (lr_max - lr_min) * (1 + np.cos(np.pi * r))
         K.set_value(self.model.optimizer.lr, float(lr))
 
@@ -85,9 +89,15 @@ class TSVLogger(keras.callbacks.Callback):
     def on_train_begin(self, logs=None):
         if self.enabled:
             self.filename.parent.mkdir(parents=True, exist_ok=True)
-            self.log_file = self.filename.open('a' if self.append else 'w', buffering=65536)
-            self.log_writer = csv.writer(self.log_file, delimiter='\t', lineterminator='\n')
-            self.log_writer.writerow(['epoch', 'lr'] + self.params['metrics'] + ['time'])
+            self.log_file = self.filename.open(
+                "a" if self.append else "w", buffering=65536
+            )
+            self.log_writer = csv.writer(
+                self.log_file, delimiter="\t", lineterminator="\n"
+            )
+            self.log_writer.writerow(
+                ["epoch", "lr"] + self.params["metrics"] + ["time"]
+            )
         else:
             self.log_file = None
             self.log_writer = None
@@ -97,17 +107,21 @@ class TSVLogger(keras.callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         logs = logs or {}
-        logs['lr'] = K.get_value(self.model.optimizer.lr)
+        logs["lr"] = K.get_value(self.model.optimizer.lr)
         elapsed_time = time.time() - self.epoch_start_time
 
         def _format_metric(logs, k):
             value = logs.get(k)
             if value is None:
-                return '<none>'
-            return f'{value:.4f}'
+                return "<none>"
+            return f"{value:.4f}"
 
-        metrics = [_format_metric(logs, k) for k in self.params['metrics']]
-        row = [epoch + 1, format(logs['lr'], '.1e')] + metrics + [str(int(np.ceil(elapsed_time)))]
+        metrics = [_format_metric(logs, k) for k in self.params["metrics"]]
+        row = (
+            [epoch + 1, format(logs["lr"], ".1e")]
+            + metrics
+            + [str(int(np.ceil(elapsed_time)))]
+        )
         if self.log_file is not None:
             self.log_writer.writerow(row)
             self.log_file.flush()
@@ -138,10 +152,14 @@ class EpochLogger(keras.callbacks.Callback):
         now = time.time()
         elapsed_time = now - self.epoch_start_time
         time_per_epoch = (now - self.train_start_time) / (epoch + 1)
-        eta = time_per_epoch * (self.params['epochs'] - epoch - 1)
-        metrics = ' '.join([f'{k}={logs.get(k):.4f}' for k in self.params['metrics'] if k in logs])
+        eta = time_per_epoch * (self.params["epochs"] - epoch - 1)
+        metrics = " ".join(
+            [f"{k}={logs.get(k):.4f}" for k in self.params["metrics"] if k in logs]
+        )
         if self.enabled:
-            tk.log.get(__name__).debug(f'Epoch {epoch + 1:3d}: lr={lr:.1e} {metrics} time={int(np.ceil(elapsed_time))} ETA={int(np.ceil(eta))}')
+            tk.log.get(__name__).debug(
+                f"Epoch {epoch + 1:3d}: lr={lr:.1e} {metrics} time={int(np.ceil(elapsed_time))} ETA={int(np.ceil(eta))}"
+            )
 
 
 class FreezeBNCallback(keras.callbacks.Callback):
@@ -166,11 +184,13 @@ class FreezeBNCallback(keras.callbacks.Callback):
         self.freeze_epochs = freeze_epochs
 
     def on_epoch_begin(self, epoch, logs=None):
-        if epoch + 1 == self.params['epochs'] - self.freeze_epochs:
+        if epoch + 1 == self.params["epochs"] - self.freeze_epochs:
             freezed_count = self._freeze_layers(self.model)
             if freezed_count > 0:
                 self._recompile()
-            tk.log.get(__name__).info(f'Epoch {epoch + 1}: {freezed_count} BNs was frozen.')
+            tk.log.get(__name__).info(
+                f"Epoch {epoch + 1}: {freezed_count} BNs was frozen."
+            )
 
     def _freeze_layers(self, container):
         freezed_count = 0
@@ -179,7 +199,7 @@ class FreezeBNCallback(keras.callbacks.Callback):
                 if layer.trainable:
                     layer.trainable = False
                     freezed_count += 1
-            elif hasattr(layer, 'layers'):
+            elif hasattr(layer, "layers"):
                 freezed_count += self._freeze_layers(layer)
         return freezed_count
 
@@ -189,7 +209,8 @@ class FreezeBNCallback(keras.callbacks.Callback):
             loss=self.model.loss,
             metrics=self.model.metrics,
             loss_weights=self.model.loss_weights,
-            sample_weight_mode=self.model.sample_weight_mode)
+            sample_weight_mode=self.model.sample_weight_mode,
+        )
 
 
 class UnfreezeCallback(keras.callbacks.Callback):
@@ -211,14 +232,16 @@ class UnfreezeCallback(keras.callbacks.Callback):
         assert 0 < epoch_rate <= 1
 
     def on_train_begin(self, logs=None):
-        self.target_epoch = int(self.params['epochs'] * self.epoch_rate)
+        self.target_epoch = int(self.params["epochs"] * self.epoch_rate)
 
     def on_epoch_begin(self, epoch, logs=None):
         if self.target_epoch == epoch + 1:
             unfreeze_count = self._unfreeze_layers(self.model)
             if unfreeze_count > 0:
                 self._recompile()
-            tk.log.get(__name__).info(f'Epoch {epoch + 1}: Unfreezed layers: {unfreeze_count}')
+            tk.log.get(__name__).info(
+                f"Epoch {epoch + 1}: Unfreezed layers: {unfreeze_count}"
+            )
 
     def _unfreeze_layers(self, container):
         count = 0
@@ -226,7 +249,7 @@ class UnfreezeCallback(keras.callbacks.Callback):
             if not layer.trainable:
                 layer.trainable = True
                 count += 1
-            elif hasattr(layer, 'layers'):
+            elif hasattr(layer, "layers"):
                 count += self._unfreeze_layers(layer)
         return count
 
@@ -237,7 +260,8 @@ class UnfreezeCallback(keras.callbacks.Callback):
             metrics=self.model.metrics,
             loss_weights=self.model.loss_weights,
             sample_weight_mode=self.model.sample_weight_mode,
-            weighted_metrics=self.model.weighted_metrics)
+            weighted_metrics=self.model.weighted_metrics,
+        )
 
 
 class Checkpoint(keras.callbacks.Callback):
@@ -259,17 +283,23 @@ class Checkpoint(keras.callbacks.Callback):
 
     def on_train_begin(self, logs=None):
         s = self.checkpoints + 1
-        self.target_epochs = {self.params['epochs'] * (i + 1) // s for i in range(s)}
+        self.target_epochs = {self.params["epochs"] * (i + 1) // s for i in range(s)}
 
     def on_epoch_begin(self, epoch, logs=None):
         if epoch in self.target_epochs:
             if tk.hvd.is_master():
-                tk.log.get(__name__).info(f'Epoch {epoch}: Saving model to {self.checkpoint_path}')
+                tk.log.get(__name__).info(
+                    f"Epoch {epoch}: Saving model to {self.checkpoint_path}"
+                )
                 # 保存の真っ最中に死んだときに大丈夫なように少し気を使った処理をする。
                 # 一度.tmpに保存してから元のを.bkにリネームして.tmpを外して.bkを削除。
                 self.checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
-                temp_path = self.checkpoint_path.parent / (self.checkpoint_path.name + '.tmp')
-                backup_path = self.checkpoint_path.parent / (self.checkpoint_path.name + '.bk')
+                temp_path = self.checkpoint_path.parent / (
+                    self.checkpoint_path.name + ".tmp"
+                )
+                backup_path = self.checkpoint_path.parent / (
+                    self.checkpoint_path.name + ".bk"
+                )
                 if temp_path.exists():
                     temp_path.unlink()
                 if backup_path.exists():
@@ -288,7 +318,7 @@ class ErrorOnNaN(keras.callbacks.Callback):
 
     def on_batch_end(self, batch, logs=None):
         logs = logs or {}
-        loss = logs.get('loss')
+        loss = logs.get("loss")
         if loss is not None:
             if np.isnan(loss) or np.isinf(loss):
-                raise RuntimeError(f'Batch {batch}: Invalid loss')
+                raise RuntimeError(f"Batch {batch}: Invalid loss")
