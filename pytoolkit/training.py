@@ -44,6 +44,9 @@ def train(
     """
     assert model_path is not None
     # 学習
+    tk.log.get(__name__).info(
+        f"train: {len(train_dataset)} samples, val: {len(val_dataset) if val_dataset is not None else 0} samples, batch_size: {batch_size}x{tk.hvd.size()}"
+    )
     tk.hvd.barrier()
     tk.models.fit(
         model,

@@ -127,3 +127,17 @@ def test_filters(data_dir, check_dir):
         else:
             x = t
         tk.ndimage.save(save_dir / f"{i:02d}_{name}.png", x)
+
+
+def test_cut_mix(data_dir, check_dir):
+    rand = np.random.RandomState(1234)
+    rgb1 = tk.ndimage.load(data_dir / "Lenna.png")  # 256x256の某有名画像
+    rgb2 = rand.randint(0, 255, size=rgb1.shape)
+    image, label = tk.ndimage.cut_mix(rgb1, 0, rgb2, 1, rand=rand)
+    tk.ndimage.save(check_dir / f"CutMix_{label}.png", image)
+
+
+def test_preprocess_tf():
+    rgb = np.array([0, 127, 128, 255], dtype=np.uint8)
+    X = tk.ndimage.preprocess_tf(rgb)
+    assert X == pytest.approx([-1, -0.0039215686, +0.0039215686, +1])
