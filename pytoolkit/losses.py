@@ -197,3 +197,9 @@ def rmse(y_true, y_pred):
     return K.sqrt(
         K.mean(K.square(y_pred - y_true), axis=list(range(1, K.ndim(y_true))))
     )
+
+
+def mape(y_true, y_pred):
+    """MAPE。"""
+    axes = list(range(1, K.ndim(y_true)))
+    return K.mean(K.abs((y_true - y_pred) / y_true), axis=axes)

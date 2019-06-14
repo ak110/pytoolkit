@@ -84,18 +84,10 @@ def fbeta_score(y_true, y_pred, beta=1):
     return ((1 + beta ** 2) * prec * rec) / ((beta ** 2) * prec + rec + K.epsilon())
 
 
-def mean_absolute_percentage_error(y_true, y_pred):
-    """MAPE。"""
-    axes = list(range(1, K.ndim(y_true)))
-    return K.mean(K.abs((y_true - y_pred) / y_true), axis=axes)
-
-
 # 省略名・別名
 recall = tpr
-mape = mean_absolute_percentage_error
 
 # 長いので名前変えちゃう
 binary_accuracy.__name__ = "acc"
 binary_iou.__name__ = "iou"
 categorical_iou.__name__ = "iou"
-mean_absolute_percentage_error.__name__ = "mape"

@@ -1,7 +1,7 @@
 """LightGBMなどなど関連。"""
 
 
-class ModelExtractionCallback(object):
+class ModelExtractionCallback:
     """lightgbm.cv() から学習済みモデルを取り出すためのコールバックに使うクラス
 
     NOTE: 非公開クラス '_CVBooster' に依存しているため将来的に動かなく恐れがある
@@ -25,18 +25,18 @@ class ModelExtractionCallback(object):
 
     @property
     def boosters_proxy(self):
+        """Booster へのプロキシオブジェクトを返す。"""
         self._assert_called_cb()
-        # Booster へのプロキシオブジェクトを返す
         return self._model
 
     @property
     def raw_boosters(self):
+        """Booster のリストを返す。"""
         self._assert_called_cb()
-        # Booster のリストを返す
         return self._model.boosters
 
     @property
     def best_iteration(self):
+        """Early stop したときの boosting round を返す。"""
         self._assert_called_cb()
-        # Early stop したときの boosting round を返す
         return self._model.best_iteration
