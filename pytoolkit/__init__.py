@@ -50,6 +50,7 @@ if True:
     from . import ndimage
     from . import od
     from . import optimizers
+    from . import preprocessing
     from . import threading
     from . import training
     from . import utils

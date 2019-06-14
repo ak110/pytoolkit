@@ -1,5 +1,7 @@
 """各種ユーティリティ"""
+import pathlib
 import os
+import joblib
 
 import pytoolkit as tk
 
@@ -22,6 +24,25 @@ def normalize_tuple(value, n):
         value = tuple(value)
         assert len(value) == n
         return value
+
+
+def dump(value, filename, compress=0, protocol=None, cache_size=None):
+    """ディレクトリを自動的に作るjoblib.dump。"""
+    filename = pathlib.Path(filename)
+    filename.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(
+        value=value,
+        filename=filename,
+        compress=compress,
+        protocol=protocol,
+        cache_size=cache_size,
+    )
+
+
+def load(filename, mmap_mode=None):
+    """joblib.loadほぼそのまま。"""
+    filename = pathlib.Path(filename)  # 一応dumpに合わせて。
+    return joblib.load(filename, mmap_mode=mmap_mode)
 
 
 def tqdm(iterable=None, desc=None, total=None, leave=True, **kwargs):

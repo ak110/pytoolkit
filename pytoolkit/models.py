@@ -53,72 +53,66 @@ def load_weights(model: keras.models.Model, path, by_name=False, skip_not_exist=
         raise RuntimeError(f"{path} is not found.")
 
 
-def save(model: keras.models.Model, path, include_optimizer=False):
-    """モデルの保存。"""
+def save(model: keras.models.Model, path, mode="hdf5", include_optimizer=False):
+    """モデルの保存。
+
+    Args:
+        model (keras.models.Model): モデル
+        path (os.PathLike): 保存先。saved_modelの場合はディレクトリ
+        format (str, optional): "hdf5", "saved_model", "onnx", "tflite"のいずれか
+        include_optimizer (bool, optional): HDF5形式で保存する場合にoptimizerを含めるか否か
+
+    """
+    assert mode in ("hdf5", "saved_model", "onnx", "tflite")
     path = pathlib.Path(path)
     if tk.hvd.is_master():
         with tk.log.trace_scope(f"save({path})"):
             path.parent.mkdir(parents=True, exist_ok=True)
-            model.save(str(path), include_optimizer=include_optimizer)
-    tk.hvd.barrier()
+            if mode == "hdf5":
+                model.save(str(path), include_optimizer=include_optimizer)
+            elif mode == "saved_model":
+                if path.is_dir():
+                    shutil.rmtree(path)
+                tk.log.get(__name__).info(
+                    f"inpus={model.inputs} outputs={model.outputs}"
+                )
+                tf.saved_model.simple_save(
+                    keras.backend.get_session(),
+                    str(path),
+                    inputs={x.name: x for x in model.inputs},
+                    outputs={x.name: x for x in model.outputs},
+                )
+            elif mode == "onnx":
+                import onnxmltools
+                import tf2onnx
 
-
-def save_saved_model(model: keras.models.Model, path):
-    """SavedModel形式で保存。(pathはディレクトリ名)"""
-    path = pathlib.Path(path)
-    if tk.hvd.is_master():
-        with tk.log.trace_scope(f"save_saved_model({path})"):
-            path.parent.mkdir(parents=True, exist_ok=True)
-            if path.is_dir():
-                shutil.rmtree(path)
-            tk.log.get(__name__).info(f"inpus={model.inputs} outputs={model.outputs}")
-            tf.saved_model.simple_save(
-                keras.backend.get_session(),
-                str(path),
-                inputs={x.name: x for x in model.inputs},
-                outputs={x.name: x for x in model.outputs},
-            )
-    tk.hvd.barrier()
-
-
-def save_onnx(model: keras.models.Model, path):
-    """ONNX形式で保存。"""
-    import onnxmltools
-    import tf2onnx
-
-    path = pathlib.Path(path)
-    if tk.hvd.is_master():
-        with tk.log.trace_scope(f"save_onnx({path})"):
-            input_names = [x.name for x in model.inputs]
-            output_names = [x.name for x in model.outputs]
-            tk.log.get(__name__).info(
-                f"input_names={input_names} output_names={output_names}"
-            )
-            onnx_graph = tf2onnx.tfonnx.process_tf_graph(
-                keras.backend.get_session().graph,
-                input_names=input_names,
-                output_names=output_names,
-            )
-            onnx_model = onnx_graph.make_model("test")
-            path.parent.mkdir(parents=True, exist_ok=True)
-            onnxmltools.utils.save_model(onnx_model, str(path))
-    tk.hvd.barrier()
-
-
-def save_tflite(model: keras.models.Model, path):
-    """tflite形式で保存。"""
-    path = pathlib.Path(path)
-    if tk.hvd.is_master():
-        with tk.log.trace_scope(f"save_tflite({path})"):
-            tk.log.get(__name__).info(f"inpus={model.inputs} outputs={model.outputs}")
-            tflite_model = tf.lite.TFLiteConverter.from_session(
-                keras.backend.get_session(),
-                input_tensors=model.inputs,
-                output_tensors=model.outputs,
-            ).convert()
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with path.open("wb") as f:
-                f.write(tflite_model)
+                input_names = [x.name for x in model.inputs]
+                output_names = [x.name for x in model.outputs]
+                tk.log.get(__name__).info(
+                    f"input_names={input_names} output_names={output_names}"
+                )
+                onnx_graph = tf2onnx.tfonnx.process_tf_graph(
+                    keras.backend.get_session().graph,
+                    input_names=input_names,
+                    output_names=output_names,
+                )
+                onnx_model = onnx_graph.make_model("test")
+                path.parent.mkdir(parents=True, exist_ok=True)
+                onnxmltools.utils.save_model(onnx_model, str(path))
+            elif mode == "tflite":
+                tk.log.get(__name__).info(
+                    f"inpus={model.inputs} outputs={model.outputs}"
+                )
+                tflite_model = tf.lite.TFLiteConverter.from_session(
+                    keras.backend.get_session(),
+                    input_tensors=model.inputs,
+                    output_tensors=model.outputs,
+                ).convert()
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with path.open("wb") as f:
+                    f.write(tflite_model)
+            else:
+                raise ValueError(f"Invalid save format: {mode}")
     tk.hvd.barrier()
 
 
@@ -249,9 +243,9 @@ def fit(
 
     # TensorFlowのバグ対策
     if tf.__version__ == "1.13.1":
-        from tensorflow.python.keras.engine import (
+        from tensorflow.python.keras.engine import (  # pylint: disable=no-name-in-module
             training_generator,
-        )  # pylint: disable=no-name-in-module
+        )
 
         original = training_generator.model_iteration
 
@@ -316,10 +310,7 @@ def predict(
         desc (str): flow時のtqdmのdesc。
 
     Returns:
-        np.ndarray: 予測結果。
-
-    Yields:
-        np.ndarray: flow=True時の予測結果。(サンプル毎)
+        np.ndarray or generator: 予測結果。flow=True時はサンプルごとのgenerator。
 
     """
     if on_batch_fn is not None and not flow:
