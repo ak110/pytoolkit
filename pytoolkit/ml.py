@@ -325,3 +325,14 @@ def search_threshold(y_true, y_pred, thresholds, score_fn, direction, cv=10):
     th = np.mean(ths)
     tk.log.get(__name__).info(f"mean: score={score:.4f} threshold={th:.4f}")
     return score, th
+
+
+def mean_absolute_percentage_error(y_true, y_pred):
+    """MAPE。"""
+    y_true, y_pred = np.ravel(y_true), np.ravel(y_pred)
+    assert len(y_true) == len(y_pred)
+    return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+
+
+# 別名
+mape = mean_absolute_percentage_error

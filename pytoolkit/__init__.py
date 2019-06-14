@@ -38,6 +38,7 @@ if True:
     from . import data
     from . import datasets
     from . import dl
+    from . import gbm
     from . import hvd
     from . import image
     from . import layers
