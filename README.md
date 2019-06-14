@@ -29,5 +29,6 @@
 - matplotlib
 - mpi4py
 - onnxmltools
+- pandas
 - pydensecrf
 - tqdm
