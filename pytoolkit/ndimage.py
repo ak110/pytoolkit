@@ -791,7 +791,7 @@ def mix_data(sample1, sample2, r):
         return np.float32(sample1) * r + np.float32(sample2) * (1 - r)
 
 
-def cut_mix(image1, label1, image2, label2, beta=1.0, prob=0.5, rand=None):
+def cut_mix(image1, label1, image2, label2, beta=1.0, rand=None):
     """CutMix。 <https://arxiv.org/abs/1905.04899>
 
     Args:
@@ -808,26 +808,21 @@ def cut_mix(image1, label1, image2, label2, beta=1.0, prob=0.5, rand=None):
     """
     assert image1.shape == image2.shape
     rand = sklearn.utils.check_random_state(rand)
-    if rand.rand() <= prob:
-        lam = rand.beta(beta, beta)
-        H, W = image1.shape[:2]
-        cut_rat = np.sqrt(1.0 - lam)
-        cut_w = np.int(W * cut_rat)
-        cut_h = np.int(H * cut_rat)
-        cx = rand.randint(W)
-        cy = rand.randint(H)
-        bbx1 = np.clip(cx - cut_w // 2, 0, W)
-        bby1 = np.clip(cy - cut_h // 2, 0, H)
-        bbx2 = np.clip(cx + cut_w // 2, 0, W)
-        bby2 = np.clip(cy + cut_h // 2, 0, H)
-        # オリジナル実装 <https://github.com/clovaai/CutMix-PyTorch> ではやっていないがclip後を反映するため再計算
-        lam = 1 - (bby2 - bby1) * (bbx2 - bbx1) / (W * H)
-        image = np.copy(image1)  # 念のためコピー
-        image[bby1:bby2, bbx1:bbx2, :] = image2[bby1:bby2, bbx1:bbx2, :]
-        label = label1 * lam + label2 * (1 - lam)
-        return image, label
-    else:
-        return image1, label1
+    lam = rand.beta(beta, beta)
+    H, W = image1.shape[:2]
+    cut_rat = np.sqrt(1.0 - lam)
+    cut_w = np.int(W * cut_rat)
+    cut_h = np.int(H * cut_rat)
+    cx = rand.randint(W)
+    cy = rand.randint(H)
+    bbx1 = np.clip(cx - cut_w // 2, 0, W)
+    bby1 = np.clip(cy - cut_h // 2, 0, H)
+    bbx2 = np.clip(cx + cut_w // 2, 0, W)
+    bby2 = np.clip(cy + cut_h // 2, 0, H)
+    image = np.copy(image1)  # 念のためコピー
+    image[bby1:bby2, bbx1:bbx2, :] = image2[bby1:bby2, bbx1:bbx2, :]
+    label = label1 * lam + label2 * (1 - lam)
+    return image, label
 
 
 @numba.njit(fastmath=True, nogil=True)
