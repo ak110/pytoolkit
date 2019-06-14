@@ -19,6 +19,7 @@ Submodules
    pytoolkit.callbacks
    pytoolkit.data
    pytoolkit.dl
+   pytoolkit.gbm
    pytoolkit.hvd
    pytoolkit.image
    pytoolkit.layers

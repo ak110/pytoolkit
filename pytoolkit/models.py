@@ -18,8 +18,11 @@ from . import log as tk_log
 
 
 def load(
-    path, custom_objects=None, compile=False, gpus=None
-):  # pylint: disable=redefined-outer-name
+    path,
+    custom_objects=None,
+    compile=False,  # pylint: disable=redefined-outer-name
+    gpus=None,
+):
     """モデルの読み込み。"""
     path = pathlib.Path(path)
     with tk.log.trace_scope(f"load({path})"):
@@ -166,6 +169,8 @@ def fit(
     model: keras.models.Model,
     training_data,
     validation_data=None,
+    train_preprocessor=None,
+    val_preprocessor=None,
     validation_freq: int = 1,
     class_weight=None,
     batch_size=32,
@@ -185,6 +190,8 @@ def fit(
         model: モデル。
         training_data (tk.data.Dataset): 訓練データ。
         validation_data (tk.data.Dataset): 検証データ。Noneなら省略。
+        train_preprocessor (tk.data.Preprocessor): 訓練データの前処理
+        val_preprocessor (tk.data.Preprocessor): 検証データの前処理
         validation_freq (int or list): 検証を行うエポック数の間隔、またはエポック数のリスト。0ならvalidationしない(独自仕様)。
         class_weight (dict): クラスごとの重みのdict。
         batch_size (int): バッチサイズ。
@@ -205,6 +212,7 @@ def fit(
 
     train_data_loader = tk.data.DataLoader(
         training_data,
+        train_preprocessor,
         batch_size,
         shuffle=True,
         parallel=data_parallel,
@@ -213,6 +221,7 @@ def fit(
     val_data_loader = (
         tk.data.DataLoader(
             validation_data,
+            val_preprocessor,
             batch_size,
             shuffle=True,
             parallel=data_parallel,
@@ -283,121 +292,68 @@ def fit(
 
 @tk_log.trace()
 def predict(
-    model: keras.models.Model, dataset, batch_size=32, verbose=1, use_horovod=False
+    model: keras.models.Model,
+    dataset,
+    preprocessor=None,
+    batch_size=32,
+    verbose=1,
+    use_horovod=False,
+    on_batch_fn=None,
+    flow=False,
+    desc="predict",
 ):
     """予測。
 
     Args:
         model: モデル。
         dataset: 予測したい入力データ。
+        preprocessor (tk.data.Preprocessor): 前処理
         batch_size (int): バッチサイズ
         verbose (int): プログレスバー(tqdm)を表示するか否か。
         use_horovod (bool): MPIによる分散処理をするか否か。
+        on_batch_fn (callable, optional): モデルとミニバッチ分の入力データを受け取り、予測結果を返す処理。(TTA用)
+        flow (bool): 結果をgeneratorで返すならTrue。
+        desc (str): flow時のtqdmのdesc。
 
     Returns:
         np.ndarray: 予測結果。
-
-    """
-    dataset = tk.hvd.split(dataset) if use_horovod else dataset
-    data_loader = tk.data.DataLoader(dataset, batch_size)
-    values = model.predict_generator(
-        data_loader, verbose=verbose if tk.hvd.is_master() else 0
-    )
-    values = tk.hvd.allgather(values) if use_horovod else values
-    return values
-
-
-@tk_log.trace()
-def evaluate(
-    model: keras.models.Model, dataset, batch_size=32, verbose=1, use_horovod=False
-):
-    """評価。
-
-    Args:
-        model: モデル。
-        dataset (tk.data.Dataset): データ。
-        verbose (int): 1ならプログレスバー表示。
-        use_horovod (bool): MPIによる分散処理をするか否か。
-
-    Returns:
-        dict: metricsの文字列と値のdict
-
-    """
-    dataset = tk.hvd.split(dataset) if use_horovod else dataset
-    data_loader = tk.data.DataLoader(dataset, batch_size)
-    values = model.evaluate_generator(
-        data_loader, verbose=verbose if tk.hvd.is_master() else 0
-    )
-    values = tk.hvd.allreduce(values) if use_horovod else values
-    evals = dict(zip(model.metrics_names, values))
-    return evals
-
-
-@tk_log.trace()
-def custom_predict(
-    model: keras.models.Model,
-    dataset,
-    batch_size,
-    verbose=1,
-    desc="predict",
-    on_batch_fn=None,
-    use_horovod=False,
-):
-    """予測。
-
-    TTAなど用。
-
-    Args:
-        model: モデル。
-        dataset (tk.data.Dataset): 予測したい入力データ。
-        batch_size (int): バッチサイズ
-        verbose (int): プログレスバー(tqdm)を表示するか否か。
-        desc (str): プログレスバーの説明。
-        on_batch_fn (callable): モデルとミニバッチ分の入力データを受け取り、予測結果を返す処理。(TTA用)
-        use_horovod (bool): MPIによる分散処理をするか否か。
-
-    Returns:
-        np.ndarray: 予測結果。
-
-    """
-    dataset = tk.hvd.split(dataset) if use_horovod else dataset
-    verbose = 0 if use_horovod and not tk.hvd.is_master() else verbose
-    values = np.array(
-        list(
-            custom_predict_flow(model, dataset, batch_size, verbose, desc, on_batch_fn)
-        )
-    )
-    values = tk.hvd.allgather(values) if use_horovod else values
-    return values
-
-
-def custom_predict_flow(
-    model: keras.models.Model,
-    dataset,
-    batch_size,
-    verbose=1,
-    desc="predict",
-    on_batch_fn=None,
-):
-    """予測。(yieldバージョン)
-
-    TTAなど用。Horovodでの分散処理機能は無し。(複数GPUで処理したい場合はmulti_gpu_modelを使用するか呼ぶ側でsplitする。処理順に注意が必要。)
-
-    Args:
-        model: モデル。
-        dataset (tk.data.Dataset): 予測したい入力データ。
-        batch_size (int): バッチサイズ
-        verbose (int): プログレスバー(tqdm)を表示するか否か。
-        desc (str): プログレスバーの説明。
-        on_batch_fn (callable): モデルとミニバッチ分の入力データを受け取り、予測結果を返す処理。(TTA用)
 
     Yields:
-        np.ndarray: 予測結果。(サンプル毎)
+        np.ndarray: flow=True時の予測結果。(サンプル毎)
 
     """
-    if on_batch_fn is None:
-        on_batch_fn = _predict_on_batch
-    data_loader = tk.data.DataLoader(dataset, batch_size)
+    if on_batch_fn is not None and not flow:
+        return np.array(
+            list(
+                predict(
+                    model,
+                    dataset,
+                    preprocessor,
+                    batch_size,
+                    verbose,
+                    use_horovod,
+                    on_batch_fn,
+                    flow=True,
+                    desc="predict",
+                )
+            )
+        )
+
+    dataset = tk.hvd.split(dataset) if use_horovod else dataset
+    data_loader = tk.data.DataLoader(dataset, preprocessor, batch_size)
+    if flow:
+        assert not use_horovod, "flow=True and use_horovod=True is not supported."
+        return _predict_flow(model, data_loader, verbose, on_batch_fn, desc)
+    else:
+        values = model.predict_generator(
+            data_loader, verbose=verbose if tk.hvd.is_master() else 0
+        )
+        values = tk.hvd.allgather(values) if use_horovod else values
+        return values
+
+
+def _predict_flow(model, data_loader, verbose, on_batch_fn, desc):
+    on_batch_fn = on_batch_fn or _predict_on_batch
     for X, _ in tk.utils.tqdm(
         data_loader, desc=desc, total=len(data_loader), disable=verbose < 1
     ):
@@ -407,6 +363,41 @@ def custom_predict_flow(
 
 def _predict_on_batch(model: keras.models.Model, X):
     return model.predict_on_batch(X)
+
+
+@tk_log.trace()
+def evaluate(
+    model: keras.models.Model,
+    dataset,
+    preprocessor=None,
+    batch_size=32,
+    verbose=1,
+    use_horovod=False,
+):
+    """評価。
+
+    Args:
+        model: モデル。
+        dataset (tk.data.Dataset): データ。
+        preprocessor (tk.data.Preprocessor): 前処理
+        verbose (int): 1ならプログレスバー表示。
+        use_horovod (bool): MPIによる分散処理をするか否か。
+
+    Returns:
+        dict: metricsの文字列と値のdict
+
+    """
+    dataset = tk.hvd.split(dataset) if use_horovod else dataset
+    data_loader = tk.data.DataLoader(dataset, preprocessor, batch_size)
+    values = model.evaluate_generator(
+        data_loader, verbose=verbose if tk.hvd.is_master() else 0
+    )
+    values = tk.hvd.allreduce(values) if use_horovod else values
+    if len(model.metrics_names) == 1:
+        evals = {model.metrics_names[0]: values}
+    else:
+        evals = dict(zip(model.metrics_names, values))
+    return evals
 
 
 @tk_log.trace()

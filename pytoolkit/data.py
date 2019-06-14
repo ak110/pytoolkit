@@ -50,16 +50,54 @@ class TupleDataset(Dataset):
         return tuple([d[index] for d in self.datasets])
 
 
+class Preprocessor:
+    """データ変換とかをするクラス。"""
+
+    def get_sample(self, dataset, index):
+        """datasetから1件のデータを取得。"""
+        return dataset[index]
+
+    def collate(self, batch):
+        """バッチサイズ分のデータを集約する処理。
+
+        Args:
+            batch (list): Datasetが返したデータをバッチサイズ分集めたもの。
+
+        Returns:
+            tuple: モデルに渡されるデータ。通常は入力データとラベルのtuple。
+
+        """
+        X_batch, y_batch = zip(*batch)
+
+        # multiple input
+        if isinstance(X_batch[0], list):
+            X_batch = [
+                np.array([x[i] for x in X_batch]) for i in range(len(X_batch[0]))
+            ]
+        else:
+            X_batch = np.array(X_batch)
+
+        # multiple output
+        if isinstance(y_batch[0], list):
+            y_batch = [
+                np.array([y[i] for y in y_batch]) for i in range(len(y_batch[0]))
+            ]
+        else:
+            y_batch = np.array(y_batch)
+
+        return X_batch, y_batch
+
+
 class DataLoader(keras.utils.Sequence):
     """データをバッチサイズずつ読み込むクラス。
 
     Args:
         dataset (Dataset): データセット。
+        preprocessor (Preprocessor): データ変換とかをするクラス。
         batch_size (int): バッチサイズ。
         shuffle (bool): データをシャッフルするか否か。
         parallel (bool): 並列処理を行うか否か。
         use_horovod (bool): 1エポックあたりのミニバッチ数(__len__の戻り値)の算出にHorovodを考慮するか否か。
-        collate_fn (callable): 集約処理
 
     Attributes:
         seconds_per_step (float): 1ステップ当たりの実処理時間の指数移動平均値。
@@ -69,19 +107,19 @@ class DataLoader(keras.utils.Sequence):
     def __init__(
         self,
         dataset,
-        batch_size,
+        preprocessor=None,
+        batch_size=32,
         shuffle=False,
         parallel=True,
         use_horovod=False,
-        collate_fn=None,
     ):
         assert len(dataset) > 0
         self.dataset = dataset
+        self.preprocessor = preprocessor or Preprocessor()
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.parallel = parallel
         self.use_horovod = use_horovod
-        self.collate_fn = collate_fn or default_collate
         self.seconds_per_step = 0
 
         if self.shuffle:
@@ -138,7 +176,7 @@ class DataLoader(keras.utils.Sequence):
         else:
             results = [self.get_sample(i) for i in batch_indices]
 
-        data = self.collate_fn(results)
+        data = self.preprocessor.collate(results)
 
         elapsed_time = time.perf_counter() - start_time
         self.seconds_per_step = self.seconds_per_step * 0.99 + elapsed_time * 0.01
@@ -155,7 +193,7 @@ class DataLoader(keras.utils.Sequence):
             tuple: 入力データとラベル。
 
         """
-        return self.dataset[index]
+        return self.preprocessor.get_sample(self.dataset, index)
 
     def __iter__(self):
         """データを返す。"""
