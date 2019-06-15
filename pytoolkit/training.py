@@ -100,6 +100,8 @@ def predict_cv(
     *,
     models_dir,
     model_name_format="model.fold{fold}.h5",
+    oof=False,
+    folds=None,
     **kwargs,
 ):
     """CVで作ったモデルで予測。
@@ -113,11 +115,18 @@ def predict_cv(
         models_dir (PathLike object): モデルの保存先パス (必須)
         model_name_format (str): モデルのファイル名のフォーマット。{fold}のところに数字が入る。
         kwargs (dict): tk.models.predictの引数
+        oof (bool): out-of-fold predictionならTrueにする。folds必須。
+        folds (array-like): oof時のみ指定する。train/valのindexの配列のtupleの配列。(sklearn.model_selection.KFold().split()の結果など)
 
     Returns:
-        list: 予測結果 (nfold個の配列)
+        list or ndarray: oof=Falseの場合、予測結果のnfold個の配列。oof=Trueの場合、予測結果のndarray。
 
     """
+    if oof:
+        assert folds is not None
+    else:
+        assert folds is None
+        folds = [(range(0), range(len(dataset))) for _ in range(nfold)]
     load_model_fn = load_model_fn or tk.models.load
 
     models = [
@@ -125,19 +134,29 @@ def predict_cv(
         for fold in tk.utils.trange(nfold, desc="load models")
     ]
 
-    predicts = [
-        tk.models.predict(
+    pred_list = []
+    val_indices_list = []
+    for fold, (model, (_, val_indices)) in enumerate(zip(models, folds)):
+        pred = tk.models.predict(
             model,
-            dataset,
+            tk.data.SubDataset(dataset, val_indices),
             preprocessor,
             batch_size,
-            desc=f"predict({fold + 1}/{nfold})",
+            desc=f"{'oofp' if oof else 'predict'}({fold + 1}/{nfold})",
             **kwargs,
         )
-        for fold, model in enumerate(models)
-    ]
+        pred_list.append(pred)
+        val_indices_list.append(val_indices)
 
-    return predicts
+    if oof:
+        # TODO: multi output対応
+        output_shape = (len(dataset),) + pred_list[0].shape[1:]
+        oofp = np.empty(output_shape, dtype=pred_list[0].dtype)
+        for pred, val_indices in zip(pred_list, val_indices_list):
+            oofp[val_indices] = pred
+        return oofp
+    else:
+        return pred_list
 
 
 @tk_log.trace()

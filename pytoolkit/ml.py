@@ -125,18 +125,24 @@ def extract1000(X, y, num_classes):
 
 
 def cv_indices(X, y, cv_count, cv_index, split_seed, stratify=None):
+    """Cross validationのインデックスを返す。"""
+    folds = get_folds(X, y, cv_count, split_seed, stratify)
+    train_indices, val_indices = folds[cv_index]
+    return train_indices, val_indices
+
+
+def get_folds(X, y, cv_count, split_seed, stratify=None):
     """Cross validationのインデックスを返す。
 
     Args:
         X: 入力データ。
         y: 出力データ。
         cv_count (int): 分割数。
-        cv_index (int): 何番目か。
         split_seed (int): 乱数のseed。
         stratify (bool or None): StratifiedKFoldにするならTrue。
 
     Returns:
-        tuple: train_indices, val_indices
+        list of tuple(train_indices, val_indices): インデックス
 
     """
     if stratify is None:
@@ -147,8 +153,8 @@ def cv_indices(X, y, cv_count, cv_index, split_seed, stratify=None):
         else sklearn.model_selection.KFold
     )
     cv = cv(cv_count, shuffle=True, random_state=split_seed)
-    train_indices, val_indices = list(cv.split(X, y))[cv_index]
-    return train_indices, val_indices
+    folds = list(cv.split(X, y))
+    return folds
 
 
 def to_categorical(num_classes):
