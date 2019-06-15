@@ -317,15 +317,15 @@ def predict(
         return np.array(
             list(
                 predict(
-                    model,
-                    dataset,
-                    preprocessor,
-                    batch_size,
-                    verbose,
-                    use_horovod,
-                    on_batch_fn,
+                    model=model,
+                    dataset=dataset,
+                    preprocessor=preprocessor,
+                    batch_size=batch_size,
+                    verbose=verbose,
+                    use_horovod=use_horovod,
+                    on_batch_fn=on_batch_fn,
                     flow=True,
-                    desc="predict",
+                    desc=desc,
                 )
             )
         )

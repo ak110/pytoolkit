@@ -126,8 +126,15 @@ def predict_cv(
     ]
 
     predicts = [
-        tk.models.predict(model, dataset, preprocessor, batch_size, **kwargs)
-        for model in models
+        tk.models.predict(
+            model,
+            dataset,
+            preprocessor,
+            batch_size,
+            desc=f"predict({fold + 1}/{nfold})",
+            **kwargs,
+        )
+        for fold, model in enumerate(models)
     ]
 
     return predicts
