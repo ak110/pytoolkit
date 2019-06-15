@@ -10,27 +10,33 @@ import pytoolkit as tk
 
 
 def memorize(cache_dir, compress=0, verbose=True):
-    """関数の戻り値をファイルにキャッシュするデコレーター。"""
+    """関数の戻り値をファイルにキャッシュするデコレーター。
+
+    force_rerun=Trueを付けて呼び出すと強制的に再実行してキャッシュを上書き。
+
+    """
     cache_dir = pathlib.Path(cache_dir)
 
     def _decorator(func):
         @functools.wraps(func)
-        def _decorated_func(*args, **kwargs):
+        def _decorated_func(*args, force_rerun=False, **kwargs):
             cache_path = get_cache_path(cache_dir, func, args, kwargs)
             # キャッシュがあれば読む
-            if cache_path.is_file():
-                if verbose:
-                    tk.log.get(__name__).info(f"Cache is found: {cache_path}")
-                return joblib.load(cache_path)
+            if not force_rerun:
+                if cache_path.is_file():
+                    if verbose:
+                        tk.log.get(__name__).info(f"Cache is found: {cache_path}")
+                    return joblib.load(cache_path)
+                else:
+                    if verbose:
+                        tk.log.get(__name__).info(f"Cache is not found: {cache_path}")
             # 無ければ実処理
-            if tk.hvd.is_local_master():
-                if verbose:
-                    tk.log.get(__name__).info(f"Cache is not found: {cache_path}")
-                result = func(*args, **kwargs)
+            result = func(*args, **kwargs)
+            if tk.hvd.is_master():
                 cache_path.parent.mkdir(parents=True, exist_ok=True)
                 joblib.dump(result, cache_path, compress=compress)
             tk.hvd.barrier()
-            if not tk.hvd.is_local_master():
+            if not tk.hvd.is_master():
                 result = joblib.load(cache_path)
             return result
 
