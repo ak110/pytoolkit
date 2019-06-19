@@ -146,7 +146,7 @@ def test_confusion_matrix():
     y_true = np.array([])
     y_pred = np.array([])
     cm_actual = tk.od.confusion_matrix(y_true, y_pred, num_classes=3)
-    assert (cm_actual == np.zeros((4, 4), dtype=int)).all()
+    assert (cm_actual == np.zeros((4, 4), dtype=np.int32)).all()
 
     y_true = np.array(
         [
@@ -178,6 +178,6 @@ def test_confusion_matrix():
         y_true, y_pred, conf_threshold=0.5, num_classes=3
     )
     cm_expected = np.array(
-        [[0, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 0], [0, 1, 2, 0]], dtype=int
+        [[0, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 0], [0, 1, 2, 0]], dtype=np.int32
     )
     assert (cm_actual == cm_expected).all()

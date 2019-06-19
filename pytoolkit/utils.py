@@ -57,6 +57,13 @@ def trange(*args, **kwargs):
     return tqdm(list(range(*args)), **kwargs)
 
 
+def tqdm_write(s, file=None, end="\n", nolock=False):
+    """tqdm中に何か出力したいとき用のやつ。"""
+    from tqdm import tqdm as t
+
+    t.write(s, file=file, end=end, nolock=nolock)
+
+
 def better_exceptions():
     """better_exceptionsを有効にする。"""
     try:

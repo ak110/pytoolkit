@@ -31,6 +31,7 @@ disable=
     ,no-else-return
     ,no-self-use
     ,too-few-public-methods
+    ,too-many-ancestors
     ,too-many-arguments
     ,too-many-branches
     ,too-many-instance-attributes

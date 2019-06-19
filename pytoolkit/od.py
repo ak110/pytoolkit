@@ -270,9 +270,9 @@ def compute_scores(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=No
     if num_classes is None:
         num_classes = np.max(np.concatenate([y.classes for y in gt])) + 1
 
-    tp = np.zeros((num_classes,), dtype=int)  # true positive
-    fp = np.zeros((num_classes,), dtype=int)  # false positive
-    fn = np.zeros((num_classes,), dtype=int)  # false negative
+    tp = np.zeros((num_classes,), dtype=np.int32)  # true positive
+    fp = np.zeros((num_classes,), dtype=np.int32)  # false positive
+    fn = np.zeros((num_classes,), dtype=np.int32)  # false negative
 
     for y_true, y_pred in zip(gt, pred):
         # conf_threshold以上をいったんすべて対象とする
@@ -321,7 +321,7 @@ def confusion_matrix(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=
     if num_classes is None:
         num_classes = np.max(np.concatenate([y.classes for y in gt])) + 1
 
-    cm = np.zeros((num_classes + 1, num_classes + 1), dtype=int)
+    cm = np.zeros((num_classes + 1, num_classes + 1), dtype=np.int32)
 
     for y_true, y_pred in zip(gt, pred):
         pred_enabled = y_pred.confs >= conf_threshold

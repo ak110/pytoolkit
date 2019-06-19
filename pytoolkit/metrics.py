@@ -1,13 +1,26 @@
 """Kerasのmetrics関連。"""
 
+import numpy as np
 import tensorflow as tf
+
+import pytoolkit as tk
 
 from . import K
 
 
 def binary_accuracy(y_true, y_pred):
-    """Soft-targetとかでも一応それっぽい値を返すbinary accuracy。"""
-    return K.mean(K.equal(K.round(y_true), K.round(y_pred)), axis=-1)
+    """Soft-targetとかでも一応それっぽい値を返すbinary accuracy。
+
+    y_true = 0 or 1 で y_pred = 0.5 のとき、BCEは np.log1p(np.exp(0)) になる。(0.693くらい)
+    それ以下なら合ってることにする。
+
+    <https://www.wolframalpha.com/input/?dataset=&i=-(y*log(x)%2B(1-y)*log(1-x))%3Dlog(exp(0)%2B1)>
+
+    """
+    axes = list(range(1, K.ndim(y_true)))
+    bce = tk.backend.binary_crossentropy(y_true, y_pred)
+    th = np.log1p(np.exp(0))  # 0.6931471805599453
+    return K.mean(K.cast(bce < th, "float32"), axis=axes)
 
 
 def binary_iou(y_true, y_pred, target_classes=None, threshold=0.5):

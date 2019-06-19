@@ -35,6 +35,7 @@ def cv(
     *,
     models_dir,
     model_name_format="model.fold{fold}.h5",
+    skip_if_exists=True,
     **kwargs,
 ):
     """CV。
@@ -52,28 +53,22 @@ def cv(
         batch_size (int): バッチサイズ
         models_dir (PathLike object): モデルの保存先パス (必須)
         model_name_format (str): モデルのファイル名のフォーマット。{fold}のところに数字が入る。
+        skip_if_exists (bool): モデルが存在してもスキップせず再学習するならFalse。
         kwargs (dict): tk.models.fit()のパラメータ
 
-    Returns:
-        dict: evaluate結果 (metricsの文字列と値のdict)
-
     """
-    evals_list = []
-
     for fold, (train_indices, val_indices) in enumerate(folds):
         # モデルが存在すればスキップ
         model_path = models_dir / model_name_format.format(fold=fold)
-        if model_path.exists():
-            # TODO: evaluate?
+        if skip_if_exists and model_path.exists():
             continue
 
         with tk.log.trace_scope(f"fold#{fold}"):
             tr = tk.data.SubDataset(train_dataset, train_indices)
             vl = tk.data.SubDataset(train_dataset, val_indices)
             with tk.dl.session(use_horovod=True):
-                model = create_model_fn()
-                evals = train(
-                    model=model,
+                train(
+                    model=create_model_fn(),
                     train_dataset=tr,
                     val_dataset=vl,
                     train_preprocessor=train_preprocessor,
@@ -82,12 +77,6 @@ def cv(
                     model_path=model_path,
                     **kwargs,
                 )
-                evals_list.append(evals)
-
-    results = {}
-    for k in evals_list[0]:
-        results[k] = np.mean([e[k] for e in evals_list])
-    return results
 
 
 @tk_log.trace()
@@ -102,6 +91,7 @@ def predict_cv(
     model_name_format="model.fold{fold}.h5",
     oof=False,
     folds=None,
+    use_horovod=False,
     **kwargs,
 ):
     """CVで作ったモデルで予測。
@@ -114,9 +104,10 @@ def predict_cv(
         load_model_fn (callable): モデルを読み込む関数
         models_dir (PathLike object): モデルの保存先パス (必須)
         model_name_format (str): モデルのファイル名のフォーマット。{fold}のところに数字が入る。
-        kwargs (dict): tk.models.predictの引数
         oof (bool): out-of-fold predictionならTrueにする。folds必須。
         folds (array-like): oof時のみ指定する。train/valのindexの配列のtupleの配列。(sklearn.model_selection.KFold().split()の結果など)
+        use_horovod (bool): tk.models.predictの引数
+        kwargs (dict): tk.models.predictの引数
 
     Returns:
         list or ndarray: oof=Falseの場合、予測結果のnfold個の配列。oof=Trueの場合、予測結果のndarray。
@@ -124,39 +115,42 @@ def predict_cv(
     """
     if oof:
         assert folds is not None
+        assert nfold == len(folds)
     else:
         assert folds is None
         folds = [(range(0), range(len(dataset))) for _ in range(nfold)]
     load_model_fn = load_model_fn or tk.models.load
 
-    models = [
-        load_model_fn(models_dir / model_name_format.format(fold=fold))
-        for fold in tk.utils.trange(nfold, desc="load models")
-    ]
+    with tk.dl.session(use_horovod=use_horovod):
+        models = [
+            load_model_fn(models_dir / model_name_format.format(fold=fold))
+            for fold in tk.utils.trange(nfold, desc="load models")
+        ]
 
-    pred_list = []
-    val_indices_list = []
-    for fold, (model, (_, val_indices)) in enumerate(zip(models, folds)):
-        pred = tk.models.predict(
-            model,
-            tk.data.SubDataset(dataset, val_indices),
-            preprocessor,
-            batch_size,
-            desc=f"{'oofp' if oof else 'predict'}({fold + 1}/{nfold})",
-            **kwargs,
-        )
-        pred_list.append(pred)
-        val_indices_list.append(val_indices)
+        pred_list = []
+        val_indices_list = []
+        for fold, (model, (_, val_indices)) in enumerate(zip(models, folds)):
+            pred = tk.models.predict(
+                model,
+                tk.data.SubDataset(dataset, val_indices),
+                preprocessor,
+                batch_size,
+                desc=f"{'oofp' if oof else 'predict'}({fold + 1}/{nfold})",
+                use_horovod=use_horovod,
+                **kwargs,
+            )
+            pred_list.append(pred)
+            val_indices_list.append(val_indices)
 
-    if oof:
-        # TODO: multi output対応
-        output_shape = (len(dataset),) + pred_list[0].shape[1:]
-        oofp = np.empty(output_shape, dtype=pred_list[0].dtype)
-        for pred, val_indices in zip(pred_list, val_indices_list):
-            oofp[val_indices] = pred
-        return oofp
-    else:
-        return pred_list
+        if oof:
+            # TODO: multi output対応
+            output_shape = (len(dataset),) + pred_list[0].shape[1:]
+            oofp = np.empty(output_shape, dtype=pred_list[0].dtype)
+            for pred, val_indices in zip(pred_list, val_indices_list):
+                oofp[val_indices] = pred
+            return oofp
+        else:
+            return pred_list
 
 
 @tk_log.trace()
