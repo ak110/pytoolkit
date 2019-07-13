@@ -157,6 +157,34 @@ def get_folds(X, y, cv_count, split_seed, stratify=None):
     return folds
 
 
+def get_group_folds(groups, cv_count, split_seed):
+    """Cross validationのインデックスを返す。
+
+    Args:
+        groups: グループIDの配列。(データ数分)
+        cv_count (int): 分割数。
+        split_seed (int): 乱数のseed。
+        stratify (bool or None): StratifiedKFoldにするならTrue。
+
+    Returns:
+        list of tuple(train_indices, val_indices): インデックス
+
+    """
+    g = np.unique(groups)
+    cv = sklearn.model_selection.KFold(
+        n_splits=cv_count, shuffle=True, random_state=split_seed
+    )
+    folds = []
+    for train_indices, val_indices in cv.split(g, g):
+        folds.append(
+            (
+                np.where(np.in1d(groups, g[train_indices]))[0],
+                np.where(np.in1d(groups, g[val_indices]))[0],
+            )
+        )
+    return folds
+
+
 def to_categorical(num_classes):
     """クラスラベルのone-hot encoding化を行う関数を返す。"""
 

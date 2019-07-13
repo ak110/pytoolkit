@@ -1,4 +1,5 @@
 """pandasなどなど関連。"""
+import warnings
 
 import numpy as np
 import sklearn.utils
@@ -78,9 +79,48 @@ def shuffled_score(score_fn, X, c, y, n_iter=5, random_state=None):
 
     random_state = sklearn.utils.check_random_state(random_state)
     X = X.copy()
+    original = X[c]
     scores = []
-    for _ in range(n_iter):
-        data = random_state.permutation(X[c].values)
-        X[c] = pd.Series(data=data, dtype=X[c].dtype)
-        scores.append(score_fn(X, y))
+    nunique = original.nunique(dropna=False)
+    if nunique - 1 <= n_iter:
+        # 値の種類の数が少ないなら全件チェック
+        values = original.value_counts(dropna=False).index.values
+        assert len(values) == nunique
+        for n in range(1, nunique):
+            d = {values[i]: values[(i + n) % nunique] for i in range(nunique)}
+            X[c] = original.map(d).astype(original.dtype)
+            scores.append(score_fn(X, y))
+    else:
+        # n_iter回シャッフルしてスコアを算出
+        for _ in range(n_iter):
+            data = random_state.permutation(original.values)
+            X[c] = pd.Series(data=data, dtype=original.dtype)
+            scores.append(score_fn(X, y))
     return np.mean(scores)
+
+
+def latlon_distance(lat1, lon1, lat2, lon2):
+    """2地点間の距離。
+
+    Args:
+        lat1: 地点1の緯度[°]
+        lon1: 地点1の経度[°]
+        lat2: 地点2の緯度[°]
+        lon2: 地点2の経度[°]
+
+    Returns:
+        float: 距離[km]
+
+    References:
+        <https://keisan.casio.jp/exec/system/1257670779>
+
+    """
+    r = 6378.137
+    d2r = np.pi / 180
+    delta_x = lon2 - lon1
+    s = np.sin(lat1 * d2r) * np.sin(lat2 * d2r)
+    c = np.cos(lat1 * d2r) * np.cos(lat2 * d2r)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        d = r * np.arccos(s + c * np.cos(delta_x * d2r))
+    return d

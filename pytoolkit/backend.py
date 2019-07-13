@@ -85,3 +85,8 @@ def lovasz_weights(y_true, perm, alpha=None):
     if alpha is not None:
         weights *= 2 * (y_true_sorted * alpha + (1 - y_true_sorted) * (1 - alpha))
     return weights
+
+
+def logcosh(x):
+    """log(cosh(x))。Smooth L1 lossみたいなもの。"""
+    return x + K.softplus(-2.0 * x)

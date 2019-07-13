@@ -3,12 +3,13 @@
 import argparse
 import base64
 import io
-import re
 import pathlib
+import re
 import sys
 
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 if True:
@@ -23,9 +24,11 @@ def _main():
     )
     parser.add_argument("logfile", type=pathlib.Path, help="対象のログファイルのパス")
     parser.add_argument("item", default=None, nargs="?", help="項目名。省略時は指定可能な項目名が表示される。")
-    parser.add_argument(
+    g = parser.add_mutually_exclusive_group(required=False)
+    g.add_argument(
         "--stdout", action="store_true", help="結果を標準出力に出力する。(既定ではOSC 52でクリップボード)"
     )
+    g.add_argument("--save", action="store_true", help="結果をカレントディレクトリに画像ファイルとして出力する。")
     args = parser.parse_args()
 
     df_list = _parse_log(
@@ -39,7 +42,13 @@ def _main():
     else:
         for col, df in df_list:
             if col == args.item:
-                ax = df.plot()
+                ax = df.plot(
+                    xlim=(1, max(10, len(df))),
+                    ylim=(
+                        min(0, np.nanmin(df)) - 0.01,
+                        max(1, min(np.nanmax(df), *(np.nanpercentile(df, [90, 99]) * [3, 2]))) + 0.01,
+                    )
+                )
                 ax.set_xlabel("Epochs")
                 ax.get_xaxis().set_major_locator(
                     matplotlib.ticker.MaxNLocator(integer=True)
@@ -56,14 +65,18 @@ def _main():
                     graph_bytes = f.getvalue()
                 plt.close(ax.get_figure())
 
-                data_url = tk.web.data_url(graph_bytes, "image/png")
                 if args.stdout:
+                    data_url = tk.web.data_url(graph_bytes, "image/png")
                     print(data_url)
+                elif args.save:
+                    save_path = pathlib.Path(f"{args.logfile.stem}.{args.item}.png")
+                    save_path = save_path.resolve()
+                    save_path.write_bytes(graph_bytes)
+                    print(save_path)
                 else:
-                    print(
-                        f'\x1b]52;0;{base64.b64encode(data_url.encode("utf-8")).decode("utf-8")}\x1b\\',
-                        end="",
-                    )
+                    data_url = tk.web.data_url(graph_bytes, "image/png")
+                    b64data = base64.b64encode(data_url.encode("utf-8")).decode("utf-8")
+                    print(f"\x1b]52;c;{b64data}\n\x1b\\")
                 return
         raise RuntimeError(f'Item "{args.item}" is not found in {args.logfile}.')
 

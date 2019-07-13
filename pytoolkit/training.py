@@ -1,4 +1,5 @@
 """Kerasでの学習周りの便利関数など。"""
+import contextlib
 
 import numpy as np
 
@@ -81,13 +82,14 @@ def cv(
 
 @tk_log.trace()
 def predict_cv(
-    nfold,
-    dataset,
+    nfold=None,
+    dataset=None,
     preprocessor=None,
     batch_size=32,
     load_model_fn=None,
     *,
-    models_dir,
+    models=None,
+    models_dir=None,
     model_name_format="model.fold{fold}.h5",
     oof=False,
     folds=None,
@@ -97,12 +99,13 @@ def predict_cv(
     """CVで作ったモデルで予測。
 
     Args:
-        nfold (int): CVのfold数
-        dataset (tk.data.Dataset): データ
+        nfold (int): CVのfold数 (models未指定時必須)
+        dataset (tk.data.Dataset): データ (必須)
         preprocessor (tk.data.Preprocessor): 前処理
         batch_size (int): バッチサイズ
-        load_model_fn (callable): モデルを読み込む関数
-        models_dir (PathLike object): モデルの保存先パス (必須)
+        load_model_fn (callable): モデルを読み込む関数 (models未指定時必須)
+        models (list of keras.models.Model): 各foldのモデル
+        models_dir (PathLike object): モデルの保存先パス (models未指定時必須)
         model_name_format (str): モデルのファイル名のフォーマット。{fold}のところに数字が入る。
         oof (bool): out-of-fold predictionならTrueにする。folds必須。
         folds (array-like): oof時のみ指定する。train/valのindexの配列のtupleの配列。(sklearn.model_selection.KFold().split()の結果など)
@@ -113,6 +116,11 @@ def predict_cv(
         list or ndarray: oof=Falseの場合、予測結果のnfold個の配列。oof=Trueの場合、予測結果のndarray。
 
     """
+    if models is not None:
+        assert nfold is None or nfold == len(models)
+        assert load_model_fn is None
+        assert models_dir is None
+        nfold = len(models)
     if oof:
         assert folds is not None
         assert nfold == len(folds)
@@ -121,11 +129,14 @@ def predict_cv(
         folds = [(range(0), range(len(dataset))) for _ in range(nfold)]
     load_model_fn = load_model_fn or tk.models.load
 
-    with tk.dl.session(use_horovod=use_horovod):
-        models = [
-            load_model_fn(models_dir / model_name_format.format(fold=fold))
-            for fold in tk.utils.trange(nfold, desc="load models")
-        ]
+    with tk.dl.session(
+        use_horovod=use_horovod
+    ) if models is None else contextlib.nullcontext():
+        if models is None:
+            models = [
+                load_model_fn(models_dir / model_name_format.format(fold=fold))
+                for fold in tk.utils.trange(nfold, desc="load models")
+            ]
 
         pred_list = []
         val_indices_list = []

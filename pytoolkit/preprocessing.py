@@ -78,8 +78,7 @@ class SafeRobustScaler(DataFrameTransformerBase):
         X = X.astype(np.float32)
         self.center_ = np.nanmedian(X, axis=0)
         lower, upper = np.nanpercentile(X, self.quantile_range, axis=0)
-        scale_q = (self.quantile_range[1] - self.quantile_range[0]) / 100
-        scale = (upper - lower) / scale_q
+        scale = np.min([upper - lower, np.nanstd(X, axis=0)], axis=0)
         scale[scale == 0.0] = 1.0
         self.scale_ = scale
         return self
@@ -121,7 +120,6 @@ class HistgramCountEncoder(DataFrameTransformerBase):
             )
             self.hist_[col] = hist
             self.bin_edges_[col] = bin_edges[1:-1]  # 両端は最小値と最大値なので要らない
-        self.hist_ = normalize_counts(self.hist_)
         return self
 
     def _transform(self, X, y=None):
@@ -178,16 +176,18 @@ class Normalizer(DataFrameTransformerBase):
         self.scalers_ = {
             "robust": SafeRobustScaler(),
             "power": sklearn.pipeline.make_pipeline(
-                sklearn.preprocessing.PowerTransformer(), SafeRobustScaler()
+                sklearn.preprocessing.PowerTransformer(),
+                sklearn.preprocessing.StandardScaler(),
             ),
             "rank": RankGaussEncoder(),
         }
 
     def _fit(self, X, y=None):
         # 列ごとに傾向を見て使うscalerを決定
+        X = X.copy().astype(np.float32)
         self.columns_scaler_ = []
         for col in range(X.shape[1]):
-            col_values = X[:, col].astype(np.float32)
+            col_values = X[:, col]
 
             # 二値っぽければ何もしない
             if np.isin(col_values, (np.float32(0), np.float32(1))).all():
@@ -240,33 +240,134 @@ class Normalizer(DataFrameTransformerBase):
         return X
 
 
+class CountEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
+    """Count Encoding。
+
+    Category Encoders <http://contrib.scikit-learn.org/categorical-encoding/> 風のインターフェースにしてみる。
+    (全部は作っていない)
+
+    """
+
+    def __init__(self, cols=None, return_df=True, handle_unknown="return_nan"):
+        assert handle_unknown in ("error", "value", "return_nan")
+        super().__init__()
+        self.cols = cols
+        self.return_df = return_df
+        self.handle_unknown = handle_unknown
+        self.maps_ = None
+
+    def fit(self, X, y=None):
+        del y
+        self.maps_ = {}
+        cols = self.cols or X.columns.values
+        for c in cols:
+            self.maps_[c] = X[c].value_counts(dropna=False).astype(np.float32).to_dict()
+            if np.nan in self.maps_[c]:
+                if self.handle_unknown == "error":
+                    raise ValueError(f"Column '{c}' has NaN!")
+                if self.handle_unknown == "return_nan":
+                    self.maps_[c][np.nan] = np.nan
+        return self
+
+    def transform(self, X, y=None):
+        del y
+        X = X.copy()
+        cols = self.cols or X.columns.values
+        for c in cols:
+            X[c] = X[c].map(self.maps_[c]).astype(np.float32)
+        return X if self.return_df else X.values
+
+
+class TargetEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
+    """Target Encoding。"""
+
+    def __init__(
+        self,
+        cols=None,
+        return_df=True,
+        handle_unknown="return_nan",
+        folds=None,
+    ):
+        assert handle_unknown in ("error", "value", "return_nan")
+        super().__init__()
+        self.cols = cols
+        self.return_df = return_df
+        self.handle_unknown = handle_unknown
+        self.folds = folds
+        self.train_df_ = None
+        self.train_maps_ = None
+        self.test_maps_ = None
+
+    def fit(self, X, y):
+        assert y is not None
+        self.train_df_ = X
+        self.train_maps_ = {}
+        self.test_maps_ = {}
+        cols = self.cols or X.columns.values
+        prior = y.mean()
+        # train用のencodingを作る
+        if self.folds is None:
+            # LOO
+            for c in cols:
+                targets = np.repeat(np.nan, len(X))
+                for v in X[c].dropna().unique():
+                    m = X[c] == v
+                    m_size = m.sum()
+                    if m_size >= 2:
+                        y_m = y[m]
+                        targets[m] = (y_m.sum() - y_m) / (m_size - 1)
+                self.train_maps_[c] = targets
+        else:
+            # CV
+            for fold, (train_indices, _) in enumerate(self.folds):
+                X_t, y_t = X.iloc[train_indices], y[train_indices]
+                for c in cols:
+                    if c not in self.train_maps_:
+                        self.train_maps_[c] = [{} for _ in range(len(self.folds))]
+                    self.train_maps_[c][fold] = {}
+                    values = X[c].dropna().unique()
+                    for v in values:
+                        m = X_t[c] == v
+                        if m.any():
+                            target = y_t[m].mean()
+                        elif self.handle_unknown == "value":
+                            target = prior
+                        else:
+                            target = np.nan
+                        self.train_maps_[c][fold][v] = target
+        # test用のencodingを作る
+        for c in cols:
+            self.test_maps_[c] = {}
+            for v in X[c].dropna().unique():
+                self.test_maps_[c][v] = y[X[c] == v].mean()
+        return self
+
+    def transform(self, X, y=None):
+        del y
+        X = X.copy()
+        cols = self.cols or X.columns.values
+        if X.equals(self.train_df_):
+            if self.folds is None:
+                for c in cols:
+                    X[c] = self.train_maps_[c]
+            else:
+                for c in cols:
+                    for fold, (_, val_indices) in enumerate(self.folds):
+                        X.loc[val_indices, c] = X.loc[val_indices, c].map(
+                            self.train_maps_[c][fold]
+                        )
+                    X[c] = X[c].astype(np.float32)
+        else:
+            for c in cols:
+                X[c] = X[c].map(self.test_maps_[c]).astype(np.float32)
+        return X if self.return_df else X.values
+
+
 def encode_binary(s, true_value, false_value):
     """列の2値化。"""
     s2 = s.map({true_value: True, false_value: False})
     assert s2.notnull().all(), f"Convert error: {s[s2.isnull()].value_counts()}"
     return s2.astype(bool)
-
-
-def encode_count(s, s_train):
-    """Count Encoding。
-
-    Args:
-        s (pd.Series): 対象の列
-        s_train (pd.Series): 対象の列(訓練データ)
-
-    """
-    d = s_train.value_counts().to_dict()
-    d = dict(zip(d.keys(), normalize_counts(list(d.values()))))
-    encoded = s.map(d).fillna(-1).astype(np.float32)
-    encoded[s.isnull()] = np.nan  # nanは維持する
-    return encoded
-
-
-def normalize_counts(counts):
-    """Count Encodingの出力をNNとかで扱いやすい感じに変換する処理。0は-1、頻度最大のが+1になる。"""
-    counts = np.log1p(np.float32(counts))
-    counts = counts * 2 / np.max(counts, axis=-1, keepdims=True) - 1
-    return counts
 
 
 def encode_target(s, s_train, y_train, min_samples_leaf=20, smoothing=10.0):

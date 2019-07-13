@@ -29,7 +29,9 @@ def get_custom_objects():
         WSConv2D,
         OctaveConv2D,
         BlurPooling2D,
+        ScaleValue,
         ScaleGradient,
+        ImputeNaN,
     ]
     return {c.__name__: c for c in classes}
 
@@ -46,7 +48,7 @@ class Preprocess(keras.layers.Layer):
         return input_shape
 
     def call(self, inputs, **kwargs):
-        _ = kwargs  # noqa
+        del kwargs
         if self.mode == "caffe":
             return K.bias_add(
                 inputs[..., ::-1], K.constant(np.array([-103.939, -116.779, -123.68]))
@@ -396,7 +398,7 @@ class Resize2D(keras.layers.Layer):
             return (input_shape[0], new_h, new_w, input_shape[-1])
 
     def call(self, inputs, **kwargs):
-        _ = kwargs  # noqa
+        del kwargs
         method = {
             "bilinear": tf.image.ResizeMethod.BILINEAR,
             "nearest": tf.image.ResizeMethod.NEAREST_NEIGHBOR,
@@ -455,7 +457,7 @@ class Pad2D(keras.layers.Layer):
         return tuple(input_shape)
 
     def call(self, inputs, **kwargs):
-        _ = kwargs  # noqa
+        del kwargs
         padding = K.constant(((0, 0),) + self.padding + ((0, 0),), dtype="int32")
         return tf.pad(
             tensor=inputs,
@@ -533,7 +535,7 @@ class CoordChannel2D(keras.layers.Layer):
         return tuple(input_shape)
 
     def call(self, inputs, **kwargs):
-        _ = kwargs  # noqa
+        del kwargs
         input_shape = K.shape(inputs)
         pad_shape = (input_shape[0], input_shape[1], input_shape[2], 1)
         ones = tf.ones(pad_shape, K.floatx())
@@ -563,7 +565,7 @@ class ChannelPair2D(keras.layers.Layer):
         return input_shape[:-1] + ((input_shape[-1] * (input_shape[-1] - 1) // 2),)
 
     def call(self, inputs, **kwargs):
-        _ = kwargs  # noqa
+        del kwargs
         ch = K.int_shape(inputs)[-1]
         return K.concatenate(
             [inputs[..., i : i + 1] * inputs[..., i + 1 :] for i in range(ch - 1)],
@@ -584,7 +586,7 @@ class StocasticAdd(keras.layers.Layer):
         return input_shape[0]
 
     def call(self, inputs, training=None, **kwargs):  # pylint: disable=arguments-differ
-        _ = kwargs  # noqa
+        del kwargs
         base, residual = inputs
 
         def _train():
@@ -601,7 +603,7 @@ class BatchNormalization(keras.layers.BatchNormalization):
     """Sync BN。基本的には互換性があるように元のを継承＆同名で。"""
 
     def call(self, inputs, training=None, **kwargs):  # pylint: disable=arguments-differ
-        _ = kwargs  # noqa
+        del kwargs
         return K.in_train_phase(
             lambda: self._bn_train(inputs), lambda: self._bn_test(inputs), training
         )
@@ -740,7 +742,7 @@ class GroupNormalization(keras.layers.Layer):
         return input_shape
 
     def call(self, inputs, **kwargs):
-        _ = kwargs  # noqa
+        del kwargs
         x = inputs
         ndim = K.ndim(x)
         shape = K.shape(x)
@@ -819,9 +821,9 @@ class MixFeat(keras.layers.Layer):
                     b, K.floatx()
                 )
 
-                def _backword(dx):
+                def _backword(dy):
                     inv = tf.math.invert_permutation(indices)
-                    return dx * K.cast(a, K.floatx()) + K.gather(dx, inv) * K.cast(
+                    return dy * K.cast(a, K.floatx()) + K.gather(dy, inv) * K.cast(
                         b, K.floatx()
                     )
 
@@ -892,7 +894,7 @@ class ParallelGridPooling2D(keras.layers.Layer):
         return b, h // self.pool_size[0], w // self.pool_size[1], c
 
     def call(self, inputs, **kwargs):
-        _ = kwargs  # noqa
+        del kwargs
         shape = K.shape(inputs)
         int_shape = K.int_shape(inputs)
         rh, rw = self.pool_size
@@ -922,7 +924,7 @@ class ParallelGridGather(keras.layers.Layer):
         return input_shape
 
     def call(self, inputs, **kwargs):
-        _ = kwargs  # noqa
+        del kwargs
         shape = K.shape(inputs)
         b = shape[0]
         gather_shape = K.concatenate([[self.r, b // self.r], shape[1:]], axis=0)
@@ -959,7 +961,7 @@ class SubpixelConv2D(keras.layers.Layer):
         return input_shape[0], h, w, input_shape[3] // (self.scale ** 2)
 
     def call(self, inputs, **kwargs):
-        _ = kwargs  # noqa
+        del kwargs
         return tf.depth_to_space(input=inputs, block_size=self.scale)
 
     def get_config(self):
@@ -1006,7 +1008,7 @@ class WSConv2D(keras.layers.Layer):
         super().build(input_shape)
 
     def call(self, inputs, **kwargs):
-        _ = kwargs  # noqa
+        del kwargs
 
         kernel_mean = K.mean(self.kernel, axis=[0, 1, 2])
         kernel_std = K.std(self.kernel, axis=[0, 1, 2])
@@ -1083,7 +1085,7 @@ class OctaveConv2D(keras.layers.Layer):
         super().build(input_shape)
 
     def call(self, inputs, **kwargs):
-        _ = kwargs  # noqa
+        del kwargs
         input_l, input_h = inputs
 
         ll = K.conv2d(input_l, self.kernel_ll, padding="same", strides=self.strides)
@@ -1128,7 +1130,7 @@ class BlurPooling2D(keras.layers.Layer):
         return tuple(input_shape)
 
     def call(self, inputs, **kwargs):
-        _ = kwargs  # noqa
+        del kwargs
         in_filters = K.int_shape(inputs)[-1]
 
         pascals_tr = np.zeros((self.taps, self.taps))
@@ -1152,6 +1154,35 @@ class BlurPooling2D(keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+class ScaleValue(keras.layers.Layer):
+    """値だけをスケーリングしてシフトするレイヤー。回帰の出力前とかに。"""
+
+    def __init__(self, scale, shift=0, **kargs):
+        super().__init__(**kargs)
+        self.scale = np.float32(scale)
+        self.shift = np.float32(shift)
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
+
+    def call(self, inputs, **kwargs):
+        del kwargs
+
+        @tf.custom_gradient
+        def _forward(x):
+            def _backword(dy):
+                return dy
+
+            return x * self.scale + self.shift, _backword
+
+        return _forward(inputs)
+
+    def get_config(self):
+        config = {"scale": self.scale, "shift": self.shift}
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
 class ScaleGradient(keras.layers.Layer):
     """勾配だけをスケーリングするレイヤー。転移学習するときとかに。"""
 
@@ -1163,12 +1194,12 @@ class ScaleGradient(keras.layers.Layer):
         return input_shape
 
     def call(self, inputs, **kwargs):
-        _ = kwargs  # noqa
+        del kwargs
 
         @tf.custom_gradient
         def _forward(x):
-            def _backword(dx):
-                return dx * self.scale
+            def _backword(dy):
+                return dy * self.scale
 
             return x, _backword
 
@@ -1176,5 +1207,55 @@ class ScaleGradient(keras.layers.Layer):
 
     def get_config(self):
         config = {"scale": self.scale}
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
+class ImputeNaN(keras.layers.Layer):
+    """NaNを適当な値に変換する層。"""
+
+    def __init__(self, units, **kwargs):
+        super().__init__(**kwargs)
+        self.units = units
+        self.kernel1 = None
+        self.kernel2 = None
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
+
+    def build(self, input_shape):
+        dim = int(input_shape[-1])
+        self.kernel1 = self.add_weight(
+            shape=(dim, self.units),
+            initializer=keras.initializers.glorot_uniform(),
+            regularizer=keras.regularizers.l2(1e-4),
+            name="kernel1",
+        )
+        self.kernel2 = self.add_weight(
+            shape=(self.units, dim),
+            initializer=keras.initializers.glorot_uniform(),
+            regularizer=keras.regularizers.l2(1e-4),
+            name="kernel2",
+        )
+        self.bias = self.add_weight(
+            shape=(dim,),
+            initializer=keras.initializers.zeros(),
+            name="bias",
+        )
+        super().build(input_shape)
+
+    def call(self, inputs, **kwargs):
+        del kwargs
+        mask = tf.math.is_nan(inputs)
+        output = tf.where(mask, K.ones_like(inputs), inputs)  # nanを1に置き換え
+        output = K.dot(output, self.kernel1)
+        output = K.relu(output)
+        output = K.dot(output, self.kernel2)
+        output = K.bias_add(output, self.bias, data_format="channels_last")
+        output = tf.where(mask, output, inputs)  # nan以外はinputsを出力
+        return output
+
+    def get_config(self):
+        config = {"units": self.units}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))

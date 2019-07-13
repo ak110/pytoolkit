@@ -183,23 +183,24 @@ def l1_smooth_loss(y_true, y_pred):
 
 
 def mse(y_true, y_pred):
-    """AutoEncoderとか用mean squared error"""
-    return K.mean(K.square(y_pred - y_true), axis=list(range(1, K.ndim(y_true))))
+    """mean squared error。"""
+    axes = list(range(1, K.ndim(y_true)))
+    return K.mean(K.square(y_pred - y_true), axis=axes)
 
 
 def mae(y_true, y_pred):
-    """AutoEncoderとか用mean absolute error"""
-    return K.mean(K.abs(y_pred - y_true), axis=list(range(1, K.ndim(y_true))))
+    """mean absolute error。"""
+    axes = list(range(1, K.ndim(y_true)))
+    return K.mean(K.abs(y_pred - y_true), axis=axes)
 
 
 def rmse(y_true, y_pred):
-    """AutoEncoderとか用root mean squared error"""
-    return K.sqrt(
-        K.mean(K.square(y_pred - y_true), axis=list(range(1, K.ndim(y_true))))
-    )
+    """root mean squared error。"""
+    axes = list(range(1, K.ndim(y_true)))
+    return K.sqrt(K.mean(K.square(y_pred - y_true), axis=axes))
 
 
 def mape(y_true, y_pred):
-    """MAPE。"""
+    """mean absolute percentage error。"""
     axes = list(range(1, K.ndim(y_true)))
     return K.mean(K.abs((y_true - y_pred) / y_true), axis=axes)

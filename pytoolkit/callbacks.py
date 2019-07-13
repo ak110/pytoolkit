@@ -18,9 +18,13 @@ class LearningRateStepDecay(keras.callbacks.Callback):
         self.reduce_epoch_rates = reduce_epoch_rates
         self.factor = factor
         self.epochs = epochs
+        self.start_lr = None
         self.reduce_epochs = None
 
     def on_train_begin(self, logs=None):
+        if not hasattr(self.model.optimizer, "lr"):
+            raise ValueError('Optimizer must have a "lr" attribute.')
+        self.start_lr = float(K.get_value(self.model.optimizer.lr))
         epochs = self.epochs or self.params["epochs"]
         self.reduce_epochs = [
             min(max(int(epochs * r), 1), epochs) for r in self.reduce_epoch_rates
@@ -35,6 +39,10 @@ class LearningRateStepDecay(keras.callbacks.Callback):
                 f"Epoch {epoch + 1}: Learning rate {lr1:.1e} -> {lr2:.1e}"
             )
 
+    def on_train_end(self, logs=None):
+        # 終わったら戻しておく
+        K.set_value(self.model.optimizer.lr, self.start_lr)
+
 
 class CosineAnnealing(keras.callbacks.Callback):
     """Cosine Annealing without restart。
@@ -44,12 +52,13 @@ class CosineAnnealing(keras.callbacks.Callback):
 
     """
 
-    def __init__(self, factor=0.01, epochs=None):
+    def __init__(self, factor=0.01, epochs=None, warmup_epochs=5):
+        assert factor < 1
         super().__init__()
         self.factor = factor
         self.epochs = epochs
+        self.warmup_epochs = warmup_epochs
         self.start_lr = None
-        assert factor < 1
 
     def on_train_begin(self, logs=None):
         if not hasattr(self.model.optimizer, "lr"):
@@ -59,8 +68,12 @@ class CosineAnnealing(keras.callbacks.Callback):
     def on_epoch_begin(self, epoch, logs=None):
         lr_max = self.start_lr
         lr_min = self.start_lr * self.factor
-        r = (epoch + 1) / (self.epochs or self.params["epochs"])
-        lr = lr_min + 0.5 * (lr_max - lr_min) * (1 + np.cos(np.pi * r))
+        if epoch + 1 <= self.warmup_epochs:
+            r = (epoch + 1) / self.warmup_epochs
+            lr = lr_min * (1 - r) + lr_max * r
+        else:
+            r = (epoch + 1) / (self.epochs or self.params["epochs"])
+            lr = lr_min + 0.5 * (lr_max - lr_min) * (1 + np.cos(np.pi * r))
         K.set_value(self.model.optimizer.lr, float(lr))
 
     def on_train_end(self, logs=None):

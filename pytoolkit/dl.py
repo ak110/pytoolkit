@@ -69,10 +69,10 @@ def session(config=None, gpu_options=None, use_horovod=False):
                     self.config["intra_op_parallelism_threads"] = int(
                         os.environ["OMP_NUM_THREADS"]
                     )
-                config = tf.ConfigProto(**self.config)
+                config = tf.compat.v1.ConfigProto(**self.config)
                 for k, v in self.gpu_options.items():
                     setattr(config.gpu_options, k, v)
-                self.session = tf.Session(config=config)
+                self.session = tf.compat.v1.Session(config=config)
                 K.set_session(self.session)
             return self
 
