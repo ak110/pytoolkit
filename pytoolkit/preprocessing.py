@@ -282,11 +282,7 @@ class TargetEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
     """Target Encoding。"""
 
     def __init__(
-        self,
-        cols=None,
-        return_df=True,
-        handle_unknown="return_nan",
-        folds=None,
+        self, cols=None, return_df=True, handle_unknown="return_nan", folds=None
     ):
         assert handle_unknown in ("error", "value", "return_nan")
         super().__init__()

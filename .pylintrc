@@ -46,5 +46,23 @@ disable=
 max-line-length=256
 
 [TYPECHECK]
-ignored-modules=__init__,numpy,pandas,matplotlib.cm,mpi4py,mpi4py.MPI,distutils,horovod,tensorflow,pydensecrf.densecrf,pydensecrf.utils
-ignored-classes=numpy.ndarray,tuple,Empty,pathlib.PurePath,h5py.File,ConfigProto
+ignored-modules=__init__
+    ,catboost
+    ,chainercv
+    ,distutils
+    ,horovod
+    ,lightgbm
+    ,matplotlib.cm
+    ,mpi4py
+    ,mpi4py.MPI
+    ,numpy
+    ,pandas
+    ,pydensecrf.densecrf
+    ,pydensecrf.utils
+    ,tensorflow
+ignored-classes=numpy.ndarray
+    ,ConfigProto
+    ,Empty
+    ,h5py.File
+    ,pathlib.PurePath
+    ,tuple

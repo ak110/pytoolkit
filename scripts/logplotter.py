@@ -46,8 +46,15 @@ def _main():
                     xlim=(1, max(10, len(df))),
                     ylim=(
                         min(0, np.nanmin(df)) - 0.01,
-                        max(1, min(np.nanmax(df), *(np.nanpercentile(df, [90, 99]) * [3, 2]))) + 0.01,
-                    )
+                        max(
+                            1,
+                            min(
+                                np.nanmax(df),
+                                *(np.nanpercentile(df, [90, 99]) * [3, 2]),
+                            ),
+                        )
+                        + 0.01,
+                    ),
                 )
                 ax.set_xlabel("Epochs")
                 ax.get_xaxis().set_major_locator(

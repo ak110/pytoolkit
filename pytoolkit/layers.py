@@ -1219,6 +1219,7 @@ class ImputeNaN(keras.layers.Layer):
         self.units = units
         self.kernel1 = None
         self.kernel2 = None
+        self.bias = None
 
     def compute_output_shape(self, input_shape):
         return input_shape
@@ -1238,9 +1239,7 @@ class ImputeNaN(keras.layers.Layer):
             name="kernel2",
         )
         self.bias = self.add_weight(
-            shape=(dim,),
-            initializer=keras.initializers.zeros(),
-            name="bias",
+            shape=(dim,), initializer=keras.initializers.zeros(), name="bias"
         )
         super().build(input_shape)
 

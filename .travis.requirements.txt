@@ -2,7 +2,6 @@
 Pillow
 better_exceptions
 black
-chainercv
 diskcache
 flake8
 flake8-docstrings
@@ -14,6 +13,7 @@ numba
 numpy
 onnxmltools
 opencv-python
+pydocstyle<4.0.0
 pydot
 pylint
 pytest
