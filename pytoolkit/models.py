@@ -176,7 +176,6 @@ def fit(
     use_multiprocessing=False,
     workers=1,
     max_queue_size=10,
-    warmup=True,
 ):
     """独自のtraining loopになる予定の関数。
 
@@ -197,12 +196,15 @@ def fit(
         use_multiprocessing (bool): Trueならマルチプロセス。
         workers (int): ワーカー数。
         max_queue_size (int): キューの最大サイズ。
-        warmup (bool): HorovodのLearningRateWarmupCallbackを使うか否か。
 
     """
+    kwargs = {}
     # validation_freq == 0ならvalidationしない(独自仕様)
     if validation_freq == 0:
         validation_data = None
+    else:
+        if tf.__version__ >= "1.14":
+            kwargs["validation_freq"] = validation_freq
 
     train_data_loader = tk.data.DataLoader(
         training_data,
@@ -232,14 +234,6 @@ def fit(
     if tk.hvd.initialized() and tk.hvd.size() > 1:
         callbacks.append(tk.hvd.get().callbacks.BroadcastGlobalVariablesCallback(0))
         callbacks.append(tk.hvd.get().callbacks.MetricAverageCallback())
-        if warmup:
-            callbacks.append(
-                tk.hvd.get().callbacks.LearningRateWarmupCallback(
-                    warmup_epochs=5, verbose=1
-                )
-            )
-
-    # TODO: validation_freqはTensorFlowに合わせて対応予定
 
     # TensorFlowのバグ対策
     if tf.__version__ == "1.13.1":
@@ -256,11 +250,7 @@ def fit(
     try:
         model.fit_generator(
             train_data_loader,
-            steps_per_epoch=-(-len(train_data_loader) // tk.hvd.size()),  # ceiling
             validation_data=val_data_loader,
-            validation_steps=-(-len(val_data_loader) // tk.hvd.size())
-            if val_data_loader is not None
-            else None,  # ceiling
             class_weight=class_weight,
             epochs=epochs,
             callbacks=callbacks,
@@ -269,6 +259,7 @@ def fit(
             use_multiprocessing=use_multiprocessing,
             workers=workers,
             max_queue_size=max_queue_size,
+            **kwargs,
         )
     finally:
         if tf.__version__ == "1.13.1":
