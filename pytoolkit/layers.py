@@ -1002,7 +1002,7 @@ class WSConv2D(keras.layers.Layer):
         self.kernel = self.add_weight(
             shape=(self.kernel_size[0], self.kernel_size[1], in_filters, self.filters),
             initializer=keras.initializers.he_uniform(),
-            regularizer=None,  # L2はたぶん要らない
+            regularizer=keras.regularizers.l2(1e-4),
             name="kernel",
         )
         super().build(input_shape)

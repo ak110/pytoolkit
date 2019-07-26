@@ -165,7 +165,7 @@ def fit(
     validation_data=None,
     train_preprocessor=None,
     val_preprocessor=None,
-    validation_freq: int = 1,
+    validation_freq="auto",
     class_weight=None,
     batch_size=32,
     epochs=1800,
@@ -185,7 +185,7 @@ def fit(
         validation_data (tk.data.Dataset): 検証データ。Noneなら省略。
         train_preprocessor (tk.data.Preprocessor): 訓練データの前処理
         val_preprocessor (tk.data.Preprocessor): 検証データの前処理
-        validation_freq (int or list): 検証を行うエポック数の間隔、またはエポック数のリスト。0ならvalidationしない(独自仕様)。
+        validation_freq (int or list or "auto"): 検証を行うエポック数の間隔、またはエポック数のリスト。0ならvalidationしない(独自仕様)。"auto"なら適当に決める(独自仕様)。
         class_weight (dict): クラスごとの重みのdict。
         batch_size (int): バッチサイズ。
         epochs (int): エポック数。
@@ -198,11 +198,25 @@ def fit(
         max_queue_size (int): キューの最大サイズ。
 
     """
-    kwargs = {}
-    # validation_freq == 0ならvalidationしない(独自仕様)
     if validation_freq == 0:
+        # validation_freq == 0ならvalidationしない(独自仕様)
+        validation_freq = None
         validation_data = None
-    else:
+    elif validation_freq == "auto":
+        # "auto"なら適当に決める(独自仕様)
+        # ・sqrt(epochs)回くらいやれば十分？ (指標にも依るが…)
+        # ・valがtrainの10%未満くらいなら毎回やっても問題無い
+        max_val_per_train = 0.1
+        validation_freq = max(
+            int(np.sqrt(epochs)),
+            int(len(validation_data) / (len(training_data) * max_val_per_train)),
+            1,
+        )
+        # 最後のepochはvalidationしたいので、そこからvalidation_freq毎に。
+        validation_freq = list(range(epochs, 0, -validation_freq))
+
+    kwargs = {}
+    if validation_freq is not None:
         if tf.__version__ >= "1.14":
             kwargs["validation_freq"] = validation_freq
 
