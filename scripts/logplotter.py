@@ -42,20 +42,20 @@ def _main():
     else:
         for col, df in df_list:
             if col == args.item:
-                ax = df.plot(
-                    xlim=(1, max(10, len(df))),
-                    ylim=(
-                        min(0, np.nanmin(df)) - 0.01,
-                        max(
-                            1,
-                            min(
-                                np.nanmax(df),
-                                *(np.nanpercentile(df, [90, 99]) * [3, 2]),
-                            ),
-                        )
-                        + 0.01,
-                    ),
+                xlim = (1, max(10, len(df)))
+                yps = np.nanpercentile(df, [90, 99]) * [3, 2]
+                ylim = (
+                    min(0, np.nanmin(df)) - 0.01,
+                    max(1, min(np.nanmax(df), *yps)) + 0.01,
                 )
+                ax = None
+                for c in df.columns:
+                    ax = df[c].plot(
+                        ax=ax,
+                        xlim=xlim,
+                        ylim=ylim,
+                        marker="." if len(df) <= 1 or df[c].isnull().any() else None,
+                    )
                 ax.set_xlabel("Epochs")
                 ax.get_xaxis().set_major_locator(
                     matplotlib.ticker.MaxNLocator(integer=True)
@@ -89,46 +89,43 @@ def _main():
 
 
 def _parse_log(log_text: str):
-    """Kerasのコンソール出力からlossなどを見つけてDataFrameに入れて返す。結果は(列名, DataFrame)の配列。"""
+    """tk.callbacks.EpochLoggerのログファイルからlossなどを見つけてDataFrameに入れて返す。結果は(列名, DataFrame)の配列。"""
     pat1 = re.compile(r"Epoch +\d+: .+ time=\d+ ")
     pat2 = re.compile(r"\b(\w+)=([-+\.e\d]+|nan|-?inf)\b")
-    data = {}
+    keys = []
+    data_rows = []
     for line in log_text.split("\n"):
         if not pat1.search(line):
             continue
 
+        data_row = {}
         for m in pat2.finditer(line):
             key = m.group(1)
             value = float(m.group(2))
-            if key not in data:
-                data[key] = []
-            data[key].append(value)
+            data_row[key] = value
+            if key not in keys:
+                keys.append(key)
 
-    if len(data) <= 0:
+        if len(data_row) > 0:
+            data_rows.append(data_row)
+
+    if len(data_rows) == 0:
         return []
 
-    max_length = max([len(v) for v in data.values()])
-    for k, v in list(data.items()):
-        if len(v) != max_length:
-            data.pop(k)
-
-    if len(data) == 0:
-        return []
-
-    df = pd.DataFrame.from_dict(data)
-    df.index += 1
+    df = pd.DataFrame(index=range(1, len(data_rows) + 1))
+    for key in keys:
+        df[key] = [row.get(key, None) for row in data_rows]
 
     df_list = []
-    columns = df.columns.values
-    for col in columns:
-        if col.startswith("val_") and col[4:] in columns:
+    for key in keys:
+        if key.startswith("val_") and key[4:] in keys:
             continue
         # acc, val_accなどはまとめる。
-        targets = [col]
-        val_col = "val_" + col
-        if val_col in columns:
-            targets.append(val_col)
-        df_list.append((col, df[targets]))
+        targets = [key]
+        val_key = "val_" + key
+        if val_key in keys:
+            targets.append(val_key)
+        df_list.append((key, df[targets]))
 
     return df_list
 

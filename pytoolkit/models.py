@@ -204,16 +204,19 @@ def fit(
         validation_data = None
     elif validation_freq == "auto":
         # "auto"なら適当に決める(独自仕様)
-        # ・sqrt(epochs)回くらいやれば十分？ (指標にも依るが…)
-        # ・valがtrainの10%未満くらいなら毎回やっても問題無い
-        max_val_per_train = 0.1
-        validation_freq = max(
-            int(np.sqrt(epochs)),
-            int(len(validation_data) / (len(training_data) * max_val_per_train)),
-            1,
-        )
-        # 最後のepochはvalidationしたいので、そこからvalidation_freq毎に。
-        validation_freq = list(range(epochs, 0, -validation_freq))
+        if validation_data is None:
+            validation_freq = None
+        else:
+            # ・sqrt(epochs)回くらいやれば十分？ (指標にも依るが…)
+            # ・valがtrainの10%未満くらいなら毎回やっても問題無い
+            max_val_per_train = 0.1
+            validation_freq = max(
+                int(np.sqrt(epochs)),
+                int(len(validation_data) / (len(training_data) * max_val_per_train)),
+                1,
+            )
+            # 最後のepochはvalidationしたいので、そこからvalidation_freq毎に。
+            validation_freq = list(range(epochs, 0, -validation_freq))
 
     kwargs = {}
     if validation_freq is not None:

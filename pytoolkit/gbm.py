@@ -63,6 +63,9 @@ class LGBModels:
                 str(models_dir / f"model.fold{fold}.txt"),
                 num_iteration=gbm.best_iteration,
             )
+        # ついでにfeature_importanceも。
+        df_importance = self.feature_importance()
+        df_importance.to_excel(str(models_dir / "feature_importance.xlsx"))
 
     @classmethod
     def load(cls, models_dir, *, num_folds=None, folds=None):
@@ -189,6 +192,9 @@ class CBModels:
         models_dir.mkdir(parents=True, exist_ok=True)
         for fold, gbm in enumerate(self.gbms):
             gbm.save_model(str(models_dir / f"model.fold{fold}.cbm"), pool=train_pool)
+        # ついでにfeature_importanceも。
+        df_importance = self.feature_importance()
+        df_importance.to_excel(str(models_dir / "feature_importance.xlsx"))
 
     @classmethod
     def load(cls, models_dir, *, num_folds=None, folds=None):

@@ -61,6 +61,55 @@ def compare(df1, df2):
     return df_result
 
 
+def permutation_importance(
+    score_fn,
+    X,
+    y,
+    greater_is_better,
+    columns=None,
+    n_iter=5,
+    random_state=None,
+    verbose=True,
+):
+    """Permutation Importanceを算出して返す。
+
+    Args:
+        - score_fn (callable): X, yを受け取りスコアを返す関数。
+        - X (pd.DataFrame): 入力データ
+        - y (np.ndarray): ラベル
+        - greater_is_better (bool): スコアが大きいほど良いならTrue
+        - columns (array-like): 対象の列
+        - n_iter (int): 繰り返し回数
+        - random_state: seed
+        - verbose (bool): プログレスバーを表示するか否か
+
+    Returns:
+        pd.DataFrame: columnとimportanceの列を持つDataFrame
+
+    """
+    import pandas as pd
+
+    if columns is None:
+        columns = X.columns.values
+
+    base_score = score_fn(X, y)
+    tk.log.get(__name__).info(f"Base Score: {base_score:.2f}")
+
+    importances = []
+    for c in tk.utils.tqdm(columns, disable=not verbose):
+        ss = tk.table.shuffled_score(
+            score_fn=score_fn, X=X, c=c, y=y, n_iter=n_iter, random_state=random_state
+        )
+        s = base_score - ss if greater_is_better else ss - base_score
+        importances.append(s)
+        tk.utils.tqdm_write(f"{c:40s}: {s:7.3f}")
+
+    df_importance = pd.DataFrame()
+    df_importance["column"] = columns
+    df_importance["importance"] = importances
+    return df_importance
+
+
 def shuffled_score(score_fn, X, c, y, n_iter=5, random_state=None):
     """Permutation Importanceのための処理。
 
@@ -73,6 +122,9 @@ def shuffled_score(score_fn, X, c, y, n_iter=5, random_state=None):
         - y (np.ndarray): ラベル
         - n_iter (int): 繰り返し回数
         - random_state: seed
+
+    Returns:
+        float: スコア
 
     """
     import pandas as pd
