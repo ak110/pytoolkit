@@ -19,7 +19,6 @@ def analyze(df):
     import pandas as pd
 
     if isinstance(df, pd.DataFrame):
-        numeric_columns = df.select_dtypes(include=np.number).columns
         df_result = pd.DataFrame(index=df.columns)
         df_result["dtype"] = df.dtypes
         df_result["null"] = df.isnull().sum()
@@ -30,16 +29,17 @@ def analyze(df):
         df_result["mode"] = df.mode().transpose()[0]
         df_result["mean"] = df.mean()
         df_result["std"] = df.std()
-        # はずれ値のはずれ度合いを見るためにRobustScalerした結果の絶対値を見てみる。
-        df_result["outlier_size"] = np.nan
-        df_result.loc[numeric_columns, "outlier_size"] = (
-            tk.preprocessing.SafeRobustScaler(clip_range=None)
-            .fit_transform(df.loc[:, numeric_columns])
-            .fillna(0)
-            .abs()
-            .max()
-            .round(decimals=1)
-        )
+        # # はずれ値のはずれ度合いを見るためにRobustScalerした結果の絶対値を見てみる。
+        # numeric_columns = df.select_dtypes(include=np.number).columns
+        # df_result["outlier_size"] = np.nan
+        # df_result.loc[numeric_columns, "outlier_size"] = (
+        #     tk.preprocessing.SafeRobustScaler(clip_range=None)
+        #     .fit_transform(df.loc[:, numeric_columns])
+        #     .fillna(0)
+        #     .abs()
+        #     .max()
+        #     .round(decimals=1)
+        # )
         return df_result
     else:
         raise NotImplementedError()
@@ -164,7 +164,7 @@ def latlon_distance(lat1, lon1, lat2, lon2):
         float: 距離[km]
 
     References:
-        <https://keisan.casio.jp/exec/system/1257670779>
+        - <https://keisan.casio.jp/exec/system/1257670779>
 
     """
     r = 6378.137

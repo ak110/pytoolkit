@@ -48,7 +48,7 @@ class CosineAnnealing(keras.callbacks.Callback):
     """Cosine Annealing without restart。
 
     References:
-        SGDR: Stochastic Gradient Descent with Warm Restarts <https://arxiv.org/abs/1608.03983>
+        - SGDR: Stochastic Gradient Descent with Warm Restarts <https://arxiv.org/abs/1608.03983>
 
     """
 
@@ -188,7 +188,7 @@ class FreezeBNCallback(keras.callbacks.Callback):
         callbacks.append(tk.dl.callbacks.freeze_bn(0.95))
 
     References:
-        Squeeze-and-Excitation Networks <https://arxiv.org/abs/1709.01507>
+        - Squeeze-and-Excitation Networks <https://arxiv.org/abs/1709.01507>
 
     """
 

@@ -17,9 +17,11 @@ Submodules
    pytoolkit.backend
    pytoolkit.cache
    pytoolkit.callbacks
+   pytoolkit.cli
    pytoolkit.data
    pytoolkit.dl
    pytoolkit.gbm
+   pytoolkit.hpo
    pytoolkit.hvd
    pytoolkit.image
    pytoolkit.layers

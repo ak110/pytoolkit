@@ -1,5 +1,6 @@
 """keras.backendやtensorflowの基礎的な関数など。"""
 
+import numpy as np
 import tensorflow as tf
 
 from . import K
@@ -89,4 +90,4 @@ def lovasz_weights(y_true, perm, alpha=None):
 
 def logcosh(x):
     """log(cosh(x))。Smooth L1 lossみたいなもの。"""
-    return x + K.softplus(-2.0 * x)
+    return x + K.softplus(-2.0 * x) - np.log(2.0)

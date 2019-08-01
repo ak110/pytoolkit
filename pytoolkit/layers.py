@@ -1228,13 +1228,13 @@ class ImputeNaN(keras.layers.Layer):
         dim = int(input_shape[-1])
         self.kernel1 = self.add_weight(
             shape=(dim, self.units),
-            initializer=keras.initializers.glorot_uniform(),
+            initializer=keras.initializers.he_uniform(),
             regularizer=keras.regularizers.l2(1e-4),
             name="kernel1",
         )
         self.kernel2 = self.add_weight(
             shape=(self.units, dim),
-            initializer=keras.initializers.glorot_uniform(),
+            initializer=keras.initializers.he_uniform(),
             regularizer=keras.regularizers.l2(1e-4),
             name="kernel2",
         )

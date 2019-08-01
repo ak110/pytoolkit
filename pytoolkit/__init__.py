@@ -35,11 +35,13 @@ if True:
     from . import backend
     from . import cache
     from . import callbacks
+    from . import cli
     from . import data
     from . import datasets
     from . import dl
     from . import gbm
     from . import hvd
+    from . import hpo
     from . import image
     from . import layers
     from . import losses

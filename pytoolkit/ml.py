@@ -110,7 +110,7 @@ def extract1000(X, y, num_classes):
     """クラスごとに均等に合計1000件を取得する。
 
     References:
-        <https://github.com/mastnk/train1000>
+        - <https://github.com/mastnk/train1000>
 
     """
     num_data = 1000

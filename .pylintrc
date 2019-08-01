@@ -56,10 +56,11 @@ ignored-modules=__init__
     ,mpi4py
     ,mpi4py.MPI
     ,numpy
-    ,pandas
+    ,optuna
     ,pydensecrf.densecrf
     ,pydensecrf.utils
     ,tensorflow
+    ,xgboost
 ignored-classes=numpy.ndarray
     ,ConfigProto
     ,Empty

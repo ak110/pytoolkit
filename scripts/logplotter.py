@@ -41,50 +41,55 @@ def _main():
         print("")
     else:
         for col, df in df_list:
-            if col == args.item:
-                xlim = (1, max(10, len(df)))
-                yps = np.nanpercentile(df, [90, 99]) * [3, 2]
-                ylim = (
-                    min(0, np.nanmin(df)) - 0.01,
-                    max(1, min(np.nanmax(df), *yps)) + 0.01,
-                )
-                ax = None
-                for c in df.columns:
-                    ax = df[c].plot(
+            if col != args.item:
+                continue
+            xlim = (1, max(10, len(df)))
+            yps = np.nanpercentile(df, [90, 99]) * [3, 2]
+            ylim = (
+                min(0, np.nanmin(df)) - 0.01,
+                max(1, min(np.nanmax(df), *yps)) + 0.01,
+            )
+            ax = None
+            for c in df.columns:
+                ax = (
+                    df[c]
+                    .dropna()
+                    .plot(
                         ax=ax,
                         xlim=xlim,
                         ylim=ylim,
                         marker="." if len(df) <= 1 or df[c].isnull().any() else None,
                     )
-                ax.set_xlabel("Epochs")
-                ax.get_xaxis().set_major_locator(
-                    matplotlib.ticker.MaxNLocator(integer=True)
                 )
-                with io.BytesIO() as f:
-                    ax.get_figure().savefig(
-                        f,
-                        facecolor="w",
-                        edgecolor="w",
-                        orientation="portrait",
-                        transparent=False,
-                        format="PNG",
-                    )
-                    graph_bytes = f.getvalue()
-                plt.close(ax.get_figure())
+            ax.set_xlabel("Epochs")
+            ax.get_xaxis().set_major_locator(
+                matplotlib.ticker.MaxNLocator(integer=True)
+            )
+            with io.BytesIO() as f:
+                ax.get_figure().savefig(
+                    f,
+                    facecolor="w",
+                    edgecolor="w",
+                    orientation="portrait",
+                    transparent=False,
+                    format="PNG",
+                )
+                graph_bytes = f.getvalue()
+            plt.close(ax.get_figure())
 
-                if args.stdout:
-                    data_url = tk.web.data_url(graph_bytes, "image/png")
-                    print(data_url)
-                elif args.save:
-                    save_path = pathlib.Path(f"{args.logfile.stem}.{args.item}.png")
-                    save_path = save_path.resolve()
-                    save_path.write_bytes(graph_bytes)
-                    print(save_path)
-                else:
-                    data_url = tk.web.data_url(graph_bytes, "image/png")
-                    b64data = base64.b64encode(data_url.encode("utf-8")).decode("utf-8")
-                    print(f"\x1b]52;c;{b64data}\n\x1b\\")
-                return
+            if args.stdout:
+                data_url = tk.web.data_url(graph_bytes, "image/png")
+                print(data_url)
+            elif args.save:
+                save_path = pathlib.Path(f"{args.logfile.stem}.{args.item}.png")
+                save_path = save_path.resolve()
+                save_path.write_bytes(graph_bytes)
+                print(save_path)
+            else:
+                data_url = tk.web.data_url(graph_bytes, "image/png")
+                b64data = base64.b64encode(data_url.encode("utf-8")).decode("utf-8")
+                print(f"\x1b]52;c;{b64data}\n\x1b\\")
+            return
         raise RuntimeError(f'Item "{args.item}" is not found in {args.logfile}.')
 
 

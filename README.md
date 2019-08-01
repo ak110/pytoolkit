@@ -29,6 +29,7 @@
 - matplotlib
 - mpi4py
 - onnxmltools
+- optuna
 - pandas
 - pydensecrf
 - tqdm
