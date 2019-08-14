@@ -1,5 +1,4 @@
 """学習時のデータの読み込み周り。"""
-import abc
 import time
 
 import numpy as np
@@ -9,45 +8,116 @@ import pytoolkit as tk
 from . import keras
 
 
-class Dataset(metaclass=abc.ABCMeta):
-    """データを読み込むクラス。"""
+class Dataset:
+    """訓練データなど。
 
-    @abc.abstractmethod
+    Args:
+        data (ndarray or DataFrame): 入力データ
+        labels (ndarray): ラベル
+        groups (ndarray): グループID
+        weights (ndarray): サンプルごとの重み
+        ids (ndarray): ID (入力データにしないIDが別途必要な場合用)
+
+    """
+
+    def __init__(self, data, labels=None, groups=None, weights=None, ids=None):
+        self.data = data
+        self.labels = labels
+        self.groups = groups
+        self.weights = weights
+        self.ids = ids
+
     def __len__(self):
-        """データ件数を返す。"""
-        raise NotImplementedError
+        return len(self.data)
 
-    @abc.abstractmethod
-    def __getitem__(self, index):
-        """指定されたインデックスのデータを返す。
+    def slice(self, rindex):
+        """スライスを作成して返す。
 
         Args:
-            index (int): データのインデックス。
+            rindex (array-like): インデックスの配列
 
         Returns:
-            tuple: Preprocessorに渡されるデータ。通常は入力データとラベルのtuple。
+            Dataset: スライス後のDataset
 
         """
-        raise NotImplementedError
 
-    def __iter__(self):
-        """データを返す。"""
-        for i in range(len(self)):
-            yield self[i]
+        def _slice(d):
+            if d is None:
+                return None
+            if hasattr(d, "iloc"):
+                if np.dtype(rindex) == bool:
+                    return d.loc[rindex]
+                else:
+                    return d.iloc[rindex]
+            return d[rindex]
+
+        return Dataset(
+            data=_slice(self.data),
+            labels=_slice(self.labels),
+            groups=_slice(self.groups),
+            weights=_slice(self.weights),
+            ids=_slice(self.ids),
+        )
+
+    def copy(self):
+        """コピーの作成。
+
+        Returns:
+            Dataset: コピー
+
+        """
+
+        def _copy(d):
+            if d is None:
+                return None
+            return d.copy()
+
+        return Dataset(
+            data=_copy(self.data),
+            labels=_copy(self.labels),
+            groups=_copy(self.groups),
+            weights=_copy(self.weights),
+            ids=_copy(self.ids),
+        )
 
 
-class TupleDataset(Dataset):
-    """タプルを持つデータセット"""
+def concat(dataset1: Dataset, dataset2: Dataset) -> Dataset:
+    """Dataset同士のconcat。"""
+    import pandas as pd
 
-    def __init__(self, *datasets):
-        assert all([len(d) == len(datasets[0]) for d in datasets])
-        self.datasets = datasets
+    def _concat(a, b):
+        if a is None or b is None:
+            return None
+        elif isinstance(a, pd.DataFrame):
+            category_columns = a.select_dtypes("category").columns
+            c = pd.concat([a, b], ignore_index=True, sort=False)
+            if len(category_columns) > 0:
+                # pd.concatでdtype=categoryが外れる列があるので再設定
+                c[category_columns] = c[category_columns].astype("category")
+            return c
+        return np.concatenate([a, b], axis=0)
 
-    def __len__(self):
-        return len(self.datasets[0])
+    return Dataset(
+        data=_concat(dataset1.data, dataset2.data),
+        labels=_concat(dataset1.labels, dataset2.labels),
+        groups=_concat(dataset1.groups, dataset2.groups),
+        weights=_concat(dataset1.weights, dataset2.weights),
+        ids=_concat(dataset1.ids, dataset2.ids),
+    )
 
-    def __getitem__(self, index):
-        return tuple([d[index] for d in self.datasets])
+
+def split(dataset: Dataset, count: int, shuffle=False):
+    """Datasetを指定個数に分割する。"""
+    dataset_size = len(dataset)
+    sub_size = dataset_size // count
+    assert sub_size > 0
+    indices = np.arange(dataset_size)
+    if shuffle:
+        np.random.shuffle(indices)
+    return [
+        dataset.slice(indices[o : o + sub_size])
+        for o in range(0, dataset_size, sub_size)
+    ]
 
 
 class Preprocessor:
@@ -55,7 +125,7 @@ class Preprocessor:
 
     def get_sample(self, dataset, index):
         """datasetから1件のデータを取得。"""
-        return dataset[index]
+        return dataset.data[index], dataset.labels[index]
 
     def collate(self, batch):
         """バッチサイズ分のデータを集約する処理。
@@ -234,37 +304,3 @@ def default_collate(batch):
         y_batch = np.array(y_batch)
 
     return X_batch, y_batch
-
-
-class SubDataset(Dataset):
-    """Datasetの一部に対するDataset。
-
-    Args:
-        dataset (Dataset): 元のDataset。
-        indices (list-like of int): インデックスの配列。
-
-    """
-
-    def __init__(self, dataset: Dataset, indices):
-        self.dataset = dataset
-        self.indices = indices
-
-    def __len__(self):
-        return len(self.indices)
-
-    def __getitem__(self, index):
-        return self.dataset[self.indices[index]]
-
-
-def split(dataset, count, shuffle=False):
-    """Datasetを指定個数に分割する。"""
-    dataset_size = len(dataset)
-    sub_size = dataset_size // count
-    assert sub_size > 0
-    indices = np.arange(dataset_size)
-    if shuffle:
-        np.random.shuffle(indices)
-    return [
-        SubDataset(dataset, indices[o : o + sub_size])
-        for o in range(0, dataset_size, sub_size)
-    ]

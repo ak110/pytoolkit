@@ -65,8 +65,8 @@ def cv(
             continue
 
         with tk.log.trace_scope(f"fold#{fold}"):
-            tr = tk.data.SubDataset(train_dataset, train_indices)
-            vl = tk.data.SubDataset(train_dataset, val_indices)
+            tr = train_dataset.slice(train_indices)
+            vl = train_dataset.slice(val_indices)
             with tk.dl.session(use_horovod=True):
                 train(
                     model=create_model_fn(),
@@ -143,7 +143,7 @@ def predict_cv(
         for fold, (model, (_, val_indices)) in enumerate(zip(models, folds)):
             pred = tk.models.predict(
                 model,
-                tk.data.SubDataset(dataset, val_indices),
+                dataset.slice(val_indices),
                 preprocessor,
                 batch_size,
                 desc=f"{'oofp' if oof else 'predict'}({fold + 1}/{nfold})",

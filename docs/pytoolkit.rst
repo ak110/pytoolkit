@@ -34,6 +34,7 @@ Submodules
    pytoolkit.ndimage
    pytoolkit.od
    pytoolkit.optimizers
+   pytoolkit.pipeline
    pytoolkit.preprocessing
    pytoolkit.table
    pytoolkit.threading

@@ -100,7 +100,7 @@ class LGBModels:
     def cv(
         cls,
         params,
-        train_set,
+        dataset,
         folds,
         early_stopping_rounds=200,
         num_boost_round=9999,
@@ -120,39 +120,56 @@ class LGBModels:
         """
         import lightgbm as lgb
 
+        # 独自拡張: sklearn風の指定
+        if params.get("feature_fraction") == "sqrt":
+            n = len(dataset.data.columns)
+            params["feature_fraction"] = np.sqrt(n) / n
+        elif params.get("feature_fraction") == "log2":
+            n = len(dataset.data.columns)
+            params["feature_fraction"] = np.log2(n) / n
+
+        train_set = lgb.Dataset(
+            dataset.data,
+            dataset.labels,
+            weight=dataset.weights if dataset.weights is not None else None,
+            group=np.bincount(dataset.groups) if dataset.groups is not None else None,
+            free_raw_data=False,
+        )
+
         seeds = [123] if seeds is None else seeds
 
         gbms = np.empty((len(folds), len(seeds)), dtype=object)
         for seed_i, seed in enumerate(seeds):
-            model_extractor = ModelExtractionCallback()
-            eval_hist = lgb.cv(
-                params,
-                train_set,
-                folds=folds,
-                early_stopping_rounds=early_stopping_rounds,
-                num_boost_round=num_boost_round,
-                verbose_eval=verbose_eval,
-                callbacks=(callbacks or []) + [model_extractor],
-                seed=seed,
-                **kwargs,
-            )
-            for k in eval_hist:
-                if k.endswith("-mean"):
-                    tk.log.get(__name__).info(
-                        f"cv {k[:-5]}: {np.float32(eval_hist[k][-1])}"
-                    )
-            gbms[:, seed_i] = model_extractor.raw_boosters
-            # 怪しいけどとりあえずいったん書き換えちゃう
-            for gbm in gbms[:, seed_i]:
-                gbm.best_iteration = model_extractor.best_iteration
+            with tk.log.trace_scope(f"seed averaging({seed_i + 1}/{len(seeds)})"):
+                model_extractor = ModelExtractionCallback()
+                eval_hist = lgb.cv(
+                    params,
+                    train_set,
+                    folds=folds,
+                    early_stopping_rounds=early_stopping_rounds,
+                    num_boost_round=num_boost_round,
+                    verbose_eval=verbose_eval,
+                    callbacks=(callbacks or []) + [model_extractor],
+                    seed=seed,
+                    **kwargs,
+                )
+                for k in eval_hist:
+                    if k.endswith("-mean"):
+                        tk.log.get(__name__).info(
+                            f"cv {k[:-5]}: {np.float32(eval_hist[k][-1])}"
+                        )
+                gbms[:, seed_i] = model_extractor.raw_boosters
+                # 怪しいけどとりあえずいったん書き換えちゃう
+                for gbm in gbms[:, seed_i]:
+                    gbm.best_iteration = model_extractor.best_iteration
 
         return cls(gbms=gbms, folds=folds, seeds=seeds)
 
-    def predict_oof(self, X, reduce=True):
+    def predict_oof(self, dataset, reduce=True):
         """out-of-foldなpredict結果を返す。
 
         Args:
-            X (pd.DataFrame): 入力データ
+            dataset (tk.data.Dataset): 入力データ
             reduce (bool): seed ensemble分を平均して返すならTrue、配列のまま返すならFalse
 
         Returns:
@@ -164,7 +181,7 @@ class LGBModels:
         for gbms_fold, (_, val_indices) in zip(self.gbms, self.folds):
             pred_val = [
                 gbm.predict(
-                    X.iloc[val_indices][gbm.feature_name()],
+                    dataset.data.iloc[val_indices][gbm.feature_name()],
                     num_iteration=gbm.best_iteration,
                 )
                 for gbm in gbms_fold
@@ -176,36 +193,43 @@ class LGBModels:
             oofp_list.append((val_indices, pred_val))
 
         if reduce:
-            oofp_shape = (len(X),) + oofp_list[0][1].shape[1:]
+            oofp_shape = (len(dataset),) + oofp_list[0][1].shape[1:]
             oofp = np.zeros(oofp_shape, dtype=oofp_list[0][1].dtype)
         else:
-            oofp_shape = (len(X), len(self.gbms[0])) + oofp_list[0][1][0].shape[1:]
+            oofp_shape = (len(dataset), len(self.gbms[0])) + oofp_list[0][1][0].shape[
+                1:
+            ]
             oofp = np.zeros(oofp_shape, dtype=oofp_list[0][1][0].dtype)
         for val_indices, pred_val in oofp_list:
             oofp[val_indices] = pred_val
 
         return oofp
 
-    def predict(self, X):
+    def predict(self, dataset):
         """予測結果をリストで返す。
 
         Args:
-            X (pd.DataFrame): 入力データ
+            dataset (tk.data.Dataset): 入力データ
 
         Returns:
-            list: len(self.folds)個の予測結果
+            np.ndarray: len(self.folds)個の予測結果
 
         """
-        return [
-            np.mean(
-                [
-                    gbm.predict(X[gbm.feature_name()], num_iteration=gbm.best_iteration)
-                    for gbm in gbms_fold
-                ],
-                axis=0,
-            )
-            for gbms_fold in self.gbms
-        ]
+        return np.array(
+            [
+                np.mean(
+                    [
+                        gbm.predict(
+                            dataset.data[gbm.feature_name()],
+                            num_iteration=gbm.best_iteration,
+                        )
+                        for gbm in gbms_fold
+                    ],
+                    axis=0,
+                )
+                for gbms_fold in self.gbms
+            ]
+        )
 
     def feature_importance(self, importance_type="gain"):
         """Feature ImportanceをDataFrameで返す。"""
@@ -264,7 +288,7 @@ class CBModels:
         return cls(gbms=gbms, folds=folds)
 
     @classmethod
-    def cv(cls, params, train_pool, *, folds, **kwargs):
+    def cv(cls, params, dataset, *, folds, **kwargs):
         """CatBoostでCV。
 
         Returns:
@@ -272,6 +296,14 @@ class CBModels:
 
         """
         import catboost
+
+        train_pool = catboost.Pool(
+            data=dataset.data,
+            label=dataset.labels,
+            group_id=dataset.groups,
+            feature_names=dataset.data.columns.values.tolist(),
+            cat_features=dataset.data.select_dtypes("object").columns.values,
+        )
 
         gbms, score_list = [], []
         for fold, (train_indices, val_indices) in enumerate(folds):
@@ -293,11 +325,11 @@ class CBModels:
 
         return cls(gbms=gbms, folds=folds, train_pool=train_pool)
 
-    def predict_oof(self, X):
+    def predict_oof(self, dataset):
         """out-of-foldなpredict結果を返す。
 
         Args:
-            X (pd.DataFrame): 入力データ
+            dataset (tk.data.Dataset): 入力データ
 
         Returns:
             np.ndarray: 予測結果
@@ -306,27 +338,27 @@ class CBModels:
         assert self.folds is not None
         oofp_list = []
         for gbm, (_, val_indices) in zip(self.gbms, self.folds):
-            pred_val = gbm.predict(X.iloc[val_indices])
+            pred_val = gbm.predict(dataset.data.iloc[val_indices])
             oofp_list.append((val_indices, pred_val))
 
-        oofp_shape = (len(X),) + oofp_list[0][1].shape[1:]
+        oofp_shape = (len(dataset),) + oofp_list[0][1].shape[1:]
         oofp = np.zeros(oofp_shape, dtype=oofp_list[0][1].dtype)
         for val_indices, pred_val in oofp_list:
             oofp[val_indices] = pred_val
 
         return oofp
 
-    def predict(self, X):
+    def predict(self, dataset):
         """予測結果をリストで返す。
 
         Args:
-            X (pd.DataFrame): 入力データ
+            dataset (tk.data.Dataset): 入力データ
 
         Returns:
-            list: len(self.folds)個の予測結果
+            np.ndarray: len(self.folds)個の予測結果
 
         """
-        return [gbm.predict(X) for gbm in self.gbms]
+        return np.array([gbm.predict(dataset.data) for gbm in self.gbms])
 
     def feature_importance(self):
         """Feature ImportanceをDataFrameで返す。"""
@@ -374,7 +406,7 @@ class XGBModels:
     def cv(
         cls,
         params,
-        train_set,
+        dataset,
         early_stopping_rounds=200,
         num_boost_round=9999,
         verbose_eval=100,
@@ -390,6 +422,13 @@ class XGBModels:
 
         """
         import xgboost as xgb
+
+        train_set = xgb.DMatrix(
+            data=dataset.data,
+            label=dataset.labels,
+            weight=dataset.weights,
+            feature_names=dataset.data.columns.values,
+        )
 
         gbms = []
 
@@ -413,11 +452,11 @@ class XGBModels:
 
         return cls(gbms=gbms, folds=folds)
 
-    def predict_oof(self, X):
+    def predict_oof(self, dataset):
         """out-of-foldなpredict結果を返す。
 
         Args:
-            X (pd.DataFrame): 入力データ
+            dataset (tk.data.Dataset): 入力データ
 
         Returns:
             np.ndarray: 予測結果
@@ -428,31 +467,34 @@ class XGBModels:
 
         oofp_list = []
         for gbm, (_, val_indices) in zip(self.gbms, self.folds):
-            data = xgb.DMatrix(data=X.iloc[val_indices], feature_names=X.columns.values)
+            data = xgb.DMatrix(
+                data=dataset.data.iloc[val_indices],
+                feature_names=dataset.data.columns.values,
+            )
             pred_val = gbm.predict(data)
             oofp_list.append((val_indices, pred_val))
 
-        oofp_shape = (len(X),) + oofp_list[0][1].shape[1:]
+        oofp_shape = (len(dataset),) + oofp_list[0][1].shape[1:]
         oofp = np.zeros(oofp_shape, dtype=oofp_list[0][1].dtype)
         for val_indices, pred_val in oofp_list:
             oofp[val_indices] = pred_val
 
         return oofp
 
-    def predict(self, X):
+    def predict(self, dataset):
         """予測結果をリストで返す。
 
         Args:
-            X (pd.DataFrame): 入力データ
+            dataset (tk.data.Dataset): 入力データ
 
         Returns:
-            list: len(self.folds)個の予測結果
+            np.ndarray: len(self.folds)個の予測結果
 
         """
         import xgboost as xgb
 
-        data = xgb.DMatrix(data=X, feature_names=X.columns.values)
-        return [gbm.predict(data) for gbm in self.gbms]
+        data = xgb.DMatrix(data=dataset.data, feature_names=dataset.data.columns.values)
+        return np.array([gbm.predict(data) for gbm in self.gbms])
 
     def feature_importance(self, importance_type="gain"):
         """Feature ImportanceをDataFrameで返す。"""

@@ -186,7 +186,7 @@ class TargetEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
 class TargetOrderEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
     """foldを切らないTarget Encoding。"""
 
-    def __init__(self, cols=None, return_df=True, min_samples_leaf=3):
+    def __init__(self, cols=None, return_df=True, min_samples_leaf=1):
         super().__init__()
         self.cols = cols
         self.return_df = return_df
@@ -206,7 +206,10 @@ class TargetOrderEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMix
 
     def _target(self, Xy, c):
         g = Xy.groupby(c)["__target__"]
-        s = g.mean()[g.count() > self.min_samples_leaf].argsort() + 1
+        s = g.mean()
+        if self.min_samples_leaf > 1:
+            s = s[g.count() >= self.min_samples_leaf]
+        s = s.argsort() + 1
         return s.to_dict()
 
     def transform(self, X, y=None):

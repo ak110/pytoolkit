@@ -39,9 +39,11 @@ def dump(value, filename, compress=0, protocol=None, cache_size=None):
     )
 
 
-def load(filename, mmap_mode=None):
+def load(filename, mmap_mode=None, skip_not_exist=False):
     """joblib.loadほぼそのまま。"""
     filename = pathlib.Path(filename)  # 一応dumpに合わせて。
+    if skip_not_exist and not filename.exists():
+        return None
     return joblib.load(filename, mmap_mode=mmap_mode)
 
 

@@ -28,9 +28,9 @@ def _main():
 
     X = np.array([data_dir / "9ab919332a1dceff9a252b43c0fb34a0_m.jpg"] * _BATCH_SIZE)
     y = X
-    dataset = MyDataset(X, y, None, data_augmentation=True)
+    dataset = tk.data.Dataset(X, y)
     data_loader = tk.data.DataLoader(
-        dataset, _BATCH_SIZE, shuffle=True, parallel=not args.profile
+        dataset, MyPreprocessor(), _BATCH_SIZE, shuffle=True, parallel=not args.profile
     )
 
     # 適当にループして速度を見る
@@ -64,13 +64,10 @@ def _run(data_loader, iterations):
                 break
 
 
-class MyDataset(tk.data.Dataset):
-    """Dataset。"""
+class MyPreprocessor(tk.data.Preprocessor):
+    """Preprocessor。"""
 
-    def __init__(self, X, y, num_classes, data_augmentation=False):
-        self.X = X
-        self.y = y
-        self.num_classes = num_classes
+    def __init__(self, data_augmentation=False):
         if data_augmentation:
             self.aug = tk.image.Compose(
                 [
@@ -82,12 +79,9 @@ class MyDataset(tk.data.Dataset):
         else:
             self.aug = tk.image.Compose([])
 
-    def __len__(self):
-        return len(self.X)
-
-    def __getitem__(self, index):
-        X = tk.ndimage.load(self.X[index])
-        y = tk.ndimage.load(self.y[index])
+    def get_sample(self, dataset, index):
+        X = tk.ndimage.load(dataset.data[index])
+        y = tk.ndimage.load(dataset.labels[index])
         a = self.aug(image=X, mask=y, rand=np.random.RandomState(index))
         X = a["image"]
         y = a["mask"]

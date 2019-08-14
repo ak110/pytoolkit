@@ -12,7 +12,7 @@ def test_xor(tmpdir):
     models_dir = pathlib.Path(str(tmpdir))
     X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]], dtype=np.float32)
     y = np.array([0, 1, 1, 0], dtype=np.int32)
-    train_dataset = tk.data.TupleDataset(X.repeat(4096, axis=0), y.repeat(4096, axis=0))
+    train_dataset = tk.data.Dataset(X.repeat(4096, axis=0), y.repeat(4096, axis=0))
 
     inputs = x = tk.keras.layers.Input(shape=(2,))
     x = tk.keras.layers.Dense(16, use_bias=False)(x)
@@ -40,7 +40,7 @@ def test_xor(tmpdir):
         ],
     )
 
-    proba = tk.models.predict(model, tk.data.TupleDataset(X, y))
+    proba = tk.models.predict(model, tk.data.Dataset(X, y))
     tk.ml.print_classification_metrics(y, proba)
 
     y_pred = np.squeeze((proba > 0.5).astype(np.int32), axis=-1)

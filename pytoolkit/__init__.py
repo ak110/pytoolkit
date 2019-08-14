@@ -40,8 +40,8 @@ if True:
     from . import datasets
     from . import dl
     from . import gbm
-    from . import hvd
     from . import hpo
+    from . import hvd
     from . import image
     from . import layers
     from . import losses
@@ -52,6 +52,7 @@ if True:
     from . import ndimage
     from . import od
     from . import optimizers
+    from . import pipeline
     from . import preprocessing
     from . import table
     from . import threading
