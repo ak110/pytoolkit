@@ -30,6 +30,12 @@ class Dataset:
     def __len__(self):
         return len(self.data)
 
+    def get_sample(self, index):
+        """dataとlabelを返すだけの糖衣構文。"""
+        if self.labels is None:
+            return self.data[index], None
+        return self.data[index], self.labels[index]
+
     def slice(self, rindex):
         """スライスを作成して返す。
 
@@ -40,12 +46,13 @@ class Dataset:
             Dataset: スライス後のDataset
 
         """
+        rindex = np.array(rindex)
 
         def _slice(d):
             if d is None:
                 return None
             if hasattr(d, "iloc"):
-                if np.dtype(rindex) == bool:
+                if rindex.dtype == bool:
                     return d.loc[rindex]
                 else:
                     return d.iloc[rindex]

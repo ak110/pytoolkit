@@ -20,6 +20,47 @@ class NullTransformer(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
         return X
 
 
+class DataFrameToNDArray(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
+    """DataFrameをndarrayに変換するだけのTransformer。"""
+
+    def fit(self, X, y=None):
+        del X, y
+        return self
+
+    def transform(self, X, y=None):
+        del y
+        return X.values
+
+
+class ResidualTransformer(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
+    """TransformedTargetRegressorなどと組み合わせて残差を学習するようにするためのTransformer。"""
+
+    def __init__(self, pred_train, pred_test):
+        assert len(pred_train) != len(pred_test)  # train/testが同一件数の場合は未実装
+        self.pred_train = pred_train
+        self.pred_test = pred_test
+
+    def fit(self, X, y=None):
+        del X, y
+        return self
+
+    def transform(self, X, y=None):
+        del y
+        return X - self._get_base(X)
+
+    def inverse_transform(self, X, y=None):
+        del y
+        return X + self._get_base(X)
+
+    def _get_base(self, X):
+        if len(X) == len(self.pred_train):
+            return self.pred_train
+        elif len(X) == len(self.pred_test):
+            return self.pred_test
+        else:
+            raise ValueError()
+
+
 class Normalizer(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
     """列ごとに値の傾向を見てできるだけいい感じにスケーリングなどをする。"""
 

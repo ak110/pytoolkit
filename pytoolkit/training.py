@@ -99,11 +99,11 @@ def predict_cv(
     """CVで作ったモデルで予測。
 
     Args:
-        nfold (int): CVのfold数 (models未指定時必須)
+        nfold (int): CVのfold数 (models, folds未指定時必須)
         dataset (tk.data.Dataset): データ (必須)
         preprocessor (tk.data.Preprocessor): 前処理
         batch_size (int): バッチサイズ
-        load_model_fn (callable): モデルを読み込む関数 (models未指定時必須)
+        load_model_fn (callable): モデルを読み込む関数
         models (list of keras.models.Model): 各foldのモデル
         models_dir (PathLike object): モデルの保存先パス (models未指定時必須)
         model_name_format (str): モデルのファイル名のフォーマット。{fold}のところに数字が入る。
@@ -123,7 +123,7 @@ def predict_cv(
         nfold = len(models)
     if oof:
         assert folds is not None
-        assert nfold == len(folds)
+        nfold = len(folds)
     else:
         assert folds is None
         folds = [(range(0), range(len(dataset))) for _ in range(nfold)]

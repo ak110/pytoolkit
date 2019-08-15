@@ -775,7 +775,10 @@ def mixup(sample1, sample2, rand=None, mode="beta"):
 
 def mix_data(sample1, sample2, r):
     """mixup用に入力や出力を混ぜる処理。rはsample1側に掛ける率。"""
-    if isinstance(sample1, tuple):
+    if sample1 is None:
+        assert sample2 is None
+        return None
+    elif isinstance(sample1, tuple):
         assert isinstance(sample2, tuple)
         assert len(sample1) == len(sample2)
         return tuple(mix_data(s1, s2, r) for s1, s2 in zip(sample1, sample2))
