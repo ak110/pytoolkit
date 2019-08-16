@@ -132,7 +132,7 @@ class Preprocessor:
 
     def get_sample(self, dataset, index):
         """datasetから1件のデータを取得。"""
-        return dataset.data[index], dataset.labels[index]
+        return dataset.get_sample(index)
 
     def collate(self, batch):
         """バッチサイズ分のデータを集約する処理。

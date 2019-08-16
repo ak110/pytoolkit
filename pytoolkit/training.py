@@ -22,7 +22,10 @@ def check(model: keras.models.Model, plot_path=None):
     tk.models.summary(model)
     # グラフを出力
     if plot_path is not None:
-        tk.models.plot(model, plot_path)
+        try:
+            tk.models.plot(model, plot_path)
+        except ValueError:
+            pass  # "Cannot embed the 'svg' image format" (tf >= 1.14)
 
 
 @tk_log.trace()

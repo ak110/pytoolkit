@@ -11,8 +11,8 @@ if True:
     sys.path.append(str(pathlib.Path(__file__).parent.parent))
     import pytoolkit as tk
 
-_BATCH_SIZE = 16
-_IMAGE_SIZE = (1024, 1024)
+batch_size = 16
+image_size = (1024, 1024)
 
 
 def _main():
@@ -26,11 +26,11 @@ def _main():
     save_dir = base_dir / "___check" / "bench"
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    X = np.array([data_dir / "9ab919332a1dceff9a252b43c0fb34a0_m.jpg"] * _BATCH_SIZE)
+    X = np.array([data_dir / "9ab919332a1dceff9a252b43c0fb34a0_m.jpg"] * batch_size)
     y = X
     dataset = tk.data.Dataset(X, y)
     data_loader = tk.data.DataLoader(
-        dataset, MyPreprocessor(), _BATCH_SIZE, shuffle=True, parallel=not args.profile
+        dataset, MyPreprocessor(), batch_size, shuffle=True, parallel=not args.profile
     )
 
     # 適当にループして速度を見る
@@ -53,11 +53,11 @@ def _main():
 
 def _run(data_loader, iterations):
     """ループして速度を見るための処理。"""
-    with tk.utils.tqdm(total=_BATCH_SIZE * iterations, unit="f") as pbar:
+    with tk.utils.tqdm(total=batch_size * iterations, unit="f") as pbar:
         while True:
             for X_batch, y_batch in data_loader:
-                assert len(X_batch) == _BATCH_SIZE
-                assert len(y_batch) == _BATCH_SIZE
+                assert len(X_batch) == batch_size
+                assert len(y_batch) == batch_size
                 pbar.update(len(X_batch))
             data_loader.on_epoch_end()
             if pbar.n >= pbar.total:
@@ -71,7 +71,7 @@ class MyPreprocessor(tk.data.Preprocessor):
         if data_augmentation:
             self.aug = tk.image.Compose(
                 [
-                    tk.image.RandomTransform(_IMAGE_SIZE[1], _IMAGE_SIZE[0]),
+                    tk.image.RandomTransform(image_size[1], image_size[0]),
                     tk.image.RandomColorAugmentors(),
                     tk.image.RandomErasing(),
                 ]
@@ -80,8 +80,9 @@ class MyPreprocessor(tk.data.Preprocessor):
             self.aug = tk.image.Compose([])
 
     def get_sample(self, dataset, index):
-        X = tk.ndimage.load(dataset.data[index])
-        y = tk.ndimage.load(dataset.labels[index])
+        X, y = dataset.get_sample(index)
+        X = tk.ndimage.load(X)
+        y = tk.ndimage.load(y)
         a = self.aug(image=X, mask=y, rand=np.random.RandomState(index))
         X = a["image"]
         y = a["mask"]

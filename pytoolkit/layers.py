@@ -1,5 +1,4 @@
 """Kerasのカスタムレイヤーなど。"""
-
 import numpy as np
 import tensorflow as tf
 
@@ -10,30 +9,11 @@ from . import K, keras
 
 def get_custom_objects():
     """独自オブジェクトのdictを返す。"""
-    classes = [
-        Preprocess,
-        ConvertColor,
-        RemoveMask,
-        Conv2DEx,
-        Resize2D,
-        Pad2D,
-        PadChannel2D,
-        CoordChannel2D,
-        ChannelPair2D,
-        GroupNormalization,
-        MixFeat,
-        DropActivation,
-        ParallelGridPooling2D,
-        ParallelGridGather,
-        SubpixelConv2D,
-        WSConv2D,
-        OctaveConv2D,
-        BlurPooling2D,
-        ScaleValue,
-        ScaleGradient,
-        ImputeNaN,
-    ]
-    return {c.__name__: c for c in classes}
+    return {
+        name: obj
+        for name, obj in globals().items()
+        if isinstance(obj, type) and issubclass(obj, keras.layers.Layer)
+    }
 
 
 class Preprocess(keras.layers.Layer):

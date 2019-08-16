@@ -41,25 +41,30 @@ class App:
 
         return _decorator
 
-    def command(self):
-        """コマンドの追加用デコレーター"""
+    def command(self, logfile=True):
+        """コマンドの追加用デコレーター。
+
+        Args:
+            logfile (bool): ログファイルを出力するのか否か。
+
+        """
 
         def _decorator(func):
             if func.__name__ in self.commands:
                 raise ValueError(f"Duplicated command: {func.__name__}")
-            _decorated_func = self._decoreate_command(func)
+            _decorated_func = self._decoreate_command(func, logfile)
             self.commands[func.__name__] = _decorated_func
             return _decorated_func
 
         return _decorator
 
-    def _decoreate_command(self, func):
+    def _decoreate_command(self, func, logfile):
         """コマンドに前処理などを付け加える。"""
 
         @functools.wraps(func)
         def _decorated_func(*args, **kwargs):
             # ログ初期化
-            tk.log.init(self.output_dir / f"{func.__name__}.log")
+            tk.log.init(self.output_dir / f"{func.__name__}.log" if logfile else None)
             # 前処理
             for f in self.inits:
                 with tk.log.trace_scope(f.__qualname__):
