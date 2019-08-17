@@ -632,31 +632,10 @@ class BatchNormalization(keras.layers.BatchNormalization):
 
 
 class GroupNormalization(keras.layers.Layer):
-    """Group normalization。
+    """Group Normalization。
 
     Args:
-        epsilon: Small float added to variance to avoid dividing by zero.
-        center: If True, add offset of `beta` to normalized tensor.
-            If False, `beta` is ignored.
-        scale: If True, multiply by `gamma`.
-            If False, `gamma` is not used.
-            When the next layer is linear (also e.g. `nn.relu`),
-            this can be disabled since the scaling
-            will be done by the next layer.
-        beta_initializer: Initializer for the beta weight.
-        gamma_initializer: Initializer for the gamma weight.
-        beta_regularizer: Optional regularizer for the beta weight.
-        gamma_regularizer: Optional regularizer for the gamma weight.
-        beta_constraint: Optional constraint for the beta weight.
-        gamma_constraint: Optional constraint for the gamma weight.
-
-    Input shape:
-        Arbitrary. Use the keyword argument `input_shape`
-        (tuple of integers, does not include the samples axis)
-        when using this layer as the first layer in a model.
-
-    Output shape:
-        Same shape as input.
+        groups: グループ数
 
     References:
         - Group Normalization <https://arxiv.org/abs/1803.08494>
@@ -694,7 +673,8 @@ class GroupNormalization(keras.layers.Layer):
 
     def build(self, input_shape):
         dim = int(input_shape[-1])
-        assert dim is None or dim % self.groups == 0
+        groups = min(dim, self.groups)
+        assert dim is None or dim % groups == 0
         shape = (dim,)
         if self.scale:
             self.gamma = self.add_weight(
@@ -758,6 +738,94 @@ class GroupNormalization(keras.layers.Layer):
     def get_config(self):
         config = {
             "groups": self.groups,
+            "epsilon": self.epsilon,
+            "center": self.center,
+            "scale": self.scale,
+            "beta_initializer": keras.initializers.serialize(self.beta_initializer),
+            "gamma_initializer": keras.initializers.serialize(self.gamma_initializer),
+            "beta_regularizer": keras.regularizers.serialize(self.beta_regularizer),
+            "gamma_regularizer": keras.regularizers.serialize(self.gamma_regularizer),
+            "beta_constraint": keras.constraints.serialize(self.beta_constraint),
+            "gamma_constraint": keras.constraints.serialize(self.gamma_constraint),
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
+class InstanceNormalization(keras.layers.Layer):
+    """Instance Normalization"""
+
+    def __init__(
+        self,
+        epsilon=1e-5,
+        center=True,
+        scale=True,
+        beta_initializer="zeros",
+        gamma_initializer="ones",
+        beta_regularizer=None,
+        gamma_regularizer=None,
+        beta_constraint=None,
+        gamma_constraint=None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.supports_masking = True
+        self.epsilon = epsilon
+        self.center = center
+        self.scale = scale
+        self.beta_initializer = keras.initializers.get(beta_initializer)
+        self.gamma_initializer = keras.initializers.get(gamma_initializer)
+        self.beta_regularizer = keras.regularizers.get(beta_regularizer)
+        self.gamma_regularizer = keras.regularizers.get(gamma_regularizer)
+        self.beta_constraint = keras.constraints.get(beta_constraint)
+        self.gamma_constraint = keras.constraints.get(gamma_constraint)
+        self.beta = None
+        self.gamma = None
+
+    def build(self, input_shape):
+        affine_shape = (input_shape[-1],)
+        if self.scale:
+            self.gamma = self.add_weight(
+                shape=affine_shape,
+                name="gamma",
+                initializer=self.gamma_initializer,
+                regularizer=self.gamma_regularizer,
+                constraint=self.gamma_constraint,
+            )
+        else:
+            self.gamma = None
+        if self.center:
+            self.beta = self.add_weight(
+                shape=affine_shape,
+                name="beta",
+                initializer=self.beta_initializer,
+                regularizer=self.beta_regularizer,
+                constraint=self.beta_constraint,
+            )
+        else:
+            self.beta = None
+        super().build(input_shape)
+
+    def call(self, inputs, **kwargs):
+        del kwargs
+        input_shape = K.int_shape(inputs)
+
+        reduction_axes = list(range(1, len(input_shape) - 1))
+        mean = K.mean(inputs, reduction_axes, keepdims=True)
+        std = K.std(inputs, reduction_axes, keepdims=True)
+        outputs = (inputs - mean) / (std + self.epsilon)
+
+        broadcast_shape = [1] * len(input_shape)
+        broadcast_shape[-1] = input_shape[-1]
+        if self.scale:
+            outputs = outputs * K.reshape(self.gamma, broadcast_shape)
+        if self.center:
+            outputs = outputs + K.reshape(self.beta, broadcast_shape)
+
+        return outputs
+
+    def get_config(self):
+        config = {
             "epsilon": self.epsilon,
             "center": self.center,
             "scale": self.scale,
@@ -1238,3 +1306,77 @@ class ImputeNaN(keras.layers.Layer):
         config = {"units": self.units}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
+
+
+class SoftGate(keras.layers.Layer):
+    """LIP用の層。sigmoidして定数倍するだけ。"""
+
+    def __init__(self, coeff=12.0, **kwargs):
+        super().__init__(**kwargs)
+        self.coeff = coeff
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
+
+    def call(self, inputs, **kwargs):
+        del kwargs
+        return K.sigmoid(inputs) * self.coeff
+
+    def get_config(self):
+        config = {"coeff": self.coeff}
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
+class LIP2D(keras.layers.Layer):
+    """LIP <https://arxiv.org/abs/1908.04156>"""
+
+    def __init__(self, pool_size=3, strides=2, padding="same", **kargs):
+        super().__init__(**kargs)
+        self.pool_size = tk.utils.normalize_tuple(pool_size, 2)
+        self.strides = tk.utils.normalize_tuple(strides, 2)
+        self.padding = padding
+
+    def compute_output_shape(self, input_shape):
+        return keras.layers.AveragePooling2D(
+            pool_size=self.pool_size, strides=self.strides, padding=self.padding
+        ).compute_output_shape(input_shape[0])
+
+    def call(self, inputs, **kwargs):
+        del kwargs
+        x, logit = inputs
+
+        weights = K.exp(logit)
+        x = x * weights
+        x = K.pool2d(
+            x,
+            self.pool_size,
+            self.strides,
+            self.padding,
+            "channels_last",
+            pool_mode="avg",
+        )
+        weights = K.pool2d(
+            weights,
+            self.pool_size,
+            self.strides,
+            self.padding,
+            "channels_last",
+            pool_mode="avg",
+        )
+        outputs = x / weights
+
+        return outputs
+
+    def get_config(self):
+        config = {
+            "pool_size": self.pool_size,
+            "strides": self.strides,
+            "padding": self.padding,
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
+class BottleneckLIP2D(keras.models.Model):
+    """LIP <https://arxiv.org/abs/1908.04156>"""
