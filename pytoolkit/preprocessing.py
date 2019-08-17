@@ -7,6 +7,17 @@ import sklearn.base
 import sklearn.pipeline
 import sklearn.preprocessing
 
+import pytoolkit as tk
+
+from . import log as tk_log
+
+
+def encode_binary(s, true_value, false_value):
+    """列の2値化。"""
+    s2 = s.map({true_value: True, false_value: False})
+    assert s2.notnull().all(), f"Convert error: {s[s2.isnull()].value_counts()}"
+    return s2.astype(bool)
+
 
 class NullTransformer(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
     """何もしないTransformer。"""
@@ -59,6 +70,328 @@ class ResidualTransformer(sklearn.base.BaseEstimator, sklearn.base.TransformerMi
             return self.pred_test
         else:
             raise ValueError()
+
+
+class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
+    """特徴を学習器に与えられるように色々いい感じに変換するクラス。
+
+    Args:
+        category (str): カテゴリ変数の処理方法
+            - "category": Ordinalエンコードしてcategory型にする (LightGBMとか用)
+            - "ordinal": Ordinalエンコードしてobject型にする (XGBoost/CatBoostとか用)
+            - "onehot": One-hotエンコードしてbool型にする (NNとか用)
+        binary_fraction (float): 0-1 or None
+        iszero_fraction (float): 0-1 or None
+        isnull_fraction (float): 0-1 or None
+        ordinal_encoder (sklearn.base.BaseEstimator): OrdinalEncoderのインスタンス or None
+        count_encoder (sklearn.base.BaseEstimator): CountEncoderのインスタンス or None
+        target_encoder (sklearn.base.BaseEstimator): TargetEncoderのインスタンス or None
+        ignore_cols (array-like): 無視する列名
+
+    """
+
+    def __init__(
+        self,
+        category="category",
+        binary_fraction=0.01,
+        iszero_fraction=0.01,
+        isnull_fraction=0.01,
+        rare_category_fraction=0.01,
+        ordinal_encoder="default",
+        onehot_encoder="default",
+        count_encoder="default",
+        target_encoder="default",
+        ignore_cols=None,
+    ):
+        import category_encoders as ce
+        import pandas as pd
+
+        assert category in ("category", "ordinal", "onehot")
+        self.category = category
+        self.binary_fraction = binary_fraction
+        self.iszero_fraction = iszero_fraction
+        self.isnull_fraction = isnull_fraction
+        self.rare_category_fraction = rare_category_fraction
+        self.ordinal_encoder = (
+            OrdinalEncoder() if ordinal_encoder == "default" else ordinal_encoder
+        )
+        self.onehot_encoder = (
+            ce.OneHotEncoder(use_cat_names=True)
+            if onehot_encoder == "default"
+            else onehot_encoder
+        )
+        self.count_encoder = (
+            CountEncoder() if count_encoder == "default" else count_encoder
+        )
+        self.target_encoder = (
+            TargetEncoder() if target_encoder == "default" else target_encoder
+        )
+        self.ignore_cols = ignore_cols or []
+        self.binary_cols_: list = None
+        self.numeric_cols_: list = None
+        self.category_cols_: list = None
+        self.rare_category_cols_: list = None
+        self.iszero_cols_: list = None
+        self.isnull_cols_: list = None
+        self.feature_names_: list = None
+        self.notnull_cols_: pd.Series = None
+
+    def fit(self, X, y):
+        self.fit_transform(X, y)
+        return self
+
+    @tk_log.trace()
+    def fit_transform(self, X, y):
+        # 対象とする列のリストアップ
+        candidate_columns = set(X.columns.values)
+        # ignore_colsを除外
+        candidate_columns -= self.ignore_cols
+        # 値が1種類の列を削除 (Null + 1種類の値だと消えちゃうので注意: 先にisnull列を作っておけばOK)
+        candidate_columns -= set(X.nunique()[lambda s: s <= 1].index)
+
+        # 型で振り分ける
+        cols = tk.table.group_columns(X, sorted(candidate_columns))
+        assert len(cols["unknown"]) == 0, f"Unknown dtypes: {cols['unknown']}"
+
+        # 以下、列ごとの処理
+
+        self.binary_cols_ = [
+            c
+            for c in cols["binary"]
+            if self.binary_fraction <= X[c].mean() <= (1 - self.binary_fraction)
+        ]
+
+        self.numeric_cols_ = cols["numeric"]
+
+        self.category_cols_ = cols["categorical"]
+        if len(self.category_cols_):
+            if self.category in ("category", "ordinal"):
+                self.ordinal_encoder.fit(X[self.category_cols_].astype(object))
+            elif self.category in ("onehot",):
+                self.onehot_encoder.fit(X[self.category_cols_].astype(object))
+
+        self.rare_category_cols_ = [
+            c
+            for c in self.category_cols_
+            if X[c].nunique() >= 3
+            and X[c].value_counts().min() <= len(X) * self.rare_category_fraction
+        ]
+        if len(self.rare_category_cols_):
+            self.target_encoder.fit(X[self.rare_category_cols_], y)
+            self.count_encoder.fit(X[self.rare_category_cols_], y)
+
+        self.iszero_cols_ = [
+            c
+            for c in self.numeric_cols_
+            if self.iszero_fraction <= (X[c] == 0).mean() <= (1 - self.iszero_fraction)
+        ]
+        self.isnull_cols_ = [
+            c
+            for c in self.numeric_cols_ + self.category_cols_
+            if self.isnull_fraction
+            <= X[c].isnull().mean()
+            <= (1 - self.isnull_fraction)
+        ]
+
+        self.feature_names_ = None
+        self.notnull_cols_ = None
+        feats = self.transform(X, y)
+        # 値の重複列の削除
+        self.feature_names_ = feats.T.drop_duplicates().index.values
+        feats = feats[self.feature_names_]
+        # trainにnullが含まれない列を覚えておく (チェック用)
+        self.notnull_cols_ = feats.notnull().all(axis=0)
+
+        return feats
+
+    @tk_log.trace()
+    def transform(self, X, y=None):
+        import pandas as pd
+
+        del y
+
+        feats = pd.DataFrame(index=X.index)
+
+        if len(self.binary_cols_):
+            feats[self.binary_cols_] = X[self.binary_cols_].astype(np.bool)
+
+        if len(self.numeric_cols_):
+            feats[self.numeric_cols_] = X[self.numeric_cols_].astype(np.float32)
+
+        if len(self.category_cols_):
+            if self.category == "category":
+                feats[self.category_cols_] = self.ordinal_encoder.transform(
+                    X[self.category_cols_].astype(object)
+                ).astype("category")
+            elif self.category in "ordinal":
+                feats[self.category_cols_] = (
+                    self.ordinal_encoder.transform(
+                        X[self.category_cols_].astype(object)
+                    )
+                    .astype("object")
+                    .fillna(-1)
+                )
+            elif self.category in ("onehot",):
+                fn = self.onehot_encoder.get_feature_names()
+                feats[fn] = self.onehot_encoder.transform(
+                    X[self.category_cols_].astype(object)
+                )[fn]
+
+        if len(self.rare_category_cols_):
+            feats[
+                [f"{c}_target" for c in self.rare_category_cols_]
+            ] = self.target_encoder.transform(X[self.rare_category_cols_])
+            feats[
+                [f"{c}_count" for c in self.rare_category_cols_]
+            ] = self.count_encoder.transform(X[self.rare_category_cols_])
+
+        if len(self.iszero_cols_):
+            feats[[f"{c}_iszero" for c in self.iszero_cols_]] = (
+                X[self.iszero_cols_] == 0
+            )
+        if len(self.isnull_cols_):
+            feats[[f"{c}_isnull" for c in self.isnull_cols_]] = X[
+                self.isnull_cols_
+            ].isnull()
+
+        # infチェック
+        isinf_cols = np.isinf(feats.astype(np.float32)).any(axis=0)
+        if isinf_cols.any():
+            raise RuntimeError(f"inf: {feats.columns.values[isinf_cols]}")
+
+        # 値の重複列の削除
+        if self.feature_names_ is not None:
+            feats = feats[self.feature_names_]
+        # testにのみnullが含まれないかチェック
+        if self.notnull_cols_ is not None:
+            test_only_null = feats.isnull().any(axis=0) & self.notnull_cols_
+            if test_only_null.any():
+                raise RuntimeError(
+                    f"test only null: {test_only_null[test_only_null].index.values}"
+                )
+
+        return feats
+
+
+class OrdinalEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
+    """Ordinal Encoding。
+
+    Category Encoders <http://contrib.scikit-learn.org/categorical-encoding/> 風のインターフェースにしてみる。
+    (全部は作っていない)
+
+    nanはfit時に存在するならvalue扱いにして、test時にのみ出てきたらerrorにする。
+    fit時に出てこなかったカテゴリもerrorにする。
+
+    """
+
+    def __init__(self, cols=None, return_df=True, output_dtype="category"):
+        super().__init__()
+        self.cols = cols
+        self.return_df = return_df
+        self.output_dtype = output_dtype
+        self.maps_ = None
+
+    def fit(self, X, y=None):
+        del y
+        self.maps_ = {}
+        for c in self.cols or X.columns.values:
+            values = X[c].unique()
+            self.maps_[c] = dict(zip(values, range(len(values))))
+        return self
+
+    def transform(self, X, y=None):
+        del y
+        X = X.copy()
+        for c in self.cols or X.columns.values:
+            s = X[c].map(self.maps_[c])
+            if s.isnull().any():
+                unk = set(X[c].unique()) - set(self.maps_[c])
+                raise ValueError(f"Unknown values in column '{c}': {unk}")
+            X[c] = s.astype(self.output_dtype)
+        return X if self.return_df else X.values
+
+
+class CountEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
+    """Count Encoding。
+
+    Category Encoders <http://contrib.scikit-learn.org/categorical-encoding/> 風のインターフェースにしてみる。
+    (全部は作っていない)
+
+    """
+
+    def __init__(self, cols=None, return_df=True, handle_missing="return_nan"):
+        assert handle_missing in ("error", "value", "return_nan")
+        super().__init__()
+        self.cols = cols
+        self.return_df = return_df
+        self.handle_missing = handle_missing
+        self.maps_ = None
+
+    def fit(self, X, y=None):
+        del y
+        self.maps_ = {}
+        for c in self.cols or X.columns.values:
+            self.maps_[c] = X[c].value_counts(dropna=False).astype(np.float32).to_dict()
+            if np.nan in self.maps_[c]:
+                if self.handle_missing == "error":
+                    raise ValueError(f"Column '{c}' has NaN!")
+                if self.handle_missing == "return_nan":
+                    self.maps_[c][np.nan] = np.nan
+        return self
+
+    def transform(self, X, y=None):
+        del y
+        X = X.copy()
+        for c in self.cols or X.columns.values:
+            X[c] = X[c].map(self.maps_[c]).astype(np.float32)
+        return X if self.return_df else X.values
+
+
+class TargetEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
+    """Target Encoding。
+
+    foldを切った方が少し安全という話はあるが、
+    trainとtestで傾向が変わりかねなくてちょっと嫌なのでfold切らないものを自作した。
+
+    お気持ちレベルだけどtargetそのままじゃなくrank化するようにしてみた(order=True)り、
+    min_samples_leaf未満のカテゴリはnp.nanになるようにしたり。
+
+    """
+
+    def __init__(self, cols=None, return_df=True, min_samples_leaf=1, order=True):
+        super().__init__()
+        self.cols = cols
+        self.return_df = return_df
+        self.min_samples_leaf = min_samples_leaf
+        self.order = order
+        self.maps_ = None
+
+    def fit(self, X, y):
+        assert y is not None
+
+        cols = self.cols or X.columns.values.tolist()
+        assert "__target__" not in cols  # 手抜き
+        Xy = X.copy()
+        Xy["__target__"] = y
+
+        self.maps_ = {c: self._target(Xy, c) for c in cols}
+        return self
+
+    def _target(self, Xy, c):
+        g = Xy.groupby(c)["__target__"]
+        s = g.mean()
+        if self.min_samples_leaf > 1:
+            s = s[g.count() >= self.min_samples_leaf]
+        if self.order:
+            s = s.argsort() + 1
+        return s.to_dict()
+
+    def transform(self, X, y=None):
+        del y
+        X = X.copy()
+        for c in self.cols or X.columns.values:
+            X[c] = X[c].map(self.maps_[c]).astype(np.float32)
+        return X if self.return_df else X.values
 
 
 class Normalizer(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
@@ -138,172 +471,6 @@ class Normalizer(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
         if self.clip_range is not None:
             s = np.clip(s, *self.clip_range)
         return s
-
-
-class CountEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
-    """Count Encoding。
-
-    Category Encoders <http://contrib.scikit-learn.org/categorical-encoding/> 風のインターフェースにしてみる。
-    (全部は作っていない)
-
-    """
-
-    def __init__(self, cols=None, return_df=True, handle_unknown="return_nan"):
-        assert handle_unknown in ("error", "value", "return_nan")
-        super().__init__()
-        self.cols = cols
-        self.return_df = return_df
-        self.handle_unknown = handle_unknown
-        self.maps_ = None
-
-    def fit(self, X, y=None):
-        del y
-        self.maps_ = {}
-        for c in self.cols or X.columns.values:
-            self.maps_[c] = X[c].value_counts(dropna=False).astype(np.float32).to_dict()
-            if np.nan in self.maps_[c]:
-                if self.handle_unknown == "error":
-                    raise ValueError(f"Column '{c}' has NaN!")
-                if self.handle_unknown == "return_nan":
-                    self.maps_[c][np.nan] = np.nan
-        return self
-
-    def transform(self, X, y=None):
-        del y
-        X = X.copy()
-        cols = self.cols or X.columns.values
-        for c in cols:
-            X[c] = X[c].map(self.maps_[c]).astype(np.float32)
-        return X if self.return_df else X.values
-
-
-class TargetEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
-    """Target Encoding。"""
-
-    def __init__(self, cols=None, return_df=True, *, folds):
-        super().__init__()
-        self.cols = cols
-        self.return_df = return_df
-        self.folds = folds
-        self.train_df_ = None
-        self.train_maps_ = None
-        self.test_maps_ = None
-
-    def fit(self, X, y):
-        assert y is not None
-        self.train_df_ = X
-        cols = self.cols or X.columns.values.tolist()
-        # train用のencodingを作る
-        assert "__target__" not in cols  # 手抜き
-        Xy = X.copy()
-        Xy["__target__"] = y
-        self.train_maps_ = {c: np.repeat(None, len(self.folds)) for c in cols}
-        for fold, (train_indices, _) in enumerate(self.folds):
-            Xy_t = Xy.iloc[train_indices]
-            for c in cols:
-                d = Xy_t.groupby(c)["__target__"].mean().to_dict()
-                self.train_maps_[c][fold] = d
-        # test用のencodingを作る
-        self.test_maps_ = {c: Xy.groupby(c)["__target__"].mean() for c in cols}
-        return self
-
-    def transform(self, X, y=None):
-        del y
-        X = X.copy()
-        cols = self.cols or X.columns.values
-        if X.equals(self.train_df_):
-            for c in cols:
-                for fold, (_, val_indices) in enumerate(self.folds):
-                    X.loc[val_indices, c] = X.loc[val_indices, c].map(
-                        self.train_maps_[c][fold]
-                    )
-                X[c] = X[c].astype(np.float32)
-        else:
-            for c in cols:
-                X[c] = X[c].map(self.test_maps_[c]).astype(np.float32)
-        return X if self.return_df else X.values
-
-
-class TargetOrderEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
-    """foldを切らないTarget Encoding。"""
-
-    def __init__(self, cols=None, return_df=True, min_samples_leaf=1):
-        super().__init__()
-        self.cols = cols
-        self.return_df = return_df
-        self.min_samples_leaf = min_samples_leaf
-        self.maps_ = None
-
-    def fit(self, X, y):
-        assert y is not None
-
-        cols = self.cols or X.columns.values.tolist()
-        assert "__target__" not in cols  # 手抜き
-        Xy = X.copy()
-        Xy["__target__"] = y
-
-        self.maps_ = {c: self._target(Xy, c) for c in cols}
-        return self
-
-    def _target(self, Xy, c):
-        g = Xy.groupby(c)["__target__"]
-        s = g.mean()
-        if self.min_samples_leaf > 1:
-            s = s[g.count() >= self.min_samples_leaf]
-        s = s.argsort() + 1
-        return s.to_dict()
-
-    def transform(self, X, y=None):
-        del y
-        X = X.copy()
-        cols = self.cols or X.columns.values
-        for c in cols:
-            X[c] = X[c].map(self.maps_[c]).astype(np.float32)
-        return X if self.return_df else X.values
-
-
-def encode_binary(s, true_value, false_value):
-    """列の2値化。"""
-    s2 = s.map({true_value: True, false_value: False})
-    assert s2.notnull().all(), f"Convert error: {s[s2.isnull()].value_counts()}"
-    return s2.astype(bool)
-
-
-def encode_target(s, s_train, y_train, min_samples_leaf=20, smoothing=10.0):
-    """Target Encoding。"""
-    assert min_samples_leaf >= 2
-    import pandas as pd
-
-    data = np.repeat(np.nan, len(s))
-    unique_values = s_train.unique()
-    y_train = y_train.astype(np.float32)
-    prior = y_train.mean()
-    for v in unique_values:
-        m = s.isnull() if pd.isnull(v) else (s == v)
-        tm = s_train.isnull() if pd.isnull(v) else (s_train == v)
-        tm_size = tm.sum()
-        if tm_size >= min_samples_leaf:
-            target = y_train[tm].mean()
-            data[m] = smooth(target, prior, tm_size, min_samples_leaf, smoothing)
-
-    data[np.isnan(data)] = prior
-
-    return pd.Series(data=data, index=s.index, dtype=np.float32)
-
-
-def smooth(target, prior, target_samples, min_samples_leaf=1, smoothing=1.0):
-    """Target Encodingのsmoothing。
-
-    Args:
-        target (np.ndarray): Target Encodingの値(カテゴリごとの平均値)
-        prior (np.ndarray): target全体の平均
-        target_samples (int): カテゴリごとの要素の数
-        min_samples_leaf (int): カテゴリごとの要素の数の最小値
-        smoothing (float): smoothingの強さ
-
-    """
-    smoove = 1 / (1 + np.exp(-(target_samples - min_samples_leaf) / smoothing))
-    return target * smoove + prior * (1 - smoove)
 
 
 def _get_cols(cols, X):

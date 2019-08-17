@@ -1,4 +1,6 @@
 """各種ユーティリティ"""
+import pickle
+import functools
 import pathlib
 import os
 import joblib
@@ -24,6 +26,20 @@ def normalize_tuple(value, n):
         value = tuple(value)
         assert len(value) == n
         return value
+
+
+def memoize(func):
+    """単純なメモ化のデコレーター。"""
+    cache = {}
+
+    @functools.wraps(func)
+    def wrapped(*args, **kwargs):
+        key = pickle.dumps((args, kwargs))
+        if key not in cache:
+            cache[key] = func(*args, **kwargs)
+        return cache[key]
+
+    return wrapped
 
 
 def dump(value, filename, compress=0, protocol=None, cache_size=None):

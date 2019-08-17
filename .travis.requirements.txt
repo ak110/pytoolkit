@@ -2,6 +2,7 @@
 Pillow
 better_exceptions
 black
+category_encoders
 diskcache
 flake8
 flake8-docstrings

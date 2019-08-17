@@ -14,6 +14,46 @@ def safe_apply(s, fn):
     return s.apply(lambda x: x if pd.isnull(x) else fn(x))
 
 
+def group_columns(df, cols=None):
+    """列を型ごとにグルーピングして返す。
+
+    Args:
+        df (pd.DataFrame): DataFrame
+        cols (array-like): 対象の列名の配列
+
+    Returns:
+        dict: 種類ごとの列名のlist
+            - "binary": 二値列
+            - "numeric": 数値列
+            - "categorical": カテゴリ列(など)
+            - "unknown": その他
+
+    """
+    import pandas as pd
+
+    binary_cols = []
+    numeric_cols = []
+    categorical_cols = []
+    unknown_cols = []
+    for c in cols or df.columns.values:
+        if pd.api.types.is_bool_dtype(df[c].dtype):
+            binary_cols.append(c)
+        elif pd.api.types.is_numeric_dtype(df[c].dtype):
+            numeric_cols.append(c)
+        elif pd.api.types.is_categorical_dtype(
+            df[c].dtype
+        ) or pd.api.types.is_object_dtype(df[c].dtype):
+            categorical_cols.append(c)
+        else:
+            unknown_cols.append(c)
+    return {
+        "binary": binary_cols,
+        "numeric": numeric_cols,
+        "categorical": categorical_cols,
+        "unknown": unknown_cols,
+    }
+
+
 def analyze(df):
     """中身を適当に分析してDataFrameに詰めて返す。"""
     import pandas as pd
@@ -74,14 +114,14 @@ def permutation_importance(
     """Permutation Importanceを算出して返す。
 
     Args:
-        - score_fn (callable): X, yを受け取りスコアを返す関数。
-        - X (pd.DataFrame): 入力データ
-        - y (np.ndarray): ラベル
-        - greater_is_better (bool): スコアが大きいほど良いならTrue
-        - columns (array-like): 対象の列
-        - n_iter (int): 繰り返し回数
-        - random_state: seed
-        - verbose (bool): プログレスバーを表示するか否か
+        score_fn (callable): X, yを受け取りスコアを返す関数。
+        X (pd.DataFrame): 入力データ
+        y (np.ndarray): ラベル
+        greater_is_better (bool): スコアが大きいほど良いならTrue
+        columns (array-like): 対象の列
+        n_iter (int): 繰り返し回数
+        random_state: seed
+        verbose (bool): プログレスバーを表示するか否か
 
     Returns:
         pd.DataFrame: columnとimportanceの列を持つDataFrame
@@ -116,12 +156,12 @@ def shuffled_score(score_fn, X, c, y, n_iter=5, random_state=None):
     c列をシャッフルしたときのスコアの平均値を返す。
 
     Args:
-        - score_fn (callable): X, yを受け取りスコアを返す関数。
-        - X (pd.DataFrame): 入力データ
-        - c (str): 対象の列
-        - y (np.ndarray): ラベル
-        - n_iter (int): 繰り返し回数
-        - random_state: seed
+        score_fn (callable): X, yを受け取りスコアを返す関数。
+        X (pd.DataFrame): 入力データ
+        c (str): 対象の列
+        y (np.ndarray): ラベル
+        n_iter (int): 繰り返し回数
+        random_state: seed
 
     Returns:
         float: スコア

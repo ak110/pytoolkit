@@ -23,6 +23,7 @@
 ## 使うときに動的にimportしている依存ライブラリ
 
 - better-exceptions
+- category_encoders
 - chainercv
 - diskcache
 - h5py

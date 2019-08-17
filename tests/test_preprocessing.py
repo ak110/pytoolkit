@@ -28,19 +28,19 @@ def test_normalizer():
 
 
 def test_target_encoder():
-    folds = [([0, 1], [2, 3]), ([2, 3], [0, 1])]
     df = pd.DataFrame()
     df["a"] = ["a", "b", "a", "b"]
     df["b"] = [0, 1, 0, 1]
     df["c"] = [0.0, 1.0, 0.0, np.nan]
     df["d"] = [0, 1, 0, 1]
+    df["b"] = df["b"].astype("category")
     y = np.array([1, 3, 5, 7])
 
-    encoder = tk.preprocessing.TargetEncoder(cols=["a", "b", "c"], folds=folds)
+    encoder = tk.preprocessing.TargetEncoder(cols=["a", "b", "c"])
     encoder.fit(df, y)
     df2 = encoder.transform(df)
 
-    assert df2["a"].values == pytest.approx([5, 7, 1, 3])
-    assert df2["b"].values == pytest.approx([5, 7, 1, 3])
-    assert df2["c"].values == pytest.approx([5, np.nan, 1, np.nan], nan_ok=True)
+    assert df2["a"].values == pytest.approx([1.0, 2.0, 1.0, 2.0])
+    assert df2["b"].values == pytest.approx([1.0, 2.0, 1.0, 2.0])
+    assert df2["c"].values == pytest.approx([1.0, 2.0, 1.0, np.nan], nan_ok=True)
     assert df2["d"].values == pytest.approx([0, 1, 0, 1])
