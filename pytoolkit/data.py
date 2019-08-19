@@ -130,11 +130,12 @@ def split(dataset: Dataset, count: int, shuffle=False):
 class Preprocessor:
     """データ変換とかをするクラス。"""
 
-    def get_sample(self, dataset, index):
-        """datasetから1件のデータを取得。"""
+    def get_sample(self, dataset: Dataset, index: int, random: np.random.RandomState):
+        """datasetから1件のデータを取得する処理。"""
+        del random
         return dataset.get_sample(index)
 
-    def collate(self, batch):
+    def collate(self, batch: list) -> tuple:
         """バッチサイズ分のデータを集約する処理。
 
         Args:
@@ -198,6 +199,7 @@ class DataLoader(keras.utils.Sequence):
         self.parallel = parallel
         self.use_horovod = use_horovod
         self.seconds_per_step = 0
+        self.epoch = 1
 
         if self.shuffle:
             # シャッフル時は常に同じバッチサイズを返せるようにする (学習時の安定性のため)
@@ -223,6 +225,7 @@ class DataLoader(keras.utils.Sequence):
                 next(self.index_generator)
                 for _ in range(self.steps_per_epoch * self.batch_size)
             ]
+        self.epoch += 1
 
     def __len__(self):
         """1エポックあたりのミニバッチ数を返す。"""
@@ -270,7 +273,8 @@ class DataLoader(keras.utils.Sequence):
             tuple: 入力データとラベル。
 
         """
-        return self.preprocessor.get_sample(self.dataset, index)
+        random = np.random.RandomState(len(self) * self.epoch + index)
+        return self.preprocessor.get_sample(self.dataset, index, random)
 
     def __iter__(self):
         """データを返す。"""
@@ -284,30 +288,3 @@ def _generate_shuffled_indices(data_count):
     while True:
         np.random.shuffle(indices)
         yield from indices
-
-
-def default_collate(batch):
-    """バッチサイズ分のデータを集約する処理。
-
-    Args:
-        batch (list): Datasetが返したデータをバッチサイズ分集めたもの。
-
-    Returns:
-        tuple: モデルに渡されるデータ。通常は入力データとラベルのtuple。
-
-    """
-    X_batch, y_batch = zip(*batch)
-
-    # multiple input
-    if isinstance(X_batch[0], list):
-        X_batch = [np.array([x[i] for x in X_batch]) for i in range(len(X_batch[0]))]
-    else:
-        X_batch = np.array(X_batch)
-
-    # multiple output
-    if isinstance(y_batch[0], list):
-        y_batch = [np.array([y[i] for y in y_batch]) for i in range(len(y_batch[0]))]
-    else:
-        y_batch = np.array(y_batch)
-
-    return X_batch, y_batch

@@ -252,7 +252,7 @@ def evaluate(
         dataset (tk.data.Dataset): データ
         preprocessor (tk.data.Preprocessor): 前処理
         batch_size (int): バッチサイズ
-        prefix (str): "" or "val_"
+        prefix (str): `""` or `"val_"`
         use_horovod (bool): MPIによる分散処理をするか否か。
 
     Returns:

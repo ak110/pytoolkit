@@ -79,11 +79,13 @@ class MyPreprocessor(tk.data.Preprocessor):
         else:
             self.aug = tk.image.Compose([])
 
-    def get_sample(self, dataset, index):
+    def get_sample(
+        self, dataset: tk.data.Dataset, index: int, random: np.random.RandomState
+    ):
         X, y = dataset.get_sample(index)
         X = tk.ndimage.load(X)
         y = tk.ndimage.load(y)
-        a = self.aug(image=X, mask=y, rand=np.random.RandomState(index))
+        a = self.aug(image=X, mask=y, rand=random)
         X = a["image"]
         y = a["mask"]
         return X, y

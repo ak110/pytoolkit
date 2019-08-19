@@ -47,6 +47,7 @@ max-line-length=256
 
 [TYPECHECK]
 ignored-modules=__init__
+    ,IPython
     ,catboost
     ,chainercv
     ,distutils

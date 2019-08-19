@@ -1,4 +1,5 @@
 """pandasなどなど関連。"""
+import html
 import warnings
 
 import numpy as np
@@ -52,6 +53,206 @@ def group_columns(df, cols=None):
         "categorical": categorical_cols,
         "unknown": unknown_cols,
     }
+
+
+def eda(df_train, df_test):
+    """色々調べて表示する。(jupyter用)"""
+    from IPython.display import display, HTML
+
+    display(HTML(eda_html(df_train, df_test)))
+
+
+def eda_html(df_train, df_test):
+    """色々調べて結果をHTML化して返す。"""
+    result = ""
+
+    train_cols = group_columns(df_train)
+    test_cols = group_columns(df_test)
+
+    def td_count(count, all_count):
+        if count < all_count * 0.01:
+            text = f"<span style='text-decoration: underline;'>{count:d}</span>"
+        else:
+            text = f"{count / all_count:.0%}"
+        return f"<td style='text-align: right;'>{text}</td>"
+
+    def td_value(value):
+        return f"<td style='text-align: right;'>{value:,.1f}</td>"
+
+    binary_cols = np.unique(train_cols["binary"] + test_cols["binary"])
+    if len(binary_cols):
+        result += "<h2>binary</h2>"
+        result += "<table>"
+        result += "<thead>"
+        result += "<tr>"
+        result += "<td></td>"
+        result += "<td colspan=1 style='text-align: left;'>train</td>"
+        result += "<td colspan=1 style='text-align: left;'>test</td>"
+        result += "</tr>"
+        result += "<tr>"
+        result += "<td style='text-align: left;'>列名</td>"
+        result += "<td style='text-align: center;'>True%</td>"
+        result += "<td style='text-align: center;'>True%</td>"
+        result += "</tr>"
+        result += "</thead>"
+        result += "<tbody>"
+        for c in binary_cols:
+            result += "<tr>"
+            result += f"<td style='text-align: left;'>{html.escape(c)}</td>"
+            for df, exists in [
+                (df_train, c in train_cols["binary"]),
+                (df_test, c in test_cols["binary"]),
+            ]:
+                if exists:
+                    result += td_count(df[c].sum(), len(df))
+                else:
+                    result += "<td style='text-align: right;'></td>"
+            result += "</tr>"
+        result += "</tbody>"
+        result += "</table>"
+
+    numeric_cols = np.unique(train_cols["numeric"] + test_cols["numeric"])
+    if len(numeric_cols):
+        result += "<h2>numeric</h2>"
+        result += "<table>"
+        result += "<thead>"
+        result += "<tr>"
+        result += "<td></td>"
+        result += "<td colspan=4 style='text-align: left;'>train</td>"
+        result += "<td colspan=4 style='text-align: left;'>test</td>"
+        result += "</tr>"
+        result += "<tr>"
+        result += "<td style='text-align: left;'>列名</td>"
+        result += "<td style='text-align: center;'>null</td>"
+        result += "<td style='text-align: center;'>nunique</td>"
+        result += "<td style='text-align: center;'>mean</td>"
+        result += "<td style='text-align: center;'>std</td>"
+        result += "<td style='text-align: center;'>null</td>"
+        result += "<td style='text-align: center;'>nunique</td>"
+        result += "<td style='text-align: center;'>mean</td>"
+        result += "<td style='text-align: center;'>std</td>"
+        result += "</tr>"
+        result += "</thead>"
+        result += "<tbody>"
+        for c in numeric_cols:
+            result += "<tr>"
+            result += f"<td style='text-align: left;'>{html.escape(c)}</td>"
+            for df, exists in [
+                (df_train, c in train_cols["numeric"]),
+                (df_test, c in test_cols["numeric"]),
+            ]:
+                if exists:
+                    result += td_count(df[c].isnull().sum(), len(df))
+                    result += td_count(df[c].nunique(), len(df))
+                    result += td_value(df[c].mean())
+                    result += td_value(df[c].std())
+                else:
+                    result += "<td></td><td></td><td></td><td></td>"
+            result += "</tr>"
+        result += "</tbody>"
+        result += "</table>"
+
+    categorical_cols = np.unique(train_cols["categorical"] + test_cols["categorical"])
+    if len(categorical_cols):
+        result += "<h2>categorical</h2>"
+        result += "<table>"
+        result += "<thead>"
+        result += "<tr>"
+        result += "<td style='text-align: left;'>列名</td>"
+        result += "<td style='text-align: left;'>値</td>"
+        result += "</tr>"
+        result += "</thead>"
+        result += "<tbody>"
+        for c in categorical_cols:
+            result += "<tr>"
+            result += f"<td style='text-align: left; vertical-align: top;'>{html.escape(c)}</td>"
+            result += "<td>"
+            result += "<table>"
+            result += "<tbody>"
+            result += "<tr>"
+            if c in train_cols["categorical"]:
+                values1 = df_train[c].value_counts().to_dict()
+                nulls = df_train[c].isnull().sum()
+                if nulls > 0:
+                    values1[""] = nulls
+            else:
+                values1 = {}
+            if c in test_cols["categorical"]:
+                values2 = df_test[c].value_counts().to_dict()
+                nulls = df_test[c].isnull().sum()
+                if nulls > 0:
+                    values2[""] = nulls
+            else:
+                values2 = {}
+            for v in set(list(values1) + list(values2)):
+                result += "<tr>"
+                result += f"<td style='text-align: left;'>{html.escape(str(v))}</td>"
+                result += (
+                    td_count(values1[v], len(df_train)) if v in values1 else "<td></td>"
+                )
+                result += (
+                    td_count(values2[v], len(df_test)) if v in values2 else "<td></td>"
+                )
+                result += "</tr>"
+            result += "</tr>"
+            result += "</tbody>"
+            result += "</table>"
+            result += "</td>"
+            result += "</tr>"
+        result += "</tbody>"
+        result += "</table>"
+
+    unknown_cols = np.unique(train_cols["unknown"] + test_cols["unknown"])
+    if len(unknown_cols):
+        result += "<h2>unknown</h2>"
+        result += "<table>"
+        result += "<thead>"
+        result += "<tr>"
+        result += "<td style='text-align: left;'>列名</td>"
+        result += "<td style='text-align: left;'>値</td>"
+        result += "</tr>"
+        result += "</thead>"
+        result += "<tbody>"
+        for c in unknown_cols:
+            result += "<tr>"
+            result += f"<td style='text-align: left; vertical-align: top;'>{html.escape(c)}</td>"
+            result += "<td>"
+            result += "<table>"
+            result += "<tbody>"
+            result += "<tr>"
+            if c in train_cols["unknown"]:
+                values1 = df_train[c].value_counts().to_dict()
+                nulls = df_train[c].isnull().sum()
+                if nulls > 0:
+                    values1[""] = nulls
+            else:
+                values1 = {}
+            if c in test_cols["unknown"]:
+                values2 = df_test[c].value_counts().to_dict()
+                nulls = df_test[c].isnull().sum()
+                if nulls > 0:
+                    values2[""] = nulls
+            else:
+                values2 = {}
+            for v in set(list(values1) + list(values2)):
+                result += "<tr>"
+                result += f"<td style='text-align: left;'>{html.escape(str(v))}</td>"
+                result += (
+                    td_count(values1[v], len(df_train)) if v in values1 else "<td></td>"
+                )
+                result += (
+                    td_count(values2[v], len(df_test)) if v in values2 else "<td></td>"
+                )
+                result += "</tr>"
+            result += "</tr>"
+            result += "</tbody>"
+            result += "</table>"
+            result += "</td>"
+            result += "</tr>"
+        result += "</tbody>"
+        result += "</table>"
+
+    return result
 
 
 def analyze(df):

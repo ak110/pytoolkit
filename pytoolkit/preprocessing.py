@@ -358,8 +358,9 @@ class TargetEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
 
     """
 
-    def __init__(self, cols=None, return_df=True, min_samples_leaf=1, order=True):
+    def __init__(self, cols=None, return_df=True, min_samples_leaf=3, order=True):
         super().__init__()
+        assert min_samples_leaf >= 1
         self.cols = cols
         self.return_df = return_df
         self.min_samples_leaf = min_samples_leaf

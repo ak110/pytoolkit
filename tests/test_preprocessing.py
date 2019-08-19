@@ -36,7 +36,7 @@ def test_target_encoder():
     df["b"] = df["b"].astype("category")
     y = np.array([1, 3, 5, 7])
 
-    encoder = tk.preprocessing.TargetEncoder(cols=["a", "b", "c"])
+    encoder = tk.preprocessing.TargetEncoder(cols=["a", "b", "c"], min_samples_leaf=1)
     encoder.fit(df, y)
     df2 = encoder.transform(df)
 

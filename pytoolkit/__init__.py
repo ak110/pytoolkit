@@ -39,7 +39,6 @@ if True:
     from . import data
     from . import datasets
     from . import dl
-    from . import gbm
     from . import hpo
     from . import hvd
     from . import image
