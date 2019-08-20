@@ -1,9 +1,11 @@
 """各種ユーティリティ"""
-import pickle
 import functools
-import pathlib
 import os
+import pathlib
+import pickle
+
 import joblib
+import numpy as np
 
 import pytoolkit as tk
 
@@ -93,3 +95,28 @@ def better_exceptions():
         be.hook()
     except BaseException:
         tk.log.get(__name__).warning("better_exceptions error", exc_info=True)
+
+
+def encode_rl_array(masks, desc="encode_rl"):
+    """encode_rlの配列版。"""
+    return [encode_rl(m) for m in tqdm(masks, desc=desc)]
+
+
+def encode_rl(mask):
+    """Kaggleのセグメンテーションで使われるようなランレングスエンコード。
+
+    Args:
+        mask (ndarray): 0 or 1のマスク画像 (shapeは(height, width)または(height, width, 1))
+
+    Returns:
+        str: エンコードされた文字列
+
+    """
+    mask = np.squeeze(mask)
+    assert mask.ndim == 2
+    mask = mask.reshape(mask.shape[0] * mask.shape[1], order="F")
+    mask = np.concatenate([[0], mask, [0]])  # 番兵
+    changes = mask[1:] != mask[:-1]  # 隣と比較
+    rls = np.where(changes)[0] + 1  # 隣と異なる位置のindex
+    rls[1::2] -= rls[::2]  # 開始位置＋サイズ
+    return " ".join(str(x) for x in rls)

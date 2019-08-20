@@ -296,7 +296,7 @@ def fit(
 def predict(
     model: keras.models.Model,
     dataset,
-    preprocessor=None,
+    preprocessor,
     batch_size=32,
     verbose=1,
     use_horovod=False,
@@ -321,32 +321,18 @@ def predict(
         np.ndarray or generator: 予測結果。flow=True時はサンプルごとのgenerator。
 
     """
-    if on_batch_fn is not None and not flow:
-        return np.array(
-            list(
-                predict(
-                    model=model,
-                    dataset=dataset,
-                    preprocessor=preprocessor,
-                    batch_size=batch_size,
-                    verbose=verbose,
-                    use_horovod=use_horovod,
-                    on_batch_fn=on_batch_fn,
-                    flow=True,
-                    desc=desc,
-                )
-            )
-        )
-
+    verbose = verbose if tk.hvd.is_master() else 0
     dataset = tk.hvd.split(dataset) if use_horovod else dataset
     data_loader = tk.data.DataLoader(dataset, preprocessor, batch_size)
     if flow:
         assert not use_horovod, "flow=True and use_horovod=True is not supported."
         return _predict_flow(model, data_loader, verbose, on_batch_fn, desc)
     else:
-        values = model.predict_generator(
-            data_loader, verbose=verbose if tk.hvd.is_master() else 0
-        )
+        if on_batch_fn is not None:
+            values = _predict_flow(model, data_loader, verbose, on_batch_fn, desc)
+            values = np.array(list(values))
+        else:
+            values = model.predict_generator(data_loader, verbose=verbose)
         values = tk.hvd.allgather(values) if use_horovod else values
         return values
 

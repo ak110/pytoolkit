@@ -1,5 +1,8 @@
 """学習時のデータの読み込み周り。"""
+# pylint: disable=unsubscriptable-object
+import dataclasses
 import time
+import typing
 
 import numpy as np
 
@@ -8,24 +11,24 @@ import pytoolkit as tk
 from . import keras
 
 
+@dataclasses.dataclass()
 class Dataset:
     """訓練データなど。
 
     Args:
-        data (ndarray or DataFrame): 入力データ
-        labels (ndarray): ラベル
-        groups (ndarray): グループID
-        weights (ndarray): サンプルごとの重み
-        ids (ndarray): ID (入力データにしないIDが別途必要な場合用)
+        data (np.ndarray or pd.DataFrame or dict): 入力データ
+        labels (np.ndarray): ラベル
+        groups (np.ndarray): グループID
+        weights (np.ndarray): サンプルごとの重み
+        ids (np.ndarray): ID (入力データにしないIDが別途必要な場合用)
 
     """
 
-    def __init__(self, data, labels=None, groups=None, weights=None, ids=None):
-        self.data = data
-        self.labels = labels
-        self.groups = groups
-        self.weights = weights
-        self.ids = ids
+    data: typing.Any
+    labels: np.ndarray = None
+    groups: np.ndarray = None
+    weights: np.ndarray = None
+    ids: np.ndarray = None
 
     def __len__(self):
         return len(self.data)
@@ -47,52 +50,68 @@ class Dataset:
 
         """
         rindex = np.array(rindex)
-
-        def _slice(d):
-            if d is None:
-                return None
-            if hasattr(d, "iloc"):
-                if rindex.dtype == bool:
-                    return d.loc[rindex]
-                else:
-                    return d.iloc[rindex]
-            return d[rindex]
-
-        return Dataset(
-            data=_slice(self.data),
-            labels=_slice(self.labels),
-            groups=_slice(self.groups),
-            weights=_slice(self.weights),
-            ids=_slice(self.ids),
+        return self.__class__(
+            data=self.__class__.slice_field(self.data, rindex),
+            labels=self.__class__.slice_field(self.labels, rindex),
+            groups=self.__class__.slice_field(self.groups, rindex),
+            weights=self.__class__.slice_field(self.weights, rindex),
+            ids=self.__class__.slice_field(self.ids, rindex),
         )
 
     def copy(self):
-        """コピーの作成。
+        """コピーを作成して返す。
 
         Returns:
             Dataset: コピー
 
         """
-
-        def _copy(d):
-            if d is None:
-                return None
-            return d.copy()
-
-        return Dataset(
-            data=_copy(self.data),
-            labels=_copy(self.labels),
-            groups=_copy(self.groups),
-            weights=_copy(self.weights),
-            ids=_copy(self.ids),
+        return self.__class__(
+            data=self.__class__.copy_field(self.data),
+            labels=self.__class__.copy_field(self.labels),
+            groups=self.__class__.copy_field(self.groups),
+            weights=self.__class__.copy_field(self.weights),
+            ids=self.__class__.copy_field(self.ids),
         )
 
+    @classmethod
+    def concat(cls, dataset1, dataset2):
+        """Dataset同士のconcat。"""
+        return cls(
+            data=cls.concat_field(dataset1.data, dataset2.data),
+            labels=cls.concat_field(dataset1.labels, dataset2.labels),
+            groups=cls.concat_field(dataset1.groups, dataset2.groups),
+            weights=cls.concat_field(dataset1.weights, dataset2.weights),
+            ids=cls.concat_field(dataset1.ids, dataset2.ids),
+        )
 
-def concat(dataset1: Dataset, dataset2: Dataset) -> Dataset:
-    """Dataset同士のconcat。"""
-    import pandas as pd
+    @classmethod
+    def slice_field(cls, d, rindex):
+        """値のスライスを作成して返す。"""
+        if d is None:
+            return None
+        if isinstance(d, dict):
+            return {k: cls.slice_field(v, rindex) for k, v in d.items()}
+        elif hasattr(d, "iloc"):
+            if rindex.dtype == bool:
+                return d.loc[rindex]
+            else:
+                return d.iloc[rindex]
+        return d[rindex]
 
-    def _concat(a, b):
+    @classmethod
+    def copy_field(cls, d):
+        """値のコピーを作成して返す。"""
+        if isinstance(d, dict):
+            return {k: cls.copy_field(v) for k, v in d.items()}
+        elif d is None:
+            return None
+        return d.copy()
+
+    @staticmethod
+    def concat_field(a, b):
+        """2個の値のconcat。"""
+        import pandas as pd
+
         if a is None or b is None:
             return None
         elif isinstance(a, pd.DataFrame):
@@ -103,14 +122,6 @@ def concat(dataset1: Dataset, dataset2: Dataset) -> Dataset:
                 c[category_columns] = c[category_columns].astype("category")
             return c
         return np.concatenate([a, b], axis=0)
-
-    return Dataset(
-        data=_concat(dataset1.data, dataset2.data),
-        labels=_concat(dataset1.labels, dataset2.labels),
-        groups=_concat(dataset1.groups, dataset2.groups),
-        weights=_concat(dataset1.weights, dataset2.weights),
-        ids=_concat(dataset1.ids, dataset2.ids),
-    )
 
 
 def split(dataset: Dataset, count: int, shuffle=False):
@@ -185,7 +196,7 @@ class DataLoader(keras.utils.Sequence):
     def __init__(
         self,
         dataset,
-        preprocessor=None,
+        preprocessor,
         batch_size=32,
         shuffle=False,
         parallel=True,
@@ -193,7 +204,7 @@ class DataLoader(keras.utils.Sequence):
     ):
         assert len(dataset) > 0
         self.dataset = dataset
-        self.preprocessor = preprocessor or Preprocessor()
+        self.preprocessor = preprocessor
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.parallel = parallel

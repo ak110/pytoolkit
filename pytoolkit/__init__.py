@@ -31,6 +31,7 @@ if True:
 
     # その他のimport
     from . import log
+    from . import applications
     from . import autoaugment
     from . import backend
     from . import cache

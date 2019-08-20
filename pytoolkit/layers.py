@@ -310,8 +310,10 @@ class Conv2DEx(keras.layers.Layer):
         # exponential moving average:
         # m_new = m_old * 0.99 + x * 0.01
         # m_new - m_old = (x - m_old) * 0.01
-        update1 = tf.assign_add(self.moving_mean, (mean - self.moving_mean) * 0.01)
-        update2 = tf.assign_add(
+        update1 = tf.compat.v1.assign_add(
+            self.moving_mean, (mean - self.moving_mean) * 0.01
+        )
+        update2 = tf.compat.v1.assign_add(
             self.moving_variance, (var - self.moving_variance) * 0.01
         )
         self.add_update([update1, update2], inputs)
@@ -612,8 +614,10 @@ class BatchNormalization(keras.layers.BatchNormalization):
         # m_new = m_old * 0.99 + x * 0.01
         # m_new - m_old = (x - m_old) * 0.01
         decay = 1 - self.momentum
-        update1 = tf.assign_add(self.moving_mean, (mean - self.moving_mean) * decay)
-        update2 = tf.assign_add(
+        update1 = tf.compat.v1.assign_add(
+            self.moving_mean, (mean - self.moving_mean) * decay
+        )
+        update2 = tf.compat.v1.assign_add(
             self.moving_variance, (var - self.moving_variance) * decay
         )
         self.add_update([update1, update2], inputs)
@@ -1010,7 +1014,7 @@ class SubpixelConv2D(keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         del kwargs
-        return tf.depth_to_space(input=inputs, block_size=self.scale)
+        return tf.compat.v1.depth_to_space(input=inputs, block_size=self.scale)
 
     def get_config(self):
         config = {"scale": self.scale}
