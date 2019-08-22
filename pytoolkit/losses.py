@@ -34,10 +34,20 @@ def binary_focal_loss(y_true, y_pred, gamma=2.0, from_logits=False, alpha=None):
     return K.sum(loss, axis=list(range(1, K.ndim(y_true))))
 
 
-def categorical_crossentropy(y_true, y_pred, alpha=None, class_weights=None):
+def categorical_crossentropy(
+    y_true,
+    y_pred,
+    from_logits=False,
+    alpha=None,
+    class_weights=None,
+    label_smoothing=None,
+):
     """クラス間のバランス補正ありのcategorical_crossentropy。
 
     Focal lossの論文ではα=0.75が良いとされていた。(class 0の重みが0.25)
+
+    label_smoothing を使う場合は0.1とかを指定。
+
     """
     assert alpha is None or class_weights is None  # 両方同時の指定はNG
     assert K.image_data_format() == "channels_last"
@@ -52,8 +62,19 @@ def categorical_crossentropy(y_true, y_pred, alpha=None, class_weights=None):
         cw = np.array([(1 - alpha) * 2] * 1 + [alpha * 2] * (num_classes - 1))
         cw = np.reshape(cw, (1, 1, -1))
 
-    y_pred = K.maximum(y_pred, K.epsilon())
-    return -K.sum(y_true * K.log(y_pred) * cw, axis=list(range(1, K.ndim(y_true))))
+    if from_logits:
+        log_p = tk.backend.log_softmax(y_pred)
+    else:
+        y_pred = K.maximum(y_pred, K.epsilon())
+        log_p = K.log(y_pred)
+
+    cce = y_true * log_p * cw
+
+    if label_smoothing is not None:
+        kl = -K.mean(log_p, axis=-1)
+        cce = (1 - label_smoothing) * cce + label_smoothing * kl
+
+    return -K.sum(cce, axis=list(range(1, K.ndim(y_true))))
 
 
 def categorical_focal_loss(y_true, y_pred, gamma=2.0, alpha=None):

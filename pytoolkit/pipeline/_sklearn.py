@@ -16,23 +16,25 @@ class SKLearnModel(Model):
 
     """
 
-    def __init__(self, estimator, weights_arg_name="sample_weight"):
+    def __init__(
+        self,
+        estimator,
+        weights_arg_name="sample_weight",
+        preprocessors=None,
+        postprocessors=None,
+    ):
+        super().__init__(preprocessors, postprocessors)
         self.estimator = estimator
         self.weights_arg_name = weights_arg_name
         self.estimators_ = None
 
-    def cv(self, dataset, folds, models_dir):
-        """CVして保存。
+    def _save(self, models_dir):
+        tk.utils.dump(self.estimators_, models_dir / "estimators.pkl")
 
-        Args:
-            dataset (tk.data.Dataset): 入力データ
-            folds (list): CVのindex
-            models_dir (pathlib.Path): 保存先ディレクトリ (Noneなら保存しない)
+    def _load(self, models_dir):
+        self.estimators_ = tk.utils.load(models_dir / "estimators.pkl")
 
-        Returns:
-            dict: metrics名と値
-
-        """
+    def _cv(self, dataset, folds):
         scores = []
         score_weights = []
         self.estimators_ = []
@@ -55,30 +57,9 @@ class SKLearnModel(Model):
             scores.append(estimator.score(val_set.data, val_set.labels, **kwargs))
             score_weights.append(len(val_set))
 
-        if models_dir is not None:
-            tk.utils.dump(self.estimators_, models_dir / "estimators.pkl")
-
         return {"score": np.average(scores, weights=score_weights)}
 
-    def load(self, models_dir):
-        """読み込み。
-
-        Args:
-            models_dir (pathlib.Path): 保存先ディレクトリ
-
-        """
-        self.estimators_ = tk.utils.load(models_dir / "estimators.pkl")
-
-    def predict(self, dataset):
-        """予測結果をリストで返す。
-
-        Args:
-            dataset (tk.data.Dataset): 入力データ
-
-        Returns:
-            np.ndarray: len(self.folds)個の予測結果
-
-        """
+    def _predict(self, dataset):
         # TODO: predict_proba対応
         return np.array(
             [estimator.predict(dataset.data) for estimator in self.estimators_]

@@ -355,10 +355,10 @@ def resize(
 
 @_float_to_uint8
 def gaussian_noise(
-    rgb: np.ndarray, rand: np.random.RandomState, scale: float
+    rgb: np.ndarray, random: np.random.RandomState, scale: float
 ) -> np.ndarray:
     """ガウシアンノイズ。scaleは0～50くらい。小さいほうが色が壊れないかも。"""
-    return rgb + rand.normal(0, scale, size=rgb.shape).astype(np.float32)
+    return rgb + random.normal(0, scale, size=rgb.shape).astype(np.float32)
 
 
 def blur(rgb: np.ndarray, sigma: float) -> np.ndarray:
@@ -682,7 +682,7 @@ def transform_points(points, m):
 
 def erase_random(
     rgb,
-    rand: np.random.RandomState,
+    random: np.random.RandomState,
     bboxes=None,
     scale_low=0.02,
     scale_high=0.4,
@@ -700,14 +700,14 @@ def erase_random(
         bb_c = (bb_lt + bb_rb) / 2  # 中央
 
     for _ in range(max_tries):
-        s = rgb.shape[0] * rgb.shape[1] * rand.uniform(scale_low, scale_high)
-        r = np.exp(rand.uniform(np.log(rate_1), np.log(rate_2)))
+        s = rgb.shape[0] * rgb.shape[1] * random.uniform(scale_low, scale_high)
+        r = np.exp(random.uniform(np.log(rate_1), np.log(rate_2)))
         ew = int(np.sqrt(s / r))
         eh = int(np.sqrt(s * r))
         if ew <= 0 or eh <= 0 or ew >= rgb.shape[1] or eh >= rgb.shape[0]:
             continue
-        ex = rand.randint(0, rgb.shape[1] - ew)
-        ey = rand.randint(0, rgb.shape[0] - eh)
+        ex = random.randint(0, rgb.shape[1] - ew)
+        ey = random.randint(0, rgb.shape[0] - eh)
 
         if bboxes is not None:
             box_lt = np.array([[ex, ey]])
@@ -730,7 +730,7 @@ def erase_random(
                 continue
 
         rgb = np.copy(rgb)
-        rc = rand.randint(0, 256, size=rgb.shape[-1])
+        rc = random.randint(0, 256, size=rgb.shape[-1])
         if alpha:
             rgb[ey : ey + eh, ex : ex + ew, :] = (
                 rgb[ey : ey + eh, ex : ex + ew, :] * (1 - alpha) + rc * alpha
@@ -742,7 +742,7 @@ def erase_random(
     return rgb
 
 
-def mixup(sample1, sample2, rand=None, mode="beta"):
+def mixup(sample1, sample2, random=None, mode="beta"):
     """mixup。 <https://arxiv.org/abs/1710.09412>
 
     常に「sample1の重み >= sample2の重み」となるようにしている。
@@ -750,7 +750,7 @@ def mixup(sample1, sample2, rand=None, mode="beta"):
     Args:
         sample1 (tuple, list, dict or ndarray): データその1
         sample2 (tuple, list, dict or ndarray): データその2
-        rand (None, int, or RandomState): 乱数シード
+        random (None, int, or RandomState): 乱数シード
         mode (str): 混ぜる割合の乱数の種類。
             - 'beta': β分布を0.5以上にした分布
             - 'uniform': [0.5, 1]の一様分布
@@ -760,13 +760,13 @@ def mixup(sample1, sample2, rand=None, mode="beta"):
         tuple, list, dict or ndarray: 混ぜられたデータ。
 
     """
-    rand = sklearn.utils.check_random_state(rand)
+    random = sklearn.utils.check_random_state(random)
     if mode == "beta":
-        r = np.float32(np.abs(rand.beta(0.2, 0.2) - 0.5) + 0.5)
+        r = np.float32(np.abs(random.beta(0.2, 0.2) - 0.5) + 0.5)
     elif mode == "uniform":
-        r = np.float32(rand.uniform(0.5, 1))
+        r = np.float32(random.uniform(0.5, 1))
     elif mode == "uniform_ex":
-        r = np.float32(rand.uniform(0.5, np.sqrt(2)))
+        r = np.float32(random.uniform(0.5, np.sqrt(2)))
     else:
         raise ValueError(f"Invalid mode: {mode}")
     assert r >= 0.5
@@ -794,7 +794,7 @@ def mix_data(sample1, sample2, r):
         return np.float32(sample1) * r + np.float32(sample2) * (1 - r)
 
 
-def cut_mix(image1, label1, image2, label2, beta=1.0, rand=None):
+def cut_mix(image1, label1, image2, label2, beta=1.0, random=None):
     """CutMix。 <https://arxiv.org/abs/1905.04899>
 
     Args:
@@ -803,21 +803,21 @@ def cut_mix(image1, label1, image2, label2, beta=1.0, rand=None):
         image2 (ndarray): 画像
         label2 (ndarray): one-hot化したラベル(など)
         beta (float): beta分布のbeta
-        rand (None, int, or RandomState): 乱数シード
+        random (None, int, or RandomState): 乱数シード
 
     Returns:
         tuple: (image, label)
 
     """
     assert image1.shape == image2.shape
-    rand = sklearn.utils.check_random_state(rand)
-    lam = rand.beta(beta, beta)
+    random = sklearn.utils.check_random_state(random)
+    lam = random.beta(beta, beta)
     H, W = image1.shape[:2]
     cut_rat = np.sqrt(1.0 - lam)
     cut_w = np.int(W * cut_rat)
     cut_h = np.int(H * cut_rat)
-    cx = rand.randint(W)
-    cy = rand.randint(H)
+    cx = random.randint(W)
+    cy = random.randint(H)
     bbx1 = np.clip(cx - cut_w // 2, 0, W)
     bby1 = np.clip(cy - cut_h // 2, 0, H)
     bbx2 = np.clip(cx + cut_w // 2, 0, W)

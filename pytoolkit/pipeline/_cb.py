@@ -17,28 +17,45 @@ class CBModel(Model):
 
     """
 
-    def __init__(self, params, nfold, cv_params=None):
+    def __init__(
+        self, params, nfold, cv_params=None, preprocessors=None, postprocessors=None
+    ):
+        super().__init__(preprocessors, postprocessors)
         self.params = params
         self.nfold = nfold
         self.cv_params = cv_params
         self.gbms_ = None
         self.train_pool_ = None
 
-    def cv(self, dataset, folds, models_dir):
-        """CVして保存。
+    def _save(self, models_dir):
+        assert self.train_pool_ is not None
+        models_dir = pathlib.Path(models_dir)
+        models_dir.mkdir(parents=True, exist_ok=True)
+        for fold, gbm in enumerate(self.gbms_):
+            gbm.save_model(
+                str(models_dir / f"model.fold{fold}.cbm"), pool=self.train_pool_
+            )
+        # ついでにfeature_importanceも。
+        df_importance = self.feature_importance()
+        df_importance.to_excel(str(models_dir / "feature_importance.xlsx"))
 
-        Args:
-            dataset (tk.data.Dataset): 入力データ
-            folds (list): CVのindex
-            models_dir (pathlib.Path): 保存先ディレクトリ (Noneなら保存しない)
-
-        Returns:
-            dict: metrics名と値
-
-        """
+    def _load(self, models_dir):
         import catboost
 
-        train_pool = catboost.Pool(
+        def load(model_path):
+            gbm = catboost.CatBoost()
+            gbm.load_model(model_path)
+            return gbm
+
+        self.gbms_ = [
+            load(str(models_dir / f"model.fold{fold}.cbm"))
+            for fold in range(self.nfold)
+        ]
+
+    def _cv(self, dataset, folds):
+        import catboost
+
+        self.train_pool_ = catboost.Pool(
             data=dataset.data,
             label=dataset.labels,
             group_id=dataset.groups,
@@ -51,8 +68,8 @@ class CBModel(Model):
             with tk.log.trace_scope(f"cv({fold + 1}/{len(folds)})"):
                 gbm = catboost.train(
                     params=self.params,
-                    pool=train_pool.slice(train_indices),
-                    eval_set=train_pool.slice(val_indices),
+                    pool=self.train_pool_.slice(train_indices),
+                    eval_set=self.train_pool_.slice(val_indices),
                     **(self.cv_params or {}),
                 )
                 self.gbms_.append(gbm)
@@ -66,54 +83,9 @@ class CBModel(Model):
             scores[k] = score
             tk.log.get(__name__).info(f"cv {k}: {score}")
 
-        if models_dir is not None:
-            self.train_pool_ = train_pool
-            self.save(models_dir)
-
         return scores
 
-    def save(self, models_dir):
-        """保存。"""
-        assert self.train_pool_ is not None
-        models_dir = pathlib.Path(models_dir)
-        models_dir.mkdir(parents=True, exist_ok=True)
-        for fold, gbm in enumerate(self.gbms_):
-            gbm.save_model(
-                str(models_dir / f"model.fold{fold}.cbm"), pool=self.train_pool_
-            )
-        # ついでにfeature_importanceも。
-        df_importance = self.feature_importance()
-        df_importance.to_excel(str(models_dir / "feature_importance.xlsx"))
-
-    def load(self, models_dir):
-        """読み込み。
-
-        Args:
-            models_dir (pathlib.Path): 保存先ディレクトリ
-
-        """
-        import catboost
-
-        def load(model_path):
-            gbm = catboost.CatBoost()
-            gbm.load_model(model_path)
-            return gbm
-
-        self.gbms_ = [
-            load(str(models_dir / f"model.fold{fold}.cbm"))
-            for fold in range(self.nfold)
-        ]
-
-    def predict(self, dataset):
-        """予測結果をリストで返す。
-
-        Args:
-            dataset (tk.data.Dataset): 入力データ
-
-        Returns:
-            np.ndarray: len(self.folds)個の予測結果
-
-        """
+    def _predict(self, dataset):
         return np.array([gbm.predict(dataset.data) for gbm in self.gbms_])
 
     def feature_importance(self):

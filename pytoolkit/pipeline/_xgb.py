@@ -31,7 +31,10 @@ class XGBModel(Model):
         verbose_eval=100,
         callbacks=None,
         cv_params=None,
+        preprocessors=None,
+        postprocessors=None,
     ):
+        super().__init__(preprocessors, postprocessors)
         self.params = params
         self.nfold = nfold
         self.early_stopping_rounds = early_stopping_rounds
@@ -41,18 +44,22 @@ class XGBModel(Model):
         self.cv_params = cv_params
         self.gbms_ = None
 
-    def cv(self, dataset, folds, models_dir):
-        """CVして保存。
+    def _save(self, models_dir):
+        models_dir = pathlib.Path(models_dir)
+        models_dir.mkdir(parents=True, exist_ok=True)
+        for fold, gbm in enumerate(self.gbms_):
+            tk.utils.dump(gbm, models_dir / f"model.fold{fold}.pkl")
+        # ついでにfeature_importanceも。
+        df_importance = self.feature_importance()
+        df_importance.to_excel(str(models_dir / "feature_importance.xlsx"))
 
-        Args:
-            dataset (tk.data.Dataset): 入力データ
-            folds (list): CVのindex
-            models_dir (pathlib.Path): 保存先ディレクトリ (Noneなら保存しない)
+    def _load(self, models_dir):
+        self.gbms_ = [
+            tk.utils.load(models_dir / f"model.fold{fold}.pkl")
+            for fold in range(self.nfold)
+        ]
 
-        Returns:
-            dict: metrics名と値
-
-        """
+    def _cv(self, dataset, folds):
         import xgboost as xgb
 
         train_set = xgb.DMatrix(
@@ -85,43 +92,9 @@ class XGBModel(Model):
                 scores[name] = score
                 tk.log.get(__name__).info(f"{name}: {score}")
 
-        if models_dir is not None:
-            self.save(models_dir)
-
         return scores
 
-    def save(self, models_dir):
-        """保存。"""
-        models_dir = pathlib.Path(models_dir)
-        models_dir.mkdir(parents=True, exist_ok=True)
-        for fold, gbm in enumerate(self.gbms_):
-            tk.utils.dump(gbm, models_dir / f"model.fold{fold}.pkl")
-        # ついでにfeature_importanceも。
-        df_importance = self.feature_importance()
-        df_importance.to_excel(str(models_dir / "feature_importance.xlsx"))
-
-    def load(self, models_dir):
-        """読み込み。
-
-        Args:
-            models_dir (pathlib.Path): 保存先ディレクトリ
-
-        """
-        self.gbms_ = [
-            tk.utils.load(models_dir / f"model.fold{fold}.pkl")
-            for fold in range(self.nfold)
-        ]
-
-    def predict(self, dataset):
-        """予測結果をリストで返す。
-
-        Args:
-            dataset (tk.data.Dataset): 入力データ
-
-        Returns:
-            np.ndarray: len(self.folds)個の予測結果
-
-        """
+    def _predict(self, dataset):
         import xgboost as xgb
 
         data = xgb.DMatrix(data=dataset.data, feature_names=dataset.data.columns.values)

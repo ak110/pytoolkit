@@ -27,6 +27,7 @@ def test_xor(tmpdir):
     tk.training.train(
         model,
         train_dataset,
+        tk.data.Preprocessor(),
         epochs=8,
         verbose=2,
         model_path=models_dir / "model.h5",
@@ -40,7 +41,7 @@ def test_xor(tmpdir):
         ],
     )
 
-    proba = tk.models.predict(model, tk.data.Dataset(X, y))
+    proba = tk.models.predict(model, tk.data.Dataset(X, y), tk.data.Preprocessor())
     tk.ml.print_classification_metrics(y, proba)
 
     y_pred = np.squeeze((proba > 0.5).astype(np.int32), axis=-1)

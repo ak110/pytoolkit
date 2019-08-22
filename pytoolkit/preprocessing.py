@@ -145,7 +145,7 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
         # 対象とする列のリストアップ
         candidate_columns = set(X.columns.values)
         # ignore_colsを除外
-        candidate_columns -= self.ignore_cols
+        candidate_columns -= set(self.ignore_cols)
         # 値が1種類の列を削除 (Null + 1種類の値だと消えちゃうので注意: 先にisnull列を作っておけばOK)
         candidate_columns -= set(X.nunique()[lambda s: s <= 1].index)
 

@@ -32,7 +32,7 @@ def test_load_text_failed(data_dir):
 def test_filters(data_dir, check_dir):
     """画像の変換のテスト。目視したいので結果を`../___check/ndimage/`に保存しちゃう。"""
     save_dir = check_dir / "ndimage"
-    rand = np.random.RandomState(1234)
+    random = np.random.RandomState(1234)
     filters = [
         # fmt: off
         (0, 'original', lambda rgb: rgb),
@@ -52,7 +52,7 @@ def test_filters(data_dir, check_dir):
         (0, 'flip_tb', tk.ndimage.flip_tb),
         (0, 'resize', lambda rgb: tk.ndimage.resize(rgb, 128, 64, padding='edge')),
         (0, 'resize', lambda rgb: tk.ndimage.resize(rgb, 128, 64, padding=None)),
-        (1, 'gaussian_noise', lambda rgb: tk.ndimage.gaussian_noise(rgb, rand, 16)),
+        (1, 'gaussian_noise', lambda rgb: tk.ndimage.gaussian_noise(rgb, random, 16)),
         (1, 'blur', lambda rgb: tk.ndimage.blur(rgb, 0.5)),
         (1, 'unsharp_mask', lambda rgb: tk.ndimage.unsharp_mask(rgb, 0.5, 1.5)),
         (1, 'median_3', lambda rgb: tk.ndimage.median(rgb, 3)),
@@ -78,10 +78,10 @@ def test_filters(data_dir, check_dir):
         (0, 'rot90', lambda rgb: tk.ndimage.rot90(rgb, 1)),
         (0, 'rot180', lambda rgb: tk.ndimage.rot90(rgb, 2)),
         (0, 'rot270', lambda rgb: tk.ndimage.rot90(rgb, 3)),
-        (0, 'random_erasing', lambda rgb: tk.ndimage.erase_random(rgb, rand)),
-        (0, 'random_alpha', lambda rgb: tk.ndimage.erase_random(rgb, rand, alpha=0.125)),
-        (0, 'random_erasing', lambda rgb: tk.ndimage.erase_random(rgb, rand, bboxes=np.array([[64, 64, 128, 128]]))),
-        (0, 'random_alpha', lambda rgb: tk.ndimage.erase_random(rgb, rand, bboxes=np.array([[64, 64, 128, 128]]), alpha=0.125)),
+        (0, 'random_erasing', lambda rgb: tk.ndimage.erase_random(rgb, random)),
+        (0, 'random_alpha', lambda rgb: tk.ndimage.erase_random(rgb, random, alpha=0.125)),
+        (0, 'random_erasing', lambda rgb: tk.ndimage.erase_random(rgb, random, bboxes=np.array([[64, 64, 128, 128]]))),
+        (0, 'random_alpha', lambda rgb: tk.ndimage.erase_random(rgb, random, bboxes=np.array([[64, 64, 128, 128]]), alpha=0.125)),
         (0, 'gt_none', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256)),
         (0, 'gt_flip_h', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, flip_h=True)),
         (0, 'gt_flip_v', lambda rgb: tk.ndimage.geometric_transform(rgb, 256, 256, flip_v=True)),
@@ -130,10 +130,10 @@ def test_filters(data_dir, check_dir):
 
 
 def test_cut_mix(data_dir, check_dir):
-    rand = np.random.RandomState(1234)
+    random = np.random.RandomState(1234)
     rgb1 = tk.ndimage.load(data_dir / "Lenna.png")  # 256x256の某有名画像
-    rgb2 = rand.randint(0, 255, size=rgb1.shape)
-    image, label = tk.ndimage.cut_mix(rgb1, 0, rgb2, 1, rand=rand)
+    rgb2 = random.randint(0, 255, size=rgb1.shape)
+    image, label = tk.ndimage.cut_mix(rgb1, 0, rgb2, 1, random=random)
     tk.ndimage.save(check_dir / f"CutMix_{label}.png", image)
 
 

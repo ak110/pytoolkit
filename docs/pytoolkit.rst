@@ -6,7 +6,9 @@ Subpackages
 
 .. toctree::
 
+   pytoolkit.applications
    pytoolkit.datasets
+   pytoolkit.pipeline
 
 Submodules
 ----------
@@ -20,7 +22,6 @@ Submodules
    pytoolkit.cli
    pytoolkit.data
    pytoolkit.dl
-   pytoolkit.gbm
    pytoolkit.hpo
    pytoolkit.hvd
    pytoolkit.image
@@ -34,7 +35,6 @@ Submodules
    pytoolkit.ndimage
    pytoolkit.od
    pytoolkit.optimizers
-   pytoolkit.pipeline
    pytoolkit.preprocessing
    pytoolkit.table
    pytoolkit.threading

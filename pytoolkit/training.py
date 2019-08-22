@@ -33,8 +33,8 @@ def cv(
     create_model_fn,
     train_dataset,
     folds,
-    train_preprocessor=None,
-    val_preprocessor=None,
+    train_preprocessor,
+    val_preprocessor,
     batch_size=32,
     *,
     models_dir,
@@ -85,12 +85,12 @@ def cv(
 
 @tk_log.trace()
 def predict_cv(
-    nfold=None,
-    dataset=None,
-    preprocessor=None,
+    dataset,
+    preprocessor,
     batch_size=32,
     load_model_fn=None,
     *,
+    nfold=None,
     models=None,
     models_dir=None,
     model_name_format="model.fold{fold}.h5",
@@ -102,11 +102,11 @@ def predict_cv(
     """CVで作ったモデルで予測。
 
     Args:
-        nfold (int): CVのfold数 (models, folds未指定時必須)
-        dataset (tk.data.Dataset): データ (必須)
+        dataset (tk.data.Dataset): データ
         preprocessor (tk.data.Preprocessor): 前処理
         batch_size (int): バッチサイズ
         load_model_fn (callable): モデルを読み込む関数
+        nfold (int): CVのfold数 (models, folds未指定時必須)
         models (list of keras.models.Model): 各foldのモデル
         models_dir (PathLike object): モデルの保存先パス (models未指定時必須)
         model_name_format (str): モデルのファイル名のフォーマット。{fold}のところに数字が入る。
@@ -171,8 +171,8 @@ def predict_cv(
 def train(
     model: keras.models.Model,
     train_dataset,
+    train_preprocessor,
     val_dataset=None,
-    train_preprocessor=None,
     val_preprocessor=None,
     batch_size=32,
     *,
@@ -184,8 +184,8 @@ def train(
     Args:
         model (keras.models.Model): モデル
         train_dataset (tk.data.Dataset): 訓練データ
-        val_dataset (tk.data.Dataset): 検証データ
         train_preprocessor (tk.data.Preprocessor): 訓練データの前処理
+        val_dataset (tk.data.Dataset): 検証データ
         val_preprocessor (tk.data.Preprocessor): 検証データの前処理
         batch_size (int): バッチサイズ
         model_path (PathLike object): モデルの保存先パス (必須)
@@ -204,8 +204,8 @@ def train(
     tk.models.fit(
         model,
         train_dataset,
-        validation_data=val_dataset,
         train_preprocessor=train_preprocessor,
+        val_dataset=val_dataset,
         val_preprocessor=val_preprocessor,
         batch_size=batch_size,
         **kwargs,

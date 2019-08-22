@@ -85,7 +85,7 @@ class MyPreprocessor(tk.data.Preprocessor):
         X, y = dataset.get_sample(index)
         X = tk.ndimage.load(X)
         y = tk.ndimage.load(y)
-        a = self.aug(image=X, mask=y, rand=random)
+        a = self.aug(image=X, mask=y, random=random)
         X = a["image"]
         y = a["mask"]
         return X, y

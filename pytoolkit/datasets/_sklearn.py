@@ -4,7 +4,7 @@ import pytoolkit as tk
 
 
 def load_boston():
-    """<https://scikit-learn.org/stable/modules/generated/sklearn.datasets.load_boston.html>"""
+    """<https://scikit-learn.org/stable/datasets/index.html#boston-dataset>"""
     import sklearn.datasets
     import pandas as pd
 

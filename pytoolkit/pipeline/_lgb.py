@@ -32,7 +32,10 @@ class LGBModel(Model):
         callbacks=None,
         cv_params=None,
         seeds=None,
+        preprocessors=None,
+        postprocessors=None,
     ):
+        super().__init__(preprocessors, postprocessors)
         self.params = params
         self.nfold = nfold
         self.early_stopping_rounds = early_stopping_rounds
@@ -43,18 +46,38 @@ class LGBModel(Model):
         self.seeds = seeds
         self.gbms_ = None
 
-    def cv(self, dataset, folds, models_dir):
-        """CVして保存。
+    def _save(self, models_dir):
+        seeds = [123] if self.seeds is None else self.seeds
 
-        Args:
-            dataset (tk.data.Dataset): 入力データ
-            folds (list): CVのindex
-            models_dir (pathlib.Path): 保存先ディレクトリ (Noneなら保存しない)
+        models_dir = pathlib.Path(models_dir)
+        models_dir.mkdir(parents=True, exist_ok=True)
+        for fold, gbms_fold in enumerate(self.gbms_):
+            for seed, gbm in zip(seeds, gbms_fold):
+                gbm.save_model(
+                    str(models_dir / f"model.fold{fold}.seed{seed}.txt"),
+                    num_iteration=gbm.best_iteration,
+                )
+        # ついでにfeature_importanceも。
+        df_importance = self.feature_importance()
+        df_importance.to_excel(str(models_dir / "feature_importance.xlsx"))
 
-        Returns:
-            dict: metrics名と値
+    def _load(self, models_dir):
+        import lightgbm as lgb
 
-        """
+        seeds = [123] if self.seeds is None else self.seeds
+        self.gbms_ = np.array(
+            [
+                [
+                    lgb.Booster(
+                        model_file=str(models_dir / f"model.fold{fold}.seed{seed}.txt")
+                    )
+                    for seed in seeds
+                ]
+                for fold in range(self.nfold)
+            ]
+        )
+
+    def _cv(self, dataset, folds):
         import lightgbm as lgb
 
         # 独自拡張: sklearn風の指定
@@ -106,61 +129,11 @@ class LGBModel(Model):
                 for gbm in self.gbms_[:, seed_i]:
                     gbm.best_iteration = model_extractor.best_iteration
 
-        if models_dir is not None:
-            self.save(models_dir)
-
         for name, score_list in scores.items():
             scores[name] = np.mean(score_list)
         return scores
 
-    def save(self, models_dir):
-        """保存。"""
-        seeds = [123] if self.seeds is None else self.seeds
-
-        models_dir = pathlib.Path(models_dir)
-        models_dir.mkdir(parents=True, exist_ok=True)
-        for fold, gbms_fold in enumerate(self.gbms_):
-            for seed, gbm in zip(seeds, gbms_fold):
-                gbm.save_model(
-                    str(models_dir / f"model.fold{fold}.seed{seed}.txt"),
-                    num_iteration=gbm.best_iteration,
-                )
-        # ついでにfeature_importanceも。
-        df_importance = self.feature_importance()
-        df_importance.to_excel(str(models_dir / "feature_importance.xlsx"))
-
-    def load(self, models_dir):
-        """読み込み。
-
-        Args:
-            models_dir (pathlib.Path): 保存先ディレクトリ
-
-        """
-        import lightgbm as lgb
-
-        seeds = [123] if self.seeds is None else self.seeds
-        self.gbms_ = np.array(
-            [
-                [
-                    lgb.Booster(
-                        model_file=str(models_dir / f"model.fold{fold}.seed{seed}.txt")
-                    )
-                    for seed in seeds
-                ]
-                for fold in range(self.nfold)
-            ]
-        )
-
-    def predict(self, dataset):
-        """予測結果をリストで返す。
-
-        Args:
-            dataset (tk.data.Dataset): 入力データ
-
-        Returns:
-            np.ndarray: len(self.folds)個の予測結果
-
-        """
+    def _predict(self, dataset):
         return np.array(
             [
                 np.mean(

@@ -21,8 +21,8 @@ class BasicTransform(metaclass=abc.ABCMeta):
         self.p = p
 
     def __call__(self, **data):
-        data["rand"] = sklearn.utils.check_random_state(data.get("rand", None))
-        if data["rand"].rand() <= self.p:
+        data["random"] = sklearn.utils.check_random_state(data.get("random", None))
+        if data["random"].rand() <= self.p:
             data = self.apply_transform(**data)
         return data
 
@@ -60,7 +60,7 @@ class RandomCompose(Compose):
         """変換の適用。"""
         backup = self.transforms.copy()
         try:
-            data["rand"].shuffle(self.transforms)
+            data["random"].shuffle(self.transforms)
             return super().apply_transform(**data)
         finally:
             self.transforms = backup
@@ -71,7 +71,7 @@ class OneOf(BasicCompose):
 
     def apply_transform(self, **data):
         """変換の適用。"""
-        transform = data["rand"].choice(self.transforms)
+        transform = data["random"].choice(self.transforms)
         data = transform(**data)
         return data
 
@@ -189,7 +189,7 @@ class RandomRotate(DualTransform):
         raise NotImplementedError()
 
     def get_params(self, **data):
-        return {"degrees": data["rand"].uniform(-self.degrees, self.degrees)}
+        return {"degrees": data["random"].uniform(-self.degrees, self.degrees)}
 
 
 class RandomTransform(DualTransform):
@@ -338,32 +338,34 @@ class RandomTransform(DualTransform):
         scale = (
             self.base_scale
             * np.exp(
-                data["rand"].uniform(
+                data["random"].uniform(
                     np.log(self.scale_range[0]), np.log(self.scale_range[1])
                 )
             )
-            if data["rand"].rand() <= self.scale_prob
+            if data["random"].rand() <= self.scale_prob
             else self.base_scale
         )
         ar = (
             np.exp(
-                data["rand"].uniform(
+                data["random"].uniform(
                     np.log(self.aspect_range[0]), np.log(self.aspect_range[1])
                 )
             )
-            if data["rand"].rand() <= self.aspect_prob
+            if data["random"].rand() <= self.aspect_prob
             else 1.0
         )
-        pos_h, pos_v = data["rand"].uniform(0, 1, size=2)
-        translate_h = data["rand"].uniform(-self.translate_h, self.translate_h)
-        translate_v = data["rand"].uniform(-self.translate_v, self.translate_v)
+        pos_h, pos_v = data["random"].uniform(0, 1, size=2)
+        translate_h = data["random"].uniform(-self.translate_h, self.translate_h)
+        translate_v = data["random"].uniform(-self.translate_v, self.translate_v)
         return {
-            "flip_h": self.flip_h and data["rand"].rand() <= 0.5,
-            "flip_v": self.flip_v and data["rand"].rand() <= 0.5,
+            "flip_h": self.flip_h and data["random"].rand() <= 0.5,
+            "flip_v": self.flip_v and data["random"].rand() <= 0.5,
             "scale_h": scale * np.sqrt(ar),
             "scale_v": scale / np.sqrt(ar),
-            "degrees": data["rand"].uniform(self.rotate_range[0], self.rotate_range[1])
-            if data["rand"].rand() <= self.rotate_prob
+            "degrees": data["random"].uniform(
+                self.rotate_range[0], self.rotate_range[1]
+            )
+            if data["random"].rand() <= self.rotate_prob
             else 0,
             "pos_h": pos_h,
             "pos_v": pos_v,
@@ -417,8 +419,8 @@ class GaussNoise(ImageOnlyTransform):
         super().__init__(always_apply=always_apply, p=p)
         self.scale = scale
 
-    def apply(self, image, **params):
-        return tk.ndimage.gaussian_noise(image, params["rand"], self.scale)
+    def apply(self, image, random, **params):
+        return tk.ndimage.gaussian_noise(image, random, self.scale)
 
 
 class RandomBlur(ImageOnlyTransform):
@@ -428,8 +430,8 @@ class RandomBlur(ImageOnlyTransform):
         super().__init__(always_apply=always_apply, p=p)
         self.radius = radius
 
-    def apply(self, image, **params):
-        return tk.ndimage.blur(image, self.radius * params["rand"].rand())
+    def apply(self, image, random, **params):
+        return tk.ndimage.blur(image, self.radius * random.rand())
 
 
 class RandomUnsharpMask(ImageOnlyTransform):
@@ -441,9 +443,9 @@ class RandomUnsharpMask(ImageOnlyTransform):
         self.min_alpha = min_alpha
         self.max_alpha = max_alpha
 
-    def apply(self, image, **params):
+    def apply(self, image, random, **params):
         return tk.ndimage.unsharp_mask(
-            image, self.sigma, params["rand"].uniform(self.min_alpha, self.max_alpha)
+            image, self.sigma, random.uniform(self.min_alpha, self.max_alpha)
         )
 
 
@@ -454,10 +456,8 @@ class RandomBrightness(ImageOnlyTransform):
         super().__init__(always_apply=always_apply, p=p)
         self.shift = shift
 
-    def apply(self, image, **params):
-        return tk.ndimage.brightness(
-            image, params["rand"].uniform(-self.shift, self.shift)
-        )
+    def apply(self, image, random, **params):
+        return tk.ndimage.brightness(image, random.uniform(-self.shift, self.shift))
 
 
 class RandomContrast(ImageOnlyTransform):
@@ -467,10 +467,8 @@ class RandomContrast(ImageOnlyTransform):
         super().__init__(always_apply=always_apply, p=p)
         self.var = var
 
-    def apply(self, image, **params):
-        return tk.ndimage.contrast(
-            image, params["rand"].uniform(1 - self.var, 1 + self.var)
-        )
+    def apply(self, image, random, **params):
+        return tk.ndimage.contrast(image, random.uniform(1 - self.var, 1 + self.var))
 
 
 class RandomSaturation(ImageOnlyTransform):
@@ -480,10 +478,8 @@ class RandomSaturation(ImageOnlyTransform):
         super().__init__(always_apply=always_apply, p=p)
         self.var = var
 
-    def apply(self, image, **params):
-        return tk.ndimage.saturation(
-            image, params["rand"].uniform(1 - self.var, 1 + self.var)
-        )
+    def apply(self, image, random, **params):
+        return tk.ndimage.saturation(image, random.uniform(1 - self.var, 1 + self.var))
 
 
 class RandomHue(ImageOnlyTransform):
@@ -494,9 +490,9 @@ class RandomHue(ImageOnlyTransform):
         self.var = var
         self.shift = shift
 
-    def apply(self, image, **params):
-        alpha = params["rand"].uniform(1 - self.var, 1 + self.var, (3,))
-        beta = params["rand"].uniform(-self.shift, +self.shift, (3,))
+    def apply(self, image, random, **params):
+        alpha = random.uniform(1 - self.var, 1 + self.var, (3,))
+        beta = random.uniform(-self.shift, +self.shift, (3,))
         return tk.ndimage.hue_lite(image, alpha, beta)
 
 
@@ -543,8 +539,8 @@ class RandomPosterize(ImageOnlyTransform):
         self.min_bits = min_bits
         self.max_bits = max_bits
 
-    def apply(self, image, **params):
-        bits = params["rand"].randint(self.min_bits, self.max_bits + 1)
+    def apply(self, image, random, **params):
+        bits = random.randint(self.min_bits, self.max_bits + 1)
         return tk.ndimage.posterize(image, bits)
 
 
@@ -572,10 +568,10 @@ class RandomAlpha(ImageOnlyTransform):
         self.rate_2 = rate_2
         self.max_tries = max_tries
 
-    def apply(self, image, **params):
+    def apply(self, image, random, **params):
         return tk.ndimage.erase_random(
             image,
-            params["rand"],
+            random,
             bboxes=None,
             scale_low=self.scale_low,
             scale_high=self.scale_high,
@@ -618,7 +614,7 @@ class RandomErasing(ImageOnlyTransform):
         self.object_aware_prob = object_aware_prob
         self.max_tries = max_tries
 
-    def apply(self, image, bboxes=None, **params):
+    def apply(self, image, random, bboxes=None, **params):
         image = np.copy(image)
         bboxes = (
             np.round(bboxes * np.array(image.shape)[[1, 0, 1, 0]])
@@ -635,7 +631,7 @@ class RandomErasing(ImageOnlyTransform):
                 if (b[2:] - b[:2] <= 1).any():
                     warnings.warn(f"bboxサイズが不正: {b}")
                     continue  # 安全装置：サイズが無いboxはskip
-                if params["rand"].rand() <= self.object_aware_prob:
+                if random.rand() <= self.object_aware_prob:
                     b = np.copy(b).astype(int)
                     # box内に含まれる他のboxを考慮
                     inter_boxes = np.copy(bboxes[inter[i]])
@@ -645,7 +641,7 @@ class RandomErasing(ImageOnlyTransform):
                     # random erasing
                     image[b[1] : b[3], b[0] : b[2], :] = tk.ndimage.erase_random(
                         image[b[1] : b[3], b[0] : b[2], :],
-                        params["rand"],
+                        random,
                         bboxes=inter_boxes,
                         scale_low=self.scale_low,
                         scale_high=self.scale_high,
@@ -657,7 +653,7 @@ class RandomErasing(ImageOnlyTransform):
             # 画像全体でrandom erasing。
             image = tk.ndimage.erase_random(
                 image,
-                params["rand"],
+                random,
                 bboxes=None,
                 scale_low=self.scale_low,
                 scale_high=self.scale_high,
@@ -700,6 +696,6 @@ class RandomBinarize(ImageOnlyTransform):
         self.threshold_min = threshold_min
         self.threshold_max = threshold_max
 
-    def apply(self, image, **params):
-        threshold = params["rand"].uniform(self.threshold_min, self.threshold_max)
+    def apply(self, image, random, **params):
+        threshold = random.uniform(self.threshold_min, self.threshold_max)
         return tk.ndimage.binarize(image, threshold)

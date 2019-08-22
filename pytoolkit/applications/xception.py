@@ -4,9 +4,7 @@ import functools
 from .. import keras, K, ndimage, hvd
 
 
-def xception(
-    weights="imagenet", input_tensor=None, input_shape=None, for_small=False, **kwargs
-):
+def xception(weights="imagenet", input_tensor=None, input_shape=None, for_small=False):
     """Xception。
 
     padding="same"にしたりinitializer, regularizerを指定したりしたもの。

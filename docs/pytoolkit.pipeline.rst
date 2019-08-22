@@ -1,5 +1,8 @@
-pytoolkit.pipeline module
-=========================
+pytoolkit.pipeline package
+==========================
+
+Module contents
+---------------
 
 .. automodule:: pytoolkit.pipeline
    :members:

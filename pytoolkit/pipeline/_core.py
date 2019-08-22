@@ -8,67 +8,7 @@ import pytoolkit as tk
 
 
 class Model:
-    """パイプラインのモデルのインターフェース。"""
-
-    def cv(self, dataset, folds, models_dir):
-        """CVして保存。
-
-        Args:
-            dataset (tk.data.Dataset): 入力データ
-            folds (list): CVのindex
-            models_dir (pathlib.Path): 保存先ディレクトリ (Noneなら保存しない)
-
-        Returns:
-            dict: metrics名と値
-
-        """
-        raise NotImplementedError()
-
-    def load(self, models_dir):
-        """読み込み。
-
-        Args:
-            models_dir (pathlib.Path): 保存先ディレクトリ
-
-        """
-        raise NotImplementedError()
-
-    def predict_oof(self, dataset, folds):
-        """out-of-foldなpredict結果を返す。
-
-        Args:
-            dataset (tk.data.Dataset): 入力データ
-            folds (list): CVのindex
-
-        Returns:
-            np.ndarray: 予測結果
-
-        """
-        pred_list = self.predict(dataset)
-        assert len(pred_list) == len(folds)
-
-        oofp_shape = (len(dataset),) + pred_list[0].shape[1:]
-        oofp = np.empty(oofp_shape, dtype=pred_list[0].dtype)
-        for pred, (_, val_indices) in zip(pred_list, folds):
-            oofp[val_indices] = pred[val_indices]
-
-        return oofp
-
-    def predict(self, dataset):
-        """予測結果をリストで返す。
-
-        Args:
-            dataset (tk.data.Dataset): 入力データ
-
-        Returns:
-            np.ndarray: len(self.folds)個の予測結果
-
-        """
-        raise NotImplementedError()
-
-
-class Pipeline(Model):
-    """前処理＋モデル＋後処理のパイプライン。
+    """パイプラインのモデルのインターフェース。
 
     Args:
         model (Model): モデル
@@ -77,8 +17,7 @@ class Pipeline(Model):
 
     """
 
-    def __init__(self, model, preprocessors=None, postprocessors=None):
-        self.model = model
+    def __init__(self, preprocessors=None, postprocessors=None):
         self.preprocessors = (
             sklearn.pipeline.make_pipeline(*preprocessors)
             if preprocessors is not None
@@ -118,13 +57,14 @@ class Pipeline(Model):
                 ),
                 axis=-1,
             )
-        scores = self.model.cv(dataset, folds, models_dir)
+        scores = self._cv(dataset, folds)
 
         if models_dir is not None:
             if self.preprocessors is not None:
                 tk.utils.dump(self.preprocessors, models_dir / "preprocessors.pkl")
             if self.postprocessors is not None:
                 tk.utils.dump(self.postprocessors, models_dir / "postprocessors.pkl")
+            self._save(models_dir)
 
         return scores
 
@@ -146,8 +86,29 @@ class Pipeline(Model):
         self.postprocessors = tk.utils.load(
             models_dir / "postprocessors.pkl", skip_not_exist=True
         )
-        self.model.load(models_dir)
+        self._load(models_dir)
         return self
+
+    def predict_oof(self, dataset, folds):
+        """out-of-foldなpredict結果を返す。
+
+        Args:
+            dataset (tk.data.Dataset): 入力データ
+            folds (list): CVのindex
+
+        Returns:
+            np.ndarray: 予測結果
+
+        """
+        pred_list = self.predict(dataset)
+        assert len(pred_list) == len(folds)
+
+        oofp_shape = (len(dataset),) + pred_list[0].shape[1:]
+        oofp = np.empty(oofp_shape, dtype=pred_list[0].dtype)
+        for pred, (_, val_indices) in zip(pred_list, folds):
+            oofp[val_indices] = pred[val_indices]
+
+        return oofp
 
     def predict(self, dataset):
         """予測結果をリストで返す。
@@ -163,7 +124,7 @@ class Pipeline(Model):
         if self.preprocessors is not None:
             dataset.data = self.preprocessors.transform(dataset.data)
 
-        pred_list = self.model.predict(dataset)
+        pred_list = self._predict(dataset)
 
         if self.postprocessors is not None:
             for i in range(len(pred_list)):
@@ -178,3 +139,46 @@ class Pipeline(Model):
                     pred_list[i] = self.postprocessors.inverse_transform(pred_list[i])
 
         return pred_list
+
+    def _save(self, models_dir):
+        """保存。
+
+        Args:
+            models_dir (pathlib.Path): 保存先ディレクトリ
+
+        """
+        raise NotImplementedError()
+
+    def _load(self, models_dir):
+        """読み込み。
+
+        Args:
+            models_dir (pathlib.Path): 保存先ディレクトリ
+
+        """
+        raise NotImplementedError()
+
+    def _cv(self, dataset, folds):
+        """CV。
+
+        Args:
+            dataset (tk.data.Dataset): 入力データ
+            folds (list): CVのindex
+
+        Returns:
+            dict: metrics名と値
+
+        """
+        raise NotImplementedError()
+
+    def _predict(self, dataset):
+        """予測結果をリストで返す。
+
+        Args:
+            dataset (tk.data.Dataset): 入力データ
+
+        Returns:
+            np.ndarray: len(self.folds)個の予測結果
+
+        """
+        raise NotImplementedError()

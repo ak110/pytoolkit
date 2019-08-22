@@ -69,7 +69,7 @@ def test_seed(data_dir):
     img = tk.ndimage.load(data_dir / "Lenna.png")
 
     for seed in range(100):
-        a = aug(image=img, rand=np.random.RandomState(seed + 123))["image"]
-        _ = aug(image=img, rand=np.random.RandomState(seed + 456))["image"]
-        b = aug(image=img, rand=np.random.RandomState(seed + 123))["image"]
+        a = aug(image=img, random=np.random.RandomState(seed + 123))["image"]
+        _ = aug(image=img, random=np.random.RandomState(seed + 456))["image"]
+        b = aug(image=img, random=np.random.RandomState(seed + 123))["image"]
         assert np.all(a == b)

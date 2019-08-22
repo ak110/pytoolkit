@@ -161,8 +161,8 @@ def compile(
 @tk_log.trace()
 def fit(
     model: keras.models.Model,
-    training_data,
-    validation_data=None,
+    train_dataset,
+    val_dataset=None,
     train_preprocessor=None,
     val_preprocessor=None,
     validation_freq="auto",
@@ -181,8 +181,8 @@ def fit(
 
     Args:
         model: モデル。
-        training_data (tk.data.Dataset): 訓練データ。
-        validation_data (tk.data.Dataset): 検証データ。Noneなら省略。
+        train_dataset (tk.data.Dataset): 訓練データ。
+        val_dataset (tk.data.Dataset): 検証データ。Noneなら省略。
         train_preprocessor (tk.data.Preprocessor): 訓練データの前処理
         val_preprocessor (tk.data.Preprocessor): 検証データの前処理
         validation_freq (int or list or "auto"): 検証を行うエポック数の間隔、またはエポック数のリスト。0ならvalidationしない(独自仕様)。"auto"なら適当に決める(独自仕様)。
@@ -201,10 +201,10 @@ def fit(
     if validation_freq == 0:
         # validation_freq == 0ならvalidationしない(独自仕様)
         validation_freq = None
-        validation_data = None
+        val_dataset = None
     elif validation_freq == "auto":
         # "auto"なら適当に決める(独自仕様)
-        if validation_data is None:
+        if val_dataset is None:
             validation_freq = None
         else:
             # ・sqrt(epochs)回くらいやれば十分？ (指標にも依るが…)
@@ -212,7 +212,7 @@ def fit(
             max_val_per_train = 0.1
             validation_freq = max(
                 int(np.sqrt(epochs)),
-                int(len(validation_data) / (len(training_data) * max_val_per_train)),
+                int(len(val_dataset) / (len(train_dataset) * max_val_per_train)),
                 1,
             )
             # 最後のepochはvalidationしたいので、そこからvalidation_freq毎に。
@@ -224,7 +224,7 @@ def fit(
             kwargs["validation_freq"] = validation_freq
 
     train_data_loader = tk.data.DataLoader(
-        training_data,
+        train_dataset,
         train_preprocessor,
         batch_size,
         shuffle=True,
@@ -233,14 +233,14 @@ def fit(
     )
     val_data_loader = (
         tk.data.DataLoader(
-            validation_data,
+            val_dataset,
             val_preprocessor,
             batch_size,
             shuffle=True,
             parallel=data_parallel,
             use_horovod=True,
         )
-        if validation_data is not None
+        if val_dataset is not None
         else None
     )
 

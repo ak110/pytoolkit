@@ -22,9 +22,9 @@ class LearningRateStepDecay(keras.callbacks.Callback):
         self.reduce_epochs = None
 
     def on_train_begin(self, logs=None):
-        if not hasattr(self.model.optimizer, "lr"):
-            raise ValueError('Optimizer must have a "lr" attribute.')
-        self.start_lr = float(K.get_value(self.model.optimizer.lr))
+        if not hasattr(self.model.optimizer, "learning_rate"):
+            raise ValueError('Optimizer must have a "learning_rate" attribute.')
+        self.start_lr = float(K.get_value(self.model.optimizer.learning_rate))
         epochs = self.epochs or self.params["epochs"]
         self.reduce_epochs = [
             min(max(int(epochs * r), 1), epochs) for r in self.reduce_epoch_rates
@@ -32,16 +32,16 @@ class LearningRateStepDecay(keras.callbacks.Callback):
 
     def on_epoch_begin(self, epoch, logs=None):
         if epoch + 1 in self.reduce_epochs:
-            lr1 = K.get_value(self.model.optimizer.lr)
+            lr1 = K.get_value(self.model.optimizer.learning_rate)
             lr2 = lr1 * self.factor
-            K.set_value(self.model.optimizer.lr, lr2)
+            K.set_value(self.model.optimizer.learning_rate, lr2)
             tk.log.get(__name__).info(
                 f"Epoch {epoch + 1}: Learning rate {lr1:.1e} -> {lr2:.1e}"
             )
 
     def on_train_end(self, logs=None):
         # 終わったら戻しておく
-        K.set_value(self.model.optimizer.lr, self.start_lr)
+        K.set_value(self.model.optimizer.learning_rate, self.start_lr)
 
 
 class CosineAnnealing(keras.callbacks.Callback):
@@ -61,9 +61,9 @@ class CosineAnnealing(keras.callbacks.Callback):
         self.start_lr = None
 
     def on_train_begin(self, logs=None):
-        if not hasattr(self.model.optimizer, "lr"):
-            raise ValueError('Optimizer must have a "lr" attribute.')
-        self.start_lr = float(K.get_value(self.model.optimizer.lr))
+        if not hasattr(self.model.optimizer, "learning_rate"):
+            raise ValueError('Optimizer must have a "learning_rate" attribute.')
+        self.start_lr = float(K.get_value(self.model.optimizer.learning_rate))
 
     def on_epoch_begin(self, epoch, logs=None):
         lr_max = self.start_lr
@@ -74,11 +74,11 @@ class CosineAnnealing(keras.callbacks.Callback):
         else:
             r = (epoch + 1) / (self.epochs or self.params["epochs"])
             lr = lr_min + 0.5 * (lr_max - lr_min) * (1 + np.cos(np.pi * r))
-        K.set_value(self.model.optimizer.lr, float(lr))
+        K.set_value(self.model.optimizer.learning_rate, float(lr))
 
     def on_train_end(self, logs=None):
         # 終わったら戻しておく
-        K.set_value(self.model.optimizer.lr, self.start_lr)
+        K.set_value(self.model.optimizer.learning_rate, self.start_lr)
 
 
 class TSVLogger(keras.callbacks.Callback):
@@ -120,7 +120,7 @@ class TSVLogger(keras.callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         logs = logs or {}
-        logs["lr"] = K.get_value(self.model.optimizer.lr)
+        logs["lr"] = K.get_value(self.model.optimizer.learning_rate)
         elapsed_time = time.time() - self.epoch_start_time
 
         def _format_metric(logs, k):
@@ -161,7 +161,7 @@ class EpochLogger(keras.callbacks.Callback):
         self.epoch_start_time = time.time()
 
     def on_epoch_end(self, epoch, logs=None):
-        lr = K.get_value(self.model.optimizer.lr)
+        lr = K.get_value(self.model.optimizer.learning_rate)
         now = time.time()
         elapsed_time = now - self.epoch_start_time
         time_per_epoch = (now - self.train_start_time) / (epoch + 1)
