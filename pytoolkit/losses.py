@@ -1,4 +1,4 @@
-"""Kerasの損失関数。"""
+"""Kerasの損失関数を実装するための関数など。"""
 
 import numpy as np
 import tensorflow as tf
@@ -6,6 +6,14 @@ import tensorflow as tf
 import pytoolkit as tk
 
 from . import K
+
+
+def reduce(x, mode="sum"):
+    """バッチ次元だけ残して次元を削減する。"""
+    axes = list(range(1, K.ndim(x)))
+    if len(axes) <= 0:
+        return x
+    return {"sum": K.sum, "mean": K.mean}[mode](x, axis=axes)
 
 
 def binary_crossentropy(y_true, y_pred, from_logits=False, alpha=None):
@@ -18,7 +26,7 @@ def binary_crossentropy(y_true, y_pred, from_logits=False, alpha=None):
     loss = tk.backend.binary_crossentropy(
         y_true, y_pred, from_logits=from_logits, alpha=alpha
     )
-    return K.sum(loss, axis=list(range(1, K.ndim(y_true))))
+    return reduce(loss)
 
 
 def binary_focal_loss(y_true, y_pred, gamma=2.0, from_logits=False, alpha=None):
@@ -31,7 +39,7 @@ def binary_focal_loss(y_true, y_pred, gamma=2.0, from_logits=False, alpha=None):
     loss = tk.backend.binary_focal_loss(
         y_true, y_pred, gamma=gamma, from_logits=from_logits, alpha=alpha
     )
-    return K.sum(loss, axis=list(range(1, K.ndim(y_true))))
+    return reduce(loss)
 
 
 def categorical_crossentropy(
@@ -46,7 +54,7 @@ def categorical_crossentropy(
 
     Focal lossの論文ではα=0.75が良いとされていた。(class 0の重みが0.25)
 
-    label_smoothing を使う場合は0.1とかを指定。
+    label_smoothing を使う場合は0.2とかを指定。
 
     """
     assert alpha is None or class_weights is None  # 両方同時の指定はNG
@@ -68,13 +76,13 @@ def categorical_crossentropy(
         y_pred = K.maximum(y_pred, K.epsilon())
         log_p = K.log(y_pred)
 
-    cce = y_true * log_p * cw
+    loss = -K.sum(y_true * log_p * cw, axis=-1)
 
     if label_smoothing is not None:
         kl = -K.mean(log_p, axis=-1)
-        cce = (1 - label_smoothing) * cce + label_smoothing * kl
+        loss = (1 - label_smoothing) * loss + label_smoothing * kl
 
-    return -K.sum(cce, axis=list(range(1, K.ndim(y_true))))
+    return reduce(loss)
 
 
 def categorical_focal_loss(y_true, y_pred, gamma=2.0, alpha=None):
@@ -86,17 +94,15 @@ def categorical_focal_loss(y_true, y_pred, gamma=2.0, alpha=None):
     """
     assert K.image_data_format() == "channels_last"
     if alpha is None:
-        class_weights = 1
+        cw = 1
     else:
         nb_classes = K.int_shape(y_pred)[-1]
-        class_weights = np.array([(1 - alpha) * 2] * 1 + [alpha * 2] * (nb_classes - 1))
-        class_weights = np.reshape(class_weights, (1, 1, -1))
+        cw = np.array([(1 - alpha) * 2] * 1 + [alpha * 2] * (nb_classes - 1))
+        cw = np.reshape(cw, (1, 1, -1))
 
     y_pred = K.maximum(y_pred, K.epsilon())
-    return -K.sum(
-        K.pow(1 - y_pred, gamma) * y_true * K.log(y_pred) * class_weights,
-        axis=list(range(1, K.ndim(y_true))),
-    )  # pylint: disable=invalid-unary-operand-type
+    loss = -cw * K.pow(1 - y_pred, gamma) * y_true * K.log(y_pred)
+    return reduce(loss)
 
 
 def lovasz_hinge(
@@ -205,23 +211,19 @@ def l1_smooth_loss(y_true, y_pred):
 
 def mse(y_true, y_pred):
     """mean squared error。"""
-    axes = list(range(1, K.ndim(y_true)))
-    return K.mean(K.square(y_pred - y_true), axis=axes)
+    return reduce(K.square(y_pred - y_true), mode="mean")
 
 
 def mae(y_true, y_pred):
     """mean absolute error。"""
-    axes = list(range(1, K.ndim(y_true)))
-    return K.mean(K.abs(y_pred - y_true), axis=axes)
+    return reduce(K.abs(y_pred - y_true), mode="mean")
 
 
 def rmse(y_true, y_pred):
     """root mean squared error。"""
-    axes = list(range(1, K.ndim(y_true)))
-    return K.sqrt(K.mean(K.square(y_pred - y_true), axis=axes))
+    return K.sqrt(reduce(K.square(y_pred - y_true), mode="mean"))
 
 
 def mape(y_true, y_pred):
     """mean absolute percentage error。"""
-    axes = list(range(1, K.ndim(y_true)))
-    return K.mean(K.abs((y_true - y_pred) / y_true), axis=axes)
+    return reduce(K.abs((y_true - y_pred) / y_true), mode="mean")

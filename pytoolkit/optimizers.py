@@ -1,7 +1,7 @@
 """Kerasのoptimizer関連。"""
 # pylint: disable=cell-var-from-loop,attribute-defined-outside-init
 
-from . import K, keras
+# from . import K, keras
 
 
 def get_custom_objects():

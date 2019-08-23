@@ -19,6 +19,29 @@ def encode_binary(s, true_value, false_value):
     return s2.astype(bool)
 
 
+def encode_ordinal(s, values):
+    """順序のあるカテゴリ変数の数値化。"""
+    mask = s.notnull()
+    result = s.map({v: i for i, v in enumerate(values)})
+    # 未知の値があればエラー
+    if result[mask].isnull().any():
+        raise ValueError(f"Unknown values: {set(s.unique()) - set(values)}")
+    # nullが無ければメモリ節約のため(?)int32に変換
+    if s.notnull().all():
+        result = result.astype(np.int32)
+    return result
+
+
+def encode_cyclic(s, min_value=0, max_value=1):
+    """周期性のある数値のsin/cos化。"""
+    import pandas as pd
+    rad = 2 * np.pi * (s - min_value) / (max_value - min_value)
+    df = pd.DataFrame()
+    df["sin"] = np.sin(rad)
+    df["cos"] = np.cos(rad)
+    return df
+
+
 class NullTransformer(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
     """何もしないTransformer。"""
 

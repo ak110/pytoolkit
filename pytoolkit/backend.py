@@ -95,7 +95,7 @@ def logcosh(x):
 
 def log_softmax(x, axis=-1):
     """log(softmax(x))"""
-    return x - tf.math.reduce_logsumexp(x, axis=axis)
+    return x - tf.math.reduce_logsumexp(x, axis=axis, keepdims=True)
 
 
 def nll(y_true, log_p):

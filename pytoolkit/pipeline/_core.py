@@ -1,4 +1,4 @@
-"""パイプライン。"""
+"""前処理＋モデル＋後処理のパイプライン。"""
 import pathlib
 
 import sklearn.pipeline
