@@ -6,7 +6,7 @@ pushd docs/
 make html
 popd
 
-black --check .
+black .
 
 flake8
 

@@ -35,6 +35,7 @@ def encode_ordinal(s, values):
 def encode_cyclic(s, min_value=0, max_value=1):
     """周期性のある数値のsin/cos化。"""
     import pandas as pd
+
     rad = 2 * np.pi * (s - min_value) / (max_value - min_value)
     df = pd.DataFrame()
     df["sin"] = np.sin(rad)
@@ -220,7 +221,7 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
         self.notnull_cols_ = None
         feats = self.transform(X, y)
         # 値の重複列の削除
-        self.feature_names_ = feats.T.drop_duplicates().index.values
+        self.feature_names_ = feats.columns.values[~feats.T.duplicated()]
         feats = feats[self.feature_names_]
         # trainにnullが含まれない列を覚えておく (チェック用)
         self.notnull_cols_ = feats.notnull().all(axis=0)
@@ -256,26 +257,38 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
                 )
             elif self.category in ("onehot",):
                 fn = self.onehot_encoder.get_feature_names()
-                feats[fn] = self.onehot_encoder.transform(
-                    X[self.category_cols_].astype(object)
-                )[fn]
+                tk.table.add_cols(
+                    feats,
+                    fn,
+                    self.onehot_encoder.transform(
+                        X[self.category_cols_].astype(object)
+                    )[fn],
+                )
 
         if len(self.rare_category_cols_):
-            feats[
-                [f"{c}_target" for c in self.rare_category_cols_]
-            ] = self.target_encoder.transform(X[self.rare_category_cols_])
-            feats[
-                [f"{c}_count" for c in self.rare_category_cols_]
-            ] = self.count_encoder.transform(X[self.rare_category_cols_])
+            tk.table.add_cols(
+                feats,
+                [f"{c}_target" for c in self.rare_category_cols_],
+                self.target_encoder.transform(X[self.rare_category_cols_]),
+            )
+            tk.table.add_cols(
+                feats,
+                [f"{c}_count" for c in self.rare_category_cols_],
+                self.count_encoder.transform(X[self.rare_category_cols_]),
+            )
 
         if len(self.iszero_cols_):
-            feats[[f"{c}_iszero" for c in self.iszero_cols_]] = (
-                X[self.iszero_cols_] == 0
+            tk.table.add_cols(
+                feats,
+                [f"{c}_iszero" for c in self.iszero_cols_],
+                X[self.iszero_cols_] == 0,
             )
         if len(self.isnull_cols_):
-            feats[[f"{c}_isnull" for c in self.isnull_cols_]] = X[
-                self.isnull_cols_
-            ].isnull()
+            tk.table.add_cols(
+                feats,
+                [f"{c}_isnull" for c in self.isnull_cols_],
+                X[self.isnull_cols_].isnull(),
+            )
 
         # infチェック
         isinf_cols = np.isinf(feats.astype(np.float32)).any(axis=0)

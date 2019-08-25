@@ -1,6 +1,7 @@
 import pathlib
 
 import numpy as np
+import sklearn.metrics
 
 import pytoolkit as tk
 
@@ -207,3 +208,9 @@ class ModelExtractionCallback:
         """Early stop したときの boosting round を返す。"""
         self._assert_called_cb()
         return self._model.best_iteration
+
+
+def lgb_r2(preds, train_data):
+    """LightGBM用R2"""
+    labels = train_data.get_label()
+    return "r2", sklearn.metrics.r2_score(labels, preds), True

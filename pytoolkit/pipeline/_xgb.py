@@ -1,6 +1,7 @@
 import pathlib
 
 import numpy as np
+import sklearn.metrics
 
 import pytoolkit as tk
 
@@ -114,3 +115,9 @@ class XGBModel(Model):
             fi += [d.get(c, 0) for c in columns]
 
         return pd.DataFrame(data={"importance": fi}, index=columns)
+
+
+def xgb_r2(preds, dtrain):
+    """XGBoost用R2"""
+    labels = dtrain.get_label()
+    return "r2", np.float32(sklearn.metrics.r2_score(labels, preds))

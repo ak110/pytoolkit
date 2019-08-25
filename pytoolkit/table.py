@@ -15,6 +15,21 @@ def safe_apply(s, fn):
     return s.apply(lambda x: x if pd.isnull(x) else fn(x))
 
 
+def add_col(df, column_name, values):
+    """上書きしないようにチェックしつつ列追加。"""
+    if column_name in df:
+        raise ValueError(f"Column '{column_name}' already exists.")
+    df[column_name] = values
+
+
+def add_cols(df, column_names, values):
+    """上書きしないようにチェックしつつ列追加。"""
+    for column_name in column_names:
+        if column_name in df:
+            raise ValueError(f"Column '{column_name}' already exists.")
+    df[column_names] = values
+
+
 def group_columns(df, cols=None):
     """列を型ごとにグルーピングして返す。
 

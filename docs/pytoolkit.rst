@@ -40,6 +40,7 @@ Submodules
    pytoolkit.threading
    pytoolkit.training
    pytoolkit.utils
+   pytoolkit.validation
    pytoolkit.vis
    pytoolkit.web
 
