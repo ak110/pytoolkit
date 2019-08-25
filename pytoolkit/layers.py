@@ -16,46 +16,6 @@ def get_custom_objects():
     }
 
 
-class Preprocess(keras.layers.Layer):
-    """前処理レイヤー。"""
-
-    def __init__(self, mode="tf", **kwargs):
-        super().__init__(**kwargs)
-        assert mode in ("caffe", "tf", "torch", "div255", "std")
-        self.mode = mode
-
-    def compute_output_shape(self, input_shape):
-        return input_shape
-
-    def call(self, inputs, **kwargs):
-        del kwargs
-        if self.mode == "caffe":
-            return K.bias_add(
-                inputs[..., ::-1], K.constant(np.array([-103.939, -116.779, -123.68]))
-            )
-        elif self.mode == "tf":
-            return (inputs / 127.5) - 1
-        elif self.mode == "torch":
-            return K.bias_add(
-                (inputs / 255.0), K.constant(np.array([-0.485, -0.456, -0.406]))
-            ) / np.array([0.229, 0.224, 0.225])
-        elif self.mode == "div255":
-            return inputs / 255.0
-        elif self.mode == "std":
-            axes = tuple(range(1, K.ndim(inputs)))
-            return (inputs - K.mean(inputs, axis=axes, keepdims=True)) / (
-                K.std(inputs, axis=axes, keepdims=True) + K.epsilon()
-            )
-        else:
-            assert False
-            return None
-
-    def get_config(self):
-        config = {"mode": self.mode}
-        base_config = super().get_config()
-        return dict(list(base_config.items()) + list(config.items()))
-
-
 class ConvertColor(keras.layers.Layer):
     """ColorNet <https://arxiv.org/abs/1902.00267> 用の色変換とついでにスケーリング。
 
@@ -1025,13 +985,23 @@ class SubpixelConv2D(keras.layers.Layer):
 class WSConv2D(keras.layers.Layer):
     """Weight StandardizationなConv2D <https://arxiv.org/abs/1903.10520>"""
 
-    def __init__(self, filters, kernel_size=3, strides=1, activation=None, **kwargs):
+    def __init__(
+        self,
+        filters,
+        kernel_size=3,
+        strides=1,
+        use_bias=False,
+        activation=None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.filters = filters
         self.kernel_size = tk.utils.normalize_tuple(kernel_size, 2)
         self.strides = tk.utils.normalize_tuple(strides, 2)
         self.activation = keras.activations.get(activation)
+        self.use_bias = use_bias
         self.kernel = None
+        self.bias = None
 
     def compute_output_shape(self, input_shape):
         assert len(input_shape) == 4
@@ -1057,6 +1027,14 @@ class WSConv2D(keras.layers.Layer):
             regularizer=keras.regularizers.l2(1e-4),
             name="kernel",
         )
+        if self.use_bias:
+            self.bias = self.add_weight(
+                shape=(self.filters,),
+                initializer=keras.initializers.zeros(),
+                name="bias",
+            )
+        else:
+            self.bias = None
         super().build(input_shape)
 
     def call(self, inputs, **kwargs):
@@ -1067,6 +1045,8 @@ class WSConv2D(keras.layers.Layer):
         kernel = (self.kernel - kernel_mean) / (kernel_std + 1e-5)
 
         outputs = K.conv2d(inputs, kernel, padding="same", strides=self.strides)
+        if self.use_bias:
+            outputs = K.bias_add(outputs, self.bias, "channels_last")
         if self.activation is not None:
             outputs = self.activation(outputs)
         return outputs
@@ -1076,6 +1056,7 @@ class WSConv2D(keras.layers.Layer):
             "filters": self.filters,
             "kernel_size": self.kernel_size,
             "strides": self.strides,
+            "use_bias": self.use_bias,
             "activation": keras.activations.serialize(self.activation),
         }
         base_config = super().get_config()

@@ -4,14 +4,6 @@ import pytest
 import pytoolkit as tk
 
 
-@pytest.mark.usefixtures("session")
-def test_Preprocess():
-    X = np.array([[[[0, 127.5, 255]]]])
-    y = np.array([[[[-1, 0, +1]]]])
-    pred = _predict_layer(tk.layers.Preprocess(), X)
-    assert pred == pytest.approx(y)
-
-
 @pytest.mark.parametrize("color", ["rgb", "lab", "hsv", "yuv", "ycbcr", "hed", "yiq"])
 def test_ConvertColor(session, color):
     import skimage.color
