@@ -13,6 +13,9 @@ def test_features_encoder(category):
     df_train["TAX"] = df_train["TAX"].astype("object")  # 適切ではないがテストのための変換
     df_test = df_train.copy()
 
+    # 列の順番が変わっても結果が同じになる事を確認する
+    df_test = df_test[np.random.permutation(df_test.columns.values)]
+
     encoder = tk.preprocessing.FeaturesEncoder(category=category)
     df_train = encoder.fit_transform(df_train, train_set.labels)
     df_test = encoder.transform(df_test)

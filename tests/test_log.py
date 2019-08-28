@@ -35,25 +35,17 @@ def test_logger(tmpdir):
 
 
 def test_trace():
-    import logging
-
     stderr = io.StringIO()
     logger = tk.log.get(tk.log.__name__)
     tk.log.close(logger)
-    logger.addHandler(tk.log.stream_handler(stderr, level=logging.DEBUG, fmt=None))
+    logger.addHandler(tk.log.stream_handler(stderr, level="DEBUG", fmt=None))
 
-    @tk.log.trace()
-    def _traced_func():
+    with tk.log.trace_scope("trace_scope"):
         logger.debug("あいうえお")
 
-    _traced_func()
-    _traced_func()
     tk.log.close(logger)
 
     lines = stderr.getvalue().split("\n")
-    assert lines[0] == "test_trace.<locals>._traced_func 開始"
+    assert lines[0] == "trace_scope 開始"
     assert lines[1] == "あいうえお"
-    assert lines[2].startswith("test_trace.<locals>._traced_func 終了 (")
-    assert lines[3] == "test_trace.<locals>._traced_func 開始"
-    assert lines[4] == "あいうえお"
-    assert lines[5].startswith("test_trace.<locals>._traced_func 終了 (")
+    assert lines[2].startswith("trace_scope 終了 (")

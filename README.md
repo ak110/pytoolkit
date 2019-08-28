@@ -28,6 +28,7 @@
 - diskcache
 - h5py
 - horovod
+- ipython
 - matplotlib
 - mpi4py
 - onnxmltools

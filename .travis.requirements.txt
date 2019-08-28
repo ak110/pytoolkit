@@ -22,6 +22,6 @@ pytest
 scikit-image
 scikit-learn
 scipy
-tensorflow
+tensorflow>=1.14.0
 tf2onnx
 tqdm

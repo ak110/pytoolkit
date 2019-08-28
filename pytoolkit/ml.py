@@ -10,8 +10,6 @@ import sklearn.utils
 
 import pytoolkit as tk
 
-from . import log as tk_log
-
 
 def listup_classification(dirpath, class_names=None, use_tqdm=True, check_image=False):
     """画像分類でよくある、クラス名ディレクトリの列挙。クラス名の配列, X, yを返す。
@@ -310,7 +308,6 @@ def print_regression_metrics(y_true, y_pred, print_fn=None):
         tk.log.get(__name__).warning("Error: print_regression_metrics", exc_info=True)
 
 
-@tk_log.trace()
 def search_threshold(y_true, y_pred, thresholds, score_fn, direction, cv=10):
     """閾値探索。
 
@@ -352,13 +349,14 @@ def search_threshold(y_true, y_pred, thresholds, score_fn, direction, cv=10):
         )
         return val_score, best_th
 
-    with joblib.Parallel(n_jobs=-1, backend="threading") as parallel:
-        scores, ths = zip(*parallel([_search(fold) for fold in range(cv)]))
+    with tk.log.trace_scope("search_threshold"):
+        with joblib.Parallel(n_jobs=-1, backend="threading") as parallel:
+            scores, ths = zip(*parallel([_search(fold) for fold in range(cv)]))
 
-    score = np.mean(scores)
-    th = np.mean(ths)
-    tk.log.get(__name__).info(f"mean: score={score:.4f} threshold={th:.4f}")
-    return score, th
+        score = np.mean(scores)
+        th = np.mean(ths)
+        tk.log.get(__name__).info(f"mean: score={score:.4f} threshold={th:.4f}")
+        return score, th
 
 
 def mape(y_true, y_pred):

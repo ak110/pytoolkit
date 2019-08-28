@@ -1,14 +1,18 @@
 #!/bin/bash
 set -eux
 
+black .
+
+flake8
+
+pushd tests/
+./touch.sh
+popd
+
 pushd docs/
 ./update.sh
 make html
 popd
-
-black .
-
-flake8
 
 pylint -j0 pytoolkit scripts
 

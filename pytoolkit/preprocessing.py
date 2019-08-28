@@ -9,8 +9,6 @@ import sklearn.preprocessing
 
 import pytoolkit as tk
 
-from . import log as tk_log
-
 
 def encode_binary(s, true_value, false_value):
     """列の2値化。"""
@@ -164,149 +162,150 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
         self.fit_transform(X, y)
         return self
 
-    @tk_log.trace()
     def fit_transform(self, X, y):
-        # 対象とする列のリストアップ
-        candidate_columns = set(X.columns.values)
-        # ignore_colsを除外
-        candidate_columns -= set(self.ignore_cols)
-        # 値が1種類の列を削除 (Null + 1種類の値だと消えちゃうので注意: 先にisnull列を作っておけばOK)
-        candidate_columns -= set(X.nunique()[lambda s: s <= 1].index)
+        with tk.log.trace_scope("FeaturesEncoder.fit_transform"):
+            # 対象とする列のリストアップ
+            candidate_columns = set(X.columns.values)
+            # ignore_colsを除外
+            candidate_columns -= set(self.ignore_cols)
+            # 値が1種類の列を削除 (Null + 1種類の値だと消えちゃうので注意: 先にisnull列を作っておけばOK)
+            candidate_columns -= set(X.nunique()[lambda s: s <= 1].index)
 
-        # 型で振り分ける
-        cols = tk.table.group_columns(X, sorted(candidate_columns))
-        assert len(cols["unknown"]) == 0, f"Unknown dtypes: {cols['unknown']}"
+            # 型で振り分ける
+            cols = tk.table.group_columns(X, sorted(candidate_columns))
+            assert len(cols["unknown"]) == 0, f"Unknown dtypes: {cols['unknown']}"
 
-        # 以下、列ごとの処理
+            # 以下、列ごとの処理
 
-        self.binary_cols_ = [
-            c
-            for c in cols["binary"]
-            if self.binary_fraction <= X[c].mean() <= (1 - self.binary_fraction)
-        ]
+            self.binary_cols_ = [
+                c
+                for c in cols["binary"]
+                if self.binary_fraction <= X[c].mean() <= (1 - self.binary_fraction)
+            ]
 
-        self.numeric_cols_ = cols["numeric"]
+            self.numeric_cols_ = cols["numeric"]
 
-        self.category_cols_ = cols["categorical"]
-        if len(self.category_cols_):
-            if self.category in ("category", "ordinal"):
-                self.ordinal_encoder.fit(X[self.category_cols_].astype(object))
-            elif self.category in ("onehot",):
-                self.onehot_encoder.fit(X[self.category_cols_].astype(object))
+            self.category_cols_ = cols["categorical"]
+            if len(self.category_cols_):
+                if self.category in ("category", "ordinal"):
+                    self.ordinal_encoder.fit(X[self.category_cols_].astype(object))
+                elif self.category in ("onehot",):
+                    self.onehot_encoder.fit(X[self.category_cols_].astype(object))
 
-        self.rare_category_cols_ = [
-            c
-            for c in self.category_cols_
-            if X[c].nunique() >= 3
-            and X[c].value_counts().min() <= len(X) * self.rare_category_fraction
-        ]
-        if len(self.rare_category_cols_):
-            self.target_encoder.fit(X[self.rare_category_cols_], y)
-            self.count_encoder.fit(X[self.rare_category_cols_], y)
+            self.rare_category_cols_ = [
+                c
+                for c in self.category_cols_
+                if X[c].nunique() >= 3
+                and X[c].value_counts().min() <= len(X) * self.rare_category_fraction
+            ]
+            if len(self.rare_category_cols_):
+                self.target_encoder.fit(X[self.rare_category_cols_], y)
+                self.count_encoder.fit(X[self.rare_category_cols_], y)
 
-        self.iszero_cols_ = [
-            c
-            for c in self.numeric_cols_
-            if self.iszero_fraction <= (X[c] == 0).mean() <= (1 - self.iszero_fraction)
-        ]
-        self.isnull_cols_ = [
-            c
-            for c in self.numeric_cols_ + self.category_cols_
-            if self.isnull_fraction
-            <= X[c].isnull().mean()
-            <= (1 - self.isnull_fraction)
-        ]
+            self.iszero_cols_ = [
+                c
+                for c in self.numeric_cols_
+                if self.iszero_fraction
+                <= (X[c] == 0).mean()
+                <= (1 - self.iszero_fraction)
+            ]
+            self.isnull_cols_ = [
+                c
+                for c in self.numeric_cols_ + self.category_cols_
+                if self.isnull_fraction
+                <= X[c].isnull().mean()
+                <= (1 - self.isnull_fraction)
+            ]
 
-        self.feature_names_ = None
-        self.notnull_cols_ = None
-        feats = self.transform(X, y)
-        # 値の重複列の削除
-        self.feature_names_ = feats.columns.values[~feats.T.duplicated()]
-        feats = feats[self.feature_names_]
-        # trainにnullが含まれない列を覚えておく (チェック用)
-        self.notnull_cols_ = feats.notnull().all(axis=0)
+            self.feature_names_ = None
+            self.notnull_cols_ = None
+            feats = self.transform(X, y)
+            # 値の重複列の削除
+            self.feature_names_ = feats.columns.values[~feats.T.duplicated()]
+            feats = feats[self.feature_names_]
+            # trainにnullが含まれない列を覚えておく (チェック用)
+            self.notnull_cols_ = feats.notnull().all(axis=0)
 
-        return feats
+            return feats
 
-    @tk_log.trace()
     def transform(self, X, y=None):
-        import pandas as pd
-
         del y
+        with tk.log.trace_scope("FeaturesEncoder.transform"):
+            import pandas as pd
 
-        feats = pd.DataFrame(index=X.index)
+            feats = pd.DataFrame(index=X.index)
 
-        if len(self.binary_cols_):
-            feats[self.binary_cols_] = X[self.binary_cols_].astype(np.bool)
+            if len(self.binary_cols_):
+                feats[self.binary_cols_] = X[self.binary_cols_].astype(np.bool)
 
-        if len(self.numeric_cols_):
-            feats[self.numeric_cols_] = X[self.numeric_cols_].astype(np.float32)
+            if len(self.numeric_cols_):
+                feats[self.numeric_cols_] = X[self.numeric_cols_].astype(np.float32)
 
-        if len(self.category_cols_):
-            if self.category == "category":
-                feats[self.category_cols_] = self.ordinal_encoder.transform(
-                    X[self.category_cols_].astype(object)
-                ).astype("category")
-            elif self.category in "ordinal":
-                feats[self.category_cols_] = (
-                    self.ordinal_encoder.transform(
+            if len(self.category_cols_):
+                if self.category == "category":
+                    feats[self.category_cols_] = self.ordinal_encoder.transform(
                         X[self.category_cols_].astype(object)
+                    ).astype("category")
+                elif self.category in "ordinal":
+                    feats[self.category_cols_] = (
+                        self.ordinal_encoder.transform(
+                            X[self.category_cols_].astype(object)
+                        )
+                        .astype("object")
+                        .fillna(-1)
                     )
-                    .astype("object")
-                    .fillna(-1)
-                )
-            elif self.category in ("onehot",):
-                fn = self.onehot_encoder.get_feature_names()
+                elif self.category in ("onehot",):
+                    fn = self.onehot_encoder.get_feature_names()
+                    tk.table.add_cols(
+                        feats,
+                        fn,
+                        self.onehot_encoder.transform(
+                            X[self.category_cols_].astype(object)
+                        )[fn],
+                    )
+
+            if len(self.rare_category_cols_):
                 tk.table.add_cols(
                     feats,
-                    fn,
-                    self.onehot_encoder.transform(
-                        X[self.category_cols_].astype(object)
-                    )[fn],
+                    [f"{c}_target" for c in self.rare_category_cols_],
+                    self.target_encoder.transform(X[self.rare_category_cols_]),
+                )
+                tk.table.add_cols(
+                    feats,
+                    [f"{c}_count" for c in self.rare_category_cols_],
+                    self.count_encoder.transform(X[self.rare_category_cols_]),
                 )
 
-        if len(self.rare_category_cols_):
-            tk.table.add_cols(
-                feats,
-                [f"{c}_target" for c in self.rare_category_cols_],
-                self.target_encoder.transform(X[self.rare_category_cols_]),
-            )
-            tk.table.add_cols(
-                feats,
-                [f"{c}_count" for c in self.rare_category_cols_],
-                self.count_encoder.transform(X[self.rare_category_cols_]),
-            )
-
-        if len(self.iszero_cols_):
-            tk.table.add_cols(
-                feats,
-                [f"{c}_iszero" for c in self.iszero_cols_],
-                X[self.iszero_cols_] == 0,
-            )
-        if len(self.isnull_cols_):
-            tk.table.add_cols(
-                feats,
-                [f"{c}_isnull" for c in self.isnull_cols_],
-                X[self.isnull_cols_].isnull(),
-            )
-
-        # infチェック
-        isinf_cols = np.isinf(feats.astype(np.float32)).any(axis=0)
-        if isinf_cols.any():
-            raise RuntimeError(f"inf: {feats.columns.values[isinf_cols]}")
-
-        # 値の重複列の削除
-        if self.feature_names_ is not None:
-            feats = feats[self.feature_names_]
-        # testにのみnullが含まれないかチェック
-        if self.notnull_cols_ is not None:
-            test_only_null = feats.isnull().any(axis=0) & self.notnull_cols_
-            if test_only_null.any():
-                raise RuntimeError(
-                    f"test only null: {test_only_null[test_only_null].index.values}"
+            if len(self.iszero_cols_):
+                tk.table.add_cols(
+                    feats,
+                    [f"{c}_iszero" for c in self.iszero_cols_],
+                    X[self.iszero_cols_] == 0,
+                )
+            if len(self.isnull_cols_):
+                tk.table.add_cols(
+                    feats,
+                    [f"{c}_isnull" for c in self.isnull_cols_],
+                    X[self.isnull_cols_].isnull(),
                 )
 
-        return feats
+            # infチェック
+            isinf_cols = np.isinf(feats.astype(np.float32)).any(axis=0)
+            if isinf_cols.any():
+                raise RuntimeError(f"inf: {feats.columns.values[isinf_cols]}")
+
+            # 値の重複列の削除
+            if self.feature_names_ is not None:
+                feats = feats[self.feature_names_]
+            # testにのみnullが含まれないかチェック
+            if self.notnull_cols_ is not None:
+                test_only_null = feats.isnull().any(axis=0) & self.notnull_cols_
+                if test_only_null.any():
+                    raise RuntimeError(
+                        f"test only null: {test_only_null[test_only_null].index.values}"
+                    )
+
+            return feats
 
 
 class OrdinalEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):

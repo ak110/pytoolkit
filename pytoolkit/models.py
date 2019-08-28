@@ -14,7 +14,6 @@ import tensorflow as tf
 import pytoolkit as tk
 
 from . import keras
-from . import log as tk_log
 
 
 def load(
@@ -145,20 +144,19 @@ def plot(
     tk.hvd.barrier()
 
 
-@tk_log.trace()
 def compile(
     model: keras.models.Model, optimizer, loss, metrics=None, loss_weights=None
 ):  # pylint: disable=redefined-builtin
     """compileするだけ。"""
-    if tk.hvd.initialized():
-        optimizer = keras.optimizers.get(optimizer)
-        optimizer = tk.hvd.get().DistributedOptimizer(
-            optimizer, compression=tk.hvd.get().Compression.fp16
-        )
-    model.compile(optimizer, loss, metrics, loss_weights=loss_weights)
+    with tk.log.trace_scope("compile"):
+        if tk.hvd.initialized():
+            optimizer = keras.optimizers.get(optimizer)
+            optimizer = tk.hvd.get().DistributedOptimizer(
+                optimizer, compression=tk.hvd.get().Compression.fp16
+            )
+        model.compile(optimizer, loss, metrics, loss_weights=loss_weights)
 
 
-@tk_log.trace()
 def fit(
     model: keras.models.Model,
     train_dataset,
@@ -204,24 +202,14 @@ def fit(
         val_dataset = None
     elif validation_freq == "auto":
         # "auto"なら適当に決める(独自仕様)
-        if val_dataset is None:
-            validation_freq = None
-        else:
-            # ・sqrt(epochs)回くらいやれば十分？ (指標にも依るが…)
-            # ・valがtrainの10%未満くらいなら毎回やっても問題無い
-            max_val_per_train = 0.1
-            validation_freq = max(
-                int(np.sqrt(epochs)),
-                int(len(val_dataset) / (len(train_dataset) * max_val_per_train)),
-                1,
-            )
-            # 最後のepochはvalidationしたいので、そこからvalidation_freq毎に。
-            validation_freq = list(range(epochs, 0, -validation_freq))
+        validation_freq = make_validation_freq(
+            validation_freq, epochs, train_dataset, val_dataset
+        )
 
-    kwargs = {}
+    fit_kwargs = {}
     if validation_freq is not None:
         if tf.__version__ >= "1.14":
-            kwargs["validation_freq"] = validation_freq
+            fit_kwargs["validation_freq"] = validation_freq
 
     train_data_loader = tk.data.DataLoader(
         train_dataset,
@@ -244,13 +232,7 @@ def fit(
         else None
     )
 
-    callbacks = (callbacks or []) + [
-        tk.callbacks.EpochLogger(),
-        tk.callbacks.ErrorOnNaN(),
-    ]
-    if tk.hvd.initialized() and tk.hvd.size() > 1:
-        callbacks.append(tk.hvd.get().callbacks.BroadcastGlobalVariablesCallback(0))
-        callbacks.append(tk.hvd.get().callbacks.MetricAverageCallback())
+    callbacks = make_callbacks(callbacks)
 
     # TensorFlowのバグ対策
     if tf.__version__ == "1.13.1":
@@ -265,19 +247,20 @@ def fit(
 
         training_generator.model_iteration = model_iteration_fixed
     try:
-        model.fit_generator(
-            train_data_loader,
-            validation_data=val_data_loader,
-            class_weight=class_weight,
-            epochs=epochs,
-            callbacks=callbacks,
-            verbose=verbose if tk.hvd.is_master() else 0,
-            initial_epoch=initial_epoch,
-            use_multiprocessing=use_multiprocessing,
-            workers=workers,
-            max_queue_size=max_queue_size,
-            **kwargs,
-        )
+        with tk.log.trace_scope("fit"):
+            model.fit_generator(
+                train_data_loader,
+                validation_data=val_data_loader,
+                class_weight=class_weight,
+                epochs=epochs,
+                callbacks=callbacks,
+                verbose=verbose if tk.hvd.is_master() else 0,
+                initial_epoch=initial_epoch,
+                use_multiprocessing=use_multiprocessing,
+                workers=workers,
+                max_queue_size=max_queue_size,
+                **fit_kwargs,
+            )
     finally:
         if tf.__version__ == "1.13.1":
             training_generator.model_iteration = original
@@ -292,7 +275,36 @@ def fit(
         )
 
 
-@tk_log.trace()
+def make_validation_freq(
+    validation_freq, epochs, train_dataset, val_dataset, max_val_per_train=0.1
+):
+    """validation_freqをほどよい感じに作成する。"""
+    if val_dataset is None:
+        return None
+    # ・sqrt(epochs)回くらいやれば十分？ (指標にも依るが…)
+    # ・valがtrainの10%未満くらいなら毎回やっても問題無い
+    validation_freq = max(
+        int(np.sqrt(epochs)),
+        int(len(val_dataset) / (len(train_dataset) * max_val_per_train)),
+        1,
+    )
+    # 最後のepochはvalidationしたいので、そこからvalidation_freq毎に。
+    validation_freq = list(range(epochs, 0, -validation_freq))
+    return validation_freq
+
+
+def make_callbacks(callbacks):
+    """callbacksをいい感じにする。"""
+    callbacks = (callbacks or []) + [
+        tk.callbacks.EpochLogger(),
+        tk.callbacks.ErrorOnNaN(),
+    ]
+    if tk.hvd.initialized() and tk.hvd.size() > 1:
+        callbacks.append(tk.hvd.get().callbacks.BroadcastGlobalVariablesCallback(0))
+        callbacks.append(tk.hvd.get().callbacks.MetricAverageCallback())
+    return callbacks
+
+
 def predict(
     model: keras.models.Model,
     dataset,
@@ -321,20 +333,21 @@ def predict(
         np.ndarray or generator: 予測結果。flow=True時はサンプルごとのgenerator。
 
     """
-    verbose = verbose if tk.hvd.is_master() else 0
-    dataset = tk.hvd.split(dataset) if use_horovod else dataset
-    data_loader = tk.data.DataLoader(dataset, preprocessor, batch_size)
-    if flow:
-        assert not use_horovod, "flow=True and use_horovod=True is not supported."
-        return _predict_flow(model, data_loader, verbose, on_batch_fn, desc)
-    else:
-        if on_batch_fn is not None:
-            values = _predict_flow(model, data_loader, verbose, on_batch_fn, desc)
-            values = np.array(list(values))
+    with tk.log.trace_scope("predict"):
+        verbose = verbose if tk.hvd.is_master() else 0
+        dataset = tk.hvd.split(dataset) if use_horovod else dataset
+        data_loader = tk.data.DataLoader(dataset, preprocessor, batch_size)
+        if flow:
+            assert not use_horovod, "flow=True and use_horovod=True is not supported."
+            return _predict_flow(model, data_loader, verbose, on_batch_fn, desc)
         else:
-            values = model.predict_generator(data_loader, verbose=verbose)
-        values = tk.hvd.allgather(values) if use_horovod else values
-        return values
+            if on_batch_fn is not None:
+                values = _predict_flow(model, data_loader, verbose, on_batch_fn, desc)
+                values = np.array(list(values))
+            else:
+                values = model.predict_generator(data_loader, verbose=verbose)
+            values = tk.hvd.allgather(values) if use_horovod else values
+            return values
 
 
 def _predict_flow(model, data_loader, verbose, on_batch_fn, desc):
@@ -350,7 +363,6 @@ def _predict_on_batch(model: keras.models.Model, X):
     return model.predict_on_batch(X)
 
 
-@tk_log.trace()
 def evaluate(
     model: keras.models.Model,
     dataset,
@@ -372,20 +384,20 @@ def evaluate(
         dict: metricsの文字列と値のdict
 
     """
-    dataset = tk.hvd.split(dataset) if use_horovod else dataset
-    data_loader = tk.data.DataLoader(dataset, preprocessor, batch_size)
-    values = model.evaluate_generator(
-        data_loader, verbose=verbose if tk.hvd.is_master() else 0
-    )
-    values = tk.hvd.allreduce(values) if use_horovod else values
-    if len(model.metrics_names) == 1:
-        evals = {model.metrics_names[0]: values}
-    else:
-        evals = dict(zip(model.metrics_names, values))
-    return evals
+    with tk.log.trace_scope("evaluate"):
+        dataset = tk.hvd.split(dataset) if use_horovod else dataset
+        data_loader = tk.data.DataLoader(dataset, preprocessor, batch_size)
+        values = model.evaluate_generator(
+            data_loader, verbose=verbose if tk.hvd.is_master() else 0
+        )
+        values = tk.hvd.allreduce(values) if use_horovod else values
+        if len(model.metrics_names) == 1:
+            evals = {model.metrics_names[0]: values}
+        else:
+            evals = dict(zip(model.metrics_names, values))
+        return evals
 
 
-@tk_log.trace()
 def multi_gpu_model(model, batch_size, gpus=None):
     """複数GPUでデータ並列するモデルを作成する。
 
@@ -403,21 +415,22 @@ def multi_gpu_model(model, batch_size, gpus=None):
     assert isinstance(model.inputs, list)
     assert isinstance(model.outputs, list)
 
-    parallel_model = keras.utils.multi_gpu_model(model, gpus)
+    with tk.log.trace_scope("multi_gpu_model"):
+        parallel_model = keras.utils.multi_gpu_model(model, gpus)
 
-    # Model.saveの置き換え
-    # https://github.com/fchollet/keras/issues/2436#issuecomment-294243024
-    def _save(self_, *args, **kargs):
-        assert self_ is not None  # noqa
-        model.save(*args, **kargs)
+        # Model.saveの置き換え
+        # https://github.com/fchollet/keras/issues/2436#issuecomment-294243024
+        def _save(self_, *args, **kargs):
+            assert self_ is not None  # noqa
+            model.save(*args, **kargs)
 
-    def _save_weights(self_, *args, **kargs):
-        assert self_ is not None  # noqa
-        model.save_weights(*args, **kargs)
+        def _save_weights(self_, *args, **kargs):
+            assert self_ is not None  # noqa
+            model.save_weights(*args, **kargs)
 
-    parallel_model.save = type(model.save)(_save, parallel_model)
-    parallel_model.save_weights = type(model.save_weights)(
-        _save_weights, parallel_model
-    )
+        parallel_model.save = type(model.save)(_save, parallel_model)
+        parallel_model.save_weights = type(model.save_weights)(
+            _save_weights, parallel_model
+        )
 
-    return parallel_model, batch_size * gpus
+        return parallel_model, batch_size * gpus

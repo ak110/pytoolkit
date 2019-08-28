@@ -20,6 +20,7 @@ class LGBModel(Model):
         callbacks (array-like): lgb.cvのパラメータ
         cv_params (dict): lgb.cvのパラメータ (`**kwargs`)
         seeds (array-like): seed ensemble用のseedの配列
+        init_score (array-like): trainとtestのinit_score
 
     """
 
@@ -33,6 +34,7 @@ class LGBModel(Model):
         callbacks=None,
         cv_params=None,
         seeds=None,
+        init_score=None,
         preprocessors=None,
         postprocessors=None,
     ):
@@ -45,6 +47,7 @@ class LGBModel(Model):
         self.callbacks = callbacks
         self.cv_params = cv_params
         self.seeds = seeds
+        self.init_score = init_score
         self.gbms_ = None
 
     def _save(self, models_dir):
@@ -94,6 +97,7 @@ class LGBModel(Model):
             dataset.labels,
             weight=dataset.weights if dataset.weights is not None else None,
             group=np.bincount(dataset.groups) if dataset.groups is not None else None,
+            init_score=dataset.init_score if dataset.init_score is not None else None,
             free_raw_data=False,
         )
 
@@ -135,7 +139,7 @@ class LGBModel(Model):
         return scores
 
     def _predict(self, dataset):
-        return np.array(
+        pred = np.array(
             [
                 np.mean(
                     [
@@ -150,6 +154,9 @@ class LGBModel(Model):
                 for gbms_fold in self.gbms_
             ]
         )
+        if dataset.init_score is not None:
+            pred += np.expand_dims(dataset.init_score, axis=0)
+        return pred
 
     def feature_importance(self, importance_type="gain"):
         """Feature ImportanceをDataFrameで返す。"""

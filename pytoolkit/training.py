@@ -6,10 +6,8 @@ import numpy as np
 import pytoolkit as tk
 
 from . import keras
-from . import log as tk_log
 
 
-@tk_log.trace()
 def check(model: keras.models.Model, plot_path=None):
     """モデルの動作確認など。
 
@@ -18,17 +16,17 @@ def check(model: keras.models.Model, plot_path=None):
         plot_path (PathLike object): モデルのplotの保存先パス
 
     """
-    # summary表示
-    tk.models.summary(model)
-    # グラフを出力
-    if plot_path is not None:
-        try:
-            tk.models.plot(model, plot_path)
-        except ValueError:
-            pass  # "Cannot embed the 'svg' image format" (tf >= 1.14)
+    with tk.log.trace_scope("check"):
+        # summary表示
+        tk.models.summary(model)
+        # グラフを出力
+        if plot_path is not None:
+            try:
+                tk.models.plot(model, plot_path)
+            except ValueError:
+                pass  # "Cannot embed the 'svg' image format" (tf >= 1.14)
 
 
-@tk_log.trace()
 def cv(
     create_model_fn,
     train_dataset,
@@ -61,29 +59,29 @@ def cv(
         kwargs (dict): tk.models.fit()のパラメータ
 
     """
-    for fold, (train_indices, val_indices) in enumerate(folds):
-        # モデルが存在すればスキップ
-        model_path = models_dir / model_name_format.format(fold=fold)
-        if skip_if_exists and model_path.exists():
-            continue
+    with tk.log.trace_scope("cv"):
+        for fold, (train_indices, val_indices) in enumerate(folds):
+            # モデルが存在すればスキップ
+            model_path = models_dir / model_name_format.format(fold=fold)
+            if skip_if_exists and model_path.exists():
+                continue
 
-        with tk.log.trace_scope(f"fold#{fold}"):
-            tr = train_dataset.slice(train_indices)
-            vl = train_dataset.slice(val_indices)
-            with tk.dl.session(use_horovod=True):
-                train(
-                    model=create_model_fn(),
-                    train_dataset=tr,
-                    val_dataset=vl,
-                    train_preprocessor=train_preprocessor,
-                    val_preprocessor=val_preprocessor,
-                    batch_size=batch_size,
-                    model_path=model_path,
-                    **kwargs,
-                )
+            with tk.log.trace_scope(f"fold#{fold}"):
+                tr = train_dataset.slice(train_indices)
+                vl = train_dataset.slice(val_indices)
+                with tk.dl.session(use_horovod=True):
+                    train(
+                        model=create_model_fn(),
+                        train_dataset=tr,
+                        val_dataset=vl,
+                        train_preprocessor=train_preprocessor,
+                        val_preprocessor=val_preprocessor,
+                        batch_size=batch_size,
+                        model_path=model_path,
+                        **kwargs,
+                    )
 
 
-@tk_log.trace()
 def predict_cv(
     dataset,
     preprocessor,
@@ -119,55 +117,55 @@ def predict_cv(
         list or ndarray: oof=Falseの場合、予測結果のnfold個の配列。oof=Trueの場合、予測結果のndarray。
 
     """
-    if models is not None:
-        assert nfold is None or nfold == len(models)
-        assert load_model_fn is None
-        assert models_dir is None
-        nfold = len(models)
-    if oof:
-        assert folds is not None
-        nfold = len(folds)
-    else:
-        assert folds is None
-        folds = [(range(0), range(len(dataset))) for _ in range(nfold)]
-    load_model_fn = load_model_fn or tk.models.load
-
-    with tk.dl.session(
-        use_horovod=use_horovod
-    ) if models is None else contextlib.nullcontext():
-        if models is None:
-            models = [
-                load_model_fn(models_dir / model_name_format.format(fold=fold))
-                for fold in tk.utils.trange(nfold, desc="load models")
-            ]
-
-        pred_list = []
-        val_indices_list = []
-        for fold, (model, (_, val_indices)) in enumerate(zip(models, folds)):
-            pred = tk.models.predict(
-                model,
-                dataset.slice(val_indices),
-                preprocessor,
-                batch_size,
-                desc=f"{'oofp' if oof else 'predict'}({fold + 1}/{nfold})",
-                use_horovod=use_horovod,
-                **kwargs,
-            )
-            pred_list.append(pred)
-            val_indices_list.append(val_indices)
-
+    with tk.log.trace_scope("predict_cv"):
+        if models is not None:
+            assert nfold is None or nfold == len(models)
+            assert load_model_fn is None
+            assert models_dir is None
+            nfold = len(models)
         if oof:
-            # TODO: multi output対応
-            output_shape = (len(dataset),) + pred_list[0].shape[1:]
-            oofp = np.empty(output_shape, dtype=pred_list[0].dtype)
-            for pred, val_indices in zip(pred_list, val_indices_list):
-                oofp[val_indices] = pred
-            return oofp
+            assert folds is not None
+            nfold = len(folds)
         else:
-            return pred_list
+            assert folds is None
+            folds = [(range(0), range(len(dataset))) for _ in range(nfold)]
+        load_model_fn = load_model_fn or tk.models.load
+
+        with tk.dl.session(
+            use_horovod=use_horovod
+        ) if models is None else contextlib.nullcontext():
+            if models is None:
+                models = [
+                    load_model_fn(models_dir / model_name_format.format(fold=fold))
+                    for fold in tk.utils.trange(nfold, desc="load models")
+                ]
+
+            pred_list = []
+            val_indices_list = []
+            for fold, (model, (_, val_indices)) in enumerate(zip(models, folds)):
+                pred = tk.models.predict(
+                    model,
+                    dataset.slice(val_indices),
+                    preprocessor,
+                    batch_size,
+                    desc=f"{'oofp' if oof else 'predict'}({fold + 1}/{nfold})",
+                    use_horovod=use_horovod,
+                    **kwargs,
+                )
+                pred_list.append(pred)
+                val_indices_list.append(val_indices)
+
+            if oof:
+                # TODO: multi output対応
+                output_shape = (len(dataset),) + pred_list[0].shape[1:]
+                oofp = np.empty(output_shape, dtype=pred_list[0].dtype)
+                for pred, val_indices in zip(pred_list, val_indices_list):
+                    oofp[val_indices] = pred
+                return oofp
+            else:
+                return pred_list
 
 
-@tk_log.trace()
 def train(
     model: keras.models.Model,
     train_dataset,
@@ -195,46 +193,47 @@ def train(
         dict: val_datasetがNoneでなければevaluate結果 (metricsの文字列と値のdict)
 
     """
-    assert model_path is not None
-    # 学習
-    tk.log.get(__name__).info(
-        f"train: {len(train_dataset)} samples, val: {len(val_dataset) if val_dataset is not None else 0} samples, batch_size: {batch_size}x{tk.hvd.size()}"
-    )
-    tk.hvd.barrier()
-    tk.models.fit(
-        model,
-        train_dataset,
-        train_preprocessor=train_preprocessor,
-        val_dataset=val_dataset,
-        val_preprocessor=val_preprocessor,
-        batch_size=batch_size,
-        **kwargs,
-    )
-    try:
-        # 評価
-        evaluate(
+    with tk.log.trace_scope("train"):
+        assert model_path is not None
+        # 学習
+        tk.log.get(__name__).info(
+            f"train: {len(train_dataset)} samples, val: {len(val_dataset) if val_dataset is not None else 0} samples, batch_size: {batch_size}x{tk.hvd.size()}"
+        )
+        tk.hvd.barrier()
+        tk.models.fit(
             model,
             train_dataset,
-            preprocessor=train_preprocessor,
+            train_preprocessor=train_preprocessor,
+            val_dataset=val_dataset,
+            val_preprocessor=val_preprocessor,
             batch_size=batch_size,
-            prefix="",
-            use_horovod=True,
+            **kwargs,
         )
-        if val_dataset:
-            evals = evaluate(
+        try:
+            # 評価
+            evaluate(
                 model,
-                val_dataset,
-                preprocessor=val_preprocessor,
+                train_dataset,
+                preprocessor=train_preprocessor,
                 batch_size=batch_size,
-                prefix="val_",
+                prefix="",
                 use_horovod=True,
             )
-        else:
-            evals = None
-        return evals
-    finally:
-        # モデルを保存
-        tk.models.save(model, model_path)
+            if val_dataset:
+                evals = evaluate(
+                    model,
+                    val_dataset,
+                    preprocessor=val_preprocessor,
+                    batch_size=batch_size,
+                    prefix="val_",
+                    use_horovod=True,
+                )
+            else:
+                evals = None
+            return evals
+        finally:
+            # モデルを保存
+            tk.models.save(model, model_path)
 
 
 def evaluate(
@@ -269,7 +268,7 @@ def evaluate(
     if tk.hvd.is_master():
         max_len = max([len(n) for n in evals]) + max(len(prefix), 4)
         for n, v in evals.items():
-            tk_log.get(__name__).info(
+            tk.log.get(__name__).info(
                 f'{prefix}{n}:{" " * (max_len - len(prefix) - len(n))} {v:.3f}'
             )
     tk.hvd.barrier()

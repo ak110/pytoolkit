@@ -455,6 +455,31 @@ class PadChannel2D(keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+class CoordChannel1D(keras.layers.Layer):
+    """CoordConvなレイヤー。
+
+    ■[1807.03247] An Intriguing Failing of Convolutional Neural Networks and the CoordConv Solution
+    https://arxiv.org/abs/1807.03247
+    """
+
+    def compute_output_shape(self, input_shape):
+        assert len(input_shape) == 3
+        input_shape = list(input_shape)
+        input_shape[-1] += 1
+        return tuple(input_shape)
+
+    def call(self, inputs, **kwargs):
+        del kwargs
+        input_shape = K.shape(inputs)
+        pad_shape = (input_shape[0], input_shape[1], 1)
+        ones = tf.ones(pad_shape, K.floatx())
+        gradation = K.cast(K.arange(0, input_shape[1]), K.floatx()) / K.cast(
+            input_shape[1], K.floatx()
+        )
+        pad_channel = ones * K.reshape(gradation, (1, input_shape[1], 1))
+        return K.concatenate([inputs] + [pad_channel], axis=-1)
+
+
 class CoordChannel2D(keras.layers.Layer):
     """CoordConvなレイヤー。
 
@@ -674,18 +699,14 @@ class GroupNormalization(keras.layers.Layer):
             N, H, W, C = shape[0], shape[1], shape[2], shape[3]
             g = K.minimum(self.groups, C)
             x = K.reshape(x, [N, H, W, g, C // g])
-            mean, var = tf.nn.moments(
-                x=x, axes=[1, 2, 4], keep_dims=True
-            )  # TODO: tf v2からkeepdims
+            mean, var = tf.compat.v2.nn.moments(x=x, axes=[1, 2, 4], keepdims=True)
             x = (x - mean) / K.sqrt(var + self.epsilon)
             x = K.reshape(x, [N, H, W, C])
         elif ndim == 5:  # 3D
             N, T, H, W, C = shape[0], shape[1], shape[2], shape[3], shape[4]
             g = K.minimum(self.groups, C)
             x = K.reshape(x, [N, T, H, W, g, C // g])
-            mean, var = tf.nn.moments(
-                x=x, axes=[1, 2, 3, 5], keep_dims=True
-            )  # TODO: tf v2からkeepdims
+            mean, var = tf.compat.v2.nn.moments(x=x, axes=[1, 2, 3, 5], keepdims=True)
             x = (x - mean) / K.sqrt(var + self.epsilon)
             x = K.reshape(x, [N, T, H, W, C])
         else:

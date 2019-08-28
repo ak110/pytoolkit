@@ -21,6 +21,7 @@ class Dataset:
         groups (np.ndarray): グループID
         weights (np.ndarray): サンプルごとの重み
         ids (np.ndarray): ID (入力データにしないIDが別途必要な場合用)
+        init_score (np.ndarray): LightGBMなど用。boostingのベーススコア。
 
     """
 
@@ -29,6 +30,7 @@ class Dataset:
     groups: np.ndarray = None
     weights: np.ndarray = None
     ids: np.ndarray = None
+    init_score: np.ndarray = None
 
     def __len__(self):
         return len(self.data)
@@ -56,6 +58,7 @@ class Dataset:
             groups=self.__class__.slice_field(self.groups, rindex),
             weights=self.__class__.slice_field(self.weights, rindex),
             ids=self.__class__.slice_field(self.ids, rindex),
+            init_score=self.__class__.slice_field(self.init_score, rindex),
         )
 
     def copy(self):
@@ -71,6 +74,7 @@ class Dataset:
             groups=self.__class__.copy_field(self.groups),
             weights=self.__class__.copy_field(self.weights),
             ids=self.__class__.copy_field(self.ids),
+            init_score=self.__class__.copy_field(self.init_score),
         )
 
     @classmethod
@@ -82,6 +86,7 @@ class Dataset:
             groups=cls.concat_field(dataset1.groups, dataset2.groups),
             weights=cls.concat_field(dataset1.weights, dataset2.weights),
             ids=cls.concat_field(dataset1.ids, dataset2.ids),
+            init_score=cls.concat_field(dataset1.init_score, dataset2.init_score),
         )
 
     @classmethod
@@ -291,6 +296,13 @@ class DataLoader(keras.utils.Sequence):
         """データを返す。"""
         for i in range(len(self)):
             yield self[i]
+
+    def run(self):
+        """データを返す。"""
+        while True:
+            for i in range(len(self)):
+                yield self[i]
+            self.on_epoch_end()
 
 
 def _generate_shuffled_indices(data_count):
