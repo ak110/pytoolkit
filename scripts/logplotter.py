@@ -59,6 +59,7 @@ def _main():
                         xlim=xlim,
                         ylim=ylim,
                         marker="." if len(df) <= 1 or df[c].isnull().any() else None,
+                        legend=True,
                     )
                 )
             ax.set_xlabel("Epochs")

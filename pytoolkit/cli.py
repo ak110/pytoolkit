@@ -21,7 +21,7 @@ class App:
 
     def __init__(self, output_dir):
         self.output_dir = pathlib.Path(output_dir)
-        self.inits = [tk.utils.better_exceptions]
+        self.inits = [tk.utils.better_exceptions, tk.math.set_ndarray_format]
         self.terms = []
         self.commands = {}
         self.then = {}

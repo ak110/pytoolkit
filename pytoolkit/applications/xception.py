@@ -48,6 +48,9 @@ def xception(weights="imagenet", input_tensor=None, input_shape=None, for_small=
     mp = functools.partial(
         keras.layers.MaxPooling2D, pool_size=3, strides=2, padding="same"
     )
+    ap = functools.partial(
+        keras.layers.AveragePooling2D, pool_size=3, strides=2, padding="same"
+    )
 
     first_strides = 1 if for_small else 2
     x = conv2d(32, strides=first_strides, name="block1_conv1")(input_tensor)
@@ -57,7 +60,7 @@ def xception(weights="imagenet", input_tensor=None, input_shape=None, for_small=
     x = bn(name="block1_conv2_bn")(x)
     x = act(name="block1_conv2_act")(x)
 
-    residual = keras.layers.AveragePooling2D(pool_size=2, strides=1)(x)  # 怪しいアレンジ
+    residual = ap(pool_size=2, strides=1)(x)  # 怪しいアレンジ
     residual = conv2d(128, kernel_size=1, strides=2, name="block2_conv")(residual)
     residual = bn(name="block2_conv_bn")(residual)
 
@@ -70,7 +73,7 @@ def xception(weights="imagenet", input_tensor=None, input_shape=None, for_small=
     x = mp(name="block2_pool")(x)
     x = keras.layers.add([x, residual], name="block2_add")
 
-    residual = keras.layers.AveragePooling2D(pool_size=2, strides=1)(x)  # 怪しいアレンジ
+    residual = ap(pool_size=2, strides=1)(x)  # 怪しいアレンジ
     residual = conv2d(256, kernel_size=1, strides=2, name="block3_conv")(residual)
     residual = bn(name="block3_conv_bn")(residual)
 
@@ -84,7 +87,7 @@ def xception(weights="imagenet", input_tensor=None, input_shape=None, for_small=
     x = mp(name="block3_pool")(x)
     x = keras.layers.add([x, residual], name="block3_add")
 
-    residual = keras.layers.AveragePooling2D(pool_size=2, strides=1)(x)  # 怪しいアレンジ
+    residual = ap(pool_size=2, strides=1)(x)  # 怪しいアレンジ
     residual = conv2d(728, kernel_size=1, strides=2, name="block4_conv")(residual)
     residual = bn(name="block4_conv_bn")(residual)
 
@@ -114,7 +117,7 @@ def xception(weights="imagenet", input_tensor=None, input_shape=None, for_small=
 
         x = keras.layers.add([x, residual], name=prefix + "_add")
 
-    residual = keras.layers.AveragePooling2D(pool_size=2, strides=1)(x)  # 怪しいアレンジ
+    residual = ap(pool_size=2, strides=1)(x)  # 怪しいアレンジ
     residual = conv2d(1024, kernel_size=1, strides=2, name="block13_conv")(residual)
     residual = bn(name="block13_conv_bn")(residual)
 
