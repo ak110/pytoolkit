@@ -32,13 +32,15 @@ if True:
     # その他のimport
     from . import log
     from . import applications
+    from . import datasets
+    from . import evaluations
+    from . import pipeline
     from . import autoaugment
     from . import backend
     from . import cache
     from . import callbacks
     from . import cli
     from . import data
-    from . import datasets
     from . import dl
     from . import hpo
     from . import hvd
@@ -52,7 +54,6 @@ if True:
     from . import ndimage
     from . import od
     from . import optimizers
-    from . import pipeline
     from . import preprocessing
     from . import table
     from . import threading

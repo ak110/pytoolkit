@@ -6,7 +6,7 @@ import tensorflow as tf
 import pytoolkit as tk
 
 from .. import keras
-from ._core import Model
+from .core import Model
 
 
 class KerasModel(Model):

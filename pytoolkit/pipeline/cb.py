@@ -4,7 +4,7 @@ import numpy as np
 
 import pytoolkit as tk
 
-from ._core import Model
+from .core import Model
 
 
 class CBModel(Model):
