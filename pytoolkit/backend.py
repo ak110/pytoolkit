@@ -37,10 +37,10 @@ def binary_crossentropy(y_true, y_pred, from_logits=False, alpha=None):
     #                      = log1p(exp(x))
 
     if alpha is None:
-        loss = tf.log1p(K.exp(y_pred)) - y_true * y_pred
+        loss = tf.math.log1p(K.exp(y_pred)) - y_true * y_pred
     else:
         t = 2 * alpha * y_true - alpha - y_true + 1
-        loss = 2 * (t * tf.log1p(K.exp(y_pred)) - alpha * y_true * y_pred)
+        loss = 2 * (t * tf.math.log1p(K.exp(y_pred)) - alpha * y_true * y_pred)
 
     return loss
 
@@ -63,7 +63,7 @@ def binary_focal_loss(y_true, y_pred, gamma=2.0, from_logits=False, alpha=None):
     # -log(1 - sigmoid(x)) = log(exp(x) + 1)
     #                      = log1p(exp(x))
 
-    t = tf.log1p(K.exp(y_logit))
+    t = tf.math.log1p(K.exp(y_logit))
     loss1 = y_true * (y_pred_inv ** gamma) * (-y_logit + t)
     loss2 = (1 - y_true) * (y_pred ** gamma) * t
 

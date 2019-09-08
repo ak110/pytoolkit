@@ -11,7 +11,7 @@ env:
 
 install:
   - pip install cython
-  - pip install -r .travis.requirements.txt
+  - pip install -r requirements.travis.txt
 
 script:
   - black --check .

@@ -206,11 +206,6 @@ def fit(
             validation_freq, epochs, train_set, val_set
         )
 
-    fit_kwargs = {}
-    if validation_freq is not None:
-        if tf.__version__ >= "1.14":
-            fit_kwargs["validation_freq"] = validation_freq
-
     train_data_loader = tk.data.DataLoader(
         train_set,
         train_preprocessor,
@@ -234,36 +229,24 @@ def fit(
 
     callbacks = make_callbacks(callbacks)
 
-    # TensorFlowのバグ対策
-    if tf.__version__ == "1.13.1":
-        from tensorflow.python.keras.engine import (  # pylint: disable=no-name-in-module
-            training_generator,
+    fit_kwargs = {}
+    if validation_freq is not None:
+        fit_kwargs["validation_freq"] = validation_freq
+
+    with tk.log.trace_scope("fit"):
+        model.fit(
+            train_data_loader,
+            validation_data=val_data_loader,
+            class_weight=class_weight,
+            epochs=epochs,
+            callbacks=callbacks,
+            verbose=verbose if tk.hvd.is_master() else 0,
+            initial_epoch=initial_epoch,
+            use_multiprocessing=use_multiprocessing,
+            workers=workers,
+            max_queue_size=max_queue_size,
+            **fit_kwargs,
         )
-
-        original = training_generator.model_iteration
-
-        def model_iteration_fixed(*args, verbose=0, **kwargs):
-            return original(*args, verbose=verbose, **kwargs)
-
-        training_generator.model_iteration = model_iteration_fixed
-    try:
-        with tk.log.trace_scope("fit"):
-            model.fit_generator(
-                train_data_loader,
-                validation_data=val_data_loader,
-                class_weight=class_weight,
-                epochs=epochs,
-                callbacks=callbacks,
-                verbose=verbose if tk.hvd.is_master() else 0,
-                initial_epoch=initial_epoch,
-                use_multiprocessing=use_multiprocessing,
-                workers=workers,
-                max_queue_size=max_queue_size,
-                **fit_kwargs,
-            )
-    finally:
-        if tf.__version__ == "1.13.1":
-            training_generator.model_iteration = original
 
     # DataLoaderの処理時間を表示
     tk.log.get(__name__).info(
@@ -345,7 +328,7 @@ def predict(
                 values = _predict_flow(model, data_loader, verbose, on_batch_fn, desc)
                 values = np.array(list(values))
             else:
-                values = model.predict_generator(data_loader, verbose=verbose)
+                values = model.predict(data_loader, verbose=verbose)
             values = tk.hvd.allgather(values) if use_horovod else values
             return values
 
@@ -387,7 +370,7 @@ def evaluate(
     with tk.log.trace_scope("evaluate"):
         dataset = tk.hvd.split(dataset) if use_horovod else dataset
         data_loader = tk.data.DataLoader(dataset, preprocessor, batch_size)
-        values = model.evaluate_generator(
+        values = model.evaluate(
             data_loader, verbose=verbose if tk.hvd.is_master() else 0
         )
         values = tk.hvd.allreduce(values) if use_horovod else values

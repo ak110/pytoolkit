@@ -15,7 +15,6 @@ numpy
 onnxmltools
 opencv-python
 pandas
-pydocstyle<4.0.0
 pydot
 pylint
 pytest
