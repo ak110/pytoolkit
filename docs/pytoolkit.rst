@@ -8,6 +8,7 @@ Subpackages
 
    pytoolkit.applications
    pytoolkit.datasets
+   pytoolkit.evaluations
    pytoolkit.pipeline
 
 Submodules

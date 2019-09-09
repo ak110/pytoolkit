@@ -7,6 +7,8 @@ Submodules
 .. toctree::
 
    pytoolkit.datasets.coco
+   pytoolkit.datasets.keras
+   pytoolkit.datasets.sklearn
    pytoolkit.datasets.voc
 
 Module contents
