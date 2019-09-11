@@ -105,6 +105,18 @@ def categorical_focal_loss(y_true, y_pred, gamma=2.0, alpha=None):
     return reduce(loss)
 
 
+def symmetric_lovasz_hinge(
+    y_true, y_pred, from_logits=False, per_sample=True, activation="elu+1"
+):
+    """lovasz_hingeのsymmetricバージョン"""
+    if not from_logits:
+        y_pred = tk.backend.logit(y_pred)
+        from_logits = True
+    loss1 = lovasz_hinge(y_true, y_pred, from_logits, per_sample, activation)
+    loss2 = lovasz_hinge(1 - y_true, -y_pred, from_logits, per_sample, activation)
+    return (loss1 + loss2) / 2
+
+
 def lovasz_hinge(
     y_true, y_pred, from_logits=False, per_sample=True, activation="elu+1"
 ):

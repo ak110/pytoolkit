@@ -37,24 +37,20 @@ def split(dataset, nfold, split_seed=1, stratify=None):
     return folds
 
 
-def pseudo_labeling(train_dataset, folds1, test_dataset, folds2, test_weights=0.5):
+def pseudo_labeling(train_set, folds1, test_set, folds2, test_weights=0.5):
     """pseudo labelなdataset, foldsを作って返す。"""
-    dataset = tk.data.Dataset.concat(train_dataset, test_dataset)
+    dataset = tk.data.Dataset.concat(train_set, test_set)
 
-    pl_weight = test_weights * len(train_dataset) / len(test_dataset)
+    pl_weight = test_weights * len(train_set) / len(test_set)
     w_train = (
-        np.ones(len(train_dataset))
-        if train_dataset.weights is None
-        else train_dataset.weights
+        np.ones(len(train_set)) if train_set.weights is None else train_set.weights
     )
     w_test = (
-        np.ones(len(test_dataset))
-        if test_dataset.weights is None
-        else test_dataset.weights
+        np.ones(len(test_set)) if test_set.weights is None else test_set.weights
     ) * pl_weight
     dataset.weights = np.concatenate([w_train, w_test * pl_weight])
 
-    folds = concat_folds(folds1, folds2, len(train_dataset))
+    folds = concat_folds(folds1, folds2, len(train_set))
     return dataset, folds
 
 

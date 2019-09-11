@@ -6,6 +6,8 @@ Submodules
 
 .. toctree::
 
+   pytoolkit.evaluations.classification
+   pytoolkit.evaluations.regression
    pytoolkit.evaluations.ss
 
 Module contents

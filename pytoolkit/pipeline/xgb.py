@@ -18,7 +18,7 @@ class XGBModel(Model):
         num_boost_round (int): xgb.cvのパラメータ
         verbose_eval (int): xgb.cvのパラメータ
         callbacks (array-like): xgb.cvのパラメータ
-        cv_params (dict): xgb.cvのパラメータ (**kwargs)
+        cv_params (dict): xgb.cvのパラメータ (kwargs)
         seeds (array-like): seed ensemble用のseedの配列
 
     """

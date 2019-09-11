@@ -22,6 +22,7 @@ class Dataset:
         weights (np.ndarray): サンプルごとの重み
         ids (np.ndarray): ID (入力データにしないIDが別途必要な場合用)
         init_score (np.ndarray): LightGBMなど用。boostingのベーススコア。
+        metadata (dict): メタデータ。色々独自に入れておいてOK。sliceとかではそのままコピーされたりするので注意。
 
     """
 
@@ -31,6 +32,7 @@ class Dataset:
     weights: np.ndarray = None
     ids: np.ndarray = None
     init_score: np.ndarray = None
+    metadata: dict = None
 
     def __len__(self):
         return len(self.data)
@@ -59,6 +61,7 @@ class Dataset:
             weights=self.__class__.slice_field(self.weights, rindex),
             ids=self.__class__.slice_field(self.ids, rindex),
             init_score=self.__class__.slice_field(self.init_score, rindex),
+            metadata=self.metadata.copy() if self.metadata is not None else None,
         )
 
     def copy(self):
@@ -75,6 +78,7 @@ class Dataset:
             weights=self.__class__.copy_field(self.weights),
             ids=self.__class__.copy_field(self.ids),
             init_score=self.__class__.copy_field(self.init_score),
+            metadata=self.metadata.copy() if self.metadata is not None else None,
         )
 
     @classmethod
@@ -87,6 +91,9 @@ class Dataset:
             weights=cls.concat_field(dataset1.weights, dataset2.weights),
             ids=cls.concat_field(dataset1.ids, dataset2.ids),
             init_score=cls.concat_field(dataset1.init_score, dataset2.init_score),
+            metadata=dataset1.metadata.copy()
+            if dataset1.metadata is not None
+            else None,
         )
 
     @classmethod

@@ -29,7 +29,7 @@ def check(model: keras.models.Model, plot_path=None):
 
 def cv(
     create_model_fn,
-    train_dataset,
+    train_set,
     folds,
     train_preprocessor,
     val_preprocessor,
@@ -48,7 +48,7 @@ def cv(
 
     Args:
         create_model_fn (callable): モデルを作成する関数。
-        train_dataset (tk.data.Dataset): 訓練データ
+        train_set (tk.data.Dataset): 訓練データ
         train_preprocessor (tk.data.Preprocessor): 訓練データの前処理
         val_preprocessor (tk.data.Preprocessor): 検証データの前処理
         folds (array-like): train/valのindexの配列のtupleの配列。(sklearn.model_selection.KFold().split()の結果など)
@@ -67,13 +67,13 @@ def cv(
                 continue
 
             with tk.log.trace_scope(f"fold#{fold}"):
-                tr = train_dataset.slice(train_indices)
-                vl = train_dataset.slice(val_indices)
+                tr = train_set.slice(train_indices)
+                vl = train_set.slice(val_indices)
                 with tk.dl.session(use_horovod=True):
                     train(
                         model=create_model_fn(),
-                        train_dataset=tr,
-                        val_dataset=vl,
+                        train_set=tr,
+                        val_set=vl,
                         train_preprocessor=train_preprocessor,
                         val_preprocessor=val_preprocessor,
                         batch_size=batch_size,
@@ -168,9 +168,9 @@ def predict_cv(
 
 def train(
     model: keras.models.Model,
-    train_dataset,
+    train_set,
     train_preprocessor,
-    val_dataset=None,
+    val_set=None,
     val_preprocessor=None,
     batch_size=32,
     *,
@@ -181,30 +181,30 @@ def train(
 
     Args:
         model (keras.models.Model): モデル
-        train_dataset (tk.data.Dataset): 訓練データ
+        train_set (tk.data.Dataset): 訓練データ
         train_preprocessor (tk.data.Preprocessor): 訓練データの前処理
-        val_dataset (tk.data.Dataset): 検証データ
+        val_set (tk.data.Dataset): 検証データ
         val_preprocessor (tk.data.Preprocessor): 検証データの前処理
         batch_size (int): バッチサイズ
         model_path (PathLike object): モデルの保存先パス (必須)
         kwargs (dict): tk.models.fit()のパラメータ
 
     Returns:
-        dict: val_datasetがNoneでなければevaluate結果 (metricsの文字列と値のdict)
+        dict: val_setがNoneでなければevaluate結果 (metricsの文字列と値のdict)
 
     """
     with tk.log.trace_scope("train"):
         assert model_path is not None
         # 学習
         tk.log.get(__name__).info(
-            f"train: {len(train_dataset)} samples, val: {len(val_dataset) if val_dataset is not None else 0} samples, batch_size: {batch_size}x{tk.hvd.size()}"
+            f"train: {len(train_set)} samples, val: {len(val_set) if val_set is not None else 0} samples, batch_size: {batch_size}x{tk.hvd.size()}"
         )
         tk.hvd.barrier()
         tk.models.fit(
             model,
-            train_dataset,
+            train_set,
             train_preprocessor=train_preprocessor,
-            val_dataset=val_dataset,
+            val_set=val_set,
             val_preprocessor=val_preprocessor,
             batch_size=batch_size,
             **kwargs,
@@ -213,16 +213,16 @@ def train(
             # 評価
             evaluate(
                 model,
-                train_dataset,
+                train_set,
                 preprocessor=train_preprocessor,
                 batch_size=batch_size,
                 prefix="",
                 use_horovod=True,
             )
-            if val_dataset:
+            if val_set:
                 evals = evaluate(
                     model,
-                    val_dataset,
+                    val_set,
                     preprocessor=val_preprocessor,
                     batch_size=batch_size,
                     prefix="val_",

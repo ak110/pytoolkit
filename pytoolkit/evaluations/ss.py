@@ -16,15 +16,14 @@ def print_ss_metrics(y_true, y_pred, threshold=0.5, print_fn=None):
         dict: 各種metrics
 
     """
-    print_fn = print_fn or tk.log.get(__name__)
+    print_fn = print_fn or tk.log.get(__name__).info
     evals = evaluate_ss(y_true, y_pred, threshold)
-    print_fn(f"IoU:        {evals['iou']:.3f}")
-    if np.ndim(evals["iou"]) >= 1:
-        print_fn(f"mIoU:       {evals['miou']:.3f}")
-    print_fn(f"IoU score:  {evals['iou_score']:.3f}")
-    print_fn(f"Dice coef.: {evals['dice']:.3f}")
-    print_fn(f"IoU mean:   {evals['iou_mean']:.3f}")
-    print_fn(f"Acc empty:  {evals['acc_empty']:.3f}")
+    print_fn(f"mIoU:           {evals['miou']:.3f}")
+    print_fn(f"IoU score:      {evals['iou_score']:.3f}")
+    print_fn(f"Dice coef.:     {evals['dice']:.3f}")
+    print_fn(f"IoU mean:       {evals['iou_mean']:.3f}")
+    print_fn(f"Acc empty:      {evals['acc_empty']:.3f}")
+    print_fn(f"Pixel Accuracy: {evals['acc']:.3f}")
     return evals
 
 
@@ -36,14 +35,16 @@ def evaluate_ss(y_true, y_pred, threshold=0.5):
     Args:
         y_true (array-like): ラベル (shape=(N, H, W) or (N, H, W, C))
         y_pred (array-like): 推論結果 (shape=(N, H, W) or (N, H, W, C))
+        threshold (float): 閾値 (ラベルと推論結果と両方に適用)
 
     Returns:
         dict: 各種metrics
 
-        "iou_score": IoUスコア (塩コンペのスコア)
-        "dice": ダイス係数
-        "iou_mean": 答えが空でないときのIoUの平均
-        "acc_empty": 答えが空の場合の正解率
+        - "iou_score": IoUスコア (塩コンペのスコア)
+        - "dice": ダイス係数
+        - "iou_mean": 答えが空でないときのIoUの平均
+        - "acc_empty": 答えが空の場合の正解率
+        - "acc": Pixel Accuracy
 
     References:
         - <https://www.kaggle.com/c/tgs-salt-identification-challenge/overview/evaluation>
@@ -52,48 +53,71 @@ def evaluate_ss(y_true, y_pred, threshold=0.5):
     """
 
     def process_per_image(yt, yp):
-        if np.ndim(yt) == 3:
+        if np.ndim(yt) == 2:
             yt = np.expand_dims(yt, axis=-1)
-        if np.ndim(yp) == 3:
+        if np.ndim(yp) == 2:
             yp = np.expand_dims(yp, axis=-1)
-        assert np.ndim(yt) == 4
-        assert np.ndim(yp) == 4
+        assert np.ndim(yt) == 3  # (H, W, C)
+        assert np.ndim(yp) == 3  # (H, W, C)
         p_true = yt >= threshold
         p_pred = yp >= threshold
-        n_true = np.logical_not(p_true)
-        n_pred = np.logical_not(p_pred)
-        tp = np.sum(np.logical_and(p_true, p_pred), axis=(0, 1))
-        fp = np.sum(np.logical_and(n_true, p_pred), axis=(0, 1))
-        tn = np.sum(np.logical_and(n_true, n_pred), axis=(0, 1))
-        fn = np.sum(np.logical_and(p_true, n_pred), axis=(0, 1))
-        return p_true, p_pred, tp, fp, tn, fn
+        n_true = ~p_true
+        n_pred = ~p_pred
+        tp = np.sum(p_true & p_pred, axis=(0, 1))  # (C,)
+        fp = np.sum(n_true & p_pred, axis=(0, 1))  # (C,)
+        tn = np.sum(n_true & n_pred, axis=(0, 1))  # (C,)
+        fn = np.sum(p_true & n_pred, axis=(0, 1))  # (C,)
+        gp = np.sum(p_true, axis=(0, 1))  # (C,)
+        pp = np.sum(p_pred, axis=(0, 1))  # (C,)
+        if yt.shape[-1] == 1:
+            cm = np.array([[np.sum(tp), np.sum(fn)], [np.sum(fp), np.sum(tn)]])
+        else:
+            assert yt.shape[-1] >= 2
+            num_classes = yt.shape[-1]
+            cm = np.zeros((num_classes, num_classes), dtype=np.int64)
+            yt_c = yt.argmax(axis=-1)
+            yp_c = yp.argmax(axis=-1)
+            for i in range(num_classes):
+                for j in range(num_classes):
+                    cm[i, j] = np.sum((yt_c == i) & (yp_c == j))
+        return tp, fp, tn, fn, gp, pp, cm
 
     r = [process_per_image(yt, yp) for yt, yp in zip(y_true, y_pred)]
-    p_true, p_pred, tp, fp, tn, fn = zip(*r)
-    p_true = np.array(p_true)
-    p_pred = np.array(p_pred)
-    tp = np.array(tp)
-    fp = np.array(fp)
-    tn = np.array(tn)
-    fn = np.array(fn)
+    tp, fp, tn, fn, gp, pp, cm = zip(*r)
+    tp = np.array(tp)  # (N, C), dtype=int
+    fp = np.array(fp)  # (N, C), dtype=int
+    tn = np.array(tn)  # (N, C), dtype=int
+    fn = np.array(fn)  # (N, C), dtype=int
+    gp = np.array(gp)  # (N, C), dtype=int
+    pp = np.array(pp)  # (N, C), dtype=int
+    cm = np.sum(cm, axis=0)  # (C, C), dtype=int
+    obj_mask = gp > 0  # (N, C), dtype=bool
+    bg_mask = ~obj_mask  # (N, C), dtype=bool
+    pred_bg_mask = pp <= 0  # (N, C), dtype=bool
 
-    sample_iou = tp.sum(axis=1) / (tp.sum(axis=1) + fp.sum(axis=1) + tn.sum(axis=1))
-    class_iou = tp.sum(axis=0) / (tp.sum(axis=0) + fp.sum(axis=0) + tn.sum(axis=0))
-    class_dice = 2 * tp.sum(axis=0) / (p_true.sum(axis=0) + p_pred.sum(axis=0))
+    epsilon = 1e-7
+    sample_iou = tp / (tp + fp + tn + epsilon)  # (N, C)
+    class_iou = np.diag(cm) / (
+        np.sum(cm, axis=1) + np.sum(cm, axis=0) - np.diag(cm)
+    )  # (C,)
+    dice = np.mean(2 * tp / (gp + pp + epsilon))
 
     # 塩コンペのスコア
     prec_list = []
     for th in np.arange(0.5, 1.0, 0.05):
-        pred_obj = sample_iou > th
-        match = np.logical_and(p_true, pred_obj) + tn
+        pred_obj = sample_iou > th  # (N, C)
+        match = (obj_mask & pred_obj) + (bg_mask & pred_bg_mask)  # (N, C)
         prec_list.append(np.mean(match))
     iou_score = np.mean(prec_list)
 
+    acc = np.diag(cm) / np.sum(cm, axis=1)
+
     return {
         "iou": class_iou,
-        "miou": np.mean(class_iou) if np.ndim(class_iou) >= 1 else class_iou,
+        "miou": np.mean(class_iou),
         "iou_score": iou_score,
-        "dice": np.mean(class_dice),
-        "iou_mean": np.mean(sample_iou[p_true]),
-        "acc_empty": np.mean(tn[np.logical_not(p_true)]),
+        "dice": dice,
+        "iou_mean": np.mean(sample_iou[obj_mask]),
+        "acc_empty": np.mean(pred_bg_mask[bg_mask]),
+        "acc": np.mean(acc),
     }

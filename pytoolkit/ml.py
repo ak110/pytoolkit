@@ -222,92 +222,6 @@ def print_scores(
     print_fn(f"{cn:16s}:  {prec:.3f}   {rec:.3f}   {f1:.3f}  {sup:7d}")
 
 
-def top_k_accuracy(y_true, proba_pred, k=5):
-    """Top-K accuracy。"""
-    assert len(y_true.shape) == 1
-    assert len(proba_pred.shape) == 2
-    best_k = np.argsort(proba_pred, axis=1)[:, -k:]
-    return np.mean([y in best_k[i, :] for i, y in enumerate(y_true)])
-
-
-def print_classification_metrics(y_true, proba_pred, average="macro", print_fn=None):
-    """分類の指標色々を表示する。"""
-    try:
-        print_fn = print_fn or tk.log.get(__name__).info
-        true_type = sklearn.utils.multiclass.type_of_target(y_true)
-        pred_type = sklearn.utils.multiclass.type_of_target(proba_pred)
-        if true_type == "binary":  # binary
-            assert pred_type in ("binary", "continuous", "continuous-multioutput")
-            if pred_type == "continuous-multioutput":
-                assert proba_pred.shape == (
-                    len(proba_pred),
-                    2,
-                ), f"Shape error: {proba_pred.shape}"
-                proba_pred = proba_pred[:, 1]
-            y_pred = (np.asarray(proba_pred) >= 0.5).astype(np.int32)
-            acc = sklearn.metrics.accuracy_score(y_true, y_pred)
-            prec, rec, f1, _ = sklearn.metrics.precision_recall_fscore_support(
-                y_true, y_pred
-            )
-            auc = sklearn.metrics.roc_auc_score(y_true, proba_pred)
-            ap = sklearn.metrics.average_precision_score(y_true, proba_pred)
-            logloss = sklearn.metrics.log_loss(y_true, proba_pred)
-            print_fn(f"Accuracy:  {acc:.3f} (Error: {1 - acc:.3f})")
-            print_fn(f"F1-score:  {f1:.3f}")
-            print_fn(f"AUC:       {auc:.3f}")
-            print_fn(f"AP:        {ap:.3f}")
-            print_fn(f"Precision: {prec:.3f}")
-            print_fn(f"Recall:    {rec:.3f}")
-            print_fn(f"Logloss:   {logloss:.3f}")
-        else:  # multiclass
-            assert true_type == "multiclass"
-            assert pred_type == "continuous-multioutput"
-            num_classes = np.max(y_true) + 1
-            labels = list(range(num_classes))
-            ohe_true = to_categorical(num_classes)(np.asarray(y_true))
-            y_pred = np.argmax(proba_pred, axis=-1)
-            acc = sklearn.metrics.accuracy_score(y_true, y_pred)
-            prec, rec, f1, _ = sklearn.metrics.precision_recall_fscore_support(
-                y_true, y_pred, labels=labels, average=average
-            )
-            auc = sklearn.metrics.roc_auc_score(ohe_true, proba_pred, average=average)
-            ap = sklearn.metrics.average_precision_score(
-                ohe_true, proba_pred, average=average
-            )
-            logloss = sklearn.metrics.log_loss(ohe_true, proba_pred)
-            print_fn(f"Accuracy:   {acc:.3f} (Error: {1 - acc:.3f})")
-            print_fn(f"F1-{average:5s}:   {f1:.3f}")
-            print_fn(f"AUC-{average:5s}:  {auc:.3f}")
-            print_fn(f"AP-{average:5s}:   {ap:.3f}")
-            print_fn(f"Prec-{average:5s}: {prec:.3f}")
-            print_fn(f"Rec-{average:5s}:  {rec:.3f}")
-            print_fn(f"Logloss:    {logloss:.3f}")
-    except BaseException:
-        tk.log.get(__name__).warning(
-            "Error: print_classification_metrics", exc_info=True
-        )
-
-
-def print_regression_metrics(y_true, y_pred, print_fn=None):
-    """回帰の指標色々を表示する。"""
-    try:
-        print_fn = print_fn or tk.log.get(__name__).info
-        y_mean = np.tile(np.mean(y_pred), len(y_true))
-        r2 = sklearn.metrics.r2_score(y_true, y_pred)
-        rmse = np.sqrt(sklearn.metrics.mean_squared_error(y_true, y_pred))
-        rmseb = np.sqrt(sklearn.metrics.mean_squared_error(y_true, y_mean))
-        mae = sklearn.metrics.mean_absolute_error(y_true, y_pred)
-        maeb = sklearn.metrics.mean_absolute_error(y_true, y_mean)
-        print_fn(f"R^2:      {r2:.3f}")
-        print_fn(f"RMSE:     {rmse:.3f} (base: {rmseb:.3f})")
-        print_fn(f"MAE:      {mae:.3f} (base: {maeb:.3f})")
-        # RMSE/MAEが1.253より小さいか大きいかで分布の予想がちょっと出来る
-        # https://funatsu-lab.github.io/open-course-ware/basic-theory/accuracy-index/#how-to-check-rmse-mae-summary
-        print_fn(f"RMSE/MAE: {rmse / mae:.3f}")
-    except BaseException:
-        tk.log.get(__name__).warning("Error: print_regression_metrics", exc_info=True)
-
-
 def search_threshold(y_true, y_pred, thresholds, score_fn, direction, cv=10):
     """閾値探索。
 
@@ -357,6 +271,14 @@ def search_threshold(y_true, y_pred, thresholds, score_fn, direction, cv=10):
         th = np.mean(ths)
         tk.log.get(__name__).info(f"mean: score={score:.4f} threshold={th:.4f}")
         return score, th
+
+
+def top_k_accuracy(y_true, proba_pred, k=5):
+    """Top-K accuracy。"""
+    assert len(y_true.shape) == 1
+    assert len(proba_pred.shape) == 2
+    best_k = np.argsort(proba_pred, axis=1)[:, -k:]
+    return np.mean([y in best_k[i, :] for i, y in enumerate(y_true)])
 
 
 def mape(y_true, y_pred):

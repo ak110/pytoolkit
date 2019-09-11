@@ -159,8 +159,8 @@ def compile(
 
 def fit(
     model: keras.models.Model,
-    train_dataset,
-    val_dataset=None,
+    train_set,
+    val_set=None,
     train_preprocessor=None,
     val_preprocessor=None,
     validation_freq="auto",
@@ -179,8 +179,8 @@ def fit(
 
     Args:
         model: モデル。
-        train_dataset (tk.data.Dataset): 訓練データ。
-        val_dataset (tk.data.Dataset): 検証データ。Noneなら省略。
+        train_set (tk.data.Dataset): 訓練データ。
+        val_set (tk.data.Dataset): 検証データ。Noneなら省略。
         train_preprocessor (tk.data.Preprocessor): 訓練データの前処理
         val_preprocessor (tk.data.Preprocessor): 検証データの前処理
         validation_freq (int or list or "auto"): 検証を行うエポック数の間隔、またはエポック数のリスト。0ならvalidationしない(独自仕様)。"auto"なら適当に決める(独自仕様)。
@@ -199,11 +199,11 @@ def fit(
     if validation_freq == 0:
         # validation_freq == 0ならvalidationしない(独自仕様)
         validation_freq = None
-        val_dataset = None
+        val_set = None
     elif validation_freq == "auto":
         # "auto"なら適当に決める(独自仕様)
         validation_freq = make_validation_freq(
-            validation_freq, epochs, train_dataset, val_dataset
+            validation_freq, epochs, train_set, val_set
         )
 
     fit_kwargs = {}
@@ -212,7 +212,7 @@ def fit(
             fit_kwargs["validation_freq"] = validation_freq
 
     train_data_loader = tk.data.DataLoader(
-        train_dataset,
+        train_set,
         train_preprocessor,
         batch_size,
         shuffle=True,
@@ -221,14 +221,14 @@ def fit(
     )
     val_data_loader = (
         tk.data.DataLoader(
-            val_dataset,
+            val_set,
             val_preprocessor,
             batch_size,
             shuffle=True,
             parallel=data_parallel,
             use_horovod=True,
         )
-        if val_dataset is not None
+        if val_set is not None
         else None
     )
 
@@ -276,16 +276,16 @@ def fit(
 
 
 def make_validation_freq(
-    validation_freq, epochs, train_dataset, val_dataset, max_val_per_train=0.1
+    validation_freq, epochs, train_set, val_set, max_val_per_train=0.1
 ):
     """validation_freqをほどよい感じに作成する。"""
-    if val_dataset is None:
+    if val_set is None:
         return None
     # ・sqrt(epochs)回くらいやれば十分？ (指標にも依るが…)
     # ・valがtrainの10%未満くらいなら毎回やっても問題無い
     validation_freq = max(
         int(np.sqrt(epochs)),
-        int(len(val_dataset) / (len(train_dataset) * max_val_per_train)),
+        int(len(val_set) / (len(train_set) * max_val_per_train)),
         1,
     )
     # 最後のepochはvalidationしたいので、そこからvalidation_freq毎に。

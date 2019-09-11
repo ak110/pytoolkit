@@ -165,23 +165,23 @@ class KerasModel(Model):
                         X_batch[f"model{i}_target{j}"] = ytj
                 yield X_batch, None
 
-        train_datasets = []
-        val_datasets = []
+        train_sets = []
+        val_sets = []
         for train_indices, val_indices in folds:
-            train_datasets.append(dataset.slice(train_indices))
-            val_datasets.append(dataset.slice(val_indices))
+            train_sets.append(dataset.slice(train_indices))
+            val_sets.append(dataset.slice(val_indices))
 
         model.fit_generator(
-            generator(train_datasets, self.train_preprocessor),
-            steps_per_epoch=-(-len(train_datasets[0]) // self.batch_size),
-            validation_data=generator(val_datasets, self.val_preprocessor),
-            validation_steps=-(-len(val_datasets[0]) // self.batch_size),
+            generator(train_sets, self.train_preprocessor),
+            steps_per_epoch=-(-len(train_sets[0]) // self.batch_size),
+            validation_data=generator(val_sets, self.val_preprocessor),
+            validation_steps=-(-len(val_sets[0]) // self.batch_size),
             **(self.fit_params or {}),
         )
 
         evals = model.evaluate_generator(
-            generator(val_datasets, self.val_preprocessor),
-            -(-len(val_datasets[0]) // self.batch_size) * 3,
+            generator(val_sets, self.val_preprocessor),
+            -(-len(val_sets[0]) // self.batch_size) * 3,
         )
         scores = dict(zip(model.metrics_names, evals))
         for k, v in scores.items():
@@ -197,14 +197,14 @@ class KerasModel(Model):
             tk.log.get(__name__).info(
                 f"Fold {fold + 1}/{len(folds)}: train={len(train_indices)} val={len(val_indices)}"
             )
-            train_dataset = dataset.slice(train_indices)
-            val_dataset = dataset.slice(val_indices)
+            train_set = dataset.slice(train_indices)
+            val_set = dataset.slice(val_indices)
             model = self.create_model_fn()
             tk.models.fit(
                 model,
-                train_dataset=train_dataset,
+                train_set=train_set,
                 train_preprocessor=self.train_preprocessor,
-                val_dataset=val_dataset,
+                val_set=val_set,
                 val_preprocessor=self.val_preprocessor,
                 batch_size=self.batch_size,
                 **(self.fit_params or {}),
@@ -214,7 +214,7 @@ class KerasModel(Model):
             self.models.append(model)
             scores = tk.models.evaluate(
                 model,
-                val_dataset,
+                val_set,
                 preprocessor=self.val_preprocessor,
                 batch_size=self.batch_size,
                 use_horovod=True,
