@@ -18,11 +18,14 @@ def print_ss_metrics(y_true, y_pred, threshold=0.5, print_fn=None):
     """
     print_fn = print_fn or tk.log.get(__name__).info
     evals = evaluate_ss(y_true, y_pred, threshold)
+    print_fn(
+        f"IoU:            {np.array_str(evals['iou'], precision=3, suppress_small=True)}"
+    )
     print_fn(f"mIoU:           {evals['miou']:.3f}")
     print_fn(f"IoU score:      {evals['iou_score']:.3f}")
     print_fn(f"Dice coef.:     {evals['dice']:.3f}")
-    print_fn(f"IoU mean:       {evals['iou_mean']:.3f}")
-    print_fn(f"Acc empty:      {evals['acc_empty']:.3f}")
+    print_fn(f"IoU mean:       {evals['fg_iou']:.3f}")
+    print_fn(f"Acc empty:      {evals['bg_acc']:.3f}")
     print_fn(f"Pixel Accuracy: {evals['acc']:.3f}")
     return evals
 
@@ -42,8 +45,8 @@ def evaluate_ss(y_true, y_pred, threshold=0.5):
 
         - "iou_score": IoUスコア (塩コンペのスコア)
         - "dice": ダイス係数
-        - "iou_mean": 答えが空でないときのIoUの平均
-        - "acc_empty": 答えが空の場合の正解率
+        - "fg_iou": 答えが空でないときのIoUの平均
+        - "bg_acc": 答えが空の場合の正解率
         - "acc": Pixel Accuracy
 
     References:
@@ -59,6 +62,7 @@ def evaluate_ss(y_true, y_pred, threshold=0.5):
             yp = np.expand_dims(yp, axis=-1)
         assert np.ndim(yt) == 3  # (H, W, C)
         assert np.ndim(yp) == 3  # (H, W, C)
+        assert yt.shape == yp.shape
         p_true = yt >= threshold
         p_pred = yp >= threshold
         n_true = ~p_true
@@ -70,7 +74,14 @@ def evaluate_ss(y_true, y_pred, threshold=0.5):
         gp = np.sum(p_true, axis=(0, 1))  # (C,)
         pp = np.sum(p_pred, axis=(0, 1))  # (C,)
         if yt.shape[-1] == 1:
-            cm = np.array([[np.sum(tp), np.sum(fn)], [np.sum(fp), np.sum(tn)]])
+            # class0=bg, class1=fg。(ひっくり返るので要注意)
+            cm = np.array(
+                [
+                    # negative,  positive
+                    [np.sum(tn), np.sum(fp)],  # gt negative
+                    [np.sum(fn), np.sum(tp)],  # gt positive
+                ]
+            )
         else:
             assert yt.shape[-1] >= 2
             num_classes = yt.shape[-1]
@@ -91,33 +102,34 @@ def evaluate_ss(y_true, y_pred, threshold=0.5):
     gp = np.array(gp)  # (N, C), dtype=int
     pp = np.array(pp)  # (N, C), dtype=int
     cm = np.sum(cm, axis=0)  # (C, C), dtype=int
-    obj_mask = gp > 0  # (N, C), dtype=bool
-    bg_mask = ~obj_mask  # (N, C), dtype=bool
+    fg_mask = gp > 0  # (N, C), dtype=bool
+    bg_mask = ~fg_mask  # (N, C), dtype=bool
     pred_bg_mask = pp <= 0  # (N, C), dtype=bool
 
     epsilon = 1e-7
-    sample_iou = tp / (tp + fp + tn + epsilon)  # (N, C)
+    sample_iou = tp / (tp + fp + fn + epsilon)  # (N, C)
     class_iou = np.diag(cm) / (
-        np.sum(cm, axis=1) + np.sum(cm, axis=0) - np.diag(cm)
+        np.sum(cm, axis=1) + np.sum(cm, axis=0) - np.diag(cm) + epsilon
     )  # (C,)
-    dice = np.mean(2 * tp / (gp + pp + epsilon))
+    dice = 2 * np.mean(tp / (gp + pp + epsilon))
 
     # 塩コンペのスコア
     prec_list = []
     for th in np.arange(0.5, 1.0, 0.05):
-        pred_obj = sample_iou > th  # (N, C)
-        match = (obj_mask & pred_obj) + (bg_mask & pred_bg_mask)  # (N, C)
+        pred_fg_mask = sample_iou > th  # (N, C)
+        match = (fg_mask & pred_fg_mask) | (bg_mask & pred_bg_mask)
+        assert np.ndim(match) == 2  # (N, C)
         prec_list.append(np.mean(match))
     iou_score = np.mean(prec_list)
 
-    acc = np.diag(cm) / np.sum(cm, axis=1)
+    acc = np.sum(np.diag(cm)) / np.sum(cm)
 
     return {
         "iou": class_iou,
         "miou": np.mean(class_iou),
         "iou_score": iou_score,
         "dice": dice,
-        "iou_mean": np.mean(sample_iou[obj_mask]),
-        "acc_empty": np.mean(pred_bg_mask[bg_mask]),
-        "acc": np.mean(acc),
+        "fg_iou": np.mean(sample_iou[fg_mask]),
+        "bg_acc": np.mean(pred_bg_mask[bg_mask]),
+        "acc": acc,
     }
