@@ -1,6 +1,8 @@
 """画像分類関連。"""
 import pathlib
 
+import numpy as np
+
 import pytoolkit as tk
 
 
@@ -31,3 +33,23 @@ def load_train_val_image_folders(data_dir, swap=False):
     if swap:
         train_set, val_set = val_set, train_set
     return train_set, val_set
+
+
+def load_train1000():
+    """train with 1000なデータの読み込み。
+
+    References:
+        - <https://github.com/mastnk/train1000>
+
+    """
+    train_set, test_set = tk.datasets.load_cifar10()
+    train_set = extract_class_balanced(train_set, num_classes=10, samples_per_class=100)
+    return train_set, test_set
+
+
+def extract_class_balanced(dataset, num_classes, samples_per_class):
+    """クラスごとに均等に抜き出す。dataset.labelsは[0, num_classes)の値のndarrayを前提とする。"""
+    index_list = []
+    for c in range(num_classes):
+        index_list.extend(np.where(dataset.labels == c)[0][:samples_per_class])
+    return dataset.slice(index_list)

@@ -42,7 +42,6 @@ def darknet53(input_shape=None, input_tensor=None, weights="imagenet", for_small
 
 def darknet_body(x, for_small=False):
     """Darknent body having 52 Convolution2D layers"""
-    # kerasとtf.kerasで名前がずれるので仕方なく名前を指定
     x = darknet_conv_bn_act(32, (3, 3), "block1_conv1")(x)
     x = darknet_resblocks(x, 64, 1, block_index=2, downsampling=not for_small)
     x = darknet_resblocks(x, 128, 2, block_index=3)
