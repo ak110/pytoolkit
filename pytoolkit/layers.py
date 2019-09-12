@@ -886,8 +886,8 @@ class DropActivation(keras.layers.Layer):
     def call(self, inputs, training=None):  # pylint: disable=arguments-differ
         def _train():
             shape = K.shape(inputs)
-            r = K.random_uniform(shape=(shape[0],))
-            return tf.where(r <= self.keep_rate, K.relu(inputs), inputs)
+            r = K.random_uniform(shape=(shape[0],) + (1,) * (K.ndim(inputs) - 1))
+            return tf.compat.v2.where(r <= self.keep_rate, K.relu(inputs), inputs)
 
         def _test():
             return K.relu(inputs, alpha=1 - self.keep_rate)
@@ -1300,12 +1300,12 @@ class ImputeNaN(keras.layers.Layer):
     def call(self, inputs, **kwargs):
         del kwargs
         mask = tf.math.is_nan(inputs)
-        output = tf.where(mask, K.ones_like(inputs), inputs)  # nanを1に置き換え
+        output = tf.compat.v2.where(mask, K.ones_like(inputs), inputs)  # nanを1に置き換え
         output = K.dot(output, self.kernel1)
         output = K.relu(output)
         output = K.dot(output, self.kernel2)
         output = K.bias_add(output, self.bias, data_format="channels_last")
-        output = tf.where(mask, output, inputs)  # nan以外はinputsを出力
+        output = tf.compat.v2.where(mask, output, inputs)  # nan以外はinputsを出力
         return output
 
     def get_config(self):
@@ -1380,6 +1380,31 @@ class LIP2D(keras.layers.Layer):
             "strides": self.strides,
             "padding": self.padding,
         }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
+class GeM2D(keras.layers.Layer):
+    """Generalized Mean Pooling (GeM) <https://github.com/filipradenovic/cnnimageretrieval-pytorch>"""
+
+    def __init__(self, p=3, epsilon=1e-6, **kargs):
+        super().__init__(**kargs)
+        self.p = p
+        self.epsilon = epsilon
+
+    def compute_output_shape(self, input_shape):
+        assert len(input_shape) == 4
+        return (input_shape[0], input_shape[3])
+
+    def call(self, inputs, **kwargs):
+        del kwargs
+        x = K.pow(K.maximum(inputs, self.epsilon), self.p)
+        x = K.mean(x, axis=[1, 2])  # GAP
+        x = K.pow(x, 1 / self.p)
+        return x
+
+    def get_config(self):
+        config = {"p": self.p, "epsilon": self.epsilon}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
@@ -1494,7 +1519,7 @@ class MultiHeadAttention(keras.layers.Layer):
                 row_index = K.cumsum(mask_ones, axis=1)
                 col_index = K.cumsum(mask_ones, axis=2)
                 causal_mask = K.greater_equal(row_index, col_index)
-                w = tf.where(causal_mask, w, K.tile([[[-np.inf]]], w_shape))
+                w = tf.compat.v2.where(causal_mask, w, K.tile([[[-np.inf]]], w_shape))
             w = K.softmax(w)
             w = K.dropout(w, level=self.drop_rate)  # Attention Dropout
             # a.shape == (None, seq.shape[1], output_units)
@@ -1624,7 +1649,9 @@ class MultiHeadAttention2D(keras.layers.Layer):
             outputs.append(a)
 
         outputs = K.concatenate(outputs, axis=-1)
-        outputs = K.reshape(outputs, self.compute_output_shape([K.shape(seq), K.shape(ctx)]))
+        outputs = K.reshape(
+            outputs, self.compute_output_shape([K.shape(seq), K.shape(ctx)])
+        )
         return outputs
 
     def get_config(self):
