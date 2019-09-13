@@ -5,6 +5,7 @@ import cProfile
 import pathlib
 import sys
 
+import albumentations as A
 import numpy as np
 
 if True:
@@ -12,11 +13,13 @@ if True:
     import pytoolkit as tk
 
 batch_size = 16
-image_size = (1024, 1024)
+image_size = (512, 512)
 
 
 def _main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--load", action="store_true")
+    parser.add_argument("--mask", action="store_true")
     parser.add_argument("--profile", action="store_true")
     args = parser.parse_args()
 
@@ -26,15 +29,26 @@ def _main():
     save_dir = base_dir / "___check" / "bench"
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    X = np.array([data_dir / "9ab919332a1dceff9a252b43c0fb34a0_m.jpg"] * batch_size)
-    y = X
+    if args.load:
+        X = np.array([data_dir / "9ab919332a1dceff9a252b43c0fb34a0_m.jpg"] * batch_size)
+    else:
+        X = tk.ndimage.load(data_dir / "9ab919332a1dceff9a252b43c0fb34a0_m.jpg")
+        X = np.tile(np.expand_dims(X, axis=0), (batch_size, 1, 1, 1))
+    if args.mask:
+        y = X
+    else:
+        y = np.zeros((batch_size,))
     dataset = tk.data.Dataset(X, y)
     data_loader = tk.data.DataLoader(
-        dataset, MyPreprocessor(), batch_size, shuffle=True, parallel=not args.profile
+        dataset,
+        MyPreprocessor(data_augmentation=True, mask=args.mask),
+        batch_size,
+        shuffle=True,
+        parallel=not args.profile,
     )
 
-    # 適当にループして速度を見る
     if args.profile:
+        # 適当にループして速度を見る
         cProfile.runctx(
             "_run(data_loader, iterations=4)",
             globals=globals(),
@@ -42,13 +56,13 @@ def _main():
             sort="cumulative",
         )  # 累積:cumulative 内部:time
     else:
+        # 1バッチ分を保存
+        for ix, x in enumerate(data_loader[0][0]):
+            tk.ndimage.save(save_dir / f"{ix}.png", np.clip(x, 0, 255).astype(np.uint8))
+        # 適当にループして速度を見る
         _run(data_loader, iterations=16)
 
     print(f"{data_loader.seconds_per_step * 1000:.0f}ms/step")
-
-    # 1バッチ分を保存
-    for ix, x in enumerate(data_loader[0][0]):
-        tk.ndimage.save(save_dir / f"{ix}.png", np.clip(x, 0, 255).astype(np.uint8))
 
 
 def _run(data_loader, iterations):
@@ -67,27 +81,33 @@ def _run(data_loader, iterations):
 class MyPreprocessor(tk.data.Preprocessor):
     """Preprocessor。"""
 
-    def __init__(self, data_augmentation=False):
+    def __init__(self, data_augmentation, mask):
+        self.data_augmentation = data_augmentation
+        self.mask = mask
         if data_augmentation:
-            self.aug = tk.image.Compose(
+            self.aug = A.Compose(
                 [
                     tk.image.RandomTransform(image_size[1], image_size[0]),
-                    tk.image.RandomColorAugmentors(),
+                    tk.image.RandomColorAugmentors(noisy=True),
                     tk.image.RandomErasing(),
                 ]
             )
         else:
-            self.aug = tk.image.Compose([])
+            self.aug = A.Compose([])
 
     def get_sample(
         self, dataset: tk.data.Dataset, index: int, random: np.random.RandomState
     ):
         X, y = dataset.get_sample(index)
         X = tk.ndimage.load(X)
-        y = tk.ndimage.load(y)
-        a = self.aug(image=X, mask=y, random=random)
-        X = a["image"]
-        y = a["mask"]
+        if self.mask:
+            y = tk.ndimage.load(y)
+            a = self.aug(image=X, mask=y)
+            X = a["image"]
+            y = a["mask"]
+        else:
+            a = self.aug(image=X)
+            X = a["image"]
         return X, y
 
 

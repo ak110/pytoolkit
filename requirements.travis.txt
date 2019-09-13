@@ -1,4 +1,5 @@
 # Travis CI用 requirements。
+albumentations
 Pillow
 better_exceptions
 black

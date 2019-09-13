@@ -12,6 +12,7 @@
 
 ## importするために最低限必要なライブラリ
 
+- albumentations
 - Pillow
 - numpy
 - numba

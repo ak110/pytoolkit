@@ -373,7 +373,8 @@ def blur(rgb: np.ndarray, sigma: float) -> np.ndarray:
 def unsharp_mask(rgb: np.ndarray, sigma: float, alpha=2.0) -> np.ndarray:
     """シャープ化。sigmaは0～1程度、alphaは1～2程度がよい？"""
     blured = blur(rgb, sigma)
-    return rgb + (rgb.astype(np.float) - blured) * alpha
+    rgb = rgb.astype(np.float)
+    return rgb + (rgb - blured) * alpha
 
 
 def median(rgb: np.ndarray, size: int) -> np.ndarray:
@@ -395,14 +396,18 @@ def brightness(rgb: np.ndarray, beta: float) -> np.ndarray:
 @numba.njit(fastmath=True, nogil=True)
 def contrast(rgb: np.ndarray, alpha: float) -> np.ndarray:
     """コントラストの変更。alphaの例：np.random.uniform(0.75, 1.25)"""
-    return rgb.astype(np.float32) * np.float32(alpha)
+    # (rgb - 127.5) * alpha + 127.5
+    # = rgb * alpha + 127.5 * (1 - alpha)
+    alpha = np.float32(alpha)
+    return rgb.astype(np.float32) * alpha + 127.5 * (1 - alpha)
 
 
 @_float_to_uint8
+@numba.njit(fastmath=True, nogil=True)
 def saturation(rgb: np.ndarray, alpha: float) -> np.ndarray:
     """彩度の変更。alphaの例：np.random.uniform(0.5, 1.5)"""
     rgb = rgb.astype(np.float32)
-    gs = rgb @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
+    gs = (rgb * np.array([[[0.299, 0.587, 0.114]]], dtype=np.float32)).sum(axis=-1)
     return alpha * rgb + (1 - alpha) * np.expand_dims(gs, axis=-1)
 
 
@@ -419,10 +424,12 @@ def hue_lite(rgb: np.ndarray, alpha: np.ndarray, beta: np.ndarray) -> np.ndarray
 
 
 @_float_to_uint8
-# @numba.njit(fastmath=True, nogil=True)
+@numba.njit(fastmath=True, nogil=True)
 def to_grayscale(rgb: np.ndarray) -> np.ndarray:
     """グレースケール化。"""
-    return rgb.astype(np.float32) @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
+    return (
+        rgb.astype(np.float32) * np.array([[[0.299, 0.587, 0.114]]], dtype=np.float32)
+    ).sum(axis=-1)
 
 
 @_float_to_uint8
@@ -481,8 +488,8 @@ def auto_contrast(rgb: np.ndarray, scale=255) -> np.ndarray:
 # @numba.njit(fastmath=True, nogil=True)
 def posterize(rgb: np.ndarray, bits) -> np.ndarray:
     """ポスタリゼーション。"""
-    assert bits in range(1, 8 + 1)
-    t = np.float32(2 ** (8 - bits) / 255)
+    assert bits in range(1, 8)
+    t = np.float32(2 ** bits / 255)
     return np.round(rgb.astype(np.float32) * t) / t
 
 
@@ -891,57 +898,3 @@ def class_to_mask(classes, class_colors):
 
     """
     return np.asarray(class_colors)[classes]
-
-
-def dense_crf(
-    rgb,
-    pred,
-    gaussian_sxy=(1, 1),
-    gaussian_compat=3,
-    bilateral_sxy=(4, 4),
-    bilateral_srgb=(13, 13, 13),
-    bilateral_compat=10,
-    num_iter=5,
-):
-    """Dense CRF <https://github.com/lucasb-eyer/pydensecrf>
-
-    Args:
-        rgb: 入力画像。
-        pred: 予測結果。shape=(height, width, num_classes) dtype=np.float32
-        num_iter: 予測回数。
-
-    Returns:
-        ndarray shape=(height, width, num_classes) dtype=np.float32
-
-    """
-    import pydensecrf.densecrf as dcrf
-    import pydensecrf.utils as du
-
-    rgb = np.copy(rgb).astype(np.uint8)
-    pred = pred.astype(np.float32)
-    pred /= pred.sum(axis=-1, keepdims=True)
-
-    if len(pred.shape) == 2:
-        pred = np.expand_dims(pred, axis=-1)
-    if pred.shape[-1] == 1:
-        pred = np.concatenate([1 - pred, pred], axis=-1)  # 2クラスのsoftmaxみたいにする
-    num_classes = pred.shape[-1]
-
-    height, width = rgb.shape[:2]
-    pred = resize(pred, width, height)
-    U = pred.transpose(2, 0, 1).reshape((num_classes, -1))
-
-    d = dcrf.DenseCRF2D(width, height, num_classes)
-    d.setUnaryEnergy(np.ascontiguousarray(du.unary_from_softmax(U)))
-    d.addPairwiseGaussian(sxy=gaussian_sxy, compat=gaussian_compat)
-    d.addPairwiseBilateral(
-        sxy=bilateral_sxy, srgb=bilateral_srgb, rgbim=rgb, compat=bilateral_compat
-    )
-    Q = d.inference(num_iter)
-    MAP = np.array(Q, dtype=np.float32)
-
-    if num_classes == 2:
-        proba = MAP[1, ...].reshape((height, width, 1))
-    else:
-        proba = MAP.reshape((num_classes, height, width)).transpose(1, 2, 0)
-    return proba

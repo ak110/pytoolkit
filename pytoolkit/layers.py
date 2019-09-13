@@ -1573,13 +1573,13 @@ class MultiHeadAttention2D(keras.layers.Layer):
             name="Wq",
         )
         self.Wk = self.add_weight(
-            shape=(self.heads, 3, 3, int(ctx_shape[-1]), hidden_units),
+            shape=(self.heads, int(ctx_shape[-1]), hidden_units),
             initializer=keras.initializers.glorot_uniform(),
             regularizer=keras.regularizers.l2(1e-4),
             name="Wk",
         )
         self.Wv = self.add_weight(
-            shape=(self.heads, 3, 3, int(ctx_shape[-1]), output_units),
+            shape=(self.heads, int(ctx_shape[-1]), output_units),
             initializer=keras.initializers.glorot_uniform(),
             regularizer=keras.regularizers.l2(1e-4),
             name="Wv",
@@ -1607,6 +1607,7 @@ class MultiHeadAttention2D(keras.layers.Layer):
     def call(self, inputs, **kwargs):
         del kwargs
         seq, ctx = inputs
+        batch_size = K.shape(seq)[0]
 
         outputs = []
         for h in range(self.heads):
@@ -1614,38 +1615,17 @@ class MultiHeadAttention2D(keras.layers.Layer):
             # k.shape == (None, ctx.shape[1], ctx.shape[2], hidden_units)
             # v.shape == (None, ctx.shape[1], ctx.shape[2], output_units)
             q = K.bias_add(K.dot(seq, self.Wq[h]), self.bq[h])
-            k = K.bias_add(
-                K.conv2d(
-                    ctx,
-                    self.Wk[h],
-                    strides=1,
-                    padding="same",
-                    data_format="channels_last",
-                    dilation_rate=1,
-                ),
-                self.bk[h],
-            )
-            v = K.bias_add(
-                K.conv2d(
-                    ctx,
-                    self.Wv[h],
-                    strides=1,
-                    padding="same",
-                    data_format="channels_last",
-                    dilation_rate=1,
-                ),
-                self.bv[h],
-            )
-            batch_size = K.shape(seq)[0]
+            k = K.bias_add(K.dot(seq, self.Wk[h]), self.bk[h])
+            v = K.bias_add(K.dot(seq, self.Wv[h]), self.bv[h])
             q = K.reshape(q, (batch_size, -1, K.int_shape(k)[-1]))
             k = K.reshape(k, (batch_size, -1, K.int_shape(k)[-1]))
             v = K.reshape(v, (batch_size, -1, K.int_shape(k)[-1]))
-            k = k / np.sqrt(3 * 3 * K.int_shape(k)[-1])
+            k = k / np.sqrt(K.int_shape(k)[-1])
             w = K.batch_dot(q, k, axes=(2, 2))  # (None, seq.shape[1], ctx.shape[1])
             w = K.softmax(w)
             w = K.dropout(w, level=self.drop_rate)  # Attention Dropout
             # a.shape == (None, seq.shape[1], output_units)
-            a = K.batch_dot(w, K.tanh(v / np.sqrt(3 * 3)), axes=(2, 1))
+            a = K.batch_dot(w, K.tanh(v), axes=(2, 1))
             outputs.append(a)
 
         outputs = K.concatenate(outputs, axis=-1)

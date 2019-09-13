@@ -1,3 +1,5 @@
+# Read the Docs用 requirements。
+albumentations
 Pillow
 numpy
 numba

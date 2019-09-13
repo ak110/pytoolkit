@@ -4,13 +4,13 @@
 
 """
 # pylint: disable=arguments-differ,abstract-method,unused-argument
+import random
 
+import albumentations as A
 import numpy as np
 import PIL.Image
 import PIL.ImageEnhance
 import PIL.ImageOps
-
-from . import image as A
 
 
 class CIFAR10Policy(A.OneOf):
@@ -148,14 +148,14 @@ class Affine(A.ImageOnlyTransform):
         self.translate_x_mag = translate_x_mag
         self.translate_y_mag = translate_y_mag
 
-    def apply(self, image, random, **params):
-        shear_x = float_parameter(random, self.shear_x_mag, 0.3, flip_sign=True)
-        shear_y = float_parameter(random, self.shear_y_mag, 0.3, flip_sign=True)
+    def apply(self, image, **params):
+        shear_x = float_parameter(self.shear_x_mag, 0.3, flip_sign=True)
+        shear_y = float_parameter(self.shear_y_mag, 0.3, flip_sign=True)
         translate_x = float_parameter(
-            random, self.translate_x_mag, image.shape[1] * 150 / 331, flip_sign=True
+            self.translate_x_mag, image.shape[1] * 150 / 331, flip_sign=True
         )
         translate_y = float_parameter(
-            random, self.translate_y_mag, image.shape[0] * 150 / 331, flip_sign=True
+            self.translate_y_mag, image.shape[0] * 150 / 331, flip_sign=True
         )
         image = PIL.Image.fromarray(image, mode="RGB")
         data = (1, shear_x, translate_x, shear_y, 1, translate_y)
@@ -210,8 +210,8 @@ class Rotate(A.ImageOnlyTransform):
         super().__init__(always_apply, p)
         self.mag = mag
 
-    def apply(self, image, random, **params):
-        degrees = int_parameter(random, self.mag, 30, flip_sign=True)
+    def apply(self, image, **params):
+        degrees = int_parameter(self.mag, 30, flip_sign=True)
         image = PIL.Image.fromarray(image, mode="RGB")
         image = image.convert("RGBA").rotate(degrees)
         bg = PIL.Image.new("RGBA", image.size, (128, 128, 128, 255))
@@ -262,8 +262,8 @@ class Solarize(A.ImageOnlyTransform):
         super().__init__(always_apply, p)
         self.mag = mag
 
-    def apply(self, image, random, **params):
-        threshold = 256 - int_parameter(random, self.mag, 256)
+    def apply(self, image, **params):
+        threshold = 256 - int_parameter(self.mag, 256)
         image = PIL.Image.fromarray(image, mode="RGB")
         return np.asarray(PIL.ImageOps.solarize(image, threshold), dtype=np.uint8)
 
@@ -275,9 +275,9 @@ class Posterize(A.ImageOnlyTransform):
         super().__init__(always_apply, p)
         self.mag = mag
 
-    def apply(self, image, random, **params):
+    def apply(self, image, **params):
         # https://github.com/tensorflow/models/blob/master/research/autoaugment/augmentation_transforms.py#L267 🤔
-        bit = 8 - int_parameter(random, self.mag, 4)
+        bit = 8 - int_parameter(self.mag, 4)
         image = PIL.Image.fromarray(image, mode="RGB")
         return np.asarray(PIL.ImageOps.posterize(image, bit), dtype=np.uint8)
 
@@ -289,8 +289,8 @@ class Contrast(A.ImageOnlyTransform):
         super().__init__(always_apply, p)
         self.mag = mag
 
-    def apply(self, image, random, **params):
-        factor = 1 + float_parameter(random, self.mag, 0.9, flip_sign=True)
+    def apply(self, image, **params):
+        factor = 1 + float_parameter(self.mag, 0.9, flip_sign=True)
         image = PIL.Image.fromarray(image, mode="RGB")
         return np.asarray(
             PIL.ImageEnhance.Contrast(image).enhance(factor), dtype=np.uint8
@@ -304,8 +304,8 @@ class Color(A.ImageOnlyTransform):
         super().__init__(always_apply, p)
         self.mag = mag
 
-    def apply(self, image, random, **params):
-        factor = 1 + float_parameter(random, self.mag, 0.9, flip_sign=True)
+    def apply(self, image, **params):
+        factor = 1 + float_parameter(self.mag, 0.9, flip_sign=True)
         image = PIL.Image.fromarray(image, mode="RGB")
         return np.asarray(PIL.ImageEnhance.Color(image).enhance(factor), dtype=np.uint8)
 
@@ -317,8 +317,8 @@ class Brightness(A.ImageOnlyTransform):
         super().__init__(always_apply, p)
         self.mag = mag
 
-    def apply(self, image, random, **params):
-        factor = 1 + float_parameter(random, self.mag, 0.9, flip_sign=True)
+    def apply(self, image, **params):
+        factor = 1 + float_parameter(self.mag, 0.9, flip_sign=True)
         image = PIL.Image.fromarray(image, mode="RGB")
         return np.asarray(
             PIL.ImageEnhance.Brightness(image).enhance(factor), dtype=np.uint8
@@ -332,27 +332,27 @@ class Sharpness(A.ImageOnlyTransform):
         super().__init__(always_apply, p)
         self.mag = mag
 
-    def apply(self, image, random, **params):
-        factor = 1 + float_parameter(random, self.mag, 0.9, flip_sign=True)
+    def apply(self, image, **params):
+        factor = 1 + float_parameter(self.mag, 0.9, flip_sign=True)
         image = PIL.Image.fromarray(image, mode="RGB")
         return np.asarray(
             PIL.ImageEnhance.Sharpness(image).enhance(factor), dtype=np.uint8
         )
 
 
-def float_parameter(random, level, maxval, flip_sign=False):
+def float_parameter(level, maxval, flip_sign=False):
     """0～maxvalへの変換。"""
     assert 0 <= level <= 9
     value = float(level) * maxval / 9
-    if flip_sign and random.rand() < 0.5:
+    if flip_sign and random.random() < 0.5:
         value = -value
     return value
 
 
-def int_parameter(random, level, maxval, flip_sign=False):
+def int_parameter(level, maxval, flip_sign=False):
     """0～maxvalへの変換。"""
     assert 0 <= level <= 9
     value = int(np.round(level * maxval / 9))
-    if flip_sign and random.rand() < 0.5:
+    if flip_sign and random.random() < 0.5:
         value = -value
     return value
