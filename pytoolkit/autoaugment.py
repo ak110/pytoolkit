@@ -277,7 +277,7 @@ class Posterize(A.ImageOnlyTransform):
 
     def apply(self, image, random, **params):
         # https://github.com/tensorflow/models/blob/master/research/autoaugment/augmentation_transforms.py#L267 🤔
-        bit = 4 + int_parameter(random, self.mag, 4)
+        bit = 8 - int_parameter(random, self.mag, 4)
         image = PIL.Image.fromarray(image, mode="RGB")
         return np.asarray(PIL.ImageOps.posterize(image, bit), dtype=np.uint8)
 
@@ -290,7 +290,7 @@ class Contrast(A.ImageOnlyTransform):
         self.mag = mag
 
     def apply(self, image, random, **params):
-        factor = float_parameter(random, self.mag, 1.8) + 0.1
+        factor = 1 + float_parameter(random, self.mag, 0.9, flip_sign=True)
         image = PIL.Image.fromarray(image, mode="RGB")
         return np.asarray(
             PIL.ImageEnhance.Contrast(image).enhance(factor), dtype=np.uint8
@@ -305,7 +305,7 @@ class Color(A.ImageOnlyTransform):
         self.mag = mag
 
     def apply(self, image, random, **params):
-        factor = float_parameter(random, self.mag, 1.8) + 0.1
+        factor = 1 + float_parameter(random, self.mag, 0.9, flip_sign=True)
         image = PIL.Image.fromarray(image, mode="RGB")
         return np.asarray(PIL.ImageEnhance.Color(image).enhance(factor), dtype=np.uint8)
 
@@ -318,7 +318,7 @@ class Brightness(A.ImageOnlyTransform):
         self.mag = mag
 
     def apply(self, image, random, **params):
-        factor = float_parameter(random, self.mag, 1.8) + 0.1
+        factor = 1 + float_parameter(random, self.mag, 0.9, flip_sign=True)
         image = PIL.Image.fromarray(image, mode="RGB")
         return np.asarray(
             PIL.ImageEnhance.Brightness(image).enhance(factor), dtype=np.uint8
@@ -333,7 +333,7 @@ class Sharpness(A.ImageOnlyTransform):
         self.mag = mag
 
     def apply(self, image, random, **params):
-        factor = float_parameter(random, self.mag, 1.8) + 0.1
+        factor = 1 + float_parameter(random, self.mag, 0.9, flip_sign=True)
         image = PIL.Image.fromarray(image, mode="RGB")
         return np.asarray(
             PIL.ImageEnhance.Sharpness(image).enhance(factor), dtype=np.uint8
@@ -352,7 +352,7 @@ def float_parameter(random, level, maxval, flip_sign=False):
 def int_parameter(random, level, maxval, flip_sign=False):
     """0～maxvalへの変換。"""
     assert 0 <= level <= 9
-    value = int(level * maxval / 9)
+    value = int(np.round(level * maxval / 9))
     if flip_sign and random.rand() < 0.5:
         value = -value
     return value

@@ -8,6 +8,7 @@ import abc
 import warnings
 
 import numpy as np
+import scipy.ndimage
 import sklearn.utils
 
 import pytoolkit as tk
@@ -699,3 +700,25 @@ class RandomBinarize(ImageOnlyTransform):
     def apply(self, image, random, **params):
         threshold = random.uniform(self.threshold_min, self.threshold_max)
         return tk.ndimage.binarize(image, threshold)
+
+
+class SpeckleNoise(ImageOnlyTransform):
+    """Speckle noise。
+
+    References:
+        - <https://github.com/keras-team/keras/blob/master/examples/image_ocr.py#L81>
+
+    """
+
+    def __init__(self, strength=0.1, always_apply=False, p=0.5):
+        super().__init__(always_apply=always_apply, p=p)
+        self.strength = strength
+
+    def apply(self, image, random, **params):
+        severity = random.uniform(0, self.strength)
+        blur = scipy.ndimage.gaussian_filter(random.randn(*image.shape) * severity, 1)
+        image = image + blur * 255
+        return np.uint8(np.clip(image, 0, 255))
+
+    def get_transform_init_args_names(self):
+        return ()

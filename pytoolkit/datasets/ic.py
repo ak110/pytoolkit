@@ -1,5 +1,6 @@
 """画像分類関連。"""
 import pathlib
+import xml.etree.ElementTree
 
 import numpy as np
 
@@ -45,6 +46,36 @@ def load_train1000():
     train_set, test_set = tk.datasets.load_cifar10()
     train_set = extract_class_balanced(train_set, num_classes=10, samples_per_class=100)
     return train_set, test_set
+
+
+def load_imagenet(data_dir, use_tqdm=True):
+    """ImageNet (ILSVRC 2012のClassification)のデータの読み込み。
+
+    Args:
+        data_dir (PathLike): ディレクトリ。(Annotations, Data, ImageSetが入っているところ)
+
+    """
+    import pandas as pd
+
+    class_index_url = "https://storage.googleapis.com/download.tensorflow.org/data/imagenet_class_index.json"
+    df = pd.read_json(class_index_url).T
+    class_names = df[0].values
+    class_names_to_id = dict(zip(class_names, df[0].index))
+
+    train_dir = data_dir / "Data/CLS-LOC/train"
+    train_set = load_image_folder(train_dir, class_names=class_names)
+
+    X_val, y_val = [], []
+    val_dir = data_dir / "Annotations/CLS-LOC/val"
+    for xml_path in tk.utils.tqdm(val_dir.glob("*.xml"), disable=not use_tqdm):
+        root = xml.etree.ElementTree.parse(str(xml_path)).getroot()
+        class_name = root.find("object").find("name").text
+
+        X_val.append(data_dir / f"Data/CLS-LOC/val/{xml_path.stem}.JPEG")
+        y_val.append(class_names_to_id[class_name])
+
+    val_set = tk.data.Dataset(X_val, y_val, metadata={"class_names": class_names})
+    return train_set, val_set
 
 
 def extract_class_balanced(dataset, num_classes, samples_per_class):
