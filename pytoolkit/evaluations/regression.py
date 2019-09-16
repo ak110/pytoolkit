@@ -14,6 +14,7 @@ def print_regression_metrics(y_true, y_pred, print_fn=None):
         print_fn(f"RMSE:     {evals['rmse']:.3f} (base: {evals['rmse_base']:.3f})")
         print_fn(f"MAE:      {evals['mae']:.3f} (base: {evals['mae_base']:.3f})")
         print_fn(f"RMSE/MAE: {evals['rmse/mae']:.3f}")
+        return evals
     except BaseException:
         tk.log.get(__name__).warning("Error: print_regression_metrics", exc_info=True)
 

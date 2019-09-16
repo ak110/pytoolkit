@@ -7,6 +7,7 @@ import atexit
 import functools
 import io
 import pathlib
+import random
 import shutil
 import tempfile
 import typing
@@ -16,7 +17,6 @@ import cv2
 import numba
 import numpy as np
 import PIL.Image
-import sklearn.utils
 
 import pytoolkit as tk
 
@@ -202,7 +202,7 @@ def rotate(
     m, w, h = compute_rotate(rgb.shape[1], rgb.shape[0], degrees=degrees, expand=expand)
     if rgb.shape[-1] in (1, 3):
         rgb = cv2.warpAffine(rgb, m, (w, h), flags=cv2_interp, borderMode=cv2_border)
-        if len(rgb.shape) == 2:
+        if rgb.ndim == 2:
             rgb = np.expand_dims(rgb, axis=-1)
     else:
         rotated_list = [
@@ -342,7 +342,7 @@ def resize(
         cv2_interp = cv2.INTER_NEAREST if interp == "nearest" else cv2.INTER_AREA
     if rgb.shape[-1] in (1, 3):
         rgb = cv2.resize(rgb, (width, height), interpolation=cv2_interp)
-        if len(rgb.shape) == 2:
+        if rgb.ndim == 2:
             rgb = np.expand_dims(rgb, axis=-1)
     else:
         resized_list = [
@@ -355,16 +355,16 @@ def resize(
 
 @_float_to_uint8
 def gaussian_noise(
-    rgb: np.ndarray, random: np.random.RandomState, scale: float
+    rgb: np.ndarray, random_state: np.random.RandomState, scale: float
 ) -> np.ndarray:
     """ガウシアンノイズ。scaleは0～50くらい。小さいほうが色が壊れないかも。"""
-    return rgb + random.normal(0, scale, size=rgb.shape).astype(np.float32)
+    return rgb + random_state.normal(0, scale, size=rgb.shape).astype(np.float32)
 
 
 def blur(rgb: np.ndarray, sigma: float) -> np.ndarray:
     """ぼかし。sigmaは0～1程度がよい？"""
     rgb = cv2.GaussianBlur(rgb, (5, 5), sigma)
-    if len(rgb.shape) == 2:
+    if rgb.ndim == 2:
         rgb = np.expand_dims(rgb, axis=-1)
     return rgb
 
@@ -380,7 +380,7 @@ def unsharp_mask(rgb: np.ndarray, sigma: float, alpha=2.0) -> np.ndarray:
 def median(rgb: np.ndarray, size: int) -> np.ndarray:
     """メディアンフィルタ。sizeは3程度がよい？"""
     rgb = cv2.medianBlur(rgb, size)
-    if len(rgb.shape) == 2:
+    if rgb.ndim == 2:
         rgb = np.expand_dims(rgb, axis=-1)
     return rgb
 
@@ -650,11 +650,11 @@ def perspective_transform(rgb, width, height, m, interp="lanczos", border_mode="
     if dw <= sw or dh <= sh:
         cv2_interp = cv2.INTER_AREA
 
-    if rgb.shape[-1] in (1, 3):
+    if rgb.ndim == 2 or rgb.shape[-1] in (1, 3):
         rgb = cv2.warpPerspective(
             rgb, m, (width, height), flags=cv2_interp, borderMode=cv2_border
         )
-        if len(rgb.shape) == 2:
+        if rgb.ndim == 2:
             rgb = np.expand_dims(rgb, axis=-1)
     else:
         resized_list = [
@@ -689,7 +689,7 @@ def transform_points(points, m):
 
 def erase_random(
     rgb,
-    random: np.random.RandomState,
+    random_state: np.random.RandomState,
     bboxes=None,
     scale_low=0.02,
     scale_high=0.4,
@@ -707,14 +707,14 @@ def erase_random(
         bb_c = (bb_lt + bb_rb) / 2  # 中央
 
     for _ in range(max_tries):
-        s = rgb.shape[0] * rgb.shape[1] * random.uniform(scale_low, scale_high)
-        r = np.exp(random.uniform(np.log(rate_1), np.log(rate_2)))
+        s = rgb.shape[0] * rgb.shape[1] * random_state.uniform(scale_low, scale_high)
+        r = np.exp(random_state.uniform(np.log(rate_1), np.log(rate_2)))
         ew = int(np.sqrt(s / r))
         eh = int(np.sqrt(s * r))
         if ew <= 0 or eh <= 0 or ew >= rgb.shape[1] or eh >= rgb.shape[0]:
             continue
-        ex = random.randint(0, rgb.shape[1] - ew)
-        ey = random.randint(0, rgb.shape[0] - eh)
+        ex = random_state.randint(0, rgb.shape[1] - ew)
+        ey = random_state.randint(0, rgb.shape[0] - eh)
 
         if bboxes is not None:
             box_lt = np.array([[ex, ey]])
@@ -737,7 +737,7 @@ def erase_random(
                 continue
 
         rgb = np.copy(rgb)
-        rc = random.randint(0, 256, size=rgb.shape[-1])
+        rc = random_state.randint(0, 256, size=rgb.shape[-1])
         if alpha:
             rgb[ey : ey + eh, ex : ex + ew, :] = (
                 rgb[ey : ey + eh, ex : ex + ew, :] * (1 - alpha) + rc * alpha
@@ -749,7 +749,7 @@ def erase_random(
     return rgb
 
 
-def mixup(sample1, sample2, random=None, mode="beta"):
+def mixup(sample1, sample2, mode="beta"):
     """mixup。 <https://arxiv.org/abs/1710.09412>
 
     常に「sample1の重み >= sample2の重み」となるようにしている。
@@ -757,7 +757,6 @@ def mixup(sample1, sample2, random=None, mode="beta"):
     Args:
         sample1 (tuple, list, dict or ndarray): データその1
         sample2 (tuple, list, dict or ndarray): データその2
-        random (None, int, or RandomState): 乱数シード
         mode (str): 混ぜる割合の乱数の種類。
             - 'beta': β分布を0.5以上にした分布
             - 'uniform': [0.5, 1]の一様分布
@@ -767,9 +766,8 @@ def mixup(sample1, sample2, random=None, mode="beta"):
         tuple, list, dict or ndarray: 混ぜられたデータ。
 
     """
-    random = sklearn.utils.check_random_state(random)
     if mode == "beta":
-        r = np.float32(np.abs(random.beta(0.2, 0.2) - 0.5) + 0.5)
+        r = np.float32(np.abs(random.betavariate(0.2, 0.2) - 0.5) + 0.5)
     elif mode == "uniform":
         r = np.float32(random.uniform(0.5, 1))
     elif mode == "uniform_ex":
@@ -801,7 +799,7 @@ def mix_data(sample1, sample2, r):
         return np.float32(sample1) * r + np.float32(sample2) * (1 - r)
 
 
-def cut_mix(image1, label1, image2, label2, beta=1.0, random=None):
+def cut_mix(image1, label1, image2, label2, beta=1.0):
     """CutMix。 <https://arxiv.org/abs/1905.04899>
 
     Args:
@@ -810,21 +808,19 @@ def cut_mix(image1, label1, image2, label2, beta=1.0, random=None):
         image2 (ndarray): 画像
         label2 (ndarray): one-hot化したラベル(など)
         beta (float): beta分布のbeta
-        random (None, int, or RandomState): 乱数シード
 
     Returns:
         tuple: (image, label)
 
     """
     assert image1.shape == image2.shape
-    random = sklearn.utils.check_random_state(random)
-    lam = random.beta(beta, beta)
+    lam = random.betavariate(beta, beta)
     H, W = image1.shape[:2]
     cut_rat = np.sqrt(1.0 - lam)
     cut_w = np.int(W * cut_rat)
     cut_h = np.int(H * cut_rat)
-    cx = random.randint(W)
-    cy = random.randint(H)
+    cx = random.randrange(W)
+    cy = random.randrange(H)
     bbx1 = np.clip(cx - cut_w // 2, 0, W)
     bby1 = np.clip(cy - cut_h // 2, 0, H)
     bbx2 = np.clip(cx + cut_w // 2, 0, W)
@@ -841,7 +837,7 @@ def preprocess_tf(rgb):
     return rgb.astype(np.float32) / 127.5 - 1.0
 
 
-@numba.njit(fastmath=True, nogil=True)
+# @numba.njit(fastmath=True, nogil=True)
 def mask_to_onehot(rgb, class_colors, append_bg=False):
     """RGBのマスク画像をone-hot形式に変換する。
 
@@ -864,7 +860,7 @@ def mask_to_onehot(rgb, class_colors, append_bg=False):
     return result
 
 
-@numba.njit(fastmath=True, nogil=True)
+# @numba.njit(fastmath=True, nogil=True)
 def mask_to_class(rgb, class_colors, void_class=None):
     """RGBのマスク画像をクラスIDの配列に変換する。
 

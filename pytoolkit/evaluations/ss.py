@@ -16,8 +16,8 @@ def print_ss_metrics(y_true, y_pred, threshold=0.5, print_fn=None):
         dict: 各種metrics
 
     """
-    print_fn = print_fn or tk.log.get(__name__).info
     evals = evaluate_ss(y_true, y_pred, threshold)
+    print_fn = print_fn or tk.log.get(__name__).info
     print_fn(
         f"IoU:            {np.array_str(evals['iou'], precision=3, suppress_small=True)}"
     )

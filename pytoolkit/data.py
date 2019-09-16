@@ -1,6 +1,7 @@
 """学習時のデータの読み込み周り。"""
 # pylint: disable=unsubscriptable-object
 import dataclasses
+import random
 import time
 import typing
 
@@ -143,7 +144,7 @@ def split(dataset: Dataset, count: int, shuffle=False):
     assert sub_size > 0
     indices = np.arange(dataset_size)
     if shuffle:
-        np.random.shuffle(indices)
+        random.shuffle(indices)
     return [
         dataset.slice(indices[o : o + sub_size])
         for o in range(0, dataset_size, sub_size)
@@ -153,9 +154,8 @@ def split(dataset: Dataset, count: int, shuffle=False):
 class Preprocessor:
     """データ変換とかをするクラス。"""
 
-    def get_sample(self, dataset: Dataset, index: int, random: np.random.RandomState):
+    def get_sample(self, dataset: Dataset, index: int):
         """datasetから1件のデータを取得する処理。"""
-        del random
         return dataset.get_sample(index)
 
     def collate(self, batch: list) -> tuple:
@@ -296,8 +296,7 @@ class DataLoader(keras.utils.Sequence):
             tuple: 入力データとラベル。
 
         """
-        random = np.random.RandomState(len(self) * self.epoch + index)
-        return self.preprocessor.get_sample(self.dataset, index, random)
+        return self.preprocessor.get_sample(self.dataset, index)
 
     def __iter__(self):
         """データを返す。"""
@@ -316,5 +315,5 @@ def _generate_shuffled_indices(data_count):
     """シャッフルしたインデックスのgenerator"""
     indices = np.arange(data_count)
     while True:
-        np.random.shuffle(indices)
+        random.shuffle(indices)
         yield from indices

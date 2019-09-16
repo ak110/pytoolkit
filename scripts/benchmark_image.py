@@ -95,9 +95,7 @@ class MyPreprocessor(tk.data.Preprocessor):
         else:
             self.aug = A.Compose([])
 
-    def get_sample(
-        self, dataset: tk.data.Dataset, index: int, random: np.random.RandomState
-    ):
+    def get_sample(self, dataset: tk.data.Dataset, index: int):
         X, y = dataset.get_sample(index)
         X = tk.ndimage.load(X)
         if self.mask:

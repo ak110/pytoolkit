@@ -132,7 +132,7 @@ def test_cut_mix(data_dir, check_dir):
     random = np.random.RandomState(1234)
     rgb1 = tk.ndimage.load(data_dir / "Lenna.png")  # 256x256の某有名画像
     rgb2 = random.randint(0, 255, size=rgb1.shape)
-    image, label = tk.ndimage.cut_mix(rgb1, 0, rgb2, 1, random=random)
+    image, label = tk.ndimage.cut_mix(rgb1, 0, rgb2, 1)
     tk.ndimage.save(check_dir / f"CutMix_{label}.png", image)
 
 

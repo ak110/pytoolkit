@@ -34,7 +34,7 @@ Submodules
    pytoolkit.ml
    pytoolkit.models
    pytoolkit.ndimage
-   pytoolkit.notification
+   pytoolkit.notifications
    pytoolkit.od
    pytoolkit.optimizers
    pytoolkit.preprocessing

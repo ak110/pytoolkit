@@ -715,7 +715,7 @@ class GroupNormalization(keras.layers.Layer):
             x = x * self.gamma
         if self.center:
             x = x + self.beta
-        # tf.keras用workaround
+        # tf.keras用
         if hasattr(x, "set_shape"):
             x.set_shape(K.int_shape(inputs))
         return x
@@ -1522,8 +1522,8 @@ class MultiHeadAttention(keras.layers.Layer):
                 w = tf.compat.v2.where(causal_mask, w, K.tile([[[-np.inf]]], w_shape))
             w = K.softmax(w)
             w = K.dropout(w, level=self.drop_rate)  # Attention Dropout
-            # a.shape == (None, seq.shape[1], output_units)
             a = K.batch_dot(w, K.tanh(v), axes=(2, 1))
+            # a.shape == (None, seq.shape[1], output_units)
             outputs.append(a)
 
         outputs = K.concatenate(outputs, axis=-1)
@@ -1624,14 +1624,13 @@ class MultiHeadAttention2D(keras.layers.Layer):
             w = K.batch_dot(q, k, axes=(2, 2))  # (None, seq.shape[1], ctx.shape[1])
             w = K.softmax(w)
             w = K.dropout(w, level=self.drop_rate)  # Attention Dropout
-            # a.shape == (None, seq.shape[1], output_units)
             a = K.batch_dot(w, K.tanh(v), axes=(2, 1))
+            # a.shape == (None, seq.shape[1], output_units)
             outputs.append(a)
 
         outputs = K.concatenate(outputs, axis=-1)
-        outputs = K.reshape(
-            outputs, self.compute_output_shape([K.shape(seq), K.shape(ctx)])
-        )
+        output_shape = self.compute_output_shape([K.shape(seq), K.shape(ctx)])
+        outputs = K.reshape(outputs, output_shape)
         return outputs
 
     def get_config(self):

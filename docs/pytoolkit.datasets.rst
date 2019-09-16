@@ -10,6 +10,7 @@ Submodules
    pytoolkit.datasets.ic
    pytoolkit.datasets.keras
    pytoolkit.datasets.sklearn
+   pytoolkit.datasets.ss
    pytoolkit.datasets.voc
 
 Module contents

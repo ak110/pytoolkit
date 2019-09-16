@@ -8,8 +8,8 @@ import pytoolkit as tk
 def print_classification_metrics(y_true, proba_pred, average="macro", print_fn=None):
     """分類の指標色々を表示する。"""
     try:
-        print_fn = print_fn or tk.log.get(__name__).info
         evals = evaluate_classification(y_true, proba_pred, average)
+        print_fn = print_fn or tk.log.get(__name__).info
         if evals["type"] == "binary":  # binary
             print_fn(f"Accuracy:  {evals['acc']:.3f} (Error: {1 - evals['acc']:.3f})")
             print_fn(f"F1-score:  {evals['f1']:.3f}")
@@ -26,6 +26,7 @@ def print_classification_metrics(y_true, proba_pred, average="macro", print_fn=N
             print_fn(f"Prec-{average:5s}: {evals['prec']:.3f}")
             print_fn(f"Rec-{average:5s}:  {evals['rec']:.3f}")
             print_fn(f"Logloss:    {evals['logloss']:.3f}")
+        return evals
     except BaseException:
         tk.log.get(__name__).warning(
             "Error: print_classification_metrics", exc_info=True

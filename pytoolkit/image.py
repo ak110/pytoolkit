@@ -205,7 +205,7 @@ class RandomColorAugmentors(RandomCompose):
                     GaussNoise(p=0.125),
                     SpeckleNoise(p=0.125),
                     A.ISONoise(color_shift=(0, 0.05), intensity=(0, 0.5), p=0.125),
-                    A.ImageCompression(quality_lower=50, quality_upper=100, p=0.125),
+                    A.JpegCompression(quality_lower=50, quality_upper=100, p=0.125),
                 ]
             )
         super().__init__(argumentors, p=p)
@@ -219,7 +219,7 @@ class GaussNoise(A.ImageOnlyTransform):
         self.scale = scale
 
     def apply(self, image, scale, **params):
-        rand = np.random.RandomState(random.randint(0, 2 ** 32 - 1))
+        rand = np.random.RandomState(random.randrange(2 ** 32))
         return tk.ndimage.gaussian_noise(image, rand, scale)
 
     def get_params(self):
@@ -401,7 +401,7 @@ class RandomAlpha(A.ImageOnlyTransform):
         self.max_tries = max_tries
 
     def apply(self, image, **params):
-        rand = np.random.RandomState(random.randint(0, 2 ** 32 - 1))
+        rand = np.random.RandomState(random.randrange(2 ** 32))
         return tk.ndimage.erase_random(
             image,
             rand,
@@ -448,7 +448,7 @@ class RandomErasing(A.ImageOnlyTransform):
         self.max_tries = max_tries
 
     def apply(self, image, bboxes=None, **params):
-        rand = np.random.RandomState(random.randint(0, 2 ** 32 - 1))
+        rand = np.random.RandomState(random.randrange(2 ** 32))
         image = np.copy(image)
         bboxes = (
             np.round(bboxes * np.array(image.shape)[[1, 0, 1, 0]])
@@ -545,7 +545,7 @@ class SpeckleNoise(A.ImageOnlyTransform):
         self.scale = scale
 
     def apply(self, image, scale, **params):
-        rand = np.random.RandomState(random.randint(0, 2 ** 32 - 1))
+        rand = np.random.RandomState(random.randrange(2 ** 32))
         noise = rand.randn(*image.shape) * scale
         noise = scipy.ndimage.gaussian_filter(noise, 1)
         return np.uint8(np.clip(image + noise, 0, 255))
