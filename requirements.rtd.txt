@@ -1,8 +1,8 @@
 # Read the Docs用 requirements。
-albumentations
 Pillow
-numpy
+albumentations
 numba
+numpy
 opencv-python
 scikit-learn
 scipy

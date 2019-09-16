@@ -198,12 +198,14 @@ class RandomColorAugmentors(RandomCompose):
             argumentors.extend(
                 [
                     RandomPosterize(p=0.0625),
+                    A.Solarize(threshold=(50, 255 - 50), p=0.0625),
                     RandomBlur(p=0.125),
                     RandomUnsharpMask(p=0.125),
+                    A.IAASharpen(alpha=(0, 0.5), p=0.125),
                     GaussNoise(p=0.125),
                     SpeckleNoise(p=0.125),
                     A.ISONoise(color_shift=(0, 0.05), intensity=(0, 0.5), p=0.125),
-                    A.JpegCompression(quality_lower=50, quality_upper=100, p=0.125),
+                    A.ImageCompression(quality_lower=50, quality_upper=100, p=0.125),
                 ]
             )
         super().__init__(argumentors, p=p)

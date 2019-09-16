@@ -1,6 +1,6 @@
 # Travis CI用 requirements。
-albumentations
 Pillow
+albumentations
 better_exceptions
 black
 category_encoders
@@ -19,6 +19,8 @@ pandas
 pydot
 pylint
 pytest
+python-dotenv
+requests
 scikit-image
 scikit-learn
 scipy

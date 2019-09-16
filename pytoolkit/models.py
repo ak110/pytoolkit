@@ -352,6 +352,7 @@ def evaluate(
     preprocessor=None,
     batch_size=32,
     verbose=1,
+    prefix="",
     use_horovod=False,
 ):
     """評価。
@@ -361,10 +362,11 @@ def evaluate(
         dataset (tk.data.Dataset): データ。
         preprocessor (tk.data.Preprocessor): 前処理
         verbose (int): 1ならプログレスバー表示。
+        prefix (str): メトリクス名の接頭文字列。
         use_horovod (bool): MPIによる分散処理をするか否か。
 
     Returns:
-        dict: metricsの文字列と値のdict
+        dict: メトリクス名と値のdict
 
     """
     with tk.log.trace_scope("evaluate"):
@@ -375,9 +377,9 @@ def evaluate(
         )
         values = tk.hvd.allreduce(values) if use_horovod else values
         if len(model.metrics_names) == 1:
-            evals = {model.metrics_names[0]: values}
+            evals = {prefix + model.metrics_names[0]: values}
         else:
-            evals = dict(zip(model.metrics_names, values))
+            evals = dict(zip([prefix + n for n in model.metrics_names], values))
         return evals
 
 

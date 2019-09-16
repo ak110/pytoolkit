@@ -176,7 +176,7 @@ def train(
     *,
     model_path,
     **kwargs,
-):
+) -> dict:
     """学習。
 
     Args:
@@ -243,7 +243,7 @@ def evaluate(
     batch_size=32,
     prefix="",
     use_horovod=False,
-):
+) -> dict:
     """評価して結果をINFOログ出力する。
 
     Args:
@@ -251,7 +251,7 @@ def evaluate(
         dataset (tk.data.Dataset): データ
         preprocessor (tk.data.Preprocessor): 前処理
         batch_size (int): バッチサイズ
-        prefix (str): `""` or `"val_"`
+        prefix (str): メトリクス名の接頭文字列。
         use_horovod (bool): MPIによる分散処理をするか否か。
 
     Returns:
@@ -263,13 +263,12 @@ def evaluate(
         dataset,
         preprocessor=preprocessor,
         batch_size=batch_size,
+        prefix=prefix,
         use_horovod=use_horovod,
     )
     if tk.hvd.is_master():
-        max_len = max([len(n) for n in evals]) + max(len(prefix), 4)
+        max_len = max([len(n) for n in evals])
         for n, v in evals.items():
-            tk.log.get(__name__).info(
-                f'{prefix}{n}:{" " * (max_len - len(prefix) - len(n))} {v:.3f}'
-            )
+            tk.log.get(__name__).info(f'{n}:{" " * (max_len - len(n))} {v:.3f}')
     tk.hvd.barrier()
     return evals

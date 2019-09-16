@@ -12,10 +12,10 @@
 
 ## importするために最低限必要なライブラリ
 
-- albumentations
 - Pillow
-- numpy
+- albumentations
 - numba
+- numpy
 - opencv-python
 - scikit-learn
 - scipy
@@ -36,4 +36,6 @@
 - optuna
 - pandas
 - pydensecrf
+- python-dotenv
+- requests
 - tqdm

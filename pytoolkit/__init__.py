@@ -52,6 +52,7 @@ if True:
     from . import ml
     from . import models
     from . import ndimage
+    from . import notification
     from . import od
     from . import optimizers
     from . import preprocessing
