@@ -103,6 +103,12 @@ class App:
             try:
                 with tk.log.trace_scope(command["func"].__qualname__):
                     command["func"]()
+            except BaseException as e:
+                # KeyboardInterrupt以外で、かつ
+                # ログファイルを出力する(ような重要な)コマンドの場合のみ通知を送信
+                if e is not KeyboardInterrupt and command["logfile"]:
+                    tk.notifications.post(tk.utils.format_exc())
+                raise
             finally:
                 # 後処理
                 for f in self.terms:

@@ -3,6 +3,8 @@ import functools
 import os
 import pathlib
 import pickle
+import sys
+import traceback
 
 import joblib
 import numpy as np
@@ -95,6 +97,31 @@ def better_exceptions():
         be.hook()
     except BaseException:
         tk.log.get(__name__).warning("better_exceptions error", exc_info=True)
+
+
+def format_exc(color=False, safe=True) -> str:
+    """例外をbetter_exceptionsで整形して返す。"""
+    return format_exception(*sys.exc_info(), color=color, safe=safe)
+
+
+def format_exception(exc, value, tb, color=False, safe=True) -> str:
+    """例外をbetter_exceptionsで整形して返す。"""
+    try:
+        import better_exceptions as be
+
+        formatter = be.ExceptionFormatter(
+            colored=color and be.SUPPORTS_COLOR,
+            theme=be.THEME,
+            max_length=be.MAX_LENGTH,
+            pipe_char=be.PIPE_CHAR,
+            cap_char=be.CAP_CHAR,
+        )
+        return formatter.format_exception(exc, value, tb)
+
+    except BaseException:
+        if not safe:
+            raise
+        return traceback.format_exception(exc, value, tb)
 
 
 def encode_rl_array(masks, desc="encode_rl"):
