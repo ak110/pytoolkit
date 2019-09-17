@@ -1,5 +1,8 @@
 """pandasなどなど関連。"""
+from __future__ import annotations
+
 import html
+import typing
 import warnings
 
 import numpy as np
@@ -7,22 +10,27 @@ import sklearn.utils
 
 import pytoolkit as tk
 
-
-def safe_apply(s, fn):
-    """nan以外にのみapply"""
+if typing.TYPE_CHECKING:
     import pandas as pd
+
+
+def safe_apply(s: pd.Series, fn) -> pd.Series:
+    """nan以外にのみapply"""
+    import pandas as pd  # pylint: disable=redefined-outer-name
 
     return s.apply(lambda x: x if pd.isnull(x) else fn(x))
 
 
-def add_col(df, column_name, values):
+def add_col(df: pd.DataFrame, column_name: str, values: typing.Sequence) -> None:
     """上書きしないようにチェックしつつ列追加。"""
     if column_name in df:
         raise ValueError(f"Column '{column_name}' already exists.")
     df[column_name] = values
 
 
-def add_cols(df, column_names, values):
+def add_cols(
+    df: pd.DataFrame, column_names: typing.List[str], values: typing.Sequence
+) -> None:
     """上書きしないようにチェックしつつ列追加。"""
     for column_name in column_names:
         if column_name in df:
@@ -30,22 +38,24 @@ def add_cols(df, column_names, values):
     df[column_names] = values
 
 
-def group_columns(df, cols=None):
+def group_columns(
+    df: pd.DataFrame, cols: typing.Sequence[str] = None
+) -> typing.Dict[str, typing.List[str]]:
     """列を型ごとにグルーピングして返す。
 
     Args:
-        df (pd.DataFrame): DataFrame
-        cols (array-like): 対象の列名の配列
+        df: DataFrame
+        cols: 対象の列名の配列
 
     Returns:
-        dict: 種類ごとの列名のlist
+        種類ごとの列名のlist
             - "binary": 二値列
             - "numeric": 数値列
             - "categorical": カテゴリ列(など)
             - "unknown": その他
 
     """
-    import pandas as pd
+    import pandas as pd  # pylint: disable=redefined-outer-name
 
     binary_cols = []
     numeric_cols = []
@@ -70,14 +80,14 @@ def group_columns(df, cols=None):
     }
 
 
-def eda(df_train, df_test):
+def eda(df_train: pd.DataFrame, df_test: pd.DataFrame):
     """色々調べて表示する。(jupyter用)"""
     from IPython.display import display, HTML
 
     display(HTML(eda_html(df_train, df_test)))
 
 
-def eda_html(df_train, df_test):
+def eda_html(df_train: pd.DataFrame, df_test: pd.DataFrame):
     """色々調べて結果をHTML化して返す。"""
     result = ""
 
@@ -270,9 +280,9 @@ def eda_html(df_train, df_test):
     return result
 
 
-def analyze(df):
+def analyze(df: pd.DataFrame):
     """中身を適当に分析してDataFrameに詰めて返す。"""
-    import pandas as pd
+    import pandas as pd  # pylint: disable=redefined-outer-name
 
     if isinstance(df, pd.DataFrame):
         df_result = pd.DataFrame(index=df.columns)
@@ -301,10 +311,10 @@ def analyze(df):
         raise NotImplementedError()
 
 
-def compare(df1, df2):
+def compare(df1: pd.DataFrame, df2: pd.DataFrame):
     """同じ列を持つ二つのdfの値を色々比べた結果をdfに入れて返す。"""
     assert (df1.columns == df2.columns).all()
-    import pandas as pd
+    import pandas as pd  # pylint: disable=redefined-outer-name
 
     std = (df1.std() + df2.std()) / 2
     df_result = pd.DataFrame(index=df1.columns)
@@ -318,32 +328,32 @@ def compare(df1, df2):
 
 
 def permutation_importance(
-    score_fn,
-    X,
-    y,
-    greater_is_better,
-    columns=None,
-    n_iter=5,
+    score_fn: typing.Callable[[np.ndarray, np.ndarray], float],
+    X: pd.DataFrame,
+    y: np.ndarray,
+    greater_is_better: bool,
+    columns: typing.Sequence[str] = None,
+    n_iter: int = 5,
     random_state=None,
-    verbose=True,
+    verbose: bool = True,
 ):
     """Permutation Importanceを算出して返す。
 
     Args:
-        score_fn (callable): X, yを受け取りスコアを返す関数。
-        X (pd.DataFrame): 入力データ
-        y (np.ndarray): ラベル
-        greater_is_better (bool): スコアが大きいほど良いならTrue
-        columns (array-like): 対象の列
-        n_iter (int): 繰り返し回数
+        score_fn: X, yを受け取りスコアを返す関数。
+        X: 入力データ
+        y: ラベル
+        greater_is_better: スコアが大きいほど良いならTrue
+        columns: 対象の列
+        n_iter: 繰り返し回数
         random_state: seed
-        verbose (bool): プログレスバーを表示するか否か
+        verbose: プログレスバーを表示するか否か
 
     Returns:
         pd.DataFrame: columnとimportanceの列を持つDataFrame
 
     """
-    import pandas as pd
+    import pandas as pd  # pylint: disable=redefined-outer-name
 
     if columns is None:
         columns = X.columns.values
@@ -366,24 +376,31 @@ def permutation_importance(
     return df_importance
 
 
-def shuffled_score(score_fn, X, c, y, n_iter=5, random_state=None):
+def shuffled_score(
+    score_fn: typing.Callable[[np.ndarray, np.ndarray], float],
+    X: pd.DataFrame,
+    c: str,
+    y: np.ndarray,
+    n_iter: int = 5,
+    random_state=None,
+) -> float:
     """Permutation Importanceのための処理。
 
     c列をシャッフルしたときのスコアの平均値を返す。
 
     Args:
-        score_fn (callable): X, yを受け取りスコアを返す関数。
-        X (pd.DataFrame): 入力データ
-        c (str): 対象の列
-        y (np.ndarray): ラベル
-        n_iter (int): 繰り返し回数
+        score_fn: X, yを受け取りスコアを返す関数。
+        X: 入力データ
+        c: 対象の列
+        y: ラベル
+        n_iter: 繰り返し回数
         random_state: seed
 
     Returns:
-        float: スコア
+        スコア
 
     """
-    import pandas as pd
+    import pandas as pd  # pylint: disable=redefined-outer-name
 
     random_state = sklearn.utils.check_random_state(random_state)
     X = X.copy()
@@ -407,7 +424,7 @@ def shuffled_score(score_fn, X, c, y, n_iter=5, random_state=None):
     return np.mean(scores)
 
 
-def latlon_distance(lat1, lon1, lat2, lon2):
+def latlon_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """2地点間の距離。
 
     Args:
@@ -417,7 +434,7 @@ def latlon_distance(lat1, lon1, lat2, lon2):
         lon2: 地点2の経度[°]
 
     Returns:
-        float: 距離[km]
+        距離[km]
 
     References:
         - <https://keisan.casio.jp/exec/system/1257670779>

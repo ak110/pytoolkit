@@ -1,11 +1,19 @@
 """CVなど。"""
+from __future__ import annotations
+
+import typing
+
 import numpy as np
 import sklearn.model_selection
 
 import pytoolkit as tk
 
+FoldsType = typing.Sequence[typing.Tuple[np.ndarray, np.ndarray]]
 
-def split(dataset, nfold, split_seed=1, stratify=None):
+
+def split(
+    dataset: tk.data.Dataset, nfold: int, split_seed: int = 1, stratify: bool = None
+) -> FoldsType:
     """nfold CV。"""
     if dataset.groups is not None:
         g = np.unique(dataset.groups)
@@ -37,8 +45,23 @@ def split(dataset, nfold, split_seed=1, stratify=None):
     return folds
 
 
-def pseudo_labeling(train_set, folds1, test_set, folds2, test_weights=0.5):
-    """pseudo labelなdataset, foldsを作って返す。"""
+def pseudo_labeling(
+    train_set: tk.data.Dataset,
+    folds1: FoldsType,
+    test_set: tk.data.Dataset,
+    folds2: FoldsType,
+    test_weights: float = 0.5,
+):
+    """pseudo labelなdataset, foldsを作って返す。
+
+    Args:
+        train_set: 訓練データ
+        folds1: 訓練データのfolds
+        test_set: テストデータ
+        folds2: テストデータのfolds
+        test_weights: 訓練データに対するテストデータの重み
+
+    """
     dataset = tk.data.Dataset.concat(train_set, test_set)
 
     pl_weight = test_weights * len(train_set) / len(test_set)
@@ -54,11 +77,14 @@ def pseudo_labeling(train_set, folds1, test_set, folds2, test_weights=0.5):
     return dataset, folds
 
 
-def concat_folds(folds1, folds2, fold2_offset):
+def concat_folds(folds1: FoldsType, folds2: FoldsType, fold2_offset: int) -> FoldsType:
     """folds同士をくっつける。"""
     assert len(folds1) == len(folds2)
 
     return [
-        tuple([np.concatenate([i1, i2 + fold2_offset]) for i1, i2 in zip(f1, f2)])
-        for f1, f2 in zip(folds1, folds2)
+        (
+            np.concatenate([f1_t, f2_t + fold2_offset]),
+            np.concatenate([f1_v, f2_v + fold2_offset]),
+        )
+        for (f1_t, f1_v), (f2_t, f2_v) in zip(folds1, folds2)
     ]

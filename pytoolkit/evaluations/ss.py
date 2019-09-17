@@ -1,19 +1,25 @@
 """セマンティックセグメンテーションの評価。"""
+import typing
 
 import numpy as np
 
 import pytoolkit as tk
 
 
-def print_ss_metrics(y_true, y_pred, threshold=0.5, print_fn=None):
+def print_ss_metrics(
+    y_true: typing.Iterable[np.ndarray],
+    y_pred: typing.Iterable[np.ndarray],
+    threshold: float = 0.5,
+    print_fn: typing.Callable[[str], None] = None,
+) -> dict:
     """semantic segmentationの各種metricsを算出してprintする。
 
     Args:
-        y_true (array-like): ラベル (shape=(N, H, W) or (N, H, W, C))
-        y_pred (array-like): 推論結果 (shape=(N, H, W) or (N, H, W, C))
+        y_true: ラベル (shape=(N, H, W) or (N, H, W, C))
+        y_pred: 推論結果 (shape=(N, H, W) or (N, H, W, C))
 
     Returns:
-        dict: 各種metrics
+        各種metrics
 
     """
     evals = evaluate_ss(y_true, y_pred, threshold)
@@ -30,18 +36,22 @@ def print_ss_metrics(y_true, y_pred, threshold=0.5, print_fn=None):
     return evals
 
 
-def evaluate_ss(y_true, y_pred, threshold=0.5):
+def evaluate_ss(
+    y_true: typing.Iterable[np.ndarray],
+    y_pred: typing.Iterable[np.ndarray],
+    threshold: float = 0.5,
+) -> dict:
     """semantic segmentationの各種metricsを算出してdictで返す。
 
     y_true, y_predはgeneratorも可。(メモリ不足にならないように)
 
     Args:
-        y_true (array-like): ラベル (shape=(N, H, W) or (N, H, W, C))
-        y_pred (array-like): 推論結果 (shape=(N, H, W) or (N, H, W, C))
-        threshold (float): 閾値 (ラベルと推論結果と両方に適用)
+        y_true: ラベル (shape=(N, H, W) or (N, H, W, C))
+        y_pred: 推論結果 (shape=(N, H, W) or (N, H, W, C))
+        threshold: 閾値 (ラベルと推論結果と両方に適用)
 
     Returns:
-        dict: 各種metrics
+        各種metrics
 
         - "iou_score": IoUスコア (塩コンペのスコア)
         - "dice": ダイス係数

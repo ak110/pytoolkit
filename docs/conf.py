@@ -48,6 +48,7 @@ extensions = [
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
+    "sphinx_autodoc_typehints",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -190,9 +191,14 @@ autodoc_default_options = {
     "members": None,
     "member-order": "bysource",
     "undoc-members": True,
-    "special-members": "__len__,__getitem__,__iter__,__repr__",
+    "special-members": "__init__,__len__,__getitem__,__iter__",
     "show-inheritance": None,
 }
+
+# sphinx-autodoc-typehints
+set_type_checking_flag = True
+typehints_fully_qualified = True
+always_document_param_types = True
 
 # -- Options for todo extension ----------------------------------------------
 

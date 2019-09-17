@@ -10,7 +10,7 @@ def data_url(data: bytes, mime_type: str) -> str:
         mime_type: 例：'image/png'
 
     Returns:
-        str: data URL。
+        data URL。
 
     """
     b64 = base64.b64encode(data).decode("ascii")

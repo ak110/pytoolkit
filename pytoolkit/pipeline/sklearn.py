@@ -1,5 +1,10 @@
-import sklearn.base
+"""scikit-learn"""
+from __future__ import annotations
+
+import typing
+
 import numpy as np
+import sklearn.base
 
 import pytoolkit as tk
 
@@ -10,23 +15,25 @@ class SKLearnModel(Model):
     """scikit-learnのモデル。
 
     Args:
-        estimator (sklearn.base.BaseEstimator): モデル
-        weights_arg_name (str): tk.data.Dataset.weightsを使う場合の引数名
-                                (pipelineなどで変わるので。例: "transformedtargetregressor__sample_weight")
+        estimator: モデル
+        weights_arg_name: tk.data.Dataset.weightsを使う場合の引数名
+                          (pipelineなどで変わるので。例: "transformedtargetregressor__sample_weight")
 
     """
 
     def __init__(
         self,
-        estimator,
-        weights_arg_name="sample_weight",
-        preprocessors=None,
-        postprocessors=None,
+        estimator: sklearn.base.BaseEstimator,
+        weights_arg_name: str = "sample_weight",
+        preprocessors: list = None,
+        postprocessors: list = None,
     ):
         super().__init__(preprocessors, postprocessors)
         self.estimator = estimator
         self.weights_arg_name = weights_arg_name
-        self.estimators_ = None
+        self.estimators_: typing.Optional[
+            typing.List[sklearn.base.BaseEstimator]
+        ] = None
 
     def _save(self, models_dir):
         tk.utils.dump(self.estimators_, models_dir / "estimators.pkl")
@@ -34,7 +41,7 @@ class SKLearnModel(Model):
     def _load(self, models_dir):
         self.estimators_ = tk.utils.load(models_dir / "estimators.pkl")
 
-    def _cv(self, dataset, folds):
+    def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
         scores = []
         score_weights = []
         self.estimators_ = []
@@ -59,8 +66,9 @@ class SKLearnModel(Model):
 
         return {"score": np.average(scores, weights=score_weights)}
 
-    def _predict(self, dataset):
+    def _predict(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:
         # TODO: predict_proba対応
+        assert self.estimators_ is not None
         return np.array(
             [estimator.predict(dataset.data) for estimator in self.estimators_]
         )

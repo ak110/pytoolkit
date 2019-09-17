@@ -1,4 +1,8 @@
+"""CatBoost"""
+from __future__ import annotations
+
 import pathlib
+import typing
 
 import numpy as np
 
@@ -11,21 +15,28 @@ class CBModel(Model):
     """CatBoostのモデル。
 
     Args:
-        params (dict): CatBoostのパラメータ
-        nfold (int): cvの分割数
-        cv_params (dict): catboost.train用パラメータ (`**kwargs`)
+        params: CatBoostのパラメータ
+        nfold: cvの分割数
+        cv_params: catboost.train用パラメータ (`**kwargs`)
 
     """
 
     def __init__(
-        self, params, nfold, cv_params=None, preprocessors=None, postprocessors=None
+        self,
+        params: dict,
+        nfold: int,
+        cv_params: dict = None,
+        preprocessors=None,
+        postprocessors=None,
     ):
+        import catboost
+
         super().__init__(preprocessors, postprocessors)
         self.params = params
         self.nfold = nfold
         self.cv_params = cv_params
-        self.gbms_ = None
-        self.train_pool_ = None
+        self.gbms_: typing.Optional[typing.List[catboost.CatBoost]] = None
+        self.train_pool_: catboost.Pool = None
 
     def _save(self, models_dir):
         assert self.train_pool_ is not None
@@ -52,7 +63,7 @@ class CBModel(Model):
             for fold in range(self.nfold)
         ]
 
-    def _cv(self, dataset, folds):
+    def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
         import catboost
 
         self.train_pool_ = catboost.Pool(
@@ -85,7 +96,8 @@ class CBModel(Model):
 
         return scores
 
-    def _predict(self, dataset):
+    def _predict(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:
+        assert self.gbms_ is not None
         return np.array([gbm.predict(dataset.data) for gbm in self.gbms_])
 
     def feature_importance(self):

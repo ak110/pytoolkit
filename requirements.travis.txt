@@ -11,6 +11,7 @@ git+https://github.com/cocodataset/cocoapi.git#egg=pycocotools&subdirectory=Pyth
 h5py
 keras
 matplotlib
+mypy
 numba
 numpy
 onnxmltools

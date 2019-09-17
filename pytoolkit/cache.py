@@ -38,6 +38,7 @@ def memorize(cache_dir, compress=0, verbose=True):
             tk.hvd.barrier()
             if not tk.hvd.is_master():
                 result = joblib.load(cache_path)
+            tk.hvd.barrier()
             return result
 
         return _decorated_func

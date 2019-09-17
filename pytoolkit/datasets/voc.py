@@ -49,8 +49,6 @@ def load_od(vocdevkit_dir):
         vocdevkit_dir: VOCdevkitディレクトリのパス
 
     Returns:
-        tuple:
-
         - (X_train, y_train): 訓練データ
         - (X_val, y_val): 検証データ
         - class_names: クラス名の配列
@@ -69,8 +67,6 @@ def load_0712_trainval(vocdevkit_dir, class_name_to_id=None):
         class_name_to_id: クラス名からIDへの変換の辞書。Noneなら0～19に変換。
 
     Returns:
-        tuple:
-
         - X: 画像ファイルのパスのndarray
         - y: tk.od.ObjectsAnnotationのndarray
 
@@ -92,8 +88,6 @@ def load_07_test(vocdevkit_dir, class_name_to_id=None):
         class_name_to_id: クラス名からIDへの変換の辞書。Noneなら0～19に変換。
 
     Returns:
-        tuple:
-
         - X: 画像ファイルのパスのndarray
         - y: tk.od.ObjectsAnnotationのndarray
 
@@ -114,8 +108,6 @@ def load_set(
         without_difficult: difficultフラグが'1'のものを読み込まないならTrue。
 
     Returns:
-        tuple:
-
         - X: 画像ファイルのパスのndarray
         - y: tk.od.ObjectsAnnotationのndarray
 
@@ -145,8 +137,6 @@ def load_annotations(
     """VOC2007などのアノテーションデータの読み込み。
 
     Returns:
-        tuple:
-
         - X: 画像ファイルのパスのndarray
         - y: tk.od.ObjectsAnnotationのndarray
         - names: 「画像ファイル名拡張子なし」のリスト。またはNone。
@@ -210,8 +200,6 @@ def evaluate(y_true, y_pred):
     https://chainercv.readthedocs.io/en/stable/reference/evaluations.html?highlight=eval_detection_coco#eval-detection-voc
 
     Returns:
-        dict:
-
         - 'mAP': 普通っぽい(?)metric。
         - 'mAP_VOC': PASCAL VOC 2007版metric。11点での平均。
 

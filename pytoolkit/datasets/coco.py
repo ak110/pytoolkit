@@ -22,8 +22,6 @@ def load_od(coco_dir, year=2017):
         year: 読み込むデータの西暦
 
     Returns:
-        tuple:
-
         - (X_train, y_train)
         - (X_val, y_val)
         - class_names
@@ -93,8 +91,6 @@ def load_ss(coco_dir, cache_dir, input_size=None, year=2017):
         input_size: 読み込み時にリサイズする場合、そのサイズ
 
     Returns:
-        tuple:
-
         - (X_train, y_train): 訓練データ
         - (X_val, y_val): 検証データ
         - class_names: クラス名の配列
@@ -165,8 +161,6 @@ def evaluate(y_true, y_pred):
     https://chainercv.readthedocs.io/en/stable/reference/evaluations.html?highlight=eval_detection_coco#chainercv.evaluations.eval_detection_coco
 
     Returns:
-        dict:
-
         - "map/iou=0.50:0.95/area=all/max_dets=100"
         - "map/iou=0.50/area=all/max_dets=100"
         - "map/iou=0.75/area=all/max_dets=100"

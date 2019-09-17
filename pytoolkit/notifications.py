@@ -19,11 +19,11 @@ import numpy as np
 import pytoolkit as tk
 
 
-def post_evals(evals):
+def post_evals(evals: dict):
     """学習結果を通知。
 
     Args:
-        evals (dict): 評価結果などの入ったdict。
+        evals: 評価結果などの入ったdict。
 
     """
     # 整形
@@ -41,9 +41,9 @@ def post_evals(evals):
     post(text)
 
 
-def post(text, add_quote=True, add_module_name=True, add_mention=True):
+def post(text: str):
     """通知。"""
-    prefix = f"<{pathlib.Path(sys.argv[0]).name}>\n" if add_module_name else ""
+    module_name = f"{pathlib.Path(sys.argv[0]).name}\n"
     tk.log.get(__name__).debug(f"Notification:\n{text}")
 
     if tk.hvd.is_master():
@@ -55,12 +55,7 @@ def post(text, add_quote=True, add_module_name=True, add_mention=True):
 
             slack_url = os.environ.get("SLACK_URL", "")
             if len(slack_url) > 0:
-                data = {"text": text}
-                if add_quote:
-                    data["text"] = "```\n" + data["text"] + "\n```"
-                if add_mention:
-                    data["text"] += "\n<!channel>"
-                data["text"] = prefix + data["text"]
+                data = {"text": f"{module_name}```\n{text}```\n<!channel>"}
                 r = requests.post(
                     slack_url,
                     data=json.dumps(data),
@@ -70,7 +65,7 @@ def post(text, add_quote=True, add_module_name=True, add_mention=True):
 
             line_token = os.environ.get("LINE_TOKEN", "")
             if len(line_token) > 0:
-                data = {"message": prefix + text}
+                data = {"message": module_name + text}
                 r = requests.post(
                     "https://notify-api.line.me/api/notify",
                     data=data,

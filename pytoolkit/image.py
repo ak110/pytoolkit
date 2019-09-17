@@ -554,7 +554,7 @@ class SpeckleNoise(A.ImageOnlyTransform):
         return {"scale": random.uniform(*self.scale)}
 
 
-def _random_loguniform(lower, upper):
+def _random_loguniform(lower: float, upper: float) -> float:
     """3/4 ～ 4/3みたいな乱数を作って返す。"""
     assert 0 < lower < 1 < upper
     return np.exp(random.uniform(np.log(lower), np.log(upper)))

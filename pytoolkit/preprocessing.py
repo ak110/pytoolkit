@@ -1,4 +1,7 @@
 """前処理関連。"""
+from __future__ import annotations
+
+import typing
 
 import numpy as np
 import scipy.special
@@ -9,15 +12,18 @@ import sklearn.preprocessing
 
 import pytoolkit as tk
 
+if typing.TYPE_CHECKING:
+    import pandas as pd
 
-def encode_binary(s, true_value, false_value):
+
+def encode_binary(s: pd.Series, true_value, false_value) -> pd.Series:
     """列の2値化。"""
     s2 = s.map({true_value: True, false_value: False})
     assert s2.notnull().all(), f"Convert error: {s[s2.isnull()].value_counts()}"
     return s2.astype(bool)
 
 
-def encode_ordinal(s, values):
+def encode_ordinal(s: pd.Series, values) -> pd.Series:
     """順序のあるカテゴリ変数の数値化。"""
     mask = s.notnull()
     result = s.map({v: i for i, v in enumerate(values)})
@@ -30,9 +36,11 @@ def encode_ordinal(s, values):
     return result
 
 
-def encode_cyclic(s, min_value=0, max_value=1):
+def encode_cyclic(
+    s: pd.Series, min_value: float = 0, max_value: float = 1
+) -> pd.DataFrame:
     """周期性のある数値のsin/cos化。"""
-    import pandas as pd
+    import pandas as pd  # pylint: disable=redefined-outer-name
 
     rad = 2 * np.pi * (s - min_value) / (max_value - min_value)
     df = pd.DataFrame()
@@ -98,35 +106,38 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
     """特徴を学習器に与えられるように色々いい感じに変換するクラス。
 
     Args:
-        category (str): カテゴリ変数の処理方法
+        category: カテゴリ変数の処理方法
             - "category": Ordinalエンコードしてcategory型にする (LightGBMとか用)
             - "ordinal": Ordinalエンコードしてobject型にする (XGBoost/CatBoostとか用)
             - "onehot": One-hotエンコードしてbool型にする (NNとか用)
-        binary_fraction (float): 0-1 or None
-        iszero_fraction (float): 0-1 or None
-        isnull_fraction (float): 0-1 or None
-        ordinal_encoder (sklearn.base.BaseEstimator): OrdinalEncoderのインスタンス or None
-        count_encoder (sklearn.base.BaseEstimator): CountEncoderのインスタンス or None
-        target_encoder (sklearn.base.BaseEstimator): TargetEncoderのインスタンス or None
-        ignore_cols (array-like): 無視する列名
+        binary_fraction: 0-1 or None
+        iszero_fraction: 0-1 or None
+        isnull_fraction: 0-1 or None
+        ordinal_encoder: OrdinalEncoderのインスタンス or None or "default"
+        onehot_encoder: OneHotEncoderのインスタンス or None or "default"
+        count_encoder: CountEncoderのインスタンス or None or "default"
+        target_encoder: TargetEncoderのインスタンス or None or "default"
+        ignore_cols: 無視する列名
 
     """
 
     def __init__(
         self,
-        category="category",
-        binary_fraction=0.01,
-        iszero_fraction=0.01,
-        isnull_fraction=0.01,
-        rare_category_fraction=0.01,
-        ordinal_encoder="default",
-        onehot_encoder="default",
-        count_encoder="default",
-        target_encoder="default",
-        ignore_cols=None,
+        category: str = "category",
+        binary_fraction: float = 0.01,
+        iszero_fraction: float = 0.01,
+        isnull_fraction: float = 0.01,
+        rare_category_fraction: float = 0.01,
+        ordinal_encoder: typing.Union[
+            sklearn.base.BaseEstimator, None, str
+        ] = "default",
+        onehot_encoder: typing.Union[sklearn.base.BaseEstimator, None, str] = "default",
+        count_encoder: typing.Union[sklearn.base.BaseEstimator, None, str] = "default",
+        target_encoder: typing.Union[sklearn.base.BaseEstimator, None, str] = "default",
+        ignore_cols: typing.Sequence[str] = None,
     ):
         import category_encoders as ce
-        import pandas as pd
+        import pandas as pd  # pylint: disable=redefined-outer-name
 
         assert category in ("category", "ordinal", "onehot")
         self.category = category
@@ -149,14 +160,14 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
             TargetEncoder() if target_encoder == "default" else target_encoder
         )
         self.ignore_cols = ignore_cols or []
-        self.binary_cols_: list = None
-        self.numeric_cols_: list = None
-        self.category_cols_: list = None
-        self.rare_category_cols_: list = None
-        self.iszero_cols_: list = None
-        self.isnull_cols_: list = None
-        self.feature_names_: list = None
-        self.notnull_cols_: pd.Series = None
+        self.binary_cols_: typing.Optional[list] = None
+        self.numeric_cols_: typing.Optional[list] = None
+        self.category_cols_: typing.Optional[list] = None
+        self.rare_category_cols_: typing.Optional[list] = None
+        self.iszero_cols_: typing.Optional[list] = None
+        self.isnull_cols_: typing.Optional[list] = None
+        self.feature_names_: typing.Optional[list] = None
+        self.notnull_cols_: typing.Optional[pd.Series] = None
 
     def fit(self, X, y):
         self.fit_transform(X, y)
@@ -231,7 +242,7 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
     def transform(self, X, y=None):
         del y
         with tk.log.trace_scope("FeaturesEncoder.transform"):
-            import pandas as pd
+            import pandas as pd  # pylint: disable=redefined-outer-name
 
             feats = pd.DataFrame(index=X.index)
 

@@ -1,4 +1,8 @@
+"""Keras"""
+from __future__ import annotations
+
 import pathlib
+import typing
 
 import numpy as np
 import tensorflow as tf
@@ -15,36 +19,36 @@ class KerasModel(Model):
     _saveではなく学習時にsaveしてしまっているので注意。
 
     Args:
-        create_model_fn (callable): モデルを作成する関数。
-        train_preprocessor (tk.data.Preprocessor): 訓練データの前処理
-        val_preprocessor (tk.data.Preprocessor): 検証データの前処理
-        batch_size (int): バッチサイズ
+        create_model_fn: モデルを作成する関数。
+        train_preprocessor: 訓練データの前処理
+        val_preprocessor: 検証データの前処理
+        batch_size: バッチサイズ
         models_dir (PathLike): 保存先ディレクトリ
-        model_name_format (str): モデルのファイル名のフォーマット。{fold}のところに数字が入る。
-        skip_if_exists (bool): モデルが存在してもスキップせず再学習するならFalse。
-        fit_params (dict): tk.models.fit()のパラメータ
-        load_model_fn (callable): モデルを読み込む関数
-        use_horovod (bool): MPIによる分散処理をするか否か。
-        parallel_cv (bool): lgb.cvなどのように全foldまとめて処理するならTrue
+        model_name_format: モデルのファイル名のフォーマット。{fold}のところに数字が入る。
+        skip_if_exists: モデルが存在してもスキップせず再学習するならFalse。
+        fit_params: tk.models.fit()のパラメータ
+        load_model_fn: モデルを読み込む関数
+        use_horovod: MPIによる分散処理をするか否か。
+        parallel_cv: lgb.cvなどのように全foldまとめて処理するならTrue
 
     """
 
     def __init__(
         self,
-        create_model_fn,
-        train_preprocessor,
-        val_preprocessor,
-        batch_size=32,
+        create_model_fn: typing.Callable[[], tk.keras.models.Model],
+        train_preprocessor: tk.data.Preprocessor,
+        val_preprocessor: tk.data.Preprocessor,
+        batch_size: int = 32,
         *,
         models_dir,
-        model_name_format="model.fold{fold}.h5",
-        skip_if_exists=True,
-        fit_params=None,
-        load_model_fn=None,
-        use_horovod=False,
-        parallel_cv=False,
-        preprocessors=None,
-        postprocessors=None,
+        model_name_format: str = "model.fold{fold}.h5",
+        skip_if_exists: bool = True,
+        fit_params: dict = None,
+        load_model_fn: typing.Callable[[pathlib.Path], tk.keras.models.Model] = None,
+        use_horovod: bool = False,
+        parallel_cv: bool = False,
+        preprocessors: list = None,
+        postprocessors: list = None,
     ):
         super().__init__(preprocessors, postprocessors)
         self.create_model_fn = create_model_fn
@@ -58,7 +62,7 @@ class KerasModel(Model):
         self.load_model_fn = load_model_fn
         self.use_horovod = use_horovod
         self.parallel_cv = parallel_cv
-        self.models = None
+        self.models: typing.Optional[typing.List[tk.keras.models.Model]] = None
 
     def _save(self, models_dir):
         assert models_dir == self.models_dir
@@ -74,20 +78,20 @@ class KerasModel(Model):
             else:
                 break
 
-    def _cv(self, dataset, folds):
+    def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
         if self.parallel_cv:
             return self._parallel_cv(dataset, folds)
         else:
             return self._serial_cv(dataset, folds)
 
-    def _parallel_cv(self, dataset, folds):
+    def _parallel_cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType):
         self.models = [self.create_model_fn() for _ in folds]
 
         inputs = []
         targets = []
         outputs = []
         losses = []
-        metrics = {n: [] for n in self.models[0].metrics_names if n != "loss"}
+        metrics: dict = {n: [] for n in self.models[0].metrics_names if n != "loss"}
         for i, model in enumerate(self.models):
             input_shape = model.input_shape
             output_shape = model.output_shape
@@ -189,7 +193,7 @@ class KerasModel(Model):
 
         return scores
 
-    def _serial_cv(self, dataset, folds):
+    def _serial_cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType):
         self.models = []
         score_list = []
         score_weights = []
@@ -231,7 +235,8 @@ class KerasModel(Model):
             for k in score_list[0]
         }
 
-    def _predict(self, dataset):
+    def _predict(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:
+        assert self.models is not None
         return [
             tk.models.predict(
                 model,

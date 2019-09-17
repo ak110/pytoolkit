@@ -10,16 +10,23 @@ class GradCamVisualizer:
     """Grad-CAM(のようなもの)による可視化。
 
     Args:
-        model: 対象のモデル。画像分類で最後がGlobalAveragePooling2D+Dense+softmaxで分類している前提。
+        model: 対象のモデル。画像分類で最後がpooling_class+Dense+softmaxで分類している前提。
         output_index: 使う出力(softmax)のインデックス。(クラスのindex)
+        pooling_class: 分類直前のpoolingのクラス。(既定値はGlobalAveragePooling2D)
 
     """
 
-    def __init__(self, model, output_index):
-        # GlobalAveragePoolingへの入力テンソルを取得
+    def __init__(
+        self,
+        model: keras.models.Model,
+        output_index: int,
+        pooling_class: keras.layers.Layer = None,
+    ):
+        pooling_class = pooling_class or keras.layers.GlobalAveragePooling2D
+        # pooling_classへの入力テンソルを取得
         map_output = None
         for layer in model.layers[::-1]:
-            if isinstance(layer, keras.layers.GlobalAveragePooling2D):
+            if isinstance(layer, pooling_class):
                 map_output = layer.input
                 break
         assert map_output is not None
@@ -29,7 +36,13 @@ class GradCamVisualizer:
         mask = mask / (K.max(mask) + 1e-3)  # [0, 1)
         self.get_mask_func = K.function(model.inputs + [K.learning_phase()], [mask])
 
-    def draw(self, source_image, model_inputs, alpha=0.5, interpolation="nearest"):
+    def draw(
+        self,
+        source_image: np.ndarray,
+        model_inputs: np.ndarray,
+        alpha: float = 0.5,
+        interpolation: str = "nearest",
+    ) -> np.ndarray:
         """ヒートマップ画像を作成して返す。
 
         Args:
@@ -65,7 +78,7 @@ class GradCamVisualizer:
         result_image = np.uint8(heatmap * alpha + source_image * (1 - alpha))
         return result_image
 
-    def get_mask(self, model_inputs):
+    def get_mask(self, model_inputs: np.ndarray) -> np.ndarray:
         """可視化してマスクを返す。マスクの値は`[0, 1)`。"""
         if not isinstance(model_inputs, list):
             model_inputs = [model_inputs]

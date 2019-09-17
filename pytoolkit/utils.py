@@ -5,6 +5,7 @@ import pathlib
 import pickle
 import sys
 import traceback
+import typing
 
 import joblib
 import numpy as np
@@ -121,22 +122,22 @@ def format_exception(exc, value, tb, color=False, safe=True) -> str:
     except BaseException:
         if not safe:
             raise
-        return traceback.format_exception(exc, value, tb)
+        return "".join(traceback.format_exception(exc, value, tb))
 
 
-def encode_rl_array(masks, desc="encode_rl"):
+def encode_rl_array(masks, desc="encode_rl") -> typing.List[str]:
     """encode_rlの配列版。"""
     return [encode_rl(m) for m in tqdm(masks, desc=desc)]
 
 
-def encode_rl(mask):
+def encode_rl(mask: np.ndarray) -> str:
     """Kaggleのセグメンテーションで使われるようなランレングスエンコード。
 
     Args:
         mask (ndarray): 0 or 1のマスク画像 (shapeは(height, width)または(height, width, 1))
 
     Returns:
-        str: エンコードされた文字列
+        エンコードされた文字列
 
     """
     mask = np.squeeze(mask)

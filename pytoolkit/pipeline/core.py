@@ -1,5 +1,8 @@
 """前処理＋モデル＋後処理のパイプライン。"""
+from __future__ import annotations
+
 import pathlib
+import typing
 
 import sklearn.pipeline
 import numpy as np
@@ -11,13 +14,12 @@ class Model:
     """パイプラインのモデルのインターフェース。
 
     Args:
-        model (Model): モデル
-        preprocessors (list): 前処理 (sklearnのTransformerの配列)
-        postprocessors (list): 後処理 (sklearnのTransformerの配列)
+        preprocessors: 前処理 (sklearnのTransformerの配列)
+        postprocessors: 後処理 (sklearnのTransformerの配列)
 
     """
 
-    def __init__(self, preprocessors=None, postprocessors=None):
+    def __init__(self, preprocessors: list = None, postprocessors: list = None):
         self.preprocessors = (
             sklearn.pipeline.make_pipeline(*preprocessors)
             if preprocessors is not None
@@ -29,16 +31,21 @@ class Model:
             else None
         )
 
-    def cv(self, dataset, folds, models_dir):
+    def cv(
+        self,
+        dataset: tk.data.Dataset,
+        folds: tk.validation.FoldsType,
+        models_dir: pathlib.Path,
+    ) -> dict:
         """CVして保存。
 
         Args:
-            dataset (tk.data.Dataset): 入力データ
-            folds (list): CVのindex
-            models_dir (pathlib.Path): 保存先ディレクトリ (Noneなら保存しない)
+            dataset: 入力データ
+            folds: CVのindex
+            models_dir: 保存先ディレクトリ (Noneなら保存しない)
 
         Returns:
-            dict: metrics名と値
+            metrics名と値
 
         """
         if models_dir is not None:
@@ -68,14 +75,14 @@ class Model:
 
         return scores
 
-    def load(self, models_dir):
+    def load(self, models_dir) -> Model:
         """読み込み。
 
         Args:
             models_dir (PathLike): 保存先ディレクトリ
 
         Returns:
-            Pipeline: self
+            self
 
         """
         models_dir = pathlib.Path(models_dir)
@@ -89,15 +96,17 @@ class Model:
         self._load(models_dir)
         return self
 
-    def predict_oof(self, dataset, folds):
+    def predict_oof(
+        self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType
+    ) -> np.ndarray:
         """out-of-foldなpredict結果を返す。
 
         Args:
-            dataset (tk.data.Dataset): 入力データ
-            folds (list): CVのindex
+            dataset: 入力データ
+            folds: CVのindex
 
         Returns:
-            np.ndarray: 予測結果
+            予測結果
 
         """
         pred_list = self.predict(dataset)
@@ -110,14 +119,14 @@ class Model:
 
         return oofp
 
-    def predict(self, dataset):
+    def predict(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:
         """予測結果をリストで返す。
 
         Args:
             dataset (tk.data.Dataset): 入力データ
 
         Returns:
-            np.ndarray: len(self.folds)個の予測結果
+            len(self.folds)個の予測結果
 
         """
         dataset = dataset.copy()
@@ -158,27 +167,27 @@ class Model:
         """
         raise NotImplementedError()
 
-    def _cv(self, dataset, folds):
+    def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
         """CV。
 
         Args:
-            dataset (tk.data.Dataset): 入力データ
-            folds (list): CVのindex
+            dataset: 入力データ
+            folds: CVのindex
 
         Returns:
-            dict: metrics名と値
+            metrics名と値
 
         """
         raise NotImplementedError()
 
-    def _predict(self, dataset):
+    def _predict(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:
         """予測結果をリストで返す。
 
         Args:
             dataset (tk.data.Dataset): 入力データ
 
         Returns:
-            np.ndarray: len(self.folds)個の予測結果
+            len(self.folds)個の予測結果
 
         """
         raise NotImplementedError()

@@ -4,6 +4,9 @@ albumentations
 numba
 numpy
 opencv-python
+optuna
+pandas
 scikit-learn
 scipy
+sphinx-autodoc-typehints
 tensorflow>=1.14.0

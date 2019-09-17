@@ -1,4 +1,6 @@
 """画像分類関連。"""
+from __future__ import annotations
+
 import pathlib
 import xml.etree.ElementTree
 
@@ -7,17 +9,19 @@ import numpy as np
 import pytoolkit as tk
 
 
-def load_image_folder(data_dir, class_names=None, use_tqdm=True, check_image=False):
+def load_image_folder(
+    data_dir, class_names=None, use_tqdm: bool = True, check_image: bool = False
+) -> tk.data.Dataset:
     """画像分類でよくある、クラス名でディレクトリが作られた階層構造のデータ。
 
     Args:
         data_dir (PathLike): 対象ディレクトリ
         class_names (ArrayLike): クラス名の配列
-        use_tqdm (bool): tqdmを使用するか否か
-        check_image (bool): 画像として読み込みチェックを行い、読み込み可能なファイルのみ返すか否か (遅いので注意)
+        use_tqdm: tqdmを使用するか否か
+        check_image: 画像として読み込みチェックを行い、読み込み可能なファイルのみ返すか否か (遅いので注意)
 
     Returns:
-        tk.data.Dataset: Dataset。metadata['class_names']にクラス名の配列。
+        Dataset。metadata['class_names']にクラス名の配列。
 
     """
     class_names, X, y = tk.ml.listup_classification(
@@ -73,6 +77,8 @@ def load_imagenet(data_dir, use_tqdm=True):
 
         X_val.append(data_dir / f"Data/CLS-LOC/val/{xml_path.stem}.JPEG")
         y_val.append(class_names_to_id[class_name])
+    X_val = np.array(X_val)
+    y_val = np.array(y_val)
 
     val_set = tk.data.Dataset(X_val, y_val, metadata={"class_names": class_names})
     return train_set, val_set

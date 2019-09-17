@@ -1,5 +1,6 @@
 """機械学習関連。"""
 import pathlib
+import typing
 
 import joblib
 import numpy as np
@@ -11,7 +12,9 @@ import sklearn.utils
 import pytoolkit as tk
 
 
-def listup_classification(dirpath, class_names=None, use_tqdm=True, check_image=False):
+def listup_classification(
+    dirpath, class_names=None, use_tqdm: bool = True, check_image: bool = False
+) -> typing.Tuple[typing.List[str], np.ndarray, np.ndarray]:
     """画像分類でよくある、クラス名ディレクトリの列挙。クラス名の配列, X, yを返す。
 
     Args:
@@ -20,7 +23,7 @@ def listup_classification(dirpath, class_names=None, use_tqdm=True, check_image=
         check_image: 画像として読み込みチェックを行い、読み込み可能なファイルのみ返すか否か (遅いので注意)
 
     Returns:
-        tuple: class_names, X, y
+        class_names, X, y
 
     """
     dirpath = pathlib.Path(dirpath)
@@ -40,7 +43,9 @@ def listup_classification(dirpath, class_names=None, use_tqdm=True, check_image=
         )
 
     # 各クラスのデータを列挙
-    X, y, errors = [], [], []
+    X: list = []
+    y: list = []
+    errors: list = []
     for class_id, class_name in enumerate(
         tk.utils.tqdm(class_names, desc="listup", disable=not use_tqdm)
     ):
@@ -104,24 +109,6 @@ def _listup_files(dirpath, recurse, use_tqdm, check_image):
     return result, errors
 
 
-def extract1000(X, y, num_classes):
-    """クラスごとに均等に合計1000件を取得する。
-
-    References:
-        - <https://github.com/mastnk/train1000>
-
-    """
-    num_data = 1000
-    num_per_class = num_data // num_classes
-
-    index_list = []
-    for c in range(num_classes):
-        index_list.extend(np.where(y == c)[0][:num_per_class])
-    assert len(index_list) == num_data
-
-    return X[index_list], y[index_list]
-
-
 def cv_indices(X, y, cv_count, cv_index, split_seed, stratify=None):
     """Cross validationのインデックスを返す。"""
     folds = get_folds(X, y, cv_count, split_seed, stratify)
@@ -152,34 +139,6 @@ def get_folds(X, y, cv_count, split_seed, stratify=None):
     )
     cv = cv(cv_count, shuffle=True, random_state=split_seed)
     folds = list(cv.split(X, y))
-    return folds
-
-
-def get_group_folds(groups, cv_count, split_seed):
-    """Cross validationのインデックスを返す。
-
-    Args:
-        groups: グループIDの配列。(データ数分)
-        cv_count (int): 分割数。
-        split_seed (int): 乱数のseed。
-        stratify (bool or None): StratifiedKFoldにするならTrue。
-
-    Returns:
-        list of tuple(train_indices, val_indices): インデックス
-
-    """
-    g = np.unique(groups)
-    cv = sklearn.model_selection.KFold(
-        n_splits=cv_count, shuffle=True, random_state=split_seed
-    )
-    folds = []
-    for train_indices, val_indices in cv.split(g, g):
-        folds.append(
-            (
-                np.where(np.in1d(groups, g[train_indices]))[0],
-                np.where(np.in1d(groups, g[val_indices]))[0],
-            )
-        )
     return folds
 
 
@@ -222,19 +181,26 @@ def print_scores(
     print_fn(f"{cn:16s}:  {prec:.3f}   {rec:.3f}   {f1:.3f}  {sup:7d}")
 
 
-def search_threshold(y_true, y_pred, thresholds, score_fn, direction, cv=10):
+def search_threshold(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    thresholds: np.ndarray,
+    score_fn: typing.Callable[[np.ndarray, np.ndarray, float], float],
+    direction: str,
+    cv: int = 10,
+) -> typing.Tuple[float, float]:
     """閾値探索。
 
     Args:
-        y_true (np.ndarray): 答え。
-        y_pred (np.ndarray): 予測結果。
-        thresholds (np.ndarray): 閾値の配列。
-        score_fn (callable): 答えと予測結果と閾値を受け取り、スコアを返す関数。
-        direction (str): 'minimize' or 'maximize'
-        cv (int): cross validationの分割数。
+        y_true: 答え。
+        y_pred: 予測結果。
+        thresholds: 閾値の配列。
+        score_fn: 答えと予測結果と閾値を受け取り、スコアを返す関数。
+        direction: 'minimize' or 'maximize'
+        cv: cross validationの分割数。
 
     Returns:
-        tuple: スコアと閾値
+        スコア, 閾値
 
     """
     assert direction in ("minimize", "maximize")
@@ -273,11 +239,14 @@ def search_threshold(y_true, y_pred, thresholds, score_fn, direction, cv=10):
         return score, th
 
 
-def top_k_accuracy(y_true, proba_pred, k=5):
+def top_k_accuracy(y_true, y_pred, k=5):
     """Top-K accuracy。"""
-    assert len(y_true.shape) == 1
-    assert len(proba_pred.shape) == 2
-    best_k = np.argsort(proba_pred, axis=1)[:, -k:]
+    assert len(y_true) == len(y_pred)
+    assert y_true.ndim in (1, 2)
+    assert y_pred.ndim == 2
+    if y_true.ndim == 2:
+        y_true = np.argmax(y_true, axis=-1)
+    best_k = np.argsort(y_pred, axis=1)[:, -k:]
     return np.mean([y in best_k[i, :] for i, y in enumerate(y_true)])
 
 

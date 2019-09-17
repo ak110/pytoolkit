@@ -5,8 +5,11 @@ Horovodに対応した簡単なwrapperなど。
 ただし引数のデフォルトや細かい挙動を変えていたりするので要注意。
 
 """
+from __future__ import annotations
+
 import pathlib
 import shutil
+import typing
 
 import numpy as np
 import tensorflow as tf
@@ -14,6 +17,12 @@ import tensorflow as tf
 import pytoolkit as tk
 
 from . import keras
+
+
+# モデルの入出力の型
+ModelIOType = typing.Union[
+    np.ndarray, typing.List[np.ndarray], typing.Dict[str, np.ndarray]
+]
 
 
 def load(
@@ -52,14 +61,16 @@ def load_weights(model: keras.models.Model, path, by_name=False, skip_not_exist=
         raise RuntimeError(f"{path} is not found.")
 
 
-def save(model: keras.models.Model, path, mode="hdf5", include_optimizer=False):
+def save(
+    model: keras.models.Model, path, mode: str = "hdf5", include_optimizer: bool = False
+):
     """モデルの保存。
 
     Args:
-        model (keras.models.Model): モデル
+        model: モデル
         path (os.PathLike): 保存先。saved_modelの場合はディレクトリ
-        format (str, optional): "hdf5", "saved_model", "onnx", "tflite"のいずれか
-        include_optimizer (bool, optional): HDF5形式で保存する場合にoptimizerを含めるか否か
+        mode: "hdf5", "saved_model", "onnx", "tflite"のいずれか
+        include_optimizer: HDF5形式で保存する場合にoptimizerを含めるか否か
 
     """
     assert mode in ("hdf5", "saved_model", "onnx", "tflite")
@@ -124,10 +135,10 @@ def summary(model: keras.models.Model):
 
 def plot(
     model: keras.models.Model,
-    to_file="model.svg",
-    show_shapes=True,
-    show_layer_names=True,
-    rankdir="TB",
+    to_file: str = "model.svg",
+    show_shapes: bool = True,
+    show_layer_names: bool = True,
+    rankdir: str = "TB",
 ):
     """モデルのグラフのplot。"""
     path = pathlib.Path(to_file)
@@ -159,52 +170,54 @@ def compile(
 
 def fit(
     model: keras.models.Model,
-    train_set,
-    val_set=None,
-    train_preprocessor=None,
-    val_preprocessor=None,
-    validation_freq="auto",
-    class_weight=None,
-    batch_size=32,
-    epochs=1800,
-    callbacks=None,
-    verbose=1,
-    data_parallel=True,
-    initial_epoch=0,
-    use_multiprocessing=False,
-    workers=1,
-    max_queue_size=10,
+    train_set: tk.data.Dataset,
+    train_preprocessor: tk.data.Preprocessor,
+    val_set: tk.data.Dataset = None,
+    val_preprocessor: tk.data.Preprocessor = None,
+    validation_freq: typing.Union[int, typing.Sequence[int], str, None] = "auto",
+    class_weight: dict = None,
+    batch_size: int = 32,
+    epochs: int = 1800,
+    callbacks: list = None,
+    verbose: int = 1,
+    data_parallel: bool = True,
+    initial_epoch: int = 0,
+    use_multiprocessing: bool = False,
+    workers: int = 1,
+    max_queue_size: int = 10,
 ):
     """独自のtraining loopになる予定の関数。
 
     Args:
-        model: モデル。
-        train_set (tk.data.Dataset): 訓練データ。
-        val_set (tk.data.Dataset): 検証データ。Noneなら省略。
-        train_preprocessor (tk.data.Preprocessor): 訓練データの前処理
-        val_preprocessor (tk.data.Preprocessor): 検証データの前処理
-        validation_freq (int or list or "auto"): 検証を行うエポック数の間隔、またはエポック数のリスト。0ならvalidationしない(独自仕様)。"auto"なら適当に決める(独自仕様)。
-        class_weight (dict): クラスごとの重みのdict。
-        batch_size (int): バッチサイズ。
-        epochs (int): エポック数。
-        callbacks (list): コールバック。EpochLoggerとErrorOnNaNは自動追加。
-        verbose (int): 1ならプログレスバー表示、2ならepoch毎の結果だけ表示。
-        data_parallel (bool): DataLoaderで並列化するのか否か。
-        initial_epoch (int): 学習を開始するエポック数 - 1。
-        use_multiprocessing (bool): Trueならマルチプロセス。
-        workers (int): ワーカー数。
-        max_queue_size (int): キューの最大サイズ。
+        model: モデル
+        train_set: 訓練データ。
+        train_preprocessor: 訓練データの前処理
+        val_set: 検証データ。Noneなら省略。
+        val_preprocessor: 検証データの前処理
+        validation_freq: 検証を行うエポック数の間隔、またはエポック数のリスト。0ならvalidationしない(独自仕様)。"auto"なら適当に決める(独自仕様)。
+        class_weight: クラスごとの重みのdict。
+        batch_size: バッチサイズ。
+        epochs: エポック数。
+        callbacks: コールバック。EpochLoggerとErrorOnNaNは自動追加。
+        verbose: 1ならプログレスバー表示、2ならepoch毎の結果だけ表示。
+        data_parallel: DataLoaderで並列化するのか否か。
+        initial_epoch: 学習を開始するエポック数 - 1。
+        use_multiprocessing: Trueならマルチプロセス。
+        workers: ワーカー数。
+        max_queue_size: キューの最大サイズ。
 
     """
     if validation_freq == 0:
         # validation_freq == 0ならvalidationしない(独自仕様)
         validation_freq = None
         val_set = None
+        val_preprocessor = None
     elif validation_freq == "auto":
         # "auto"なら適当に決める(独自仕様)
         validation_freq = make_validation_freq(
             validation_freq, epochs, train_set, val_set
         )
+    assert (val_set is None) == (val_preprocessor is None)
 
     train_data_loader = tk.data.DataLoader(
         train_set,
@@ -223,7 +236,7 @@ def fit(
             parallel=data_parallel,
             use_horovod=True,
         )
-        if val_set is not None
+        if val_set is not None and val_preprocessor is not None
         else None
     )
 
@@ -290,30 +303,30 @@ def make_callbacks(callbacks):
 
 def predict(
     model: keras.models.Model,
-    dataset,
-    preprocessor,
-    batch_size=32,
-    verbose=1,
-    use_horovod=False,
-    on_batch_fn=None,
-    flow=False,
-    desc="predict",
-):
+    dataset: tk.data.Dataset,
+    preprocessor: tk.data.Preprocessor,
+    batch_size: int = 32,
+    verbose: int = 1,
+    use_horovod: bool = False,
+    on_batch_fn: typing.Callable[[keras.models.Model, ModelIOType], ModelIOType] = None,
+    flow: bool = False,
+    desc: str = "predict",
+) -> typing.Union[ModelIOType, typing.Iterator[ModelIOType]]:
     """予測。
 
     Args:
         model: モデル。
         dataset: 予測したい入力データ。
-        preprocessor (tk.data.Preprocessor): 前処理
-        batch_size (int): バッチサイズ
-        verbose (int): プログレスバー(tqdm)を表示するか否か。
-        use_horovod (bool): MPIによる分散処理をするか否か。
+        preprocessor: 前処理
+        batch_size: バッチサイズ
+        verbose: プログレスバー(tqdm)を表示するか否か。
+        use_horovod: MPIによる分散処理をするか否か。
         on_batch_fn (callable, optional): モデルとミニバッチ分の入力データを受け取り、予測結果を返す処理。(TTA用)
-        flow (bool): 結果をgeneratorで返すならTrue。
-        desc (str): flow時のtqdmのdesc。
+        flow: 結果をgeneratorで返すならTrue。
+        desc: flow時のtqdmのdesc。
 
     Returns:
-        np.ndarray or generator: 予測結果。flow=True時はサンプルごとのgenerator。
+        予測結果。flow=False時はndarray、flow=True時はサンプルごとのgenerator。
 
     """
     with tk.log.trace_scope("predict"):
@@ -348,25 +361,25 @@ def _predict_on_batch(model: keras.models.Model, X):
 
 def evaluate(
     model: keras.models.Model,
-    dataset,
-    preprocessor=None,
-    batch_size=32,
-    verbose=1,
-    prefix="",
-    use_horovod=False,
-):
+    dataset: tk.data.Dataset,
+    preprocessor: tk.data.Preprocessor,
+    batch_size: int = 32,
+    verbose: int = 1,
+    prefix: str = "",
+    use_horovod: bool = False,
+) -> typing.Dict[str, float]:
     """評価。
 
     Args:
         model: モデル。
-        dataset (tk.data.Dataset): データ。
-        preprocessor (tk.data.Preprocessor): 前処理
-        verbose (int): 1ならプログレスバー表示。
-        prefix (str): メトリクス名の接頭文字列。
-        use_horovod (bool): MPIによる分散処理をするか否か。
+        dataset: データ。
+        preprocessor: 前処理
+        verbose: 1ならプログレスバー表示。
+        prefix: メトリクス名の接頭文字列。
+        use_horovod: MPIによる分散処理をするか否か。
 
     Returns:
-        dict: メトリクス名と値のdict
+        メトリクス名と値のdict
 
     """
     with tk.log.trace_scope("evaluate"):
@@ -383,7 +396,9 @@ def evaluate(
         return evals
 
 
-def multi_gpu_model(model, batch_size, gpus=None):
+def multi_gpu_model(
+    model: keras.models.Model, batch_size: int, gpus: int = None
+) -> keras.models.Model:
     """複数GPUでデータ並列するモデルを作成する。
 
     References:

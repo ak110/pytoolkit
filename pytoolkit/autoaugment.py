@@ -340,7 +340,7 @@ class Sharpness(A.ImageOnlyTransform):
         )
 
 
-def float_parameter(level, maxval, flip_sign=False):
+def float_parameter(level: int, maxval: float, flip_sign: bool = False) -> float:
     """0～maxvalへの変換。"""
     assert 0 <= level <= 9
     value = float(level) * maxval / 9
@@ -349,7 +349,7 @@ def float_parameter(level, maxval, flip_sign=False):
     return value
 
 
-def int_parameter(level, maxval, flip_sign=False):
+def int_parameter(level: int, maxval: int, flip_sign: bool = False) -> int:
     """0～maxvalへの変換。"""
     assert 0 <= level <= 9
     value = int(np.round(level * maxval / 9))

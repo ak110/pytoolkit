@@ -35,8 +35,6 @@ def test_xor(tmpdir):
             tk.callbacks.LearningRateStepDecay(),
             tk.callbacks.CosineAnnealing(),
             tk.callbacks.TSVLogger(models_dir / "history.tsv"),
-            tk.callbacks.FreezeBNCallback(1),
-            tk.callbacks.UnfreezeCallback(0.0001),
             tk.callbacks.Checkpoint(models_dir / "checkpoint.h5"),
         ],
     )

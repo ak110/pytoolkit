@@ -1,4 +1,8 @@
+"""xgboost"""
+from __future__ import annotations
+
 import pathlib
+import typing
 
 import numpy as np
 import sklearn.metrics
@@ -12,29 +16,30 @@ class XGBModel(Model):
     """XGBoostのモデル。
 
     Args:
-        params (dict): XGBoostのパラメータ
-        nfold (int): cvの分割数
-        early_stopping_rounds (int): xgb.cvのパラメータ
-        num_boost_round (int): xgb.cvのパラメータ
-        verbose_eval (int): xgb.cvのパラメータ
-        callbacks (array-like): xgb.cvのパラメータ
-        cv_params (dict): xgb.cvのパラメータ (kwargs)
-        seeds (array-like): seed ensemble用のseedの配列
+        params: XGBoostのパラメータ
+        nfold: cvの分割数
+        early_stopping_rounds: xgb.cvのパラメータ
+        num_boost_round: xgb.cvのパラメータ
+        verbose_eval: xgb.cvのパラメータ
+        callbacks: xgb.cvのパラメータ
+        cv_params: xgb.cvのパラメータ (kwargs)
 
     """
 
     def __init__(
         self,
-        params,
-        nfold,
-        early_stopping_rounds=200,
-        num_boost_round=9999,
-        verbose_eval=100,
-        callbacks=None,
-        cv_params=None,
-        preprocessors=None,
-        postprocessors=None,
+        params: dict,
+        nfold: int,
+        early_stopping_rounds: int = 200,
+        num_boost_round: int = 9999,
+        verbose_eval: int = 100,
+        callbacks: list = None,
+        cv_params: dict = None,
+        preprocessors: list = None,
+        postprocessors: list = None,
     ):
+        import xgboost as xgb
+
         super().__init__(preprocessors, postprocessors)
         self.params = params
         self.nfold = nfold
@@ -43,7 +48,7 @@ class XGBModel(Model):
         self.verbose_eval = verbose_eval
         self.callbacks = callbacks
         self.cv_params = cv_params
-        self.gbms_ = None
+        self.gbms_: typing.Optional[typing.List[xgb.Booster]] = None
 
     def _save(self, models_dir):
         models_dir = pathlib.Path(models_dir)
@@ -60,7 +65,7 @@ class XGBModel(Model):
             for fold in range(self.nfold)
         ]
 
-    def _cv(self, dataset, folds):
+    def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
         import xgboost as xgb
 
         train_set = xgb.DMatrix(
@@ -95,14 +100,16 @@ class XGBModel(Model):
 
         return scores
 
-    def _predict(self, dataset):
+    def _predict(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:
+        assert self.gbms_ is not None
         import xgboost as xgb
 
         data = xgb.DMatrix(data=dataset.data, feature_names=dataset.data.columns.values)
         return np.array([gbm.predict(data) for gbm in self.gbms_])
 
-    def feature_importance(self, importance_type="gain"):
+    def feature_importance(self, importance_type: str = "gain"):
         """Feature ImportanceをDataFrameで返す。"""
+        assert self.gbms_ is not None
         import pandas as pd
 
         columns = self.gbms_[0].feature_names

@@ -566,8 +566,8 @@ class StocasticAdd(keras.layers.Layer):
         return K.in_train_phase(_train, _test, training)
 
 
-class BatchNormalization(keras.layers.BatchNormalization):
-    """Sync BN。基本的には互換性があるように元のを継承＆同名で。"""
+class SyncBatchNormalization(keras.layers.BatchNormalization):
+    """Sync BN。"""
 
     def call(self, inputs, training=None, **kwargs):  # pylint: disable=arguments-differ
         del kwargs
@@ -607,14 +607,15 @@ class BatchNormalization(keras.layers.BatchNormalization):
         )
         self.add_update([update1, update2], inputs)
 
-        # y = (x - mean) / (sqrt(var) + epsilon) * gamma
+        # y = (x - mean) / (sqrt(var) + epsilon) * gamma + beta
+        #   = x * gamma / (sqrt(var) + epsilon) + (beta - mean * gamma / (sqrt(var) + epsilon))
+        #   = x * a + (beta - mean * a)
         a = self.gamma / (K.sqrt(var) + 1e-3)
         b = self.beta - mean * a
         return inputs * K.cast(a, K.dtype(inputs)) + K.cast(b, K.dtype(inputs))
 
     def _bn_test(self, inputs):
         """予測時のBN。"""
-        # y = (x - mean) / (sqrt(var) + epsilon) * gamma
         a = self.gamma / (K.sqrt(self.moving_variance) + 1e-3)
         b = self.beta - self.moving_mean * a
         return inputs * K.cast(a, K.dtype(inputs)) + K.cast(b, K.dtype(inputs))

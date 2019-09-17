@@ -5,6 +5,8 @@ black .
 
 flake8
 
+mypy pytoolkit
+
 pushd tests/
 ./touch.sh
 popd

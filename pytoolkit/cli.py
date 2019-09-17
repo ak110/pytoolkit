@@ -11,16 +11,16 @@ class App:
     ログの初期化とかのボイラープレートコードを出来るだけ排除するためのもの。
 
     Args:
-        output_dir (PathLike): ログ出力先ディレクトリ
+        output_dir (PathLike, optional): ログ出力先ディレクトリ
 
     Fields:
-        output_dir (pathlib.Path): ログ出力先ディレクトリ
-        current_command (str): 現在実行中のコマンド名
+        output_dir (pathlib.Path, optional): ログ出力先ディレクトリ
+        current_command (str, optional): 現在実行中のコマンド名
 
     """
 
     def __init__(self, output_dir):
-        self.output_dir = pathlib.Path(output_dir)
+        self.output_dir = pathlib.Path(output_dir) if output_dir is not None else None
         self.inits = [tk.utils.better_exceptions, tk.math.set_ndarray_format]
         self.terms = []
         self.commands = {}
@@ -45,14 +45,15 @@ class App:
 
         return _decorator
 
-    def command(self, logfile=True, then=None):
+    def command(self, logfile: bool = True, then: str = None):
         """コマンドの追加用デコレーター。
 
         Args:
-            logfile (bool): ログファイルを出力するのか否か。
-            then (str): 当該コマンドが終わった後に続けて実行するコマンドの名前。
+            logfile: ログファイルを出力するのか否か。
+            then: 当該コマンドが終わった後に続けて実行するコマンドの名前。
 
         """
+        assert not logfile or self.output_dir is not None
 
         def _decorator(func):
             if func.__name__ in self.commands:
@@ -66,12 +67,12 @@ class App:
 
         return _decorator
 
-    def run(self, args=None, default=None):
+    def run(self, argv: list = None, default: str = None):
         """実行。
 
         Args:
-            args (list): 引数。(既定値はsys.argv)
-            default (string): 未指定時に実行するコマンド名 (既定値は先頭のコマンド)
+            args: 引数。(既定値はsys.argv)
+            default: 未指定時に実行するコマンド名 (既定値は先頭のコマンド)
 
         """
         commands = self.commands.copy()
@@ -84,7 +85,7 @@ class App:
         parser.add_argument(
             "command", choices=command_names, nargs="?", default=default
         )
-        args = parser.parse_args(args)
+        args = parser.parse_args(argv)
 
         self.current_command = args.command
         while True:

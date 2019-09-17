@@ -23,7 +23,7 @@ def _use_tf_keras():
 if True:
     # tf.keras or keras
     if _use_tf_keras():
-        keras = tf.keras
+        from tensorflow import keras
     else:
         print("Using native Keras.")
         import keras

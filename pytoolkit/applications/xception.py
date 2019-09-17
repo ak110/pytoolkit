@@ -149,7 +149,7 @@ def xception(weights="imagenet", input_tensor=None, input_shape=None, for_small=
             cache_subdir="models",
             file_hash="b0042744bf5b25fce3cb969f33bebb97",
         )
-        model.load_weights(str(weights_path))
+        model.load_weights(weights_path)
     elif weights is not None:
         model.load_weights(weights)
 

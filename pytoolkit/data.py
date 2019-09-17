@@ -1,5 +1,7 @@
 """学習時のデータの読み込み周り。"""
 # pylint: disable=unsubscriptable-object
+from __future__ import annotations
+
 import dataclasses
 import random
 import time
@@ -17,13 +19,13 @@ class Dataset:
     """訓練データなど。
 
     Args:
-        data (np.ndarray or pd.DataFrame or dict): 入力データ
-        labels (np.ndarray): ラベル
-        groups (np.ndarray): グループID
-        weights (np.ndarray): サンプルごとの重み
-        ids (np.ndarray): ID (入力データにしないIDが別途必要な場合用)
-        init_score (np.ndarray): LightGBMなど用。boostingのベーススコア。
-        metadata (dict): メタデータ。色々独自に入れておいてOK。sliceとかではそのままコピーされたりするので注意。
+        data: 入力データ
+        labels: ラベル
+        groups: グループID
+        weights: サンプルごとの重み
+        ids: ID (入力データにしないIDが別途必要な場合用)
+        init_score: LightGBMなど用。boostingのベーススコア。
+        metadata: メタデータ。色々独自に入れておいてOK。sliceとかではそのままコピーされたりするので注意。
 
     """
 
@@ -33,7 +35,7 @@ class Dataset:
     weights: np.ndarray = None
     ids: np.ndarray = None
     init_score: np.ndarray = None
-    metadata: dict = None
+    metadata: typing.Optional[dict] = None
 
     def __len__(self):
         return len(self.data)
@@ -44,14 +46,14 @@ class Dataset:
             return self.data[index], None
         return self.data[index], self.labels[index]
 
-    def slice(self, rindex):
+    def slice(self, rindex: typing.Sequence[int]) -> Dataset:
         """スライスを作成して返す。
 
         Args:
-            rindex (array-like): インデックスの配列
+            rindex: インデックスの配列
 
         Returns:
-            Dataset: スライス後のDataset
+            スライス後のDataset
 
         """
         rindex = np.array(rindex)
@@ -65,11 +67,11 @@ class Dataset:
             metadata=self.metadata.copy() if self.metadata is not None else None,
         )
 
-    def copy(self):
+    def copy(self) -> Dataset:
         """コピーを作成して返す。
 
         Returns:
-            Dataset: コピー
+            コピー
 
         """
         return self.__class__(
@@ -83,7 +85,7 @@ class Dataset:
         )
 
     @classmethod
-    def concat(cls, dataset1, dataset2):
+    def concat(cls, dataset1, dataset2) -> Dataset:
         """Dataset同士のconcat。"""
         return cls(
             data=cls.concat_field(dataset1.data, dataset2.data),
@@ -98,14 +100,14 @@ class Dataset:
         )
 
     @classmethod
-    def slice_field(cls, d, rindex):
+    def slice_field(cls, d, rindex: typing.Sequence[int]):
         """値のスライスを作成して返す。"""
         if d is None:
             return None
         if isinstance(d, dict):
             return {k: cls.slice_field(v, rindex) for k, v in d.items()}
         elif hasattr(d, "iloc"):
-            if rindex.dtype == bool:
+            if np.asarray(rindex).dtype == bool:
                 return d.loc[rindex]
             else:
                 return d.iloc[rindex]
@@ -162,10 +164,10 @@ class Preprocessor:
         """バッチサイズ分のデータを集約する処理。
 
         Args:
-            batch (list): Datasetが返したデータをバッチサイズ分集めたもの。
+            batch: Datasetが返したデータをバッチサイズ分集めたもの。
 
         Returns:
-            tuple: モデルに渡されるデータ。通常は入力データとラベルのtuple。
+            モデルに渡されるデータ。通常は入力データとラベルのtuple。
 
         """
         X_batch, y_batch = zip(*batch)
@@ -193,12 +195,12 @@ class DataLoader(keras.utils.Sequence):
     """データをバッチサイズずつ読み込むクラス。
 
     Args:
-        dataset (Dataset): データセット。
-        preprocessor (Preprocessor): データ変換とかをするクラス。
-        batch_size (int): バッチサイズ。
-        shuffle (bool): データをシャッフルするか否か。
-        parallel (bool): 並列処理を行うか否か。
-        use_horovod (bool): 1エポックあたりのミニバッチ数(__len__の戻り値)の算出にHorovodを考慮するか否か。
+        dataset: データセット。
+        preprocessor: データ変換とかをするクラス。
+        batch_size : バッチサイズ。
+        shuffle: データをシャッフルするか否か。
+        parallel: 並列処理を行うか否か。
+        use_horovod: 1エポックあたりのミニバッチ数(__len__の戻り値)の算出にHorovodを考慮するか否か。
 
     Attributes:
         seconds_per_step (float): 1ステップ当たりの実処理時間の指数移動平均値。
@@ -207,12 +209,12 @@ class DataLoader(keras.utils.Sequence):
 
     def __init__(
         self,
-        dataset,
-        preprocessor,
-        batch_size=32,
-        shuffle=False,
-        parallel=True,
-        use_horovod=False,
+        dataset: Dataset,
+        preprocessor: Preprocessor,
+        batch_size: int = 32,
+        shuffle: bool = False,
+        parallel: bool = True,
+        use_horovod: bool = False,
     ):
         assert len(dataset) > 0
         self.dataset = dataset
@@ -221,7 +223,7 @@ class DataLoader(keras.utils.Sequence):
         self.shuffle = shuffle
         self.parallel = parallel
         self.use_horovod = use_horovod
-        self.seconds_per_step = 0
+        self.seconds_per_step = 0.0
         self.epoch = 1
 
         if self.shuffle:
@@ -261,7 +263,7 @@ class DataLoader(keras.utils.Sequence):
             index (int): データのインデックス。
 
         Returns:
-            tuple: 入力データとラベル。
+            入力データとラベル。
 
         """
         start_time = time.perf_counter()
@@ -293,7 +295,7 @@ class DataLoader(keras.utils.Sequence):
             index (int): データのインデックス。
 
         Returns:
-            tuple: 入力データとラベル。
+            入力データとラベル。
 
         """
         return self.preprocessor.get_sample(self.dataset, index)

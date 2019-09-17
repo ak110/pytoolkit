@@ -1,4 +1,8 @@
+"""LightGBM"""
+from __future__ import annotations
+
 import pathlib
+import typing
 
 import numpy as np
 import sklearn.metrics
@@ -12,31 +16,31 @@ class LGBModel(Model):
     """LightGBMのモデル。
 
     Args:
-        params (dict): lgb.cvのパラメータ
-        nfold (int): cvの分割数
-        early_stopping_rounds (int): lgb.cvのパラメータ
-        num_boost_round (int): lgb.cvのパラメータ
-        verbose_eval (int): lgb.cvのパラメータ
-        callbacks (array-like): lgb.cvのパラメータ
-        cv_params (dict): lgb.cvのパラメータ (`**kwargs`)
-        seeds (array-like): seed ensemble用のseedの配列
-        init_score (array-like): trainとtestのinit_score
+        params: lgb.cvのパラメータ
+        nfold: cvの分割数
+        early_stopping_rounds: lgb.cvのパラメータ
+        num_boost_round: lgb.cvのパラメータ
+        verbose_eval: lgb.cvのパラメータ
+        callbacks: lgb.cvのパラメータ
+        cv_params: lgb.cvのパラメータ (`**kwargs`)
+        seeds: seed ensemble用のseedの配列
+        init_score: trainとtestのinit_score
 
     """
 
     def __init__(
         self,
-        params,
-        nfold,
-        early_stopping_rounds=200,
-        num_boost_round=9999,
-        verbose_eval=100,
-        callbacks=None,
-        cv_params=None,
-        seeds=None,
-        init_score=None,
-        preprocessors=None,
-        postprocessors=None,
+        params: dict,
+        nfold: int,
+        early_stopping_rounds: int = 200,
+        num_boost_round: int = 9999,
+        verbose_eval: int = 100,
+        callbacks: list = None,
+        cv_params: dict = None,
+        seeds: np.ndarray = None,
+        init_score: np.ndarray = None,
+        preprocessors: list = None,
+        postprocessors: list = None,
     ):
         super().__init__(preprocessors, postprocessors)
         self.params = params
@@ -48,7 +52,7 @@ class LGBModel(Model):
         self.cv_params = cv_params
         self.seeds = seeds
         self.init_score = init_score
-        self.gbms_ = None
+        self.gbms_: np.ndarray = None
 
     def _save(self, models_dir):
         seeds = [123] if self.seeds is None else self.seeds
@@ -81,7 +85,7 @@ class LGBModel(Model):
             ]
         )
 
-    def _cv(self, dataset, folds):
+    def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
         import lightgbm as lgb
 
         # 独自拡張: sklearn風の指定
@@ -103,7 +107,7 @@ class LGBModel(Model):
 
         seeds = [123] if self.seeds is None else self.seeds
 
-        scores = {}
+        scores: dict = {}
         self.gbms_ = np.empty((len(folds), len(seeds)), dtype=object)
         for seed_i, seed in enumerate(seeds):
             with tk.log.trace_scope(f"seed averaging({seed_i + 1}/{len(seeds)})"):
@@ -138,7 +142,7 @@ class LGBModel(Model):
             scores[name] = np.mean(score_list)
         return scores
 
-    def _predict(self, dataset):
+    def _predict(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:
         pred = np.array(
             [
                 np.mean(
@@ -158,7 +162,7 @@ class LGBModel(Model):
             pred += np.expand_dims(dataset.init_score, axis=0)
         return pred
 
-    def feature_importance(self, importance_type="gain"):
+    def feature_importance(self, importance_type: str = "gain"):
         """Feature ImportanceをDataFrameで返す。"""
         import pandas as pd
 

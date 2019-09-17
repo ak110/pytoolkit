@@ -1,5 +1,9 @@
 """Kerasでの学習周りの便利関数など。"""
+from __future__ import annotations
+
+import pathlib
 import contextlib
+import typing
 
 import numpy as np
 
@@ -28,16 +32,16 @@ def check(model: keras.models.Model, plot_path=None):
 
 
 def cv(
-    create_model_fn,
-    train_set,
-    folds,
-    train_preprocessor,
-    val_preprocessor,
-    batch_size=32,
+    create_model_fn: typing.Callable[[], tk.keras.models.Model],
+    train_set: tk.data.Dataset,
+    folds: tk.validation.FoldsType,
+    train_preprocessor: tk.data.Preprocessor,
+    val_preprocessor: tk.data.Preprocessor,
+    batch_size: int = 32,
     *,
     models_dir,
-    model_name_format="model.fold{fold}.h5",
-    skip_if_exists=True,
+    model_name_format: str = "model.fold{fold}.h5",
+    skip_if_exists: bool = True,
     **kwargs,
 ):
     """CV。
@@ -47,16 +51,16 @@ def cv(
     1/5 foldだけ実行したいとかがあればfoldsの要素を先頭1個にすればOK。
 
     Args:
-        create_model_fn (callable): モデルを作成する関数。
-        train_set (tk.data.Dataset): 訓練データ
-        train_preprocessor (tk.data.Preprocessor): 訓練データの前処理
-        val_preprocessor (tk.data.Preprocessor): 検証データの前処理
-        folds (array-like): train/valのindexの配列のtupleの配列。(sklearn.model_selection.KFold().split()の結果など)
-        batch_size (int): バッチサイズ
+        create_model_fn: モデルを作成する関数。
+        train_set: 訓練データ
+        train_preprocessor: 訓練データの前処理
+        val_preprocessor: 検証データの前処理
+        folds: train/valのindexの配列のtupleの配列。(sklearn.model_selection.KFold().split()の結果など)
+        batch_size: バッチサイズ
         models_dir (PathLike object): モデルの保存先パス (必須)
-        model_name_format (str): モデルのファイル名のフォーマット。{fold}のところに数字が入る。
-        skip_if_exists (bool): モデルが存在してもスキップせず再学習するならFalse。
-        kwargs (dict): tk.models.fit()のパラメータ
+        model_name_format: モデルのファイル名のフォーマット。{fold}のところに数字が入る。
+        skip_if_exists : モデルが存在してもスキップせず再学習するならFalse。
+        kwargs: tk.models.fit()のパラメータ
 
     """
     with tk.log.trace_scope("cv"):
@@ -83,35 +87,35 @@ def cv(
 
 
 def predict_cv(
-    dataset,
-    preprocessor,
-    batch_size=32,
-    load_model_fn=None,
+    dataset: tk.data.Dataset,
+    preprocessor: tk.data.Preprocessor,
+    batch_size: int = 32,
+    load_model_fn: typing.Callable[[pathlib.Path], tk.keras.models.Model] = None,
     *,
-    nfold=None,
-    models=None,
+    nfold: int = None,
+    models: typing.Sequence[keras.models.Model] = None,
     models_dir=None,
-    model_name_format="model.fold{fold}.h5",
-    oof=False,
-    folds=None,
-    use_horovod=False,
+    model_name_format: str = "model.fold{fold}.h5",
+    oof: bool = False,
+    folds: tk.validation.FoldsType = None,
+    use_horovod: bool = False,
     **kwargs,
 ):
     """CVで作ったモデルで予測。
 
     Args:
-        dataset (tk.data.Dataset): データ
-        preprocessor (tk.data.Preprocessor): 前処理
-        batch_size (int): バッチサイズ
-        load_model_fn (callable): モデルを読み込む関数
-        nfold (int): CVのfold数 (models, folds未指定時必須)
-        models (list of keras.models.Model): 各foldのモデル
+        dataset: データ
+        preprocessor: 前処理
+        batch_size: バッチサイズ
+        load_model_fn: モデルを読み込む関数
+        nfold: CVのfold数 (models, folds未指定時必須)
+        models: 各foldのモデル
         models_dir (PathLike object): モデルの保存先パス (models未指定時必須)
-        model_name_format (str): モデルのファイル名のフォーマット。{fold}のところに数字が入る。
-        oof (bool): out-of-fold predictionならTrueにする。folds必須。
-        folds (array-like): oof時のみ指定する。train/valのindexの配列のtupleの配列。(sklearn.model_selection.KFold().split()の結果など)
-        use_horovod (bool): tk.models.predictの引数
-        kwargs (dict): tk.models.predictの引数
+        model_name_format: モデルのファイル名のフォーマット。{fold}のところに数字が入る。
+        oof: out-of-fold predictionならTrueにする。folds必須。
+        folds: oof時のみ指定する。train/valのindexの配列のtupleの配列。(sklearn.model_selection.KFold().split()の結果など)
+        use_horovod: tk.models.predictの引数
+        kwargs: tk.models.predictの引数
 
     Returns:
         list or ndarray: oof=Falseの場合、予測結果のnfold個の配列。oof=Trueの場合、予測結果のndarray。
@@ -128,7 +132,8 @@ def predict_cv(
             nfold = len(folds)
         else:
             assert folds is None
-            folds = [(range(0), range(len(dataset))) for _ in range(nfold)]
+            assert nfold is not None
+            folds = [(np.arange(0), np.arange(len(dataset))) for _ in range(nfold)]
         load_model_fn = load_model_fn or tk.models.load
 
         with tk.dl.session(
@@ -140,7 +145,7 @@ def predict_cv(
                     for fold in tk.utils.trange(nfold, desc="load models")
                 ]
 
-            pred_list = []
+            pred_list: list = []
             val_indices_list = []
             for fold, (model, (_, val_indices)) in enumerate(zip(models, folds)):
                 pred = tk.models.predict(
@@ -168,33 +173,34 @@ def predict_cv(
 
 def train(
     model: keras.models.Model,
-    train_set,
-    train_preprocessor,
-    val_set=None,
-    val_preprocessor=None,
-    batch_size=32,
+    train_set: tk.data.Dataset,
+    train_preprocessor: tk.data.Preprocessor,
+    val_set: tk.data.Dataset = None,
+    val_preprocessor: tk.data.Preprocessor = None,
+    batch_size: int = 32,
     *,
     model_path,
     **kwargs,
-) -> dict:
+) -> typing.Optional[dict]:
     """学習。
 
     Args:
-        model (keras.models.Model): モデル
-        train_set (tk.data.Dataset): 訓練データ
-        train_preprocessor (tk.data.Preprocessor): 訓練データの前処理
-        val_set (tk.data.Dataset): 検証データ
-        val_preprocessor (tk.data.Preprocessor): 検証データの前処理
-        batch_size (int): バッチサイズ
+        model: モデル
+        train_set: 訓練データ
+        train_preprocessor: 訓練データの前処理
+        val_set: 検証データ
+        val_preprocessor: 検証データの前処理
+        batch_size: バッチサイズ
         model_path (PathLike object): モデルの保存先パス (必須)
-        kwargs (dict): tk.models.fit()のパラメータ
+        kwargs: tk.models.fit()のパラメータ
 
     Returns:
-        dict: val_setがNoneでなければevaluate結果 (metricsの文字列と値のdict)
+        val_setがNoneでなければevaluate結果 (metricsの文字列と値のdict)
 
     """
     with tk.log.trace_scope("train"):
         assert model_path is not None
+        assert (val_set is None) == (val_preprocessor is None)
         # 学習
         tk.log.get(__name__).info(
             f"train: {len(train_set)} samples, val: {len(val_set) if val_set is not None else 0} samples, batch_size: {batch_size}x{tk.hvd.size()}"
@@ -219,8 +225,8 @@ def train(
                 prefix="",
                 use_horovod=True,
             )
-            if val_set:
-                evals = evaluate(
+            evals = (
+                evaluate(
                     model,
                     val_set,
                     preprocessor=val_preprocessor,
@@ -228,8 +234,9 @@ def train(
                     prefix="val_",
                     use_horovod=True,
                 )
-            else:
-                evals = None
+                if val_set is not None and val_preprocessor is not None
+                else None
+            )
             return evals
         finally:
             # モデルを保存
@@ -238,24 +245,24 @@ def train(
 
 def evaluate(
     model: keras.models.Model,
-    dataset,
-    preprocessor=None,
-    batch_size=32,
-    prefix="",
-    use_horovod=False,
+    dataset: tk.data.Dataset,
+    preprocessor: tk.data.Preprocessor,
+    batch_size: int = 32,
+    prefix: str = "",
+    use_horovod: bool = False,
 ) -> dict:
     """評価して結果をINFOログ出力する。
 
     Args:
-        model (keras.models.Model): モデル
-        dataset (tk.data.Dataset): データ
-        preprocessor (tk.data.Preprocessor): 前処理
-        batch_size (int): バッチサイズ
-        prefix (str): メトリクス名の接頭文字列。
-        use_horovod (bool): MPIによる分散処理をするか否か。
+        model: モデル
+        dataset: データ
+        preprocessor: 前処理
+        batch_size: バッチサイズ
+        prefix: メトリクス名の接頭文字列。
+        use_horovod: MPIによる分散処理をするか否か。
 
     Returns:
-        dict: metricsの文字列と値のdict
+        metricsの文字列と値のdict
 
     """
     evals = tk.models.evaluate(

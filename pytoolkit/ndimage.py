@@ -215,17 +215,19 @@ def rotate(
     return rgb
 
 
-def compute_rotate(width, height, degrees, expand=False):
+def compute_rotate(
+    width: int, height: int, degrees: float, expand: bool = False
+) -> tuple:
     """回転の変換行列を作成して返す。
 
     Args:
-        width (int): 横幅
-        height (int): 縦幅
-        degrees (float): 回転する角度
-        expand (bool, optional): Defaults to False. はみ出ないように画像を大きくするならTrue。
+        width: 横幅
+        height: 縦幅
+        degrees: 回転する角度
+        expand: Defaults to False. はみ出ないように画像を大きくするならTrue。
 
     Returns:
-        tuple: 変換行列、幅、高さ
+        変換行列、幅、高さ
 
     """
     center = (width // 2, height // 2)
@@ -508,7 +510,7 @@ def geometric_transform(
     translate_v=0.0,
     interp="lanczos",
     border_mode="edge",
-):
+) -> np.ndarray:
     """透視変換。
 
     Args:
@@ -528,7 +530,7 @@ def geometric_transform(
         border_mode (str, optional): Defaults to 'edge'. パディング方法。'edge', 'reflect', 'wrap'
 
     Returns:
-        ndarray: 変換後画像
+        変換後画像
 
     """
     m = compute_perspective(
@@ -566,7 +568,7 @@ def compute_perspective(
     pos_v=0.5,
     translate_h=0.0,
     translate_v=0.0,
-):
+) -> np.ndarray:
     """透視変換の変換行列を作成。
 
     Args:
@@ -585,7 +587,7 @@ def compute_perspective(
         translate_v (float, optional): Defaults to 0.0. 変形元を垂直にずらす量。-0.125なら12.5%上にずらし、+0.125なら12.5%下にずらす。
 
     Returns:
-        tuple: rgb, m 変換後画像と変換行列
+        変換行列
 
     """
     # 左上から時計回りに座標を用意
@@ -671,12 +673,12 @@ def perspective_transform(rgb, width, height, m, interp="lanczos", border_mode="
     return rgb
 
 
-def transform_points(points, m):
+def transform_points(points: np.ndarray, m: np.ndarray) -> np.ndarray:
     """geometric_transformの座標変換。
 
     Args:
-        points (ndarray): 座標の配列。shape=(num_points, 2)。[(x, y)]
-        m (ndarray): 変換行列。
+        points: 座標の配列。shape=(num_points, 2)。[(x, y)]
+        m: 変換行列。
 
     Returns:
         変換後の座標の配列。
@@ -749,7 +751,7 @@ def erase_random(
     return rgb
 
 
-def mixup(sample1, sample2, mode="beta"):
+def mixup(sample1, sample2, mode: str = "beta"):
     """mixup。 <https://arxiv.org/abs/1710.09412>
 
     常に「sample1の重み >= sample2の重み」となるようにしている。
@@ -757,7 +759,7 @@ def mixup(sample1, sample2, mode="beta"):
     Args:
         sample1 (tuple, list, dict or ndarray): データその1
         sample2 (tuple, list, dict or ndarray): データその2
-        mode (str): 混ぜる割合の乱数の種類。
+        mode: 混ぜる割合の乱数の種類。
             - 'beta': β分布を0.5以上にした分布
             - 'uniform': [0.5, 1]の一様分布
             - 'uniform_ex': [0.5, √2]の一様分布
@@ -799,18 +801,24 @@ def mix_data(sample1, sample2, r):
         return np.float32(sample1) * r + np.float32(sample2) * (1 - r)
 
 
-def cut_mix(image1, label1, image2, label2, beta=1.0):
+def cut_mix(
+    image1: np.ndarray,
+    label1: np.ndarray,
+    image2: np.ndarray,
+    label2: np.ndarray,
+    beta: float = 1.0,
+) -> tuple:
     """CutMix。 <https://arxiv.org/abs/1905.04899>
 
     Args:
-        image1 (ndarray): 画像
-        label1 (ndarray): one-hot化したラベル(など)
-        image2 (ndarray): 画像
-        label2 (ndarray): one-hot化したラベル(など)
-        beta (float): beta分布のbeta
+        image1: 画像
+        label1: one-hot化したラベル(など)
+        image2: 画像
+        label2: one-hot化したラベル(など)
+        beta: beta分布のbeta
 
     Returns:
-        tuple: (image, label)
+        image, label
 
     """
     assert image1.shape == image2.shape
@@ -838,7 +846,9 @@ def preprocess_tf(rgb):
 
 
 # @numba.njit(fastmath=True, nogil=True)
-def mask_to_onehot(rgb, class_colors, append_bg=False):
+def mask_to_onehot(
+    rgb: np.ndarray, class_colors: np.ndarray, append_bg: bool = False
+) -> np.ndarray:
     """RGBのマスク画像をone-hot形式に変換する。
 
     Args:
@@ -861,7 +871,9 @@ def mask_to_onehot(rgb, class_colors, append_bg=False):
 
 
 # @numba.njit(fastmath=True, nogil=True)
-def mask_to_class(rgb, class_colors, void_class=None):
+def mask_to_class(
+    rgb: np.ndarray, class_colors: np.ndarray, void_class: int = None
+) -> np.ndarray:
     """RGBのマスク画像をクラスIDの配列に変換する。
 
     Args:
@@ -882,7 +894,7 @@ def mask_to_class(rgb, class_colors, void_class=None):
 
 
 @numba.njit(fastmath=True, nogil=True)
-def class_to_mask(classes, class_colors):
+def class_to_mask(classes: np.ndarray, class_colors: np.ndarray) -> np.ndarray:
     """クラスIDの配列をRGBのマスク画像に変換する。
 
     Args:

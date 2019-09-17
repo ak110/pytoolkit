@@ -1,12 +1,18 @@
 """Optuna関連など。"""
+from __future__ import annotations
+
 import inspect
+import typing
 
 import pytoolkit as tk
 
+if typing.TYPE_CHECKING:
+    import optuna
+
 
 def optimize(
-    params_fn,
-    score_fn,
+    params_fn: typing.Callable[[optuna.Trial], typing.Any],
+    score_fn: typing.Callable[..., float],
     storage=None,
     sampler=None,
     pruner=None,
@@ -21,9 +27,9 @@ def optimize(
     """Optunaの簡易ラッパー。
 
     Args:
-        params_fn (callable): trialを受け取り、dictなどを返す関数。
-        score_fn (callable): params_fnの結果と、trial(省略可)を受け取り、スコアを返す関数。
-                             (trialを受け取りたい場合は引数名は必ず`trial`にする。)
+        params_fn: trialを受け取り、dictなどを返す関数。
+        score_fn: params_fnの結果と、trial(省略可)を受け取り、スコアを返す関数。
+                  (trialを受け取りたい場合は引数名は必ず`trial`にする。)
         storage: optuna.create_studyの引数
         sampler: optuna.create_studyの引数
         pruner: optuna.create_studyの引数
@@ -50,7 +56,7 @@ def optimize(
         - <https://optuna.readthedocs.io/en/latest/reference/study.html#optuna.study.Study.optimize>
 
     """
-    import optuna
+    import optuna  # pylint: disable=redefined-outer-name
 
     logger = tk.log.get(__name__)
 

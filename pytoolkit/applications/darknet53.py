@@ -33,7 +33,7 @@ def darknet53(input_shape=None, input_tensor=None, weights="imagenet", for_small
             file_hash="1a3857c961bcb77cd25ebbe0fcb346d4",
             cache_subdir="models",
         )
-        model.load_weights(str(weights_path))
+        model.load_weights(weights_path)
     elif weights is not None:
         model.load_weights(weights)
 
