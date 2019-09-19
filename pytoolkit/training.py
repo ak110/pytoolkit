@@ -35,9 +35,8 @@ def cv(
     create_model_fn: typing.Callable[[], tk.keras.models.Model],
     train_set: tk.data.Dataset,
     folds: tk.validation.FoldsType,
-    train_preprocessor: tk.data.Preprocessor,
-    val_preprocessor: tk.data.Preprocessor,
-    batch_size: int = 32,
+    train_data_loader: tk.data.DataLoader,
+    val_data_loader: tk.data.DataLoader,
     *,
     models_dir,
     model_name_format: str = "model.fold{fold}.h5",
@@ -53,10 +52,9 @@ def cv(
     Args:
         create_model_fn: モデルを作成する関数。
         train_set: 訓練データ
-        train_preprocessor: 訓練データの前処理
-        val_preprocessor: 検証データの前処理
+        train_data_loader: 訓練データの読み込み
+        val_data_loader: 検証データの読み込み
         folds: train/valのindexの配列のtupleの配列。(sklearn.model_selection.KFold().split()の結果など)
-        batch_size: バッチサイズ
         models_dir (PathLike object): モデルの保存先パス (必須)
         model_name_format: モデルのファイル名のフォーマット。{fold}のところに数字が入る。
         skip_if_exists : モデルが存在してもスキップせず再学習するならFalse。
@@ -78,9 +76,8 @@ def cv(
                         model=create_model_fn(),
                         train_set=tr,
                         val_set=vl,
-                        train_preprocessor=train_preprocessor,
-                        val_preprocessor=val_preprocessor,
-                        batch_size=batch_size,
+                        train_data_loader=train_data_loader,
+                        val_data_loader=val_data_loader,
                         model_path=model_path,
                         **kwargs,
                     )
@@ -88,8 +85,7 @@ def cv(
 
 def predict_cv(
     dataset: tk.data.Dataset,
-    preprocessor: tk.data.Preprocessor,
-    batch_size: int = 32,
+    data_loader: tk.data.DataLoader,
     load_model_fn: typing.Callable[[pathlib.Path], tk.keras.models.Model] = None,
     *,
     nfold: int = None,
@@ -105,8 +101,7 @@ def predict_cv(
 
     Args:
         dataset: データ
-        preprocessor: 前処理
-        batch_size: バッチサイズ
+        data_loader: 読み込み
         load_model_fn: モデルを読み込む関数
         nfold: CVのfold数 (models, folds未指定時必須)
         models: 各foldのモデル
@@ -151,8 +146,7 @@ def predict_cv(
                 pred = tk.models.predict(
                     model,
                     dataset.slice(val_indices),
-                    preprocessor,
-                    batch_size,
+                    data_loader,
                     desc=f"{'oofp' if oof else 'predict'}({fold + 1}/{nfold})",
                     use_horovod=use_horovod,
                     **kwargs,
@@ -174,10 +168,9 @@ def predict_cv(
 def train(
     model: keras.models.Model,
     train_set: tk.data.Dataset,
-    train_preprocessor: tk.data.Preprocessor,
+    train_data_loader: tk.data.DataLoader,
     val_set: tk.data.Dataset = None,
-    val_preprocessor: tk.data.Preprocessor = None,
-    batch_size: int = 32,
+    val_data_loader: tk.data.DataLoader = None,
     *,
     model_path,
     **kwargs,
@@ -187,10 +180,9 @@ def train(
     Args:
         model: モデル
         train_set: 訓練データ
-        train_preprocessor: 訓練データの前処理
+        train_data_loader: 訓練データの読み込み
         val_set: 検証データ
-        val_preprocessor: 検証データの前処理
-        batch_size: バッチサイズ
+        val_data_loader: 検証データの読み込み
         model_path (PathLike object): モデルの保存先パス (必須)
         kwargs: tk.models.fit()のパラメータ
 
@@ -200,19 +192,18 @@ def train(
     """
     with tk.log.trace_scope("train"):
         assert model_path is not None
-        assert (val_set is None) == (val_preprocessor is None)
+        assert (val_set is None) == (val_data_loader is None)
         # 学習
         tk.log.get(__name__).info(
-            f"train: {len(train_set)} samples, val: {len(val_set) if val_set is not None else 0} samples, batch_size: {batch_size}x{tk.hvd.size()}"
+            f"train: {len(train_set)} samples, val: {len(val_set) if val_set is not None else 0} samples, batch_size: {train_data_loader.batch_size}x{tk.hvd.size()}"
         )
         tk.hvd.barrier()
         tk.models.fit(
             model,
             train_set,
-            train_preprocessor=train_preprocessor,
+            train_data_loader=train_data_loader,
             val_set=val_set,
-            val_preprocessor=val_preprocessor,
-            batch_size=batch_size,
+            val_data_loader=val_data_loader,
             **kwargs,
         )
         try:
@@ -220,8 +211,7 @@ def train(
             evaluate(
                 model,
                 train_set,
-                preprocessor=train_preprocessor,
-                batch_size=batch_size,
+                data_loader=train_data_loader,
                 prefix="",
                 use_horovod=True,
             )
@@ -229,12 +219,11 @@ def train(
                 evaluate(
                     model,
                     val_set,
-                    preprocessor=val_preprocessor,
-                    batch_size=batch_size,
+                    data_loader=val_data_loader,
                     prefix="val_",
                     use_horovod=True,
                 )
-                if val_set is not None and val_preprocessor is not None
+                if val_set is not None and val_data_loader is not None
                 else None
             )
             return evals
@@ -246,8 +235,7 @@ def train(
 def evaluate(
     model: keras.models.Model,
     dataset: tk.data.Dataset,
-    preprocessor: tk.data.Preprocessor,
-    batch_size: int = 32,
+    data_loader: tk.data.DataLoader,
     prefix: str = "",
     use_horovod: bool = False,
 ) -> dict:
@@ -256,8 +244,7 @@ def evaluate(
     Args:
         model: モデル
         dataset: データ
-        preprocessor: 前処理
-        batch_size: バッチサイズ
+        data_loader: 読み込み
         prefix: メトリクス名の接頭文字列。
         use_horovod: MPIによる分散処理をするか否か。
 
@@ -266,12 +253,7 @@ def evaluate(
 
     """
     evals = tk.models.evaluate(
-        model,
-        dataset,
-        preprocessor=preprocessor,
-        batch_size=batch_size,
-        prefix=prefix,
-        use_horovod=use_horovod,
+        model, dataset, data_loader=data_loader, prefix=prefix, use_horovod=use_horovod
     )
     if tk.hvd.is_master():
         max_len = max([len(n) for n in evals])

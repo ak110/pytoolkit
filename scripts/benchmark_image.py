@@ -39,49 +39,50 @@ def _main():
     else:
         y = np.zeros((batch_size,))
     dataset = tk.data.Dataset(X, y)
-    data_loader = tk.data.DataLoader(
-        dataset,
-        MyPreprocessor(data_augmentation=True, mask=args.mask),
-        batch_size,
-        shuffle=True,
+    data_loader = MyDataLoader(
+        data_augmentation=True,
+        mask=args.mask,
+        batch_size=batch_size,
         parallel=not args.profile,
     )
+    data_iterator = data_loader.iter(dataset, shuffle=True)
 
     if args.profile:
         # 適当にループして速度を見る
         cProfile.runctx(
-            "_run(data_loader, iterations=4)",
+            "_run(data_iterator, iterations=4)",
             globals=globals(),
-            locals={"_run": _run, "data_loader": data_loader},
+            locals={"_run": _run, "data_iterator": data_iterator},
             sort="cumulative",
         )  # 累積:cumulative 内部:time
     else:
         # 1バッチ分を保存
-        for ix, x in enumerate(data_loader[0][0]):
+        for ix, x in enumerate(data_iterator[0][0]):
             tk.ndimage.save(save_dir / f"{ix}.png", np.clip(x, 0, 255).astype(np.uint8))
         # 適当にループして速度を見る
-        _run(data_loader, iterations=16)
+        _run(data_iterator, iterations=16)
 
-    print(f"{data_loader.seconds_per_step * 1000:.0f}ms/step")
+    print(f"{data_iterator.seconds_per_step * 1000:.0f}ms/step")
 
 
-def _run(data_loader, iterations):
+def _run(data_iterator, iterations):
     """ループして速度を見るための処理。"""
     with tk.utils.tqdm(total=batch_size * iterations, unit="f") as pbar:
         while True:
-            for X_batch, y_batch in data_loader:
+            for X_batch, y_batch in data_iterator:
                 assert len(X_batch) == batch_size
                 assert len(y_batch) == batch_size
                 pbar.update(len(X_batch))
-            data_loader.on_epoch_end()
+            data_iterator.on_epoch_end()
             if pbar.n >= pbar.total:
                 break
 
 
-class MyPreprocessor(tk.data.Preprocessor):
-    """Preprocessor。"""
+class MyDataLoader(tk.data.DataLoader):
+    """DataLoader"""
 
-    def __init__(self, data_augmentation, mask):
+    def __init__(self, data_augmentation, mask, batch_size, parallel):
+        super().__init__(batch_size=batch_size, parallel=parallel)
         self.data_augmentation = data_augmentation
         self.mask = mask
         if data_augmentation:
@@ -95,7 +96,7 @@ class MyPreprocessor(tk.data.Preprocessor):
         else:
             self.aug = A.Compose([])
 
-    def get_sample(self, dataset: tk.data.Dataset, index: int):
+    def get_data(self, dataset: tk.data.Dataset, index: int):
         X, y = dataset.get_sample(index)
         X = tk.ndimage.load(X)
         if self.mask:

@@ -1,4 +1,11 @@
-"""学習時のデータの読み込み周り。"""
+"""学習時のデータの読み込み周り。
+
+dataset: dataの集合
+data: 1件のデータ
+sample: 学習時に使用する1件のデータ (1件以上のdataから作られるもの) (という事にしている)
+batch: sampleのバッチサイズ個の集合
+
+"""
 # pylint: disable=unsubscriptable-object
 from __future__ import annotations
 
@@ -153,152 +160,169 @@ def split(dataset: Dataset, count: int, shuffle=False):
     ]
 
 
-class Preprocessor:
-    """データ変換とかをするクラス。"""
+class DataLoader:
+    """データをモデルに渡す処理をするクラス。
 
-    def get_sample(self, dataset: Dataset, index: int):
-        """datasetから1件のデータを取得する処理。"""
+    継承してカスタマイズする。ここでData Augmentationとかをする。
+    このクラス自体はステートレスにしておき、Iteratorが状態を持つ。
+
+    Args:
+        batch_size: バッチサイズ
+        data_per_sample: sampleあたりのデータ数。mixupとかするなら2にする。
+        parallel: サンプル単位でスレッド並列するならTrue
+
+    """
+
+    def __init__(self, batch_size: int = 16, data_per_sample=1, parallel: bool = True):
+        self.batch_size = batch_size
+        self.data_per_sample = data_per_sample
+        self.parallel = parallel
+
+    def iter(
+        self, dataset: Dataset, shuffle: bool = False, use_horovod: bool = False
+    ) -> Iterator:
+        """Iteratorを作成する。
+
+        Args:
+            dataset: データセット
+            shuffle: シャッフルするのか否か
+            use_horovod: 1エポックあたりのミニバッチ数(__len__の戻り値)の算出にHorovodを考慮するか否か。
+
+        Returns:
+            Iterator
+
+        """
+        if shuffle:
+            bs = self.batch_size * self.data_per_sample
+            return RandomIterator(self, dataset, bs, use_horovod)
+        assert self.data_per_sample == 1  # 挙動がややこしいので1のみ可とする
+        return SequentialIterator(self, dataset, self.batch_size, use_horovod)
+
+    def get_batch(self, dataset: Dataset, indices):
+        """1件のミニバッチを取得する。
+
+        Args:
+            dataset: データセット
+            indices: Iteratorが作成したindexの配列。
+
+        Returns:
+            ミニバッチ。通常は入力データとラベルのtuple。
+
+        """
+        # data
+        if self.parallel:
+            futures = [
+                tk.threading.get_pool().submit(self.get_data, dataset, i)
+                for i in indices
+            ]
+            data = [f.result() for f in futures]
+        else:
+            data = [self.get_data(dataset, i) for i in indices]
+        # samples
+        samples = self.collate_data(data)
+        # batch
+        return self.collate_samples(samples)
+
+    def collate_data(self, data: list) -> list:
+        """self.data_per_sample個ずつ集約してget_sampleする処理。"""
+        return [
+            self.get_sample(data[i : i + self.data_per_sample])
+            for i in range(0, len(data), self.data_per_sample)
+        ]
+
+    def get_sample(self, data: list) -> tuple:
+        """1件のサンプルを取得する。"""
+        assert len(data) == self.data_per_sample
+        assert self.data_per_sample == 1
+        return data[0]
+
+    def get_data(self, dataset: Dataset, index: int):
+        """1件のデータを取得する。
+
+        Args:
+            dataset: データセット
+            batch: Datasetが返したデータをバッチサイズ分集めたもの
+
+        Returns:
+            1件のデータ。通常は入力データとラベルのtuple。
+
+        """
         return dataset.get_sample(index)
 
-    def collate(self, batch: list) -> tuple:
+    def collate_samples(self, batch: list) -> tuple:
         """バッチサイズ分のデータを集約する処理。
 
         Args:
-            batch: Datasetが返したデータをバッチサイズ分集めたもの。
+            batch: get_sample()の結果をバッチサイズ分集めたもの
 
         Returns:
             モデルに渡されるデータ。通常は入力データとラベルのtuple。
 
         """
-        X_batch, y_batch = zip(*batch)
+        return tuple([self.collate_part(part) for part in zip(*batch)])
 
-        # multiple input
-        if isinstance(X_batch[0], list):
-            X_batch = [
-                np.array([x[i] for x in X_batch]) for i in range(len(X_batch[0]))
-            ]
+    def collate_part(self, part):
+        """サンプルごとのデータをバッチ分まとめる処理。"""
+        if isinstance(part[0], list):
+            part = [np.array([x[i] for x in part]) for i in range(len(part[0]))]
+        elif isinstance(part[0], dict):
+            part = {k: np.array([x[k] for x in part]) for k in part[0]}
         else:
-            X_batch = np.array(X_batch)
-
-        # multiple output
-        if isinstance(y_batch[0], list):
-            y_batch = [
-                np.array([y[i] for y in y_batch]) for i in range(len(y_batch[0]))
-            ]
-        else:
-            y_batch = np.array(y_batch)
-
-        return X_batch, y_batch
+            part = np.array(part)
+        return part
 
 
-class DataLoader(keras.utils.Sequence):
-    """データをバッチサイズずつ読み込むクラス。
+class Iterator(keras.utils.Sequence):
+    """データをモデルに渡すクラス。
 
     Args:
-        dataset: データセット。
-        preprocessor: データ変換とかをするクラス。
-        batch_size : バッチサイズ。
-        shuffle: データをシャッフルするか否か。
-        parallel: 並列処理を行うか否か。
+        data_loader: データをモデルに渡す処理をするクラス
+        dataset: データセット
+        batch_size: バッチサイズ
         use_horovod: 1エポックあたりのミニバッチ数(__len__の戻り値)の算出にHorovodを考慮するか否か。
 
     Attributes:
-        seconds_per_step (float): 1ステップ当たりの実処理時間の指数移動平均値。
+        seconds_per_step: 1ステップ当たりの実処理時間の指数移動平均値
 
     """
 
     def __init__(
         self,
+        data_loader: DataLoader,
         dataset: Dataset,
-        preprocessor: Preprocessor,
-        batch_size: int = 32,
-        shuffle: bool = False,
-        parallel: bool = True,
-        use_horovod: bool = False,
+        batch_size: int,
+        use_horovod: bool,
     ):
-        assert len(dataset) > 0
+        self.data_loader = data_loader
         self.dataset = dataset
-        self.preprocessor = preprocessor
         self.batch_size = batch_size
-        self.shuffle = shuffle
-        self.parallel = parallel
         self.use_horovod = use_horovod
-        self.seconds_per_step = 0.0
-        self.epoch = 1
+        self.epoch: int = 1
+        self.seconds_per_step: float = 0.0
 
-        if self.shuffle:
-            # シャッフル時は常に同じバッチサイズを返せるようにする (学習時の安定性のため)
-            mp_batch_size = (
-                self.batch_size * tk.hvd.size() if self.use_horovod else self.batch_size
-            )
-            self.steps_per_epoch = -(-len(self.dataset) // mp_batch_size)  # ceiling
-            self.index_generator = _generate_shuffled_indices(len(self.dataset))
-            self.indices = [
-                next(self.index_generator)
-                for _ in range(self.steps_per_epoch * self.batch_size)
-            ]
-        else:
-            # シャッフル無しの場合はそのまま順に返す。
-            self.steps_per_epoch = -(-len(self.dataset) // self.batch_size)  # ceiling
-            self.index_generator = None
-            self.indices = np.arange(len(self.dataset))
-
-    def on_epoch_end(self):
-        """1エポック完了時の処理。(シャッフルする)"""
-        if self.shuffle:
-            self.indices = [
-                next(self.index_generator)
-                for _ in range(self.steps_per_epoch * self.batch_size)
-            ]
+    def on_epoch_end(self) -> None:
+        """1エポック完了時の処理。"""
         self.epoch += 1
 
-    def __len__(self):
+    def __len__(self) -> int:
         """1エポックあたりのミニバッチ数を返す。"""
-        return self.steps_per_epoch
+        bs = self.batch_size * tk.hvd.size() if self.use_horovod else self.batch_size
+        return -(-len(self.dataset) // bs)
 
-    def __getitem__(self, index):
-        """指定されたインデックスのミニバッチを1件返す。
-
-        Args:
-            index (int): データのインデックス。
-
-        Returns:
-            入力データとラベル。
-
-        """
+    def __getitem__(self, index: int) -> tk.models.ModelIOType:
+        """ミニバッチを1つ返す。"""
         start_time = time.perf_counter()
 
-        offset = self.batch_size * index
-        batch_indices = self.indices[offset : offset + self.batch_size]
-        assert not self.shuffle or len(batch_indices) == self.batch_size
-
-        if self.parallel:
-            futures = [
-                tk.threading.get_pool().submit(self.get_sample, i)
-                for i in batch_indices
-            ]
-            results = [f.result() for f in futures]
-        else:
-            results = [self.get_sample(i) for i in batch_indices]
-
-        data = self.preprocessor.collate(results)
+        indices = self.sample_batch_indices(index)
+        batch = self.data_loader.get_batch(self.dataset, indices)
 
         elapsed_time = time.perf_counter() - start_time
         self.seconds_per_step = self.seconds_per_step * 0.99 + elapsed_time * 0.01
+        return batch
 
-        return data
-
-    def get_sample(self, index):
-        """指定されたインデックスのデータを返す。
-
-        Args:
-            index (int): データのインデックス。
-
-        Returns:
-            入力データとラベル。
-
-        """
-        return self.preprocessor.get_sample(self.dataset, index)
+    def sample_batch_indices(self, index: int):
+        """1ミニバッチ分のindexの配列を返す。"""
+        raise NotImplementedError()
 
     def __iter__(self):
         """データを返す。"""
@@ -313,9 +337,61 @@ class DataLoader(keras.utils.Sequence):
             self.on_epoch_end()
 
 
-def _generate_shuffled_indices(data_count):
-    """シャッフルしたインデックスのgenerator"""
-    indices = np.arange(data_count)
-    while True:
-        random.shuffle(indices)
-        yield from indices
+class SequentialIterator(Iterator):
+    """順番にサンプリングするIterator。"""
+
+    def sample_batch_indices(self, index: int):
+        """1ミニバッチ分のindexの配列を返す。"""
+        start = self.batch_size * index
+        end = start + self.batch_size
+        return list(range(start, min(end, len(self.dataset))))
+
+
+class RandomIterator(Iterator):
+    """シャッフルするIterator。"""
+
+    def __init__(
+        self,
+        data_loader: DataLoader,
+        dataset: Dataset,
+        batch_size: int,
+        use_horovod: bool,
+    ):
+        super().__init__(
+            data_loader=data_loader,
+            dataset=dataset,
+            batch_size=batch_size,
+            use_horovod=use_horovod,
+        )
+        self.gen = RandomIterator._generate_shuffled_indices(len(dataset))
+        self.indices = [next(self.gen) for _ in range(len(self) * self.batch_size)]
+
+    def on_epoch_end(self) -> None:
+        """1エポック完了時の処理。"""
+        super().on_epoch_end()
+        self.indices = [next(self.gen) for _ in range(len(self) * self.batch_size)]
+
+    def sample_batch_indices(self, index: int):
+        """1ミニバッチ分のindexの配列を返す。"""
+        offset = self.batch_size * index
+        return self.indices[offset : offset + self.batch_size]
+
+    @staticmethod
+    def _generate_shuffled_indices(data_count):
+        """シャッフルしたインデックスのgenerator"""
+        indices = np.arange(data_count)
+        while True:
+            random.shuffle(indices)
+            yield from indices
+
+
+class WeightedRandomIterator(Iterator):
+    """重み付き乱数によるSampler。"""
+
+    def sample_batch_indices(self, index: int):
+        """1ミニバッチ分のindexの配列を返す。"""
+        del index
+        assert self.dataset.weights is not None
+        return random.choices(
+            range(len(self.dataset)), weights=self.dataset.weights, k=self.batch_size
+        )

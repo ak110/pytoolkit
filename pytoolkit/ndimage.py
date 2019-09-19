@@ -801,26 +801,20 @@ def mix_data(sample1, sample2, r):
         return np.float32(sample1) * r + np.float32(sample2) * (1 - r)
 
 
-def cut_mix(
-    image1: np.ndarray,
-    label1: np.ndarray,
-    image2: np.ndarray,
-    label2: np.ndarray,
-    beta: float = 1.0,
-) -> tuple:
+def cut_mix(sample1: np.ndarray, sample2: np.ndarray, beta: float = 1.0) -> tuple:
     """CutMix。 <https://arxiv.org/abs/1905.04899>
 
     Args:
-        image1: 画像
-        label1: one-hot化したラベル(など)
-        image2: 画像
-        label2: one-hot化したラベル(など)
+        sample1: 画像とone-hot化したラベル(など)のタプル
+        sample2: 画像とone-hot化したラベル(など)のタプル
         beta: beta分布のbeta
 
     Returns:
         image, label
 
     """
+    image1, label1 = sample1
+    image2, label2 = sample2
     assert image1.shape == image2.shape
     lam = random.betavariate(beta, beta)
     H, W = image1.shape[:2]

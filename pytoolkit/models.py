@@ -171,16 +171,14 @@ def compile(
 def fit(
     model: keras.models.Model,
     train_set: tk.data.Dataset,
-    train_preprocessor: tk.data.Preprocessor,
+    train_data_loader: tk.data.DataLoader,
     val_set: tk.data.Dataset = None,
-    val_preprocessor: tk.data.Preprocessor = None,
+    val_data_loader: tk.data.DataLoader = None,
     validation_freq: typing.Union[int, typing.Sequence[int], str, None] = "auto",
     class_weight: dict = None,
-    batch_size: int = 32,
     epochs: int = 1800,
     callbacks: list = None,
     verbose: int = 1,
-    data_parallel: bool = True,
     initial_epoch: int = 0,
     use_multiprocessing: bool = False,
     workers: int = 1,
@@ -190,53 +188,37 @@ def fit(
 
     Args:
         model: モデル
-        train_set: 訓練データ。
-        train_preprocessor: 訓練データの前処理
+        train_set: 訓練データ
+        train_data_loader: 訓練データの読み込み
         val_set: 検証データ。Noneなら省略。
-        val_preprocessor: 検証データの前処理
+        val_data_loader: 検証データの読み込み
         validation_freq: 検証を行うエポック数の間隔、またはエポック数のリスト。0ならvalidationしない(独自仕様)。"auto"なら適当に決める(独自仕様)。
-        class_weight: クラスごとの重みのdict。
-        batch_size: バッチサイズ。
-        epochs: エポック数。
+        class_weight: クラスごとの重みのdict
+        epochs: エポック数
         callbacks: コールバック。EpochLoggerとErrorOnNaNは自動追加。
         verbose: 1ならプログレスバー表示、2ならepoch毎の結果だけ表示。
-        data_parallel: DataLoaderで並列化するのか否か。
-        initial_epoch: 学習を開始するエポック数 - 1。
-        use_multiprocessing: Trueならマルチプロセス。
-        workers: ワーカー数。
-        max_queue_size: キューの最大サイズ。
+        initial_epoch: 学習を開始するエポック数 - 1
+        use_multiprocessing: Trueならマルチプロセス
+        workers: ワーカー数
+        max_queue_size: キューの最大サイズ
 
     """
     if validation_freq == 0:
         # validation_freq == 0ならvalidationしない(独自仕様)
         validation_freq = None
         val_set = None
-        val_preprocessor = None
+        val_data_loader = None
     elif validation_freq == "auto":
         # "auto"なら適当に決める(独自仕様)
         validation_freq = make_validation_freq(
             validation_freq, epochs, train_set, val_set
         )
-    assert (val_set is None) == (val_preprocessor is None)
+    assert (val_set is None) == (val_data_loader is None)
 
-    train_data_loader = tk.data.DataLoader(
-        train_set,
-        train_preprocessor,
-        batch_size,
-        shuffle=True,
-        parallel=data_parallel,
-        use_horovod=True,
-    )
-    val_data_loader = (
-        tk.data.DataLoader(
-            val_set,
-            val_preprocessor,
-            batch_size,
-            shuffle=True,
-            parallel=data_parallel,
-            use_horovod=True,
-        )
-        if val_set is not None and val_preprocessor is not None
+    train_iterator = train_data_loader.iter(train_set, shuffle=True, use_horovod=True)
+    val_iterator = (
+        val_data_loader.iter(val_set, shuffle=True, use_horovod=True)
+        if val_set is not None and val_data_loader is not None
         else None
     )
 
@@ -248,8 +230,8 @@ def fit(
 
     with tk.log.trace_scope("fit"):
         model.fit(
-            train_data_loader,
-            validation_data=val_data_loader,
+            train_iterator,
+            validation_data=val_iterator,
             class_weight=class_weight,
             epochs=epochs,
             callbacks=callbacks,
@@ -263,11 +245,11 @@ def fit(
 
     # DataLoaderの処理時間を表示
     tk.log.get(__name__).info(
-        f"train_data_loader: {train_data_loader.seconds_per_step * 1000:4.0f}ms/step"
+        f"train_iterator: {train_iterator.seconds_per_step * 1000:4.0f}ms/step"
     )
-    if val_data_loader is not None:
+    if val_iterator is not None:
         tk.log.get(__name__).info(
-            f"val_data_loader:   {train_data_loader.seconds_per_step * 1000:4.0f}ms/step"
+            f"val_iterator:   {val_iterator.seconds_per_step * 1000:4.0f}ms/step"
         )
 
 
@@ -304,8 +286,7 @@ def make_callbacks(callbacks):
 def predict(
     model: keras.models.Model,
     dataset: tk.data.Dataset,
-    preprocessor: tk.data.Preprocessor,
-    batch_size: int = 32,
+    data_loader: tk.data.DataLoader,
     verbose: int = 1,
     use_horovod: bool = False,
     on_batch_fn: typing.Callable[[keras.models.Model, ModelIOType], ModelIOType] = None,
@@ -315,15 +296,14 @@ def predict(
     """予測。
 
     Args:
-        model: モデル。
-        dataset: 予測したい入力データ。
-        preprocessor: 前処理
-        batch_size: バッチサイズ
-        verbose: プログレスバー(tqdm)を表示するか否か。
-        use_horovod: MPIによる分散処理をするか否か。
+        model: モデル
+        dataset: 予測したい入力データ
+        data_loader: データの読み込み
+        verbose: プログレスバー(tqdm)を表示するか否か
+        use_horovod: MPIによる分散処理をするか否か
         on_batch_fn (callable, optional): モデルとミニバッチ分の入力データを受け取り、予測結果を返す処理。(TTA用)
-        flow: 結果をgeneratorで返すならTrue。
-        desc: flow時のtqdmのdesc。
+        flow: 結果をgeneratorで返すならTrue
+        desc: flow時のtqdmのdesc
 
     Returns:
         予測結果。flow=False時はndarray、flow=True時はサンプルごとのgenerator。
@@ -332,24 +312,24 @@ def predict(
     with tk.log.trace_scope("predict"):
         verbose = verbose if tk.hvd.is_master() else 0
         dataset = tk.hvd.split(dataset) if use_horovod else dataset
-        data_loader = tk.data.DataLoader(dataset, preprocessor, batch_size)
+        iterator = data_loader.iter(dataset)
         if flow:
             assert not use_horovod, "flow=True and use_horovod=True is not supported."
-            return _predict_flow(model, data_loader, verbose, on_batch_fn, desc)
+            return _predict_flow(model, iterator, verbose, on_batch_fn, desc)
         else:
             if on_batch_fn is not None:
-                values = _predict_flow(model, data_loader, verbose, on_batch_fn, desc)
+                values = _predict_flow(model, iterator, verbose, on_batch_fn, desc)
                 values = np.array(list(values))
             else:
-                values = model.predict(data_loader, verbose=verbose)
+                values = model.predict(iterator, verbose=verbose)
             values = tk.hvd.allgather(values) if use_horovod else values
             return values
 
 
-def _predict_flow(model, data_loader, verbose, on_batch_fn, desc):
+def _predict_flow(model, iterator, verbose, on_batch_fn, desc):
     on_batch_fn = on_batch_fn or _predict_on_batch
     for X, _ in tk.utils.tqdm(
-        data_loader, desc=desc, total=len(data_loader), disable=verbose < 1
+        iterator, desc=desc, total=len(iterator), disable=verbose < 1
     ):
         pred_batch = on_batch_fn(model, X)
         yield from pred_batch
@@ -362,8 +342,7 @@ def _predict_on_batch(model: keras.models.Model, X):
 def evaluate(
     model: keras.models.Model,
     dataset: tk.data.Dataset,
-    preprocessor: tk.data.Preprocessor,
-    batch_size: int = 32,
+    data_loader: tk.data.DataLoader,
     verbose: int = 1,
     prefix: str = "",
     use_horovod: bool = False,
@@ -373,7 +352,7 @@ def evaluate(
     Args:
         model: モデル。
         dataset: データ。
-        preprocessor: 前処理
+        data_loader: データの読み込み
         verbose: 1ならプログレスバー表示。
         prefix: メトリクス名の接頭文字列。
         use_horovod: MPIによる分散処理をするか否か。
@@ -384,10 +363,8 @@ def evaluate(
     """
     with tk.log.trace_scope("evaluate"):
         dataset = tk.hvd.split(dataset) if use_horovod else dataset
-        data_loader = tk.data.DataLoader(dataset, preprocessor, batch_size)
-        values = model.evaluate(
-            data_loader, verbose=verbose if tk.hvd.is_master() else 0
-        )
+        iterator = data_loader.iter(dataset)
+        values = model.evaluate(iterator, verbose=verbose if tk.hvd.is_master() else 0)
         values = tk.hvd.allreduce(values) if use_horovod else values
         if len(model.metrics_names) == 1:
             evals = {prefix + model.metrics_names[0]: values}

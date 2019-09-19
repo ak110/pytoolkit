@@ -20,9 +20,8 @@ class KerasModel(Model):
 
     Args:
         create_model_fn: モデルを作成する関数。
-        train_preprocessor: 訓練データの前処理
-        val_preprocessor: 検証データの前処理
-        batch_size: バッチサイズ
+        train_data_loader: 訓練データの読み込み
+        val_data_loader: 検証データの読み込み
         models_dir (PathLike): 保存先ディレクトリ
         model_name_format: モデルのファイル名のフォーマット。{fold}のところに数字が入る。
         skip_if_exists: モデルが存在してもスキップせず再学習するならFalse。
@@ -36,9 +35,8 @@ class KerasModel(Model):
     def __init__(
         self,
         create_model_fn: typing.Callable[[], tk.keras.models.Model],
-        train_preprocessor: tk.data.Preprocessor,
-        val_preprocessor: tk.data.Preprocessor,
-        batch_size: int = 32,
+        train_data_loader: tk.data.DataLoader,
+        val_data_loader: tk.data.DataLoader,
         *,
         models_dir,
         model_name_format: str = "model.fold{fold}.h5",
@@ -47,14 +45,13 @@ class KerasModel(Model):
         load_model_fn: typing.Callable[[pathlib.Path], tk.keras.models.Model] = None,
         use_horovod: bool = False,
         parallel_cv: bool = False,
-        preprocessors: list = None,
+        data_loaders: list = None,
         postprocessors: list = None,
     ):
-        super().__init__(preprocessors, postprocessors)
+        super().__init__(data_loaders, postprocessors)
         self.create_model_fn = create_model_fn
-        self.train_preprocessor = train_preprocessor
-        self.val_preprocessor = val_preprocessor
-        self.batch_size = batch_size
+        self.train_data_loader = train_data_loader
+        self.val_data_loader = val_data_loader
         self.models_dir = pathlib.Path(models_dir)
         self.model_name_format = model_name_format
         self.skip_if_exists = skip_if_exists
@@ -137,16 +134,9 @@ class KerasModel(Model):
         model.compile(self.models[0].optimizer, loss, [m for m in metrics.values()])
         tk.models.summary(model)
 
-        def generator(datasets, preprocessor):
+        def generator(datasets, data_loader):
             iterators = [
-                tk.data.DataLoader(
-                    dataset,
-                    preprocessor,
-                    self.batch_size,
-                    shuffle=True,
-                    parallel=True,
-                    use_horovod=True,
-                ).run()
+                data_loader.iter(dataset, shuffle=True, use_horovod=True).run()
                 for dataset in datasets
             ]
             while True:
@@ -176,16 +166,16 @@ class KerasModel(Model):
             val_sets.append(dataset.slice(val_indices))
 
         model.fit_generator(
-            generator(train_sets, self.train_preprocessor),
-            steps_per_epoch=-(-len(train_sets[0]) // self.batch_size),
-            validation_data=generator(val_sets, self.val_preprocessor),
-            validation_steps=-(-len(val_sets[0]) // self.batch_size),
+            generator(train_sets, self.train_data_loader),
+            steps_per_epoch=-(-len(train_sets[0]) // self.train_data_loader.batch_size),
+            validation_data=generator(val_sets, self.val_data_loader),
+            validation_steps=-(-len(val_sets[0]) // self.val_data_loader.batch_size),
             **(self.fit_params or {}),
         )
 
         evals = model.evaluate_generator(
-            generator(val_sets, self.val_preprocessor),
-            -(-len(val_sets[0]) // self.batch_size) * 3,
+            generator(val_sets, self.val_data_loader),
+            -(-len(val_sets[0]) // self.val_data_loader.batch_size) * 3,
         )
         scores = dict(zip(model.metrics_names, evals))
         for k, v in scores.items():
@@ -207,21 +197,16 @@ class KerasModel(Model):
             tk.models.fit(
                 model,
                 train_set=train_set,
-                train_preprocessor=self.train_preprocessor,
+                train_data_loader=self.train_data_loader,
                 val_set=val_set,
-                val_preprocessor=self.val_preprocessor,
-                batch_size=self.batch_size,
+                val_data_loader=self.val_data_loader,
                 **(self.fit_params or {}),
             )
             model_path = self.models_dir / self.model_name_format.format(fold=fold)
             tk.models.save(model, model_path)
             self.models.append(model)
             scores = tk.models.evaluate(
-                model,
-                val_set,
-                preprocessor=self.val_preprocessor,
-                batch_size=self.batch_size,
-                use_horovod=True,
+                model, val_set, data_loader=self.val_data_loader, use_horovod=True
             )
             for k, v in scores.items():
                 tk.log.get(__name__).info(
@@ -241,8 +226,7 @@ class KerasModel(Model):
             tk.models.predict(
                 model,
                 dataset,
-                self.val_preprocessor,
-                self.batch_size,
+                self.val_data_loader,
                 desc=f"fold",
                 use_horovod=self.use_horovod,
                 # TODO: TTA
