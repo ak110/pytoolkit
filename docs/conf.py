@@ -191,13 +191,13 @@ autodoc_default_options = {
     "members": None,
     "member-order": "bysource",
     "undoc-members": True,
-    "special-members": "__init__,__len__,__getitem__,__iter__",
+    "special-members": "__len__,__getitem__,__iter__",
     "show-inheritance": None,
 }
 
 # sphinx-autodoc-typehints
 set_type_checking_flag = True
-typehints_fully_qualified = True
+typehints_fully_qualified = False
 always_document_param_types = True
 
 # -- Options for todo extension ----------------------------------------------
