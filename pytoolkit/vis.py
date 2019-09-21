@@ -17,10 +17,7 @@ class GradCamVisualizer:
     """
 
     def __init__(
-        self,
-        model: keras.models.Model,
-        output_index: int,
-        pooling_class: keras.layers.Layer = None,
+        self, model: keras.models.Model, output_index: int, pooling_class: type = None
     ):
         pooling_class = pooling_class or keras.layers.GlobalAveragePooling2D
         # pooling_classへの入力テンソルを取得

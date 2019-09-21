@@ -214,7 +214,7 @@ def search_threshold(
         val_t, val_p = y_true[val_indices], y_pred[val_indices]
 
         best_score = np.inf if direction == "minimize" else -np.inf
-        best_th = None
+        best_th: typing.Optional[float] = None
         for th in thresholds:
             s = score_fn(tr_t, tr_p, th)
             if (direction == "minimize" and s < best_score) or (
@@ -222,6 +222,7 @@ def search_threshold(
             ):
                 best_score = s
                 best_th = th
+        assert best_th is not None
 
         val_score = score_fn(val_t, val_p, best_th)
         tk.log.get(__name__).info(

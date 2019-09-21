@@ -21,11 +21,10 @@ def find_by_name(arr, name):
     raise ValueError(f'"{name}" is not exist in [{arr}]')
 
 
-def normalize_tuple(value, n):
-    """n個の要素を持つtupleにして返す。ただしNoneならNoneのまま。"""
-    if value is None:
-        return None
-    elif isinstance(value, int):
+def normalize_tuple(value, n: int) -> tuple:
+    """n個の要素を持つtupleにして返す。"""
+    assert value is not None
+    if isinstance(value, int):
         return (value,) * n
     else:
         value = tuple(value)

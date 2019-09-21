@@ -119,6 +119,7 @@ class TSVLogger(keras.callbacks.Callback):
         self.epoch_start_time = time.time()
 
     def on_epoch_end(self, epoch, logs=None):
+        assert self.epoch_start_time is not None
         logs = logs or {}
         logs["lr"] = K.get_value(self.model.optimizer.lr)
         elapsed_time = time.time() - self.epoch_start_time
@@ -161,6 +162,8 @@ class EpochLogger(keras.callbacks.Callback):
         self.epoch_start_time = time.time()
 
     def on_epoch_end(self, epoch, logs=None):
+        assert self.train_start_time is not None
+        assert self.epoch_start_time is not None
         lr = K.get_value(self.model.optimizer.lr)
         now = time.time()
         elapsed_time = now - self.epoch_start_time

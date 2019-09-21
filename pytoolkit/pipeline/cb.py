@@ -39,6 +39,7 @@ class CBModel(Model):
         self.train_pool_: catboost.Pool = None
 
     def _save(self, models_dir):
+        assert self.gbms_ is not None
         assert self.train_pool_ is not None
         models_dir = pathlib.Path(models_dir)
         models_dir.mkdir(parents=True, exist_ok=True)

@@ -40,10 +40,7 @@ def _main():
         y = np.zeros((batch_size,))
     dataset = tk.data.Dataset(X, y)
     data_loader = MyDataLoader(
-        data_augmentation=True,
-        mask=args.mask,
-        batch_size=batch_size,
-        parallel=not args.profile,
+        data_augmentation=True, mask=args.mask, parallel=not args.profile
     )
     data_iterator = data_loader.iter(dataset, shuffle=True)
 
@@ -57,7 +54,8 @@ def _main():
         )  # 累積:cumulative 内部:time
     else:
         # 1バッチ分を保存
-        for ix, x in enumerate(data_iterator[0][0]):
+        X_batch, _ = data_iterator[0]
+        for ix, x in enumerate(X_batch):
             tk.ndimage.save(save_dir / f"{ix}.png", np.clip(x, 0, 255).astype(np.uint8))
         # 適当にループして速度を見る
         _run(data_iterator, iterations=16)
@@ -81,7 +79,7 @@ def _run(data_iterator, iterations):
 class MyDataLoader(tk.data.DataLoader):
     """DataLoader"""
 
-    def __init__(self, data_augmentation, mask, batch_size, parallel):
+    def __init__(self, data_augmentation, mask, parallel):
         super().__init__(batch_size=batch_size, parallel=parallel)
         self.data_augmentation = data_augmentation
         self.mask = mask

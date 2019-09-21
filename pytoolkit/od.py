@@ -288,11 +288,13 @@ def compute_scores(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=No
                 pred_ix = iou.argmax()
                 pred_iou = iou[pred_ix]
             else:
+                pred_ix = None
                 pred_iou = -1  # 検出失敗
             if pred_iou >= iou_threshold:
                 # 検出成功
                 if not gt_difficult:
                     tp[gt_class] += 1
+                assert pred_ix is not None
                 pred_enabled[np.where(pred_mask)[0][pred_ix]] = False
             else:
                 # 検出失敗

@@ -59,7 +59,7 @@ def load_with_cache(
         読み込み結果のndarray。
 
     """
-    max_size = tk.utils.normalize_tuple(max_size, 2)
+    max_size = tk.utils.normalize_tuple(max_size, 2) if max_size is not None else None
 
     def _load():
         img = load(path_or_array, grayscale=grayscale)

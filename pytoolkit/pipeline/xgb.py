@@ -51,6 +51,7 @@ class XGBModel(Model):
         self.gbms_: typing.Optional[typing.List[xgb.Booster]] = None
 
     def _save(self, models_dir):
+        assert self.gbms_ is not None
         models_dir = pathlib.Path(models_dir)
         models_dir.mkdir(parents=True, exist_ok=True)
         for fold, gbm in enumerate(self.gbms_):

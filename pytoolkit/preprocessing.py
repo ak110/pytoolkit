@@ -110,13 +110,13 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
             - "category": Ordinalエンコードしてcategory型にする (LightGBMとか用)
             - "ordinal": Ordinalエンコードしてobject型にする (XGBoost/CatBoostとか用)
             - "onehot": One-hotエンコードしてbool型にする (NNとか用)
-        binary_fraction: 0-1 or None
-        iszero_fraction: 0-1 or None
-        isnull_fraction: 0-1 or None
-        ordinal_encoder: OrdinalEncoderのインスタンス or None or "default"
-        onehot_encoder: OneHotEncoderのインスタンス or None or "default"
-        count_encoder: CountEncoderのインスタンス or None or "default"
-        target_encoder: TargetEncoderのインスタンス or None or "default"
+        binary_fraction: 0-1
+        iszero_fraction: 0-1
+        isnull_fraction: 0-1
+        ordinal_encoder: OrdinalEncoderのインスタンス
+        onehot_encoder: OneHotEncoderのインスタンス
+        count_encoder: CountEncoderのインスタンス
+        target_encoder: TargetEncoderのインスタンス
         ignore_cols: 無視する列名
 
     """
@@ -128,12 +128,10 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
         iszero_fraction: float = 0.01,
         isnull_fraction: float = 0.01,
         rare_category_fraction: float = 0.01,
-        ordinal_encoder: typing.Union[
-            sklearn.base.BaseEstimator, None, str
-        ] = "default",
-        onehot_encoder: typing.Union[sklearn.base.BaseEstimator, None, str] = "default",
-        count_encoder: typing.Union[sklearn.base.BaseEstimator, None, str] = "default",
-        target_encoder: typing.Union[sklearn.base.BaseEstimator, None, str] = "default",
+        ordinal_encoder: sklearn.base.BaseEstimator = None,
+        onehot_encoder: sklearn.base.BaseEstimator = None,
+        count_encoder: sklearn.base.BaseEstimator = None,
+        target_encoder: sklearn.base.BaseEstimator = None,
         ignore_cols: typing.Sequence[str] = None,
     ):
         import category_encoders as ce
@@ -145,20 +143,10 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
         self.iszero_fraction = iszero_fraction
         self.isnull_fraction = isnull_fraction
         self.rare_category_fraction = rare_category_fraction
-        self.ordinal_encoder = (
-            OrdinalEncoder() if ordinal_encoder == "default" else ordinal_encoder
-        )
-        self.onehot_encoder = (
-            ce.OneHotEncoder(use_cat_names=True)
-            if onehot_encoder == "default"
-            else onehot_encoder
-        )
-        self.count_encoder = (
-            CountEncoder() if count_encoder == "default" else count_encoder
-        )
-        self.target_encoder = (
-            TargetEncoder() if target_encoder == "default" else target_encoder
-        )
+        self.ordinal_encoder = ordinal_encoder or OrdinalEncoder()
+        self.onehot_encoder = onehot_encoder or ce.OneHotEncoder(use_cat_names=True)
+        self.count_encoder = count_encoder or CountEncoder()
+        self.target_encoder = target_encoder or TargetEncoder()
         self.ignore_cols = ignore_cols or []
         self.binary_cols_: typing.Optional[list] = None
         self.numeric_cols_: typing.Optional[list] = None
@@ -240,6 +228,12 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
             return feats
 
     def transform(self, X, y=None):
+        assert self.binary_cols_ is not None
+        assert self.numeric_cols_ is not None
+        assert self.category_cols_ is not None
+        assert self.rare_category_cols_ is not None
+        assert self.iszero_cols_ is not None
+        assert self.isnull_cols_ is not None
         del y
         with tk.log.trace_scope("FeaturesEncoder.transform"):
             import pandas as pd  # pylint: disable=redefined-outer-name

@@ -142,7 +142,9 @@ class KerasModel(Model):
             while True:
                 X_batch = {}
                 for i, it in enumerate(iterators):
-                    Xt, yt = next(it, None)
+                    Xt, yt = next(it, (None, None))
+                    assert Xt is not None
+                    assert yt is not None
 
                     if isinstance(Xt, np.ndarray):
                         Xt = [Xt]

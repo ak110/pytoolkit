@@ -191,8 +191,8 @@ def train(
 
     """
     with tk.log.trace_scope("train"):
-        assert model_path is not None
-        assert (val_set is None) == (val_data_loader is None)
+        if val_set is not None:
+            assert val_data_loader is not None
         # 学習
         tk.log.get(__name__).info(
             f"train: {len(train_set)} samples, val: {len(val_set) if val_set is not None else 0} samples, batch_size: {train_data_loader.batch_size}x{tk.hvd.size()}"
@@ -208,25 +208,28 @@ def train(
         )
         try:
             # 評価
-            evaluate(
-                model,
-                train_set,
-                data_loader=train_data_loader,
-                prefix="",
-                use_horovod=True,
-            )
-            evals = (
+            if val_data_loader is not None:
                 evaluate(
                     model,
-                    val_set,
-                    data_loader=val_data_loader,
-                    prefix="val_",
+                    train_set,
+                    data_loader=val_data_loader,  # DataAugmentation無しで評価
+                    prefix="",
                     use_horovod=True,
                 )
-                if val_set is not None and val_data_loader is not None
-                else None
-            )
-            return evals
+                evals = (
+                    evaluate(
+                        model,
+                        val_set,
+                        data_loader=val_data_loader,
+                        prefix="val_",
+                        use_horovod=True,
+                    )
+                    if val_set is not None
+                    else None
+                )
+                return evals
+            else:
+                return None
         finally:
             # モデルを保存
             tk.models.save(model, model_path)
