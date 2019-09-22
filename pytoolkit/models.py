@@ -140,7 +140,7 @@ def summary(model: keras.models.Model):
 
 def plot(
     model: keras.models.Model,
-    to_file: str = "model.svg",
+    to_file: tk.typing.PathLike = "model.svg",
     show_shapes: bool = True,
     show_layer_names: bool = True,
     rankdir: str = "TB",
@@ -295,9 +295,7 @@ def predict(
     verbose: int = 1,
     use_horovod: bool = False,
     on_batch_fn: OnBatchFnType = None,
-    flow: bool = False,
-    desc: str = "predict",
-) -> typing.Union[ModelIOType, typing.Iterator[ModelIOType]]:
+) -> ModelIOType:
     """予測。
 
     Args:
@@ -311,24 +309,50 @@ def predict(
         desc: flow時のtqdmのdesc
 
     Returns:
-        予測結果。flow=False時はndarray、flow=True時はサンプルごとのgenerator。
+        予測結果。
 
     """
     with tk.log.trace_scope("predict"):
         verbose = verbose if tk.hvd.is_master() else 0
         dataset = tk.hvd.split(dataset) if use_horovod else dataset
         iterator = data_loader.iter(dataset)
-        if flow:
-            assert not use_horovod, "flow=True and use_horovod=True is not supported."
-            return _predict_flow(model, iterator, verbose, on_batch_fn, desc)
+        if on_batch_fn is not None:
+            values = _predict_flow(
+                model, iterator, verbose, on_batch_fn, desc="predict"
+            )
+            values = np.array(list(values))
         else:
-            if on_batch_fn is not None:
-                values = _predict_flow(model, iterator, verbose, on_batch_fn, desc)
-                values = np.array(list(values))
-            else:
-                values = model.predict(iterator, verbose=verbose)
-            values = tk.hvd.allgather(values) if use_horovod else values
-            return values
+            values = model.predict(iterator, verbose=verbose)
+        values = tk.hvd.allgather(values) if use_horovod else values
+        return values
+
+
+def predict_flow(
+    model: keras.models.Model,
+    dataset: tk.data.Dataset,
+    data_loader: tk.data.DataLoader,
+    verbose: int = 1,
+    on_batch_fn: OnBatchFnType = None,
+    desc: str = "predict",
+) -> typing.Iterator[ModelIOType]:
+    """予測。
+
+    Args:
+        model: モデル
+        dataset: 予測したい入力データ
+        data_loader: データの読み込み
+        verbose: プログレスバー(tqdm)を表示するか否か
+        on_batch_fn (callable, optional): モデルとミニバッチ分の入力データを受け取り、予測結果を返す処理。(TTA用)
+        flow: 結果をgeneratorで返すならTrue
+        desc: flow時のtqdmのdesc
+
+    Returns:
+        予測結果。サンプルごとのgenerator。
+
+    """
+    with tk.log.trace_scope("predict"):
+        iterator = data_loader.iter(dataset)
+        return _predict_flow(model, iterator, verbose, on_batch_fn, desc)
 
 
 def _predict_flow(model, iterator, verbose, on_batch_fn, desc):

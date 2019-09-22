@@ -58,7 +58,6 @@ if True:
     from . import preprocessing
     from . import table
     from . import threading
-    from . import training
     from . import typing
     from . import utils
     from . import validation

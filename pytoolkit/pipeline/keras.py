@@ -27,7 +27,7 @@ class KerasModel(Model):
         skip_if_exists: モデルが存在してもスキップせず再学習するならFalse。
         fit_params: tk.models.fit()のパラメータ
         load_model_fn: モデルを読み込む関数
-        use_horovod: MPIによる分散処理をするか否か。
+        use_horovod: 推論時にMPIによる分散処理をするか否か。(学習時は常にTrue)
         parallel_cv: lgb.cvなどのように全foldまとめて処理するならTrue
 
     """
@@ -71,13 +71,16 @@ class KerasModel(Model):
         load_model_fn = self.load_model_fn or tk.models.load
         self.models = []
         for fold in range(999):
-            model_path = models_dir / self.model_name_format.format(fold=fold)
+            model_path = models_dir / self.model_name_format.format(fold=fold + 1)
             if model_path.exists():
                 self.models.append(load_model_fn(model_path))
+                if "{fold}" not in self.model_name_format:
+                    break
             else:
                 break
 
     def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
+        assert "{fold}" in self.model_name_format
         if self.parallel_cv:
             return self._parallel_cv(dataset, folds)
         else:
@@ -197,25 +200,7 @@ class KerasModel(Model):
             )
             train_set = dataset.slice(train_indices)
             val_set = dataset.slice(val_indices)
-            model = self.create_model_fn()
-            tk.models.fit(
-                model,
-                train_set=train_set,
-                train_data_loader=self.train_data_loader,
-                val_set=val_set,
-                val_data_loader=self.val_data_loader,
-                **(self.fit_params or {}),
-            )
-            model_path = self.models_dir / self.model_name_format.format(fold=fold)
-            tk.models.save(model, model_path)
-            self.models.append(model)
-            scores = tk.models.evaluate(
-                model, val_set, data_loader=self.val_data_loader, use_horovod=True
-            )
-            for k, v in scores.items():
-                tk.log.get(__name__).info(
-                    f"Fold {fold + 1}/{len(folds)}: val_{k}={v:,.3f}"
-                )
+            scores = self.train(train_set, val_set, _fold=fold)
             score_list.append(scores)
             score_weights.append(len(val_indices))
 
@@ -231,9 +216,104 @@ class KerasModel(Model):
                 model,
                 dataset,
                 self.val_data_loader,
-                desc=f"fold",
                 use_horovod=self.use_horovod,
-                # TODO: TTA
+                on_batch_fn=self.on_batch_fn,
             )
             for model in self.models
         ]
+
+    def check(self) -> KerasModel:
+        """モデルの動作確認。(KerasModel独自メソッド)
+
+        Returns:
+            self
+
+        """
+        model = self.create_model_fn()
+        # summary表示
+        tk.models.summary(model)
+        # グラフを出力
+        try:
+            tk.models.plot(model, self.models_dir / "model.svg")
+        except ValueError:
+            pass  # "Cannot embed the 'svg' image format" (tf >= 1.14)
+        return self
+
+    def train(
+        self, train_set: tk.data.Dataset, val_set: tk.data.Dataset, *, _fold: int = 0
+    ) -> typing.Dict[str, float]:
+        """1fold分の学習。(KerasModel独自メソッド)
+
+        Args:
+            train_set: 訓練データ
+            val_set: 検証データ
+            _fold: 内部用
+
+        Returns:
+            メトリクス名と値のdict
+
+        """
+        # 学習
+        model = self.create_model_fn()
+        tk.models.fit(
+            model,
+            train_set=train_set,
+            train_data_loader=self.train_data_loader,
+            val_set=val_set,
+            val_data_loader=self.val_data_loader,
+            **(self.fit_params or {}),
+        )
+        model_path = self.models_dir / self.model_name_format.format(fold=_fold + 1)
+        tk.models.save(model, model_path)
+        if self.models is None:
+            self.models = []
+        self.models.append(model)
+        # 訓練データと検証データの評価
+        self.evaluate(train_set, prefix="")
+        return self.evaluate(val_set, prefix="val_")
+
+    def evaluate(
+        self, dataset: tk.data.Dataset, prefix: str = ""
+    ) -> typing.Dict[str, float]:
+        """評価して結果をINFOログ出力する。(KerasModel独自メソッド)
+
+        Args:
+            dataset: データ
+            prefix: メトリクス名の接頭文字列。
+
+        Returns:
+            metricsの文字列と値のdict
+
+        """
+        assert self.models is not None and len(self.models) == 1
+        assert self.preprocessors is None  # とりあえず未対応
+        assert self.postprocessors is None  # とりあえず未対応
+        evals = tk.models.evaluate(
+            self.models[0],
+            dataset,
+            data_loader=self.val_data_loader,  # DataAugmentation無しで評価
+            prefix=prefix,
+            use_horovod=self.use_horovod,
+        )
+        if tk.hvd.is_master():
+            max_len = max([len(n) for n in evals])
+            for n, v in evals.items():
+                tk.log.get(__name__).info(f'{n}:{" " * (max_len - len(n))} {v:.3f}')
+        tk.hvd.barrier()
+        return evals
+
+    def predict_flow(
+        self, dataset: tk.data.Dataset
+    ) -> typing.Iterator[tk.models.ModelIOType]:
+        """予測。
+
+        Args:
+            dataset: データセット
+
+        """
+        assert self.models is not None and len(self.models) == 1
+        assert self.preprocessors is None  # とりあえず未対応
+        assert self.postprocessors is None  # とりあえず未対応
+        return tk.models.predict_flow(
+            self.models[0], dataset, self.val_data_loader, on_batch_fn=self.on_batch_fn
+        )

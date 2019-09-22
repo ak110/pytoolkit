@@ -34,7 +34,7 @@ def load_image_folder(
     return tk.data.Dataset(X, y, metadata={"class_names": class_names})
 
 
-def load_train_val_image_folders(data_dir, swap=False):
+def load_trainval_folders(data_dir, swap=False):
     """data_dir直下のtrainとvalをload_image_folderで読み込む。"""
     data_dir = pathlib.Path(data_dir)
     train_set = load_image_folder(data_dir / "train")

@@ -40,7 +40,6 @@ Submodules
    pytoolkit.preprocessing
    pytoolkit.table
    pytoolkit.threading
-   pytoolkit.training
    pytoolkit.typing
    pytoolkit.utils
    pytoolkit.validation
