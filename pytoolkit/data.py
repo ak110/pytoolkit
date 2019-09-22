@@ -9,6 +9,7 @@ batch: sampleのバッチサイズ個の集合
 # pylint: disable=unsubscriptable-object
 from __future__ import annotations
 
+import abc
 import dataclasses
 import random
 import time
@@ -193,12 +194,13 @@ class DataLoader:
 
         """
         if shuffle:
-            bs = self.batch_size * self.data_per_sample
-            return RandomIterator(self, dataset, bs, use_horovod)
+            return RandomIterator(
+                self, dataset, self.batch_size, self.data_per_sample, use_horovod
+            )
         assert self.data_per_sample == 1  # 挙動がややこしいので1のみ可とする
         return SequentialIterator(self, dataset, self.batch_size, use_horovod)
 
-    def get_batch(self, dataset: Dataset, indices):
+    def get_batch(self, dataset: Dataset, indices: typing.Sequence[int]):
         """1件のミニバッチを取得する。
 
         Args:
@@ -272,7 +274,7 @@ class DataLoader:
         return part
 
 
-class Iterator(keras.utils.Sequence):
+class Iterator(keras.utils.Sequence, metaclass=abc.ABCMeta):
     """データをモデルに渡すクラス。
 
     Args:
@@ -320,9 +322,9 @@ class Iterator(keras.utils.Sequence):
         self.seconds_per_step = self.seconds_per_step * 0.99 + elapsed_time * 0.01
         return batch
 
-    def sample_batch_indices(self, index: int):
+    @abc.abstractmethod
+    def sample_batch_indices(self, index: int) -> typing.Sequence[int]:
         """1ミニバッチ分のindexの配列を返す。"""
-        raise NotImplementedError()
 
     def __iter__(self):
         """データを返す。"""
@@ -340,7 +342,7 @@ class Iterator(keras.utils.Sequence):
 class SequentialIterator(Iterator):
     """順番にサンプリングするIterator。"""
 
-    def sample_batch_indices(self, index: int):
+    def sample_batch_indices(self, index: int) -> typing.Sequence[int]:
         """1ミニバッチ分のindexの配列を返す。"""
         start = self.batch_size * index
         end = start + self.batch_size
@@ -355,6 +357,7 @@ class RandomIterator(Iterator):
         data_loader: DataLoader,
         dataset: Dataset,
         batch_size: int,
+        data_per_sample: int,
         use_horovod: bool,
     ):
         super().__init__(
@@ -363,18 +366,28 @@ class RandomIterator(Iterator):
             batch_size=batch_size,
             use_horovod=use_horovod,
         )
-        self.gen = RandomIterator._generate_shuffled_indices(len(dataset))
-        self.indices = [next(self.gen) for _ in range(len(self) * self.batch_size)]
+        self.data_per_sample = data_per_sample
+        self.gens = [
+            RandomIterator._generate_shuffled_indices(len(dataset))
+            for _ in range(self.data_per_sample)
+        ]
+        self.indices = [
+            [next(gen) for _ in range(len(self) * self.batch_size)] for gen in self.gens
+        ]
 
     def on_epoch_end(self) -> None:
         """1エポック完了時の処理。"""
         super().on_epoch_end()
-        self.indices = [next(self.gen) for _ in range(len(self) * self.batch_size)]
+        self.indices = [
+            [next(gen) for _ in range(len(self) * self.batch_size)] for gen in self.gens
+        ]
 
-    def sample_batch_indices(self, index: int):
+    def sample_batch_indices(self, index: int) -> typing.Sequence[int]:
         """1ミニバッチ分のindexの配列を返す。"""
         offset = self.batch_size * index
-        return self.indices[offset : offset + self.batch_size]
+        return sum(
+            [indices[offset : offset + self.batch_size] for indices in self.indices], []
+        )
 
     @staticmethod
     def _generate_shuffled_indices(data_count):
@@ -388,7 +401,7 @@ class RandomIterator(Iterator):
 class WeightedRandomIterator(Iterator):
     """重み付き乱数によるSampler。"""
 
-    def sample_batch_indices(self, index: int):
+    def sample_batch_indices(self, index: int) -> typing.Sequence[int]:
         """1ミニバッチ分のindexの配列を返す。"""
         del index
         assert self.dataset.weights is not None

@@ -23,6 +23,8 @@ from . import keras
 ModelIOType = typing.Union[
     np.ndarray, typing.List[np.ndarray], typing.Dict[str, np.ndarray]
 ]
+# predictで使う型
+OnBatchFnType = typing.Callable[[keras.models.Model, ModelIOType], ModelIOType]
 
 
 def load(
@@ -62,13 +64,16 @@ def load_weights(model: keras.models.Model, path, by_name=False, skip_not_exist=
 
 
 def save(
-    model: keras.models.Model, path, mode: str = "hdf5", include_optimizer: bool = False
+    model: keras.models.Model,
+    path: tk.typing.PathLike,
+    mode: str = "hdf5",
+    include_optimizer: bool = False,
 ):
     """モデルの保存。
 
     Args:
         model: モデル
-        path (os.PathLike): 保存先。saved_modelの場合はディレクトリ
+        path: 保存先。saved_modelの場合はディレクトリ
         mode: "hdf5", "saved_model", "onnx", "tflite"のいずれか
         include_optimizer: HDF5形式で保存する場合にoptimizerを含めるか否か
 
@@ -289,7 +294,7 @@ def predict(
     data_loader: tk.data.DataLoader,
     verbose: int = 1,
     use_horovod: bool = False,
-    on_batch_fn: typing.Callable[[keras.models.Model, ModelIOType], ModelIOType] = None,
+    on_batch_fn: OnBatchFnType = None,
     flow: bool = False,
     desc: str = "predict",
 ) -> typing.Union[ModelIOType, typing.Iterator[ModelIOType]]:

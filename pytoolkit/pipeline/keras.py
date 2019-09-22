@@ -22,7 +22,7 @@ class KerasModel(Model):
         create_model_fn: モデルを作成する関数。
         train_data_loader: 訓練データの読み込み
         val_data_loader: 検証データの読み込み
-        models_dir (PathLike): 保存先ディレクトリ
+        models_dir: 保存先ディレクトリ
         model_name_format: モデルのファイル名のフォーマット。{fold}のところに数字が入る。
         skip_if_exists: モデルが存在してもスキップせず再学習するならFalse。
         fit_params: tk.models.fit()のパラメータ
@@ -38,17 +38,18 @@ class KerasModel(Model):
         train_data_loader: tk.data.DataLoader,
         val_data_loader: tk.data.DataLoader,
         *,
-        models_dir,
+        models_dir: tk.typing.PathLike,
         model_name_format: str = "model.fold{fold}.h5",
         skip_if_exists: bool = True,
         fit_params: dict = None,
         load_model_fn: typing.Callable[[pathlib.Path], tk.keras.models.Model] = None,
         use_horovod: bool = False,
         parallel_cv: bool = False,
-        data_loaders: list = None,
-        postprocessors: list = None,
+        on_batch_fn: tk.models.OnBatchFnType = None,
+        preprocessors: tk.pipeline.EstimatorListType = None,
+        postprocessors: tk.pipeline.EstimatorListType = None,
     ):
-        super().__init__(data_loaders, postprocessors)
+        super().__init__(preprocessors, postprocessors)
         self.create_model_fn = create_model_fn
         self.train_data_loader = train_data_loader
         self.val_data_loader = val_data_loader
@@ -59,12 +60,13 @@ class KerasModel(Model):
         self.load_model_fn = load_model_fn
         self.use_horovod = use_horovod
         self.parallel_cv = parallel_cv
+        self.on_batch_fn = on_batch_fn
         self.models: typing.Optional[typing.List[tk.keras.models.Model]] = None
 
-    def _save(self, models_dir):
+    def _save(self, models_dir: pathlib.Path):
         assert models_dir == self.models_dir
 
-    def _load(self, models_dir):
+    def _load(self, models_dir: pathlib.Path):
         assert models_dir == self.models_dir
         load_model_fn = self.load_model_fn or tk.models.load
         self.models = []

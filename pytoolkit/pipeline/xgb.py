@@ -35,8 +35,8 @@ class XGBModel(Model):
         verbose_eval: int = 100,
         callbacks: list = None,
         cv_params: dict = None,
-        preprocessors: list = None,
-        postprocessors: list = None,
+        preprocessors: tk.pipeline.EstimatorListType = None,
+        postprocessors: tk.pipeline.EstimatorListType = None,
     ):
         import xgboost as xgb
 
@@ -50,7 +50,7 @@ class XGBModel(Model):
         self.cv_params = cv_params
         self.gbms_: typing.Optional[typing.List[xgb.Booster]] = None
 
-    def _save(self, models_dir):
+    def _save(self, models_dir: pathlib.Path):
         assert self.gbms_ is not None
         models_dir = pathlib.Path(models_dir)
         models_dir.mkdir(parents=True, exist_ok=True)
@@ -60,7 +60,7 @@ class XGBModel(Model):
         df_importance = self.feature_importance()
         df_importance.to_excel(str(models_dir / "feature_importance.xlsx"))
 
-    def _load(self, models_dir):
+    def _load(self, models_dir: pathlib.Path):
         self.gbms_ = [
             tk.utils.load(models_dir / f"model.fold{fold}.pkl")
             for fold in range(self.nfold)

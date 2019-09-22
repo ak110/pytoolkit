@@ -98,7 +98,7 @@ def _parse_log(log_text: str):
     """tk.callbacks.EpochLoggerのログファイルからlossなどを見つけてDataFrameに入れて返す。結果は(列名, DataFrame)の配列。"""
     pat1 = re.compile(r"Epoch +\d+: .+ time=\d+ ")
     pat2 = re.compile(r"\b(\w+)=([-+\.e\d]+|nan|-?inf)\b")
-    keys = []
+    keys: list = []
     data_rows = []
     for line in log_text.split("\n"):
         if not pat1.search(line):

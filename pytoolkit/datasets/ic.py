@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import pathlib
+import typing
 import xml.etree.ElementTree
 
 import numpy as np
@@ -10,13 +11,16 @@ import pytoolkit as tk
 
 
 def load_image_folder(
-    data_dir, class_names=None, use_tqdm: bool = True, check_image: bool = False
+    data_dir: tk.typing.PathLike,
+    class_names: typing.Sequence[str] = None,
+    use_tqdm: bool = True,
+    check_image: bool = False,
 ) -> tk.data.Dataset:
     """画像分類でよくある、クラス名でディレクトリが作られた階層構造のデータ。
 
     Args:
-        data_dir (PathLike): 対象ディレクトリ
-        class_names (ArrayLike): クラス名の配列
+        data_dir: 対象ディレクトリ
+        class_names: クラス名の配列
         use_tqdm: tqdmを使用するか否か
         check_image: 画像として読み込みチェックを行い、読み込み可能なファイルのみ返すか否か (遅いので注意)
 
@@ -52,14 +56,17 @@ def load_train1000():
     return train_set, test_set
 
 
-def load_imagenet(data_dir, use_tqdm=True):
+def load_imagenet(data_dir: tk.typing.PathLike, verbose: bool = True):
     """ImageNet (ILSVRC 2012のClassification)のデータの読み込み。
 
     Args:
-        data_dir (PathLike): ディレクトリ。(Annotations, Data, ImageSetが入っているところ)
+        data_dir: ディレクトリ。(Annotations, Data, ImageSetが入っているところ)
+        verbose: 読み込み状況をtqdmで表示するならTrue
 
     """
     import pandas as pd
+
+    data_dir = pathlib.Path(data_dir)
 
     class_index_url = "https://storage.googleapis.com/download.tensorflow.org/data/imagenet_class_index.json"
     df = pd.read_json(class_index_url).T
@@ -71,9 +78,9 @@ def load_imagenet(data_dir, use_tqdm=True):
 
     X_val, y_val = [], []
     val_dir = data_dir / "Annotations/CLS-LOC/val"
-    for xml_path in tk.utils.tqdm(val_dir.glob("*.xml"), disable=not use_tqdm):
+    for xml_path in tk.utils.tqdm(val_dir.glob("*.xml"), disable=not verbose):
         root = xml.etree.ElementTree.parse(str(xml_path)).getroot()
-        class_name = root.find("object").find("name").text
+        class_name: str = root.find("object").find("name").text  # type: ignore
 
         X_val.append(data_dir / f"Data/CLS-LOC/val/{xml_path.stem}.JPEG")
         y_val.append(class_names_to_id[class_name])

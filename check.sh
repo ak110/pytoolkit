@@ -5,7 +5,7 @@ black .
 
 flake8
 
-mypy pytoolkit
+mypy pytoolkit scripts
 
 pushd tests/
 ./touch.sh

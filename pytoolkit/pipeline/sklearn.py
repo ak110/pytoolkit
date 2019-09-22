@@ -1,6 +1,7 @@
 """scikit-learn"""
 from __future__ import annotations
 
+import pathlib
 import typing
 
 import numpy as np
@@ -25,8 +26,8 @@ class SKLearnModel(Model):
         self,
         estimator: sklearn.base.BaseEstimator,
         weights_arg_name: str = "sample_weight",
-        preprocessors: list = None,
-        postprocessors: list = None,
+        preprocessors: tk.pipeline.EstimatorListType = None,
+        postprocessors: tk.pipeline.EstimatorListType = None,
     ):
         super().__init__(preprocessors, postprocessors)
         self.estimator = estimator
@@ -35,10 +36,10 @@ class SKLearnModel(Model):
             typing.List[sklearn.base.BaseEstimator]
         ] = None
 
-    def _save(self, models_dir):
+    def _save(self, models_dir: pathlib.Path):
         tk.utils.dump(self.estimators_, models_dir / "estimators.pkl")
 
-    def _load(self, models_dir):
+    def _load(self, models_dir: pathlib.Path):
         self.estimators_ = tk.utils.load(models_dir / "estimators.pkl")
 
     def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:

@@ -13,7 +13,10 @@ import pytoolkit as tk
 
 
 def listup_classification(
-    dirpath, class_names=None, use_tqdm: bool = True, check_image: bool = False
+    dirpath,
+    class_names: typing.Sequence[str] = None,
+    use_tqdm: bool = True,
+    check_image: bool = False,
 ) -> typing.Tuple[typing.List[str], np.ndarray, np.ndarray]:
     """画像分類でよくある、クラス名ディレクトリの列挙。クラス名の配列, X, yを返す。
 
@@ -41,6 +44,8 @@ def listup_classification(
         class_names = list(
             sorted([p.name for p in dirpath.iterdir() if _is_valid_classdir(p)])
         )
+    else:
+        class_names = list(class_names)
 
     # 各クラスのデータを列挙
     X: list = []

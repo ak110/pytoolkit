@@ -39,8 +39,8 @@ class LGBModel(Model):
         cv_params: dict = None,
         seeds: np.ndarray = None,
         init_score: np.ndarray = None,
-        preprocessors: list = None,
-        postprocessors: list = None,
+        preprocessors: tk.pipeline.EstimatorListType = None,
+        postprocessors: tk.pipeline.EstimatorListType = None,
     ):
         super().__init__(preprocessors, postprocessors)
         self.params = params
@@ -54,7 +54,7 @@ class LGBModel(Model):
         self.init_score = init_score
         self.gbms_: np.ndarray = None
 
-    def _save(self, models_dir):
+    def _save(self, models_dir: pathlib.Path):
         seeds = [123] if self.seeds is None else self.seeds
 
         models_dir = pathlib.Path(models_dir)
@@ -69,7 +69,7 @@ class LGBModel(Model):
         df_importance = self.feature_importance()
         df_importance.to_excel(str(models_dir / "feature_importance.xlsx"))
 
-    def _load(self, models_dir):
+    def _load(self, models_dir: pathlib.Path):
         import lightgbm as lgb
 
         seeds = [123] if self.seeds is None else self.seeds

@@ -4,10 +4,14 @@ from __future__ import annotations
 import pathlib
 import typing
 
+import sklearn.base
 import sklearn.pipeline
 import numpy as np
 
 import pytoolkit as tk
+
+
+EstimatorListType = typing.Sequence[sklearn.base.BaseEstimator]
 
 
 class Model:
@@ -19,7 +23,11 @@ class Model:
 
     """
 
-    def __init__(self, preprocessors: list = None, postprocessors: list = None):
+    def __init__(
+        self,
+        preprocessors: EstimatorListType = None,
+        postprocessors: EstimatorListType = None,
+    ):
         self.preprocessors = (
             sklearn.pipeline.make_pipeline(*preprocessors)
             if preprocessors is not None
@@ -75,11 +83,11 @@ class Model:
 
         return scores
 
-    def load(self, models_dir) -> Model:
+    def load(self, models_dir: tk.typing.PathLike) -> Model:
         """読み込み。
 
         Args:
-            models_dir (PathLike): 保存先ディレクトリ
+            models_dir: 保存先ディレクトリ
 
         Returns:
             self
@@ -149,20 +157,20 @@ class Model:
 
         return pred_list
 
-    def _save(self, models_dir):
+    def _save(self, models_dir: pathlib.Path):
         """保存。
 
         Args:
-            models_dir (pathlib.Path): 保存先ディレクトリ
+            models_dir: 保存先ディレクトリ
 
         """
         raise NotImplementedError()
 
-    def _load(self, models_dir):
+    def _load(self, models_dir: pathlib.Path):
         """読み込み。
 
         Args:
-            models_dir (pathlib.Path): 保存先ディレクトリ
+            models_dir: 保存先ディレクトリ
 
         """
         raise NotImplementedError()

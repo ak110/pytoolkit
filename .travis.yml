@@ -16,7 +16,7 @@ install:
 script:
   - black --check .
   - flake8
-  - mypy pytoolkit
+  - mypy pytoolkit scripts
   - pylint --jobs=4 pytoolkit scripts
   - env PYTOOLKIT_BACKEND=tf pytest
   - env PYTOOLKIT_BACKEND=keras pytest

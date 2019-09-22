@@ -38,7 +38,7 @@ class CBModel(Model):
         self.gbms_: typing.Optional[typing.List[catboost.CatBoost]] = None
         self.train_pool_: catboost.Pool = None
 
-    def _save(self, models_dir):
+    def _save(self, models_dir: pathlib.Path):
         assert self.gbms_ is not None
         assert self.train_pool_ is not None
         models_dir = pathlib.Path(models_dir)
@@ -51,7 +51,7 @@ class CBModel(Model):
         df_importance = self.feature_importance()
         df_importance.to_excel(str(models_dir / "feature_importance.xlsx"))
 
-    def _load(self, models_dir):
+    def _load(self, models_dir: pathlib.Path):
         import catboost
 
         def load(model_path):
