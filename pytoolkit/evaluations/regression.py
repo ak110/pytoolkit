@@ -1,11 +1,17 @@
 """回帰の評価。"""
+import typing
+
 import numpy as np
 import sklearn.metrics
 
 import pytoolkit as tk
 
 
-def print_regression_metrics(y_true, y_pred, print_fn=None):
+def print_regression_metrics(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    print_fn: typing.Callable[[str], None] = None,
+) -> typing.Dict[str, typing.Any]:
     """回帰の指標色々を表示する。"""
     try:
         evals = evaluate_regression(y_true, y_pred)
@@ -17,9 +23,12 @@ def print_regression_metrics(y_true, y_pred, print_fn=None):
         return evals
     except BaseException:
         tk.log.get(__name__).warning("Error: print_regression_metrics", exc_info=True)
+        return {}
 
 
-def evaluate_regression(y_true, y_pred):
+def evaluate_regression(
+    y_true: np.ndarray, y_pred: np.ndarray
+) -> typing.Dict[str, typing.Any]:
     """回帰の指標色々を算出してdictで返す。"""
     y_mean = np.tile(np.mean(y_pred), len(y_true))
     r2 = sklearn.metrics.r2_score(y_true, y_pred)

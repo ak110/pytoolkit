@@ -4,14 +4,54 @@ pytoolkit.datasets package
 Submodules
 ----------
 
-.. toctree::
+pytoolkit.datasets.coco module
+------------------------------
 
-   pytoolkit.datasets.coco
-   pytoolkit.datasets.ic
-   pytoolkit.datasets.keras
-   pytoolkit.datasets.sklearn
-   pytoolkit.datasets.ss
-   pytoolkit.datasets.voc
+.. automodule:: pytoolkit.datasets.coco
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pytoolkit.datasets.ic module
+----------------------------
+
+.. automodule:: pytoolkit.datasets.ic
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pytoolkit.datasets.keras module
+-------------------------------
+
+.. automodule:: pytoolkit.datasets.keras
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pytoolkit.datasets.sklearn module
+---------------------------------
+
+.. automodule:: pytoolkit.datasets.sklearn
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pytoolkit.datasets.ss module
+----------------------------
+
+.. automodule:: pytoolkit.datasets.ss
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pytoolkit.datasets.voc module
+-----------------------------
+
+.. automodule:: pytoolkit.datasets.voc
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 
 Module contents
 ---------------

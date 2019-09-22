@@ -4,11 +4,30 @@ pytoolkit.evaluations package
 Submodules
 ----------
 
-.. toctree::
+pytoolkit.evaluations.classification module
+-------------------------------------------
 
-   pytoolkit.evaluations.classification
-   pytoolkit.evaluations.regression
-   pytoolkit.evaluations.ss
+.. automodule:: pytoolkit.evaluations.classification
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pytoolkit.evaluations.regression module
+---------------------------------------
+
+.. automodule:: pytoolkit.evaluations.regression
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pytoolkit.evaluations.ss module
+-------------------------------
+
+.. automodule:: pytoolkit.evaluations.ss
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 
 Module contents
 ---------------

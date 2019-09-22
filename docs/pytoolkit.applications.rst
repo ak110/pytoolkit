@@ -4,10 +4,22 @@ pytoolkit.applications package
 Submodules
 ----------
 
-.. toctree::
+pytoolkit.applications.darknet53 module
+---------------------------------------
 
-   pytoolkit.applications.darknet53
-   pytoolkit.applications.xception
+.. automodule:: pytoolkit.applications.darknet53
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pytoolkit.applications.xception module
+--------------------------------------
+
+.. automodule:: pytoolkit.applications.xception
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 
 Module contents
 ---------------

@@ -1,11 +1,18 @@
 """分類の評価。"""
+import typing
+
 import numpy as np
 import sklearn.metrics
 
 import pytoolkit as tk
 
 
-def print_classification_metrics(y_true, proba_pred, average="macro", print_fn=None):
+def print_classification_metrics(
+    y_true: np.ndarray,
+    proba_pred: np.ndarray,
+    average: str = "macro",
+    print_fn: typing.Callable[[str], None] = None,
+) -> typing.Dict[str, typing.Any]:
     """分類の指標色々を表示する。"""
     try:
         evals = evaluate_classification(y_true, proba_pred, average)
@@ -31,9 +38,13 @@ def print_classification_metrics(y_true, proba_pred, average="macro", print_fn=N
         tk.log.get(__name__).warning(
             "Error: print_classification_metrics", exc_info=True
         )
+        return {}
 
 
-def evaluate_classification(y_true, proba_pred, average="macro"):
+def evaluate_classification(
+    y_true: np.ndarray, proba_pred: np.ndarray, average: str = "macro"
+) -> typing.Dict[str, typing.Any]:
+    """分類の評価。"""
     true_type = sklearn.utils.multiclass.type_of_target(y_true)
     pred_type = sklearn.utils.multiclass.type_of_target(proba_pred)
     if true_type == "binary":  # binary

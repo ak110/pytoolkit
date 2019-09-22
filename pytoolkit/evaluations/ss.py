@@ -11,7 +11,7 @@ def print_ss_metrics(
     y_pred: typing.Iterable[np.ndarray],
     threshold: float = 0.5,
     print_fn: typing.Callable[[str], None] = None,
-) -> dict:
+) -> typing.Dict[str, typing.Any]:
     """semantic segmentationの各種metricsを算出してprintする。
 
     Args:
@@ -40,7 +40,7 @@ def evaluate_ss(
     y_true: typing.Iterable[np.ndarray],
     y_pred: typing.Iterable[np.ndarray],
     threshold: float = 0.5,
-) -> dict:
+) -> typing.Dict[str, typing.Any]:
     """semantic segmentationの各種metricsを算出してdictで返す。
 
     y_true, y_predはgeneratorも可。(メモリ不足にならないように)

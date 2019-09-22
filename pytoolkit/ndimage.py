@@ -801,7 +801,7 @@ def mix_data(sample1, sample2, r):
         return np.float32(sample1) * r + np.float32(sample2) * (1 - r)
 
 
-def cut_mix(sample1: np.ndarray, sample2: np.ndarray, beta: float = 1.0) -> tuple:
+def cut_mix(sample1: tuple, sample2: tuple, beta: float = 1.0) -> tuple:
     """CutMix。 <https://arxiv.org/abs/1905.04899>
 
     Args:

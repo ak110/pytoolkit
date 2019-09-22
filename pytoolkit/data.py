@@ -38,7 +38,7 @@ class Dataset:
 
     """
 
-    data: typing.Union[typing.Sequence[typing.Any], pd.DataFrame]
+    data: typing.Union[typing.Sequence[typing.Any], pd.DataFrame, dict]
     labels: np.ndarray = None
     groups: np.ndarray = None
     weights: np.ndarray = None
@@ -126,24 +126,32 @@ class Dataset:
     @classmethod
     def copy_field(cls, d):
         """値のコピーを作成して返す。"""
-        if isinstance(d, dict):
-            return {k: cls.copy_field(v) for k, v in d.items()}
-        elif d is None:
+        if d is None:
             return None
+        elif isinstance(d, dict):
+            return {k: cls.copy_field(v) for k, v in d.items()}
+        assert isinstance(d, (list, np.ndarray, pd.Series, pd.DataFrame))
         return d.copy()
 
-    @staticmethod
-    def concat_field(a, b):
+    @classmethod
+    def concat_field(cls, a, b):
         """2個の値のconcat。"""
-        if a is None or b is None:
+        if a is None:
+            assert b is None
             return None
+        elif isinstance(a, dict):
+            assert isinstance(b, dict)
+            assert tuple(a) == tuple(b)
+            return {k: cls.concat_field(a[k], b[k]) for k in a}
         elif isinstance(a, pd.DataFrame):
+            assert isinstance(b, pd.DataFrame)
             category_columns = a.select_dtypes("category").columns
             c = pd.concat([a, b], ignore_index=True, sort=False)
             if len(category_columns) > 0:
                 # pd.concatでdtype=categoryが外れる列があるので再設定
                 c[category_columns] = c[category_columns].astype("category")
             return c
+        assert isinstance(a, np.ndarray) and isinstance(b, np.ndarray)
         return np.concatenate([a, b], axis=0)
 
 
