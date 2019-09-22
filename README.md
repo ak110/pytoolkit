@@ -17,6 +17,7 @@
 - numba
 - numpy
 - opencv-python
+- pandas
 - scikit-learn
 - scipy
 - tensorflow-gpu
@@ -34,7 +35,6 @@
 - mpi4py
 - onnxmltools
 - optuna
-- pandas
 - pydensecrf
 - python-dotenv
 - requests

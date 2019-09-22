@@ -296,7 +296,7 @@ class KerasModel(Model):
             use_horovod=self.use_horovod,
         )
         if tk.hvd.is_master():
-            max_len = max([len(n) for n in evals])
+            max_len = max(len(n) for n in evals)
             for n, v in evals.items():
                 tk.log.get(__name__).info(f'{n}:{" " * (max_len - len(n))} {v:.3f}')
         tk.hvd.barrier()

@@ -10,6 +10,7 @@ env:
     - CUDA_VISIBLE_DEVICES=-1
 
 install:
+  - sudo apt-get install graphviz
   - pip install cython
   - pip install -r requirements.travis.txt
 

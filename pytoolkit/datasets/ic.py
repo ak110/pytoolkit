@@ -6,6 +6,7 @@ import typing
 import xml.etree.ElementTree
 
 import numpy as np
+import pandas as pd
 
 import pytoolkit as tk
 
@@ -64,8 +65,6 @@ def load_imagenet(data_dir: tk.typing.PathLike, verbose: bool = True):
         verbose: 読み込み状況をtqdmで表示するならTrue
 
     """
-    import pandas as pd
-
     data_dir = pathlib.Path(data_dir)
 
     class_index_url = "https://storage.googleapis.com/download.tensorflow.org/data/imagenet_class_index.json"

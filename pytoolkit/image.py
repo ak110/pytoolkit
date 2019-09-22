@@ -554,6 +554,38 @@ class SpeckleNoise(A.ImageOnlyTransform):
         return {"scale": random.uniform(*self.scale)}
 
 
+class WrappedTranslateX(A.ImageOnlyTransform):
+    """水平に移動してはみ出た分を反対側にくっつける。"""
+
+    def __init__(self, scale=(-1.0, +1.0), always_apply=False, p=0.5):
+        super().__init__(always_apply=always_apply, p=p)
+        self.scale = scale
+
+    def apply(self, image, scale, **params):
+        scale = int(np.round(image.shape[1] * scale))
+        image = np.concatenate([image[:, scale:, :], image[:, :scale, :]], axis=1)
+        return image
+
+    def get_params(self):
+        return {"scale": random.uniform(*self.scale)}
+
+
+class WrappedTranslateY(A.ImageOnlyTransform):
+    """垂直に移動してはみ出た分を反対側にくっつける。"""
+
+    def __init__(self, scale=(-1.0, +1.0), always_apply=False, p=0.5):
+        super().__init__(always_apply=always_apply, p=p)
+        self.scale = scale
+
+    def apply(self, image, scale, **params):
+        scale = int(np.round(image.shape[0] * scale))
+        image = np.concatenate([image[scale:, :, :], image[:scale, :, :]], axis=0)
+        return image
+
+    def get_params(self):
+        return {"scale": random.uniform(*self.scale)}
+
+
 def _random_loguniform(lower: float, upper: float) -> float:
     """3/4 ～ 4/3みたいな乱数を作って返す。"""
     assert 0 < lower < 1 < upper

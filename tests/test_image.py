@@ -1,3 +1,4 @@
+# pylint: disable=redefined-outer-name
 import albumentations as A
 import pytest
 
@@ -39,18 +40,40 @@ def test_data_augmentation(data_dir, save_dir, filename):
         )
 
 
-def test_to_gray_scale(data_dir, save_dir):
+def test_ToGrayScale(data_dir, save_dir):
     """ToGrayScale"""
     aug = tk.image.ToGrayScale(p=1)
     img = tk.ndimage.load(data_dir / "Lenna.png")
     tk.ndimage.save(save_dir / f"Lenna.ToGrayScale.png", aug(image=img)["image"])
 
 
-def test_to_random_binarize(data_dir, save_dir):
+def test_RandomBinarize(data_dir, save_dir):
     """RandomBinarize"""
     aug = tk.image.RandomBinarize(p=1)
     img = tk.ndimage.load(data_dir / "Lenna.png")
     for i in range(4):
         tk.ndimage.save(
             save_dir / f"Lenna.RandomBinarize.{i}.png", aug(image=img)["image"]
+        )
+
+
+def test_WrappedTranslateX(data_dir, save_dir):
+    """WrappedTranslateX"""
+    aug = tk.image.WrappedTranslateX(p=1)
+    img = tk.ndimage.load(data_dir / "Lenna.png")
+    for s in [-0.75, -0.25, +0.25, +0.75]:
+        tk.ndimage.save(
+            save_dir / f"Lenna.WrappedTranslateX.{s:+.2f}.png",
+            aug.apply(image=img, scale=s),
+        )
+
+
+def test_WrappedTranslateY(data_dir, save_dir):
+    """WrappedTranslateY"""
+    aug = tk.image.WrappedTranslateY(p=1)
+    img = tk.ndimage.load(data_dir / "Lenna.png")
+    for s in [-0.75, -0.25, +0.25, +0.75]:
+        tk.ndimage.save(
+            save_dir / f"Lenna.WrappedTranslateY.{s:+.2f}.png",
+            aug.apply(image=img, scale=s),
         )

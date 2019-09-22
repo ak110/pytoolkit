@@ -42,7 +42,7 @@ def listup_classification(
             return True
 
         class_names = list(
-            sorted([p.name for p in dirpath.iterdir() if _is_valid_classdir(p)])
+            sorted(p.name for p in dirpath.iterdir() if _is_valid_classdir(p))
         )
     else:
         class_names = list(class_names)

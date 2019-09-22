@@ -5,6 +5,7 @@ import pathlib
 import typing
 
 import numpy as np
+import pandas as pd
 import sklearn.metrics
 
 import pytoolkit as tk
@@ -69,6 +70,8 @@ class XGBModel(Model):
     def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
         import xgboost as xgb
 
+        assert isinstance(dataset.data, pd.DataFrame)
+
         train_set = xgb.DMatrix(
             data=dataset.data,
             label=dataset.labels,
@@ -102,8 +105,10 @@ class XGBModel(Model):
         return scores
 
     def _predict(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:
-        assert self.gbms_ is not None
         import xgboost as xgb
+
+        assert self.gbms_ is not None
+        assert isinstance(dataset.data, pd.DataFrame)
 
         data = xgb.DMatrix(data=dataset.data, feature_names=dataset.data.columns.values)
         return np.array([gbm.predict(data) for gbm in self.gbms_])
@@ -111,7 +116,6 @@ class XGBModel(Model):
     def feature_importance(self, importance_type: str = "gain"):
         """Feature ImportanceをDataFrameで返す。"""
         assert self.gbms_ is not None
-        import pandas as pd
 
         columns = self.gbms_[0].feature_names
         for gbm in self.gbms_:

@@ -5,6 +5,7 @@ import pathlib
 import typing
 
 import numpy as np
+import pandas as pd
 import sklearn.metrics
 
 import pytoolkit as tk
@@ -88,6 +89,8 @@ class LGBModel(Model):
     def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
         import lightgbm as lgb
 
+        assert isinstance(dataset.data, pd.DataFrame)
+
         # 独自拡張: sklearn風の指定
         if self.params.get("feature_fraction") == "sqrt":
             n = len(dataset.data.columns)
@@ -164,8 +167,6 @@ class LGBModel(Model):
 
     def feature_importance(self, importance_type: str = "gain"):
         """Feature ImportanceをDataFrameで返す。"""
-        import pandas as pd
-
         columns = self.gbms_[0][0].feature_name()
         for gbms_fold in self.gbms_:
             for gbm in gbms_fold:

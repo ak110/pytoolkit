@@ -16,6 +16,7 @@ import time
 import typing
 
 import numpy as np
+import pandas as pd
 
 import pytoolkit as tk
 
@@ -37,7 +38,7 @@ class Dataset:
 
     """
 
-    data: typing.Any
+    data: typing.Union[typing.Sequence[typing.Any], pd.DataFrame]
     labels: np.ndarray = None
     groups: np.ndarray = None
     weights: np.ndarray = None
@@ -45,10 +46,11 @@ class Dataset:
     init_score: np.ndarray = None
     metadata: typing.Optional[dict] = None
 
-    def __len__(self):
+    def __len__(self) -> int:
+        """データ件数を返す。"""
         return len(self.data)
 
-    def get_sample(self, index):
+    def get_data(self, index: int) -> tuple:
         """dataとlabelを返すだけの糖衣構文。"""
         if self.labels is None:
             return self.data[index], None
@@ -133,8 +135,6 @@ class Dataset:
     @staticmethod
     def concat_field(a, b):
         """2個の値のconcat。"""
-        import pandas as pd
-
         if a is None or b is None:
             return None
         elif isinstance(a, pd.DataFrame):
@@ -249,7 +249,7 @@ class DataLoader:
             1件のデータ。通常は入力データとラベルのtuple。
 
         """
-        return dataset.get_sample(index)
+        return dataset.get_data(index)
 
     def collate_samples(self, batch: list) -> tuple:
         """バッチサイズ分のデータを集約する処理。
@@ -261,7 +261,7 @@ class DataLoader:
             モデルに渡されるデータ。通常は入力データとラベルのtuple。
 
         """
-        return tuple([self.collate_part(part) for part in zip(*batch)])
+        return tuple(self.collate_part(part) for part in zip(*batch))
 
     def collate_part(self, part):
         """サンプルごとのデータをバッチ分まとめる処理。"""

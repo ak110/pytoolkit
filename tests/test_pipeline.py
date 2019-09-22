@@ -48,8 +48,6 @@ def test_keras_xor(tmpdir):
 
     model = create_pipeline()
     model.check()
-    model.train(train_set)
-    model.fit_params["initial_epoch"] = 7
     model.train(train_set, train_set)
 
     proba = model.predict(tk.data.Dataset(X, y))[0]

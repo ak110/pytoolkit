@@ -18,7 +18,6 @@ import pytoolkit as tk
 
 from . import keras
 
-
 # モデルの入出力の型
 ModelIOType = typing.Union[
     np.ndarray, typing.List[np.ndarray], typing.Dict[str, np.ndarray]
@@ -28,15 +27,15 @@ OnBatchFnType = typing.Callable[[keras.models.Model, ModelIOType], ModelIOType]
 
 
 def load(
-    path,
-    custom_objects=None,
-    compile=False,  # pylint: disable=redefined-outer-name
-    gpus=None,
+    path: tk.typing.PathLike,
+    custom_objects: dict = None,
+    compile: bool = False,  # pylint: disable=redefined-outer-name
+    gpus: int = None,
 ):
     """モデルの読み込み。"""
     path = pathlib.Path(path)
     with tk.log.trace_scope(f"load({path})"):
-        custom_objects = custom_objects.copy() if custom_objects else dict()
+        custom_objects = custom_objects.copy() if custom_objects else {}
         custom_objects.update(tk.get_custom_objects())
         if gpus is not None and gpus > 1:
             with tf.device("/cpu:0"):
@@ -51,7 +50,12 @@ def load(
     return model
 
 
-def load_weights(model: keras.models.Model, path, by_name=False, skip_not_exist=False):
+def load_weights(
+    model: keras.models.Model,
+    path: tk.typing.PathLike,
+    by_name: bool = False,
+    skip_not_exist: bool = False,
+):
     """モデルの重みの読み込み。"""
     path = pathlib.Path(path)
     if path.exists():

@@ -5,6 +5,7 @@ import pathlib
 import typing
 
 import numpy as np
+import pandas as pd
 
 import pytoolkit as tk
 
@@ -67,6 +68,8 @@ class CBModel(Model):
     def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
         import catboost
 
+        assert isinstance(dataset.data, pd.DataFrame)
+
         self.train_pool_ = catboost.Pool(
             data=dataset.data,
             label=dataset.labels,
@@ -103,8 +106,6 @@ class CBModel(Model):
 
     def feature_importance(self):
         """Feature ImportanceをDataFrameで返す。"""
-        import pandas as pd
-
         columns = self.gbms_[0].feature_names_
         for gbm in self.gbms_:
             assert tuple(columns) == tuple(gbm.feature_names_)

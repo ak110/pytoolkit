@@ -4,6 +4,7 @@ from __future__ import annotations
 import typing
 
 import numpy as np
+import pandas as pd
 import scipy.special
 import scipy.stats
 import sklearn.base
@@ -11,9 +12,6 @@ import sklearn.pipeline
 import sklearn.preprocessing
 
 import pytoolkit as tk
-
-if typing.TYPE_CHECKING:
-    import pandas as pd
 
 
 def encode_binary(s: pd.Series, true_value, false_value) -> pd.Series:
@@ -40,8 +38,6 @@ def encode_cyclic(
     s: pd.Series, min_value: float = 0, max_value: float = 1
 ) -> pd.DataFrame:
     """周期性のある数値のsin/cos化。"""
-    import pandas as pd  # pylint: disable=redefined-outer-name
-
     rad = 2 * np.pi * (s - min_value) / (max_value - min_value)
     df = pd.DataFrame()
     df["sin"] = np.sin(rad)
@@ -135,7 +131,6 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
         ignore_cols: typing.Sequence[str] = None,
     ):
         import category_encoders as ce
-        import pandas as pd  # pylint: disable=redefined-outer-name
 
         assert category in ("category", "ordinal", "onehot")
         self.category = category
@@ -236,8 +231,6 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
         assert self.isnull_cols_ is not None
         del y
         with tk.log.trace_scope("FeaturesEncoder.transform"):
-            import pandas as pd  # pylint: disable=redefined-outer-name
-
             feats = pd.DataFrame(index=X.index)
 
             if len(self.binary_cols_):

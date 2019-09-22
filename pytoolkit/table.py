@@ -6,18 +6,14 @@ import typing
 import warnings
 
 import numpy as np
+import pandas as pd
 import sklearn.utils
 
 import pytoolkit as tk
 
-if typing.TYPE_CHECKING:
-    import pandas as pd
-
 
 def safe_apply(s: pd.Series, fn) -> pd.Series:
     """nan以外にのみapply"""
-    import pandas as pd  # pylint: disable=redefined-outer-name
-
     return s.apply(lambda x: x if pd.isnull(x) else fn(x))
 
 
@@ -55,8 +51,6 @@ def group_columns(
             - "unknown": その他
 
     """
-    import pandas as pd  # pylint: disable=redefined-outer-name
-
     binary_cols = []
     numeric_cols = []
     categorical_cols = []
@@ -282,8 +276,6 @@ def eda_html(df_train: pd.DataFrame, df_test: pd.DataFrame):
 
 def analyze(df: pd.DataFrame):
     """中身を適当に分析してDataFrameに詰めて返す。"""
-    import pandas as pd  # pylint: disable=redefined-outer-name
-
     if isinstance(df, pd.DataFrame):
         df_result = pd.DataFrame(index=df.columns)
         df_result["dtype"] = df.dtypes
@@ -314,7 +306,6 @@ def analyze(df: pd.DataFrame):
 def compare(df1: pd.DataFrame, df2: pd.DataFrame):
     """同じ列を持つ二つのdfの値を色々比べた結果をdfに入れて返す。"""
     assert (df1.columns == df2.columns).all()
-    import pandas as pd  # pylint: disable=redefined-outer-name
 
     std = (df1.std() + df2.std()) / 2
     df_result = pd.DataFrame(index=df1.columns)
@@ -353,8 +344,6 @@ def permutation_importance(
         pd.DataFrame: columnとimportanceの列を持つDataFrame
 
     """
-    import pandas as pd  # pylint: disable=redefined-outer-name
-
     if columns is None:
         columns = X.columns.values
 
@@ -400,8 +389,6 @@ def shuffled_score(
         スコア
 
     """
-    import pandas as pd  # pylint: disable=redefined-outer-name
-
     random_state = sklearn.utils.check_random_state(random_state)
     X = X.copy()
     original = X[c]
