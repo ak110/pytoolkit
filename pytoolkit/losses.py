@@ -56,6 +56,9 @@ def categorical_crossentropy(
 
     label_smoothing を使う場合は0.2とかを指定。
 
+    References:
+        - label smoothing <https://myrtle.ai/how-to-train-your-resnet-8-bag-of-tricks/>
+
     """
     assert alpha is None or class_weights is None  # 両方同時の指定はNG
     assert K.image_data_format() == "channels_last"

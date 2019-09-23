@@ -255,6 +255,10 @@ class KerasModel(Model):
         """
         # 学習
         model = self.create_model_fn()
+        tk.log.get(__name__).info(
+            f"train: {len(train_set)} samples, val: {len(val_set) if val_set is not None else 0} samples, batch_size: {self.train_data_loader.batch_size}x{tk.hvd.size()}"
+        )
+        tk.hvd.barrier()
         tk.models.fit(
             model,
             train_set=train_set,

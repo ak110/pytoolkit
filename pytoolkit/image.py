@@ -557,7 +557,7 @@ class SpeckleNoise(A.ImageOnlyTransform):
 class WrappedTranslateX(A.ImageOnlyTransform):
     """水平に移動してはみ出た分を反対側にくっつける。"""
 
-    def __init__(self, scale=(-1.0, +1.0), always_apply=False, p=0.5):
+    def __init__(self, scale=(-0.25, +0.25), always_apply=False, p=0.5):
         super().__init__(always_apply=always_apply, p=p)
         self.scale = scale
 
@@ -573,7 +573,7 @@ class WrappedTranslateX(A.ImageOnlyTransform):
 class WrappedTranslateY(A.ImageOnlyTransform):
     """垂直に移動してはみ出た分を反対側にくっつける。"""
 
-    def __init__(self, scale=(-1.0, +1.0), always_apply=False, p=0.5):
+    def __init__(self, scale=(-0.25, +0.25), always_apply=False, p=0.5):
         super().__init__(always_apply=always_apply, p=p)
         self.scale = scale
 

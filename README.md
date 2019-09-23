@@ -10,6 +10,12 @@
 
 `git submodule add https://github.com/ak110/pytoolkit.git` で配置して `import pytoolkit as tk` とかで使う。
 
+## cookiecutter
+
+```bash
+cookiecutter gh:ak110/cookiecutter-pytoolkit
+```
+
 ## importするために最低限必要なライブラリ
 
 - Pillow
