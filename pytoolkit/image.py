@@ -99,13 +99,13 @@ class RandomTransform(A.DualTransform):
         self.interp = interp
         self.border_mode = border_mode
 
-    def apply(self, image, m, **params):
+    def apply(self, image, m, interp=None, **params):
         return tk.ndimage.perspective_transform(
             image,
             self.width,
             self.height,
             m,
-            interp=self.interp,
+            interp=interp or self.interp,
             border_mode=self.border_mode,
         )
 
@@ -114,6 +114,10 @@ class RandomTransform(A.DualTransform):
 
     def apply_to_keypoint(self, keypoint, m, **params):
         raise tk.ndimage.transform_points(keypoint, m)
+
+    def apply_to_mask(self, img, interp=None, **params):
+        del interp
+        return self.apply(img, interp="nearest", **params)
 
     def get_params_dependent_on_targets(self, params):
         image = params["image"]

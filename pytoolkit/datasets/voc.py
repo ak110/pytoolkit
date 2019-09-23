@@ -161,24 +161,24 @@ def load_annotation(
     vocdevkit_dir = pathlib.Path(vocdevkit_dir)
     class_name_to_id = class_name_to_id or CLASS_NAMES_TO_ID
     root = xml.etree.ElementTree.parse(str(xml_path)).getroot()
-    folder = root.find("folder").text
-    filename = root.find("filename").text
+    folder = root.find("folder").text  # type: ignore
+    filename = root.find("filename").text  # type: ignore
     size_tree = root.find("size")
-    width = float(size_tree.find("width").text)
-    height = float(size_tree.find("height").text)
+    width = float(size_tree.find("width").text)  # type: ignore
+    height = float(size_tree.find("height").text)  # type: ignore
     classes = []
     bboxes = []
     difficults = []
     for object_tree in root.findall("object"):
-        difficult = object_tree.find("difficult").text == "1"
+        difficult = object_tree.find("difficult").text == "1"  # type: ignore
         if without_difficult and difficult:
             continue
-        class_id = class_name_to_id[object_tree.find("name").text]
+        class_id = class_name_to_id[object_tree.find("name").text]  # type: ignore
         bndbox = object_tree.find("bndbox")
-        xmin = float(bndbox.find("xmin").text) / width
-        ymin = float(bndbox.find("ymin").text) / height
-        xmax = float(bndbox.find("xmax").text) / width
-        ymax = float(bndbox.find("ymax").text) / height
+        xmin = float(bndbox.find("xmin").text) / width  # type: ignore
+        ymin = float(bndbox.find("ymin").text) / height  # type: ignore
+        xmax = float(bndbox.find("xmax").text) / width  # type: ignore
+        ymax = float(bndbox.find("ymax").text) / height  # type: ignore
         classes.append(class_id)
         bboxes.append([xmin, ymin, xmax, ymax])
         difficults.append(difficult)

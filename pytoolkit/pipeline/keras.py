@@ -30,6 +30,10 @@ class KerasModel(Model):
         use_horovod: 推論時にMPIによる分散処理をするか否か。(学習時は常にTrue)
         parallel_cv: lgb.cvなどのように全foldまとめて処理するならTrue
 
+    model_name_formatに"{fold}"が含まれない名前を指定した場合、
+    cvではなくtrainを使うモードということにする。
+    このときtrainを何度読んでも同じモデルを使ったりする。
+
     """
 
     def __init__(
@@ -239,9 +243,26 @@ class KerasModel(Model):
             pass  # "Cannot embed the 'svg' image format" (tf >= 1.14)
         return self
 
+    @typing.overload
+    def train(
+        self, train_set: tk.data.Dataset, val_set: None = None, *, _fold: int = 0
+    ) -> None:
+        pass
+
+    @typing.overload
     def train(
         self, train_set: tk.data.Dataset, val_set: tk.data.Dataset, *, _fold: int = 0
     ) -> typing.Dict[str, float]:
+        # pylint: disable=function-redefined
+        pass
+
+    def train(
+        self,
+        train_set: tk.data.Dataset,
+        val_set: tk.data.Dataset = None,
+        *,
+        _fold: int = 0,
+    ) -> typing.Optional[typing.Dict[str, float]]:
         """1fold分の学習。(KerasModel独自メソッド)
 
         Args:
@@ -253,8 +274,13 @@ class KerasModel(Model):
             メトリクス名と値のdict
 
         """
+        # pylint: disable=function-redefined
         # 学習
-        model = self.create_model_fn()
+        if "{fold}" not in self.model_name_format and self.models is not None:
+            assert len(self.models) == 1
+            model = self.models[0]
+        else:
+            model = self.create_model_fn()
         tk.log.get(__name__).info(
             f"train: {len(train_set)} samples, val: {len(val_set) if val_set is not None else 0} samples, batch_size: {self.train_data_loader.batch_size}x{tk.hvd.size()}"
         )
@@ -269,11 +295,16 @@ class KerasModel(Model):
         )
         model_path = self.models_dir / self.model_name_format.format(fold=_fold + 1)
         tk.models.save(model, model_path)
-        if self.models is None:
-            self.models = []
-        self.models.append(model)
+        if "{fold}" not in self.model_name_format:
+            self.models = [model]
+        else:
+            if self.models is None:
+                self.models = []
+            self.models.append(model)
         # 訓練データと検証データの評価
         self.evaluate(train_set, prefix="")
+        if val_set is None:
+            return None
         return self.evaluate(val_set, prefix="val_")
 
     def evaluate(

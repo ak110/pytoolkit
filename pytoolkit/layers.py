@@ -22,7 +22,7 @@ class ConvertColor(keras.layers.Layer):
     入力は[0, 255]、出力はモード次第だが-3 ～ +3程度。
 
     Args:
-        mode (str):
+        mode:
             'rgb_to_rgb'
             'rgb_to_lab'
             'rgb_to_hsv'
@@ -34,7 +34,7 @@ class ConvertColor(keras.layers.Layer):
 
     """
 
-    def __init__(self, mode, **kargs):
+    def __init__(self, mode: str, **kargs):
         super().__init__(**kargs)
         self.mode = mode
 

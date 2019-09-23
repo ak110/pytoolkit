@@ -121,15 +121,15 @@ def cv_indices(X, y, cv_count, cv_index, split_seed, stratify=None):
     return train_indices, val_indices
 
 
-def get_folds(X, y, cv_count, split_seed, stratify=None):
+def get_folds(X, y, cv_count: int, split_seed: int, stratify: bool = None):
     """Cross validationのインデックスを返す。
 
     Args:
         X: 入力データ。
         y: 出力データ。
-        cv_count (int): 分割数。
-        split_seed (int): 乱数のseed。
-        stratify (bool or None): StratifiedKFoldにするならTrue。
+        cv_count: 分割数。
+        split_seed: 乱数のseed。
+        stratify: StratifiedKFoldにするならTrue。
 
     Returns:
         list of tuple(train_indices, val_indices): インデックス

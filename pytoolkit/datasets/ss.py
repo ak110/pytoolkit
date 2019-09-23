@@ -1,5 +1,8 @@
 """セマンティックセグメンテーション関連。"""
+from __future__ import annotations
+
 import pathlib
+import typing
 
 import numpy as np
 
@@ -51,8 +54,19 @@ _cityscapes_void_colors = np.array(
 )
 
 
-def load_cityscapes(data_dir, mode="fine"):
-    """Cityscapes Dataset <https://www.cityscapes-dataset.com/>"""
+def load_cityscapes(
+    data_dir: tk.typing.PathLike, mode: str = "fine"
+) -> typing.Tuple[tk.data.Dataset, tk.data.Dataset]:
+    """Cityscapes Dataset <https://www.cityscapes-dataset.com/>
+
+    Args:
+        mode: データの種類。"fine" or "coarse"。
+
+    Dataset.metadata:
+        - class_colors: 評価対象のクラスのRGB値。shape=(N, 3)
+        - void_colors: 評価対象外のクラスのRGB値。shape=(M, 3)
+
+    """
     assert mode in ("fine", "coarse")
     data_dir = pathlib.Path(data_dir)
     name = {"fine": "gtFine", "coarse": "gtCoarse"}[mode]

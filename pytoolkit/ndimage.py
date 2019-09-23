@@ -496,38 +496,38 @@ def posterize(rgb: np.ndarray, bits) -> np.ndarray:
 
 
 def geometric_transform(
-    rgb,
-    output_width,
-    output_height,
-    flip_h=False,
-    flip_v=False,
-    degrees=0,
-    scale_h=1.0,
-    scale_v=1.0,
-    pos_h=0.5,
-    pos_v=0.5,
-    translate_h=0.0,
-    translate_v=0.0,
-    interp="lanczos",
-    border_mode="edge",
+    rgb: np.ndarray,
+    output_width: int,
+    output_height: int,
+    flip_h: bool = False,
+    flip_v: bool = False,
+    degrees: float = 0,
+    scale_h: float = 1.0,
+    scale_v: float = 1.0,
+    pos_h: float = 0.5,
+    pos_v: float = 0.5,
+    translate_h: float = 0.0,
+    translate_v: float = 0.0,
+    interp: str = "lanczos",
+    border_mode: str = "edge",
 ) -> np.ndarray:
     """透視変換。
 
     Args:
-        rgb (np.ndarray): 入力画像
-        output_width (int): 出力サイズ
-        output_height (int): 出力サイズ
-        flip_h (bool, optional): Defaults to False. Trueなら水平に反転する。
-        flip_v (bool, optional): Defaults to False. Trueなら垂直に反転する。
-        degrees (int, optional): Defaults to 0. 回転する角度。(0や360なら回転無し。)
-        scale_h (float, optional): Defaults to 1.0. 水平方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
-        scale_v (float, optional): Defaults to 1.0. 垂直方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
-        pos_h (float, optional): Defaults to 0.5. スケール変換に伴う水平位置。0で左端、0.5で中央、1で右端。
-        pos_v (float, optional): Defaults to 0.5. スケール変換に伴う垂直位置。0で上端、0.5で中央、1で下端。
-        translate_h (float, optional): Defaults to 0.0. 変形元を水平にずらす量。-0.125なら12.5%左にずらし、+0.125なら12.5%右にずらす。
-        translate_v (float, optional): Defaults to 0.0. 変形元を垂直にずらす量。-0.125なら12.5%上にずらし、+0.125なら12.5%下にずらす。
-        interp (str, optional): Defaults to 'lanczos'. 補間方法。'nearest', 'bilinear', 'bicubic', 'lanczos'。縮小時は自動的にcv2.INTER_AREA。
-        border_mode (str, optional): Defaults to 'edge'. パディング方法。'edge', 'reflect', 'wrap'
+        rgb: 入力画像
+        output_width: 出力サイズ
+        output_height: 出力サイズ
+        flip_h: Defaults to False. Trueなら水平に反転する。
+        flip_v: Defaults to False. Trueなら垂直に反転する。
+        degrees: Defaults to 0. 回転する角度。(0や360なら回転無し。)
+        scale_h: Defaults to 1.0. 水平方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
+        scale_v: Defaults to 1.0. 垂直方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
+        pos_h: Defaults to 0.5. スケール変換に伴う水平位置。0で左端、0.5で中央、1で右端。
+        pos_v: Defaults to 0.5. スケール変換に伴う垂直位置。0で上端、0.5で中央、1で下端。
+        translate_h: Defaults to 0.0. 変形元を水平にずらす量。-0.125なら12.5%左にずらし、+0.125なら12.5%右にずらす。
+        translate_v: Defaults to 0.0. 変形元を垂直にずらす量。-0.125なら12.5%上にずらし、+0.125なら12.5%下にずらす。
+        interp: Defaults to 'lanczos'. 補間方法。'nearest', 'bilinear', 'bicubic', 'lanczos'。縮小時は自動的にcv2.INTER_AREA。
+        border_mode: Defaults to 'edge'. パディング方法。'edge', 'reflect', 'wrap'
 
     Returns:
         変換後画像
@@ -555,36 +555,36 @@ def geometric_transform(
 
 
 def compute_perspective(
-    input_width,
-    input_height,
-    output_width,
-    output_height,
-    flip_h=False,
-    flip_v=False,
-    degrees=0,
-    scale_h=1.0,
-    scale_v=1.0,
-    pos_h=0.5,
-    pos_v=0.5,
-    translate_h=0.0,
-    translate_v=0.0,
+    input_width: int,
+    input_height: int,
+    output_width: int,
+    output_height: int,
+    flip_h: bool = False,
+    flip_v: bool = False,
+    degrees: float = 0,
+    scale_h: float = 1.0,
+    scale_v: float = 1.0,
+    pos_h: float = 0.5,
+    pos_v: float = 0.5,
+    translate_h: float = 0.0,
+    translate_v: float = 0.0,
 ) -> np.ndarray:
     """透視変換の変換行列を作成。
 
     Args:
-        input_width (int): 入力サイズ
-        input_height (int): 入力サイズ
-        output_width (int): 出力サイズ
-        output_height (int): 出力サイズ
-        flip_h (bool, optional): Defaults to False. Trueなら水平に反転する。
-        flip_v (bool, optional): Defaults to False. Trueなら垂直に反転する。
-        degrees (int, optional): Defaults to 0. 回転する角度。(0や360なら回転無し。)
-        scale_h (float, optional): Defaults to 1.0. 水平方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
-        scale_v (float, optional): Defaults to 1.0. 垂直方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
-        pos_h (float, optional): Defaults to 0.5. スケール変換に伴う水平位置。0で左端、0.5で中央、1で右端。
-        pos_v (float, optional): Defaults to 0.5. スケール変換に伴う垂直位置。0で上端、0.5で中央、1で下端。
-        translate_h (float, optional): Defaults to 0.0. 変形元を水平にずらす量。-0.125なら12.5%左にずらし、+0.125なら12.5%右にずらす。
-        translate_v (float, optional): Defaults to 0.0. 変形元を垂直にずらす量。-0.125なら12.5%上にずらし、+0.125なら12.5%下にずらす。
+        input_width: 入力サイズ
+        input_height: 入力サイズ
+        output_width: 出力サイズ
+        output_height: 出力サイズ
+        flip_h: Defaults to False. Trueなら水平に反転する。
+        flip_v: Defaults to False. Trueなら垂直に反転する。
+        degrees: Defaults to 0. 回転する角度。(0や360なら回転無し。)
+        scale_h: Defaults to 1.0. 水平方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
+        scale_v: Defaults to 1.0. 垂直方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
+        pos_h: Defaults to 0.5. スケール変換に伴う水平位置。0で左端、0.5で中央、1で右端。
+        pos_v: Defaults to 0.5. スケール変換に伴う垂直位置。0で上端、0.5で中央、1で下端。
+        translate_h: Defaults to 0.0. 変形元を水平にずらす量。-0.125なら12.5%左にずらし、+0.125なら12.5%右にずらす。
+        translate_v: Defaults to 0.0. 変形元を垂直にずらす量。-0.125なら12.5%上にずらし、+0.125なら12.5%下にずらす。
 
     Returns:
         変換行列
@@ -620,16 +620,26 @@ def compute_perspective(
     return m
 
 
-def perspective_transform(rgb, width, height, m, interp="lanczos", border_mode="edge"):
+def perspective_transform(
+    rgb: np.ndarray,
+    width: int,
+    height: int,
+    m: np.ndarray,
+    interp: str = "lanczos",
+    border_mode: str = "edge",
+) -> np.ndarray:
     """透視変換。
 
     Args:
-        rgb (np.ndarray): 入力画像
-        width (int): 出力サイズ
-        height (int): 出力サイズ
-        m (ndarray): 変換行列。
-        interp (str, optional): Defaults to 'lanczos'. 補間方法。'nearest', 'bilinear', 'bicubic', 'lanczos'。縮小時は自動的にcv2.INTER_AREA。
-        border_mode (str, optional): Defaults to 'edge'. パディング方法。'edge', 'reflect', 'wrap'
+        rgb: 入力画像
+        width: 出力サイズ
+        height: 出力サイズ
+        m: 変換行列。
+        interp: Defaults to 'lanczos'. 補間方法。'nearest', 'bilinear', 'bicubic', 'lanczos'。縮小時は自動的にcv2.INTER_AREA。
+        border_mode: Defaults to 'edge'. パディング方法。'edge', 'reflect', 'wrap'
+
+    Returns:
+        変換後画像
 
     """
     cv2_interp = {
@@ -751,21 +761,21 @@ def erase_random(
     return rgb
 
 
-def mixup(sample1, sample2, mode: str = "beta"):
+def mixup(sample1: tuple, sample2: tuple, mode: str = "beta") -> tuple:
     """mixup。 <https://arxiv.org/abs/1710.09412>
 
     常に「sample1の重み >= sample2の重み」となるようにしている。
 
     Args:
-        sample1 (tuple, list, dict or ndarray): データその1
-        sample2 (tuple, list, dict or ndarray): データその2
+        sample1: データその1
+        sample2: データその2
         mode: 混ぜる割合の乱数の種類。
             - 'beta': β分布を0.5以上にした分布
             - 'uniform': [0.5, 1]の一様分布
             - 'uniform_ex': [0.5, √2]の一様分布
 
     Returns:
-        tuple, list, dict or ndarray: 混ぜられたデータ。
+        tuple: 混ぜられたデータ。
 
     """
     if mode == "beta":
@@ -780,8 +790,21 @@ def mixup(sample1, sample2, mode: str = "beta"):
     return mix_data(sample1, sample2, r)
 
 
-def mix_data(sample1, sample2, r):
+@typing.overload
+def mix_data(sample1: tuple, sample2: tuple, r: np.float32) -> tuple:
+    # pylint: disable=function-redefined
+    raise NotImplementedError()
+
+
+@typing.overload
+def mix_data(sample1: typing.Any, sample2: typing.Any, r: np.float32) -> typing.Any:
+    # pylint: disable=function-redefined
+    raise NotImplementedError()
+
+
+def mix_data(sample1, sample2, r: np.float32):
     """mixup用に入力や出力を混ぜる処理。rはsample1側に掛ける率。"""
+    # pylint: disable=function-redefined
     if sample1 is None:
         assert sample2 is None
         return None

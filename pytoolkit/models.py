@@ -308,7 +308,7 @@ def predict(
         data_loader: データの読み込み
         verbose: プログレスバー(tqdm)を表示するか否か
         use_horovod: MPIによる分散処理をするか否か
-        on_batch_fn (callable, optional): モデルとミニバッチ分の入力データを受け取り、予測結果を返す処理。(TTA用)
+        on_batch_fn: モデルとミニバッチ分の入力データを受け取り、予測結果を返す処理。(TTA用)
         flow: 結果をgeneratorで返すならTrue
         desc: flow時のtqdmのdesc
 
@@ -346,7 +346,7 @@ def predict_flow(
         dataset: 予測したい入力データ
         data_loader: データの読み込み
         verbose: プログレスバー(tqdm)を表示するか否か
-        on_batch_fn (callable, optional): モデルとミニバッチ分の入力データを受け取り、予測結果を返す処理。(TTA用)
+        on_batch_fn: モデルとミニバッチ分の入力データを受け取り、予測結果を返す処理。(TTA用)
         flow: 結果をgeneratorで返すならTrue
         desc: flow時のtqdmのdesc
 

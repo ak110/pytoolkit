@@ -1,6 +1,9 @@
 """CLI関連。"""
+from __future__ import annotations
+
 import argparse
 import pathlib
+import typing
 
 import pytoolkit as tk
 
@@ -11,21 +14,23 @@ class App:
     ログの初期化とかのボイラープレートコードを出来るだけ排除するためのもの。
 
     Args:
-        output_dir (PathLike, optional): ログ出力先ディレクトリ
+        output_dir: ログ出力先ディレクトリ
 
     Fields:
-        output_dir (pathlib.Path, optional): ログ出力先ディレクトリ
-        current_command (str, optional): 現在実行中のコマンド名
+        output_dir: ログ出力先ディレクトリ
+        current_command: 現在実行中のコマンド名
 
     """
 
-    def __init__(self, output_dir):
+    def __init__(self, output_dir: typing.Union[tk.typing.PathLike, None]):
         self.output_dir = pathlib.Path(output_dir) if output_dir is not None else None
-        self.inits = [tk.utils.better_exceptions, tk.math.set_ndarray_format]
-        self.terms = []
-        self.commands = {}
-        self.then = {}
-        self.current_command = None
+        self.inits: typing.List[typing.Callable[[], None]] = [
+            tk.utils.better_exceptions,
+            tk.math.set_ndarray_format,
+        ]
+        self.terms: typing.List[typing.Callable[[], None]] = []
+        self.commands: typing.Dict[str, typing.Dict[str, typing.Any]] = {}
+        self.current_command: typing.Optional[str] = None
 
     def init(self):
         """前処理の追加用デコレーター"""

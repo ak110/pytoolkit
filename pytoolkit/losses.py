@@ -159,7 +159,7 @@ def lovasz_binary_crossentropy(
     """Lovasz hinge lossのhingeじゃない版。
 
     Args:
-        epsilon (float): sigmoidの値をclipする値。 sigmoid=0.01のときlogit=-4.6くらい。
+        epsilon: sigmoidの値をclipする値。 sigmoid=0.01のときlogit=-4.6くらい。
 
     """
     if per_sample:
