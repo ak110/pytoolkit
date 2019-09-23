@@ -109,15 +109,15 @@ def trace(process_name=None):
 
     """
 
-    def _decorator(func):
+    def decorator(func):
         @functools.wraps(func)
-        def _decorated_func(*args, **kwargs):
+        def traced_func(*args, **kwargs):
             with trace_scope(process_name or func.__qualname__):
                 return func(*args, **kwargs)
 
-        return _decorated_func
+        return traced_func
 
-    return _decorator
+    return decorator
 
 
 @contextlib.contextmanager

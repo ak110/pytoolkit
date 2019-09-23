@@ -68,9 +68,8 @@ class CosineAnnealing(keras.callbacks.Callback):
     def on_epoch_begin(self, epoch, logs=None):
         lr_max = self.start_lr
         lr_min = self.start_lr * self.factor
-        if epoch + 1 <= self.warmup_epochs:
-            r = (epoch + 1) / self.warmup_epochs
-            lr = lr_min * (1 - r) + lr_max * r
+        if epoch + 1 < self.warmup_epochs:
+            lr = lr_max * (epoch + 1) / self.warmup_epochs
         else:
             r = (epoch + 1) / (self.epochs or self.params["epochs"])
             lr = lr_min + 0.5 * (lr_max - lr_min) * (1 + np.cos(np.pi * r))

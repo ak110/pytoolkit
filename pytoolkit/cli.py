@@ -94,12 +94,13 @@ class App:
 
         self.current_command = args.command
         while True:
+            assert self.current_command is not None
             command = commands[self.current_command]
 
             # ログ初期化
             tk.log.init(
                 self.output_dir / f"{command['func'].__name__}.log"
-                if command["logfile"]
+                if command["logfile"] and self.output_dir is not None
                 else None
             )
             # 前処理

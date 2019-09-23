@@ -35,10 +35,10 @@ def _float_to_uint8(func):
     """floatからnp.uint8への変換。"""
 
     @functools.wraps(func)
-    def _decorated(*args, **kwargs):
+    def float_to_uint8_func(*args, **kwargs):
         return np.clip(func(*args, **kwargs), 0, 255).astype(np.uint8)
 
-    return _decorated
+    return float_to_uint8_func
 
 
 def load_with_cache(

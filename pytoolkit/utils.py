@@ -37,13 +37,13 @@ def memoize(func):
     cache = {}
 
     @functools.wraps(func)
-    def wrapped(*args, **kwargs):
+    def memoized_func(*args, **kwargs):
         key = pickle.dumps((args, kwargs))
         if key not in cache:
             cache[key] = func(*args, **kwargs)
         return cache[key]
 
-    return wrapped
+    return memoized_func
 
 
 def dump(value, filename, compress=0, protocol=None, cache_size=None):

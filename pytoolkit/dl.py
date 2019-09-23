@@ -15,17 +15,17 @@ from . import K
 def wrap_session(config=None, gpu_options=None, use_horovod=False):
     """session()のデコレーター版。"""
 
-    def _decorator(func):
+    def decorator(func):
         @functools.wraps(func)
-        def _decorated_func(*args, **kwargs):
+        def session_func(*args, **kwargs):
             with session(
                 config=config, gpu_options=gpu_options, use_horovod=use_horovod
             ):
                 return func(*args, **kwargs)
 
-        return _decorated_func
+        return session_func
 
-    return _decorator
+    return decorator
 
 
 def session(config=None, gpu_options=None, use_horovod=False):

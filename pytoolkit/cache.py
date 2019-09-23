@@ -17,9 +17,9 @@ def memorize(cache_dir, compress=0, verbose=True):
     """
     cache_dir = pathlib.Path(cache_dir)
 
-    def _decorator(func):
+    def decorator(func):
         @functools.wraps(func)
-        def _decorated_func(*args, force_rerun=False, **kwargs):
+        def memorized_func(*args, force_rerun=False, **kwargs):
             cache_path = get_cache_path(cache_dir, func, args, kwargs)
             # キャッシュがあれば読む
             if not force_rerun:
@@ -41,9 +41,9 @@ def memorize(cache_dir, compress=0, verbose=True):
             tk.hvd.barrier()
             return result
 
-        return _decorated_func
+        return memorized_func
 
-    return _decorator
+    return decorator
 
 
 def get_cache_path(cache_dir, func, args, kwargs):
