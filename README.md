@@ -31,12 +31,14 @@ cookiecutter gh:ak110/cookiecutter-pytoolkit
 ## 使うときに動的にimportしている依存ライブラリ
 
 - better-exceptions
+- catboost
 - category_encoders
 - chainercv
 - diskcache
 - h5py
 - horovod
 - ipython
+- lightgbm
 - matplotlib
 - mpi4py
 - onnxmltools
@@ -44,4 +46,6 @@ cookiecutter gh:ak110/cookiecutter-pytoolkit
 - pydensecrf
 - python-dotenv
 - requests
+- tf2onnx
 - tqdm
+- xgboost

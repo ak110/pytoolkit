@@ -140,7 +140,7 @@ class KerasModel(Model):
             metrics[k] = metric_func
 
         model = keras.models.Model(inputs=inputs + targets, outputs=outputs)
-        model.compile(self.models[0].optimizer, loss, [m for m in metrics.values()])
+        model.compile(self.models[0].optimizer, loss, list(metrics.values()))
         tk.models.summary(model)
 
         def generator(datasets, data_loader):

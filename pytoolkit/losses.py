@@ -8,15 +8,19 @@ import pytoolkit as tk
 from . import K
 
 
-def reduce(x, mode="sum"):
+def reduce(x, reduce_mode):
     """バッチ次元だけ残して次元を削減する。"""
+    if reduce_mode is None:
+        return x
     axes = list(range(1, K.ndim(x)))
     if len(axes) <= 0:
         return x
-    return {"sum": K.sum, "mean": K.mean}[mode](x, axis=axes)
+    return {"sum": K.sum, "mean": K.mean}[reduce_mode](x, axis=axes)
 
 
-def binary_crossentropy(y_true, y_pred, from_logits=False, alpha=None):
+def binary_crossentropy(
+    y_true, y_pred, from_logits=False, alpha=None, reduce_mode="sum"
+):
     """クラス間のバランス補正ありのbinary_crossentropy。
 
     Args:
@@ -26,10 +30,12 @@ def binary_crossentropy(y_true, y_pred, from_logits=False, alpha=None):
     loss = tk.backend.binary_crossentropy(
         y_true, y_pred, from_logits=from_logits, alpha=alpha
     )
-    return reduce(loss)
+    return reduce(loss, reduce_mode)
 
 
-def binary_focal_loss(y_true, y_pred, gamma=2.0, from_logits=False, alpha=None):
+def binary_focal_loss(
+    y_true, y_pred, gamma=2.0, from_logits=False, alpha=None, reduce_mode="sum"
+):
     """2クラス分類用Focal Loss <https://arxiv.org/abs/1708.02002>。
 
     Args:
@@ -39,7 +45,7 @@ def binary_focal_loss(y_true, y_pred, gamma=2.0, from_logits=False, alpha=None):
     loss = tk.backend.binary_focal_loss(
         y_true, y_pred, gamma=gamma, from_logits=from_logits, alpha=alpha
     )
-    return reduce(loss)
+    return reduce(loss, reduce_mode)
 
 
 def categorical_crossentropy(
@@ -49,6 +55,7 @@ def categorical_crossentropy(
     alpha=None,
     class_weights=None,
     label_smoothing=None,
+    reduce_mode="sum",
 ):
     """クラス間のバランス補正ありのcategorical_crossentropy。
 
@@ -85,10 +92,10 @@ def categorical_crossentropy(
         kl = -K.mean(log_p, axis=-1)
         loss = (1 - label_smoothing) * loss + label_smoothing * kl
 
-    return reduce(loss)
+    return reduce(loss, reduce_mode)
 
 
-def categorical_focal_loss(y_true, y_pred, gamma=2.0, alpha=None):
+def categorical_focal_loss(y_true, y_pred, gamma=2.0, alpha=None, reduce_mode="sum"):
     """多クラス分類用Focal Loss <https://arxiv.org/abs/1708.02002>。
 
     Args:
@@ -105,7 +112,7 @@ def categorical_focal_loss(y_true, y_pred, gamma=2.0, alpha=None):
 
     y_pred = K.maximum(y_pred, K.epsilon())
     loss = -cw * K.pow(1 - y_pred, gamma) * y_true * K.log(y_pred)
-    return reduce(loss)
+    return reduce(loss, reduce_mode)
 
 
 def symmetric_lovasz_hinge(
@@ -224,21 +231,21 @@ def l1_smooth_loss(y_true, y_pred):
     return l1_loss
 
 
-def mse(y_true, y_pred):
+def mse(y_true, y_pred, reduce_mode="mean"):
     """mean squared error。"""
-    return reduce(K.square(y_pred - y_true), mode="mean")
+    return reduce(K.square(y_pred - y_true), reduce_mode)
 
 
-def mae(y_true, y_pred):
+def mae(y_true, y_pred, reduce_mode="mean"):
     """mean absolute error。"""
-    return reduce(K.abs(y_pred - y_true), mode="mean")
+    return reduce(K.abs(y_pred - y_true), reduce_mode)
 
 
-def rmse(y_true, y_pred):
+def rmse(y_true, y_pred, reduce_mode="mean"):
     """root mean squared error。"""
-    return K.sqrt(reduce(K.square(y_pred - y_true), mode="mean"))
+    return K.sqrt(reduce(K.square(y_pred - y_true), reduce_mode))
 
 
-def mape(y_true, y_pred):
+def mape(y_true, y_pred, reduce_mode="mean"):
     """mean absolute percentage error。"""
-    return reduce(K.abs((y_true - y_pred) / y_true), mode="mean")
+    return reduce(K.abs((y_true - y_pred) / y_true), reduce_mode)

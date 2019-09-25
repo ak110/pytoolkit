@@ -20,7 +20,7 @@ def memorize(cache_dir, compress=0, verbose=True):
     def decorator(func):
         @functools.wraps(func)
         def memorized_func(*args, force_rerun=False, **kwargs):
-            cache_path = get_cache_path(cache_dir, func, args, kwargs)
+            cache_path = get_cache_path(cache_dir, func, args, kwargs, verbose)
             # キャッシュがあれば読む
             if not force_rerun:
                 if cache_path.is_file():
@@ -46,11 +46,13 @@ def memorize(cache_dir, compress=0, verbose=True):
     return decorator
 
 
-def get_cache_path(cache_dir, func, args, kwargs):
+def get_cache_path(cache_dir, func, args, kwargs, verbose):
     """キャッシュのパスを作って返す。"""
     bound_args = inspect.signature(func).bind(*args, **kwargs).arguments
     args_list = sorted(dict(bound_args).items())
     args_str = ",".join([f"{repr(k)}:{repr(v)}" for k, v in args_list])
     args_hash = hashlib.md5(args_str.encode("utf-8")).hexdigest()[:8]
+    if verbose:
+        tk.log.get(__name__).info(f"Cache {args_hash}: arguments={args_str}")
     cache_path = cache_dir / f"{func.__name__}_{args_hash}.pkl"
     return cache_path

@@ -20,10 +20,10 @@ disable=
     ,W0603
     # W1202:Use % formatting in logging functions and pass the % parameters as arguments
     ,W1202
-    # for black
     ,bad-continuation
     ,bare-except
     ,broad-except
+    ,import-outside-toplevel
     ,len-as-condition
     ,locally-disabled
     ,logging-fstring-interpolation

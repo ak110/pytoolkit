@@ -11,16 +11,15 @@ from . import K
 def binary_accuracy(y_true, y_pred):
     """Soft-targetとかでも一応それっぽい値を返すbinary accuracy。
 
-    y_true = 0 or 1 で y_pred = 0.5 のとき、BCEは np.log1p(np.exp(0)) になる。(0.693くらい)
+    y_true = 0 or 1 で y_pred = 0.5 のとき、BCEは np.log1p(1) になる。(0.693くらい)
     それ以下なら合ってることにする。
 
     <https://www.wolframalpha.com/input/?dataset=&i=-(y*log(x)%2B(1-y)*log(1-x))%3Dlog(exp(0)%2B1)>
 
     """
-    axes = list(range(1, K.ndim(y_true)))
-    bce = tk.backend.binary_crossentropy(y_true, y_pred)
-    th = np.log1p(np.exp(0))  # 0.6931471805599453
-    return K.mean(K.cast(bce < th, "float32"), axis=axes)
+    loss = tk.losses.binary_crossentropy(y_true, y_pred, reduce_mode=None)
+    th = np.log1p(1)  # 0.6931471805599453
+    return tk.losses.reduce(K.cast(loss < th, "float32"), reduce_mode="mean")
 
 
 def binary_iou(y_true, y_pred, target_classes=None, threshold=0.5):
@@ -101,6 +100,6 @@ def fbeta_score(y_true, y_pred, beta=1):
 recall = tpr
 
 # 長いので名前変えちゃう
-binary_accuracy.__name__ = "acc"
+binary_accuracy.__name__ = "safe_acc"
 binary_iou.__name__ = "iou"
 categorical_iou.__name__ = "iou"
