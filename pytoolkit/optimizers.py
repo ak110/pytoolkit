@@ -2,9 +2,8 @@
 # pylint: disable=no-name-in-module,attribute-defined-outside-init,invalid-unary-operand-type
 
 import tensorflow as tf
-from tensorflow.python.keras.optimizer_v2.optimizer_v2 import OptimizerV2
 
-from . import K
+K = tf.keras.backend
 
 
 def get_custom_objects():
@@ -13,7 +12,7 @@ def get_custom_objects():
     return {c.__name__: c for c in classes}
 
 
-class SAdam(OptimizerV2):
+class SAdam(tf.keras.optimizers.Optimizer):
     """色々混ぜてみたOptimizer。"""
 
     def __init__(

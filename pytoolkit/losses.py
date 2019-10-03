@@ -5,7 +5,7 @@ import tensorflow as tf
 
 import pytoolkit as tk
 
-from . import K
+K = tf.keras.backend
 
 
 def reduce(x, reduce_mode):

@@ -17,10 +17,9 @@ import typing
 
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 
 import pytoolkit as tk
-
-from . import keras
 
 
 @dataclasses.dataclass()
@@ -282,7 +281,7 @@ class DataLoader:
         return part
 
 
-class Iterator(keras.utils.Sequence, metaclass=abc.ABCMeta):
+class Iterator(tf.keras.utils.Sequence, metaclass=abc.ABCMeta):
     """データをモデルに渡すクラス。
 
     Args:

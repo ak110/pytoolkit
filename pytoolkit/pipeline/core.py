@@ -4,12 +4,11 @@ from __future__ import annotations
 import pathlib
 import typing
 
+import numpy as np
 import sklearn.base
 import sklearn.pipeline
-import numpy as np
 
 import pytoolkit as tk
-
 
 EstimatorListType = typing.Sequence[sklearn.base.BaseEstimator]
 

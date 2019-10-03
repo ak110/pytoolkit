@@ -9,7 +9,6 @@ import tensorflow as tf
 
 import pytoolkit as tk
 
-from .. import keras
 from .core import Model
 
 
@@ -38,7 +37,7 @@ class KerasModel(Model):
 
     def __init__(
         self,
-        create_model_fn: typing.Callable[[], tk.keras.models.Model],
+        create_model_fn: typing.Callable[[], tf.keras.models.Model],
         train_data_loader: tk.data.DataLoader,
         val_data_loader: tk.data.DataLoader,
         *,
@@ -46,7 +45,7 @@ class KerasModel(Model):
         model_name_format: str = "model.fold{fold}.h5",
         skip_if_exists: bool = True,
         fit_params: dict = None,
-        load_model_fn: typing.Callable[[pathlib.Path], tk.keras.models.Model] = None,
+        load_model_fn: typing.Callable[[pathlib.Path], tf.keras.models.Model] = None,
         use_horovod: bool = False,
         parallel_cv: bool = False,
         on_batch_fn: tk.models.OnBatchFnType = None,
@@ -65,7 +64,7 @@ class KerasModel(Model):
         self.use_horovod = use_horovod
         self.parallel_cv = parallel_cv
         self.on_batch_fn = on_batch_fn
-        self.models: typing.Optional[typing.List[tk.keras.models.Model]] = None
+        self.models: typing.Optional[typing.List[tf.keras.models.Model]] = None
 
     def _save(self, models_dir: pathlib.Path):
         assert models_dir == self.models_dir
@@ -107,11 +106,11 @@ class KerasModel(Model):
                 output_shape = [output_shape]
 
             model_inputs = [
-                keras.layers.Input(s[1:], name=f"model{i}_input{j}")
+                tf.keras.layers.Input(s[1:], name=f"model{i}_input{j}")
                 for j, s in enumerate(input_shape)
             ]
             model_targets = [
-                keras.layers.Input(s[1:], name=f"model{i}_target{j}")
+                tf.keras.layers.Input(s[1:], name=f"model{i}_target{j}")
                 for j, s in enumerate(output_shape)
             ]
             inputs.extend(model_inputs)
@@ -139,7 +138,7 @@ class KerasModel(Model):
             metric_func.__name__ = k
             metrics[k] = metric_func
 
-        model = keras.models.Model(inputs=inputs + targets, outputs=outputs)
+        model = tf.keras.models.Model(inputs=inputs + targets, outputs=outputs)
         model.compile(self.models[0].optimizer, loss, list(metrics.values()))
         tk.models.summary(model)
 

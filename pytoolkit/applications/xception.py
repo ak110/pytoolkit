@@ -1,7 +1,11 @@
 """Xception。"""
 import functools
 
-from .. import keras, K, ndimage, hvd
+import tensorflow as tf
+
+from .. import hvd, ndimage
+
+K = tf.keras.backend
 
 
 def xception(weights="imagenet", input_tensor=None, input_shape=None, for_small=False):
@@ -23,33 +27,34 @@ def xception(weights="imagenet", input_tensor=None, input_shape=None, for_small=
         assert input_tensor is not None
     else:
         assert input_tensor is None
-        input_tensor = keras.layers.Input(input_shape)
+        input_tensor = tf.keras.layers.Input(input_shape)
 
     conv2d = functools.partial(
-        keras.layers.Conv2D,
+        tf.keras.layers.Conv2D,
         kernel_size=3,
         padding="same",
         use_bias=False,
         kernel_initializer="he_uniform",
-        kernel_regularizer=keras.regularizers.l2(1e-4),
+        kernel_regularizer=tf.keras.regularizers.l2(1e-4),
     )
     sepconv2d = functools.partial(
-        keras.layers.SeparableConv2D,
+        tf.keras.layers.SeparableConv2D,
         kernel_size=3,
         padding="same",
         use_bias=False,
         kernel_initializer="he_uniform",
-        kernel_regularizer=keras.regularizers.l2(1e-4),
+        kernel_regularizer=tf.keras.regularizers.l2(1e-4),
     )
     bn = functools.partial(
-        keras.layers.BatchNormalization, gamma_regularizer=keras.regularizers.l2(1e-4)
+        tf.keras.layers.BatchNormalization,
+        gamma_regularizer=tf.keras.regularizers.l2(1e-4),
     )
-    act = functools.partial(keras.layers.Activation, "relu")
+    act = functools.partial(tf.keras.layers.Activation, "relu")
     mp = functools.partial(
-        keras.layers.MaxPooling2D, pool_size=3, strides=2, padding="same"
+        tf.keras.layers.MaxPooling2D, pool_size=3, strides=2, padding="same"
     )
     ap = functools.partial(
-        keras.layers.AveragePooling2D, pool_size=3, strides=2, padding="same"
+        tf.keras.layers.AveragePooling2D, pool_size=3, strides=2, padding="same"
     )
 
     first_strides = 1 if for_small else 2
@@ -71,7 +76,7 @@ def xception(weights="imagenet", input_tensor=None, input_shape=None, for_small=
     x = bn(name="block2_sepconv2_bn")(x)
 
     x = mp(name="block2_pool")(x)
-    x = keras.layers.add([x, residual], name="block2_add")
+    x = tf.keras.layers.add([x, residual], name="block2_add")
 
     residual = ap(pool_size=2, strides=1)(x)  # 怪しいアレンジ
     residual = conv2d(256, kernel_size=1, strides=2, name="block3_conv")(residual)
@@ -85,7 +90,7 @@ def xception(weights="imagenet", input_tensor=None, input_shape=None, for_small=
     x = bn(name="block3_sepconv2_bn")(x)
 
     x = mp(name="block3_pool")(x)
-    x = keras.layers.add([x, residual], name="block3_add")
+    x = tf.keras.layers.add([x, residual], name="block3_add")
 
     residual = ap(pool_size=2, strides=1)(x)  # 怪しいアレンジ
     residual = conv2d(728, kernel_size=1, strides=2, name="block4_conv")(residual)
@@ -99,7 +104,7 @@ def xception(weights="imagenet", input_tensor=None, input_shape=None, for_small=
     x = bn(name="block4_sepconv2_bn")(x)
 
     x = mp(name="block4_pool")(x)
-    x = keras.layers.add([x, residual], name="block4_add")
+    x = tf.keras.layers.add([x, residual], name="block4_add")
 
     for i in range(8):
         residual = x
@@ -115,7 +120,7 @@ def xception(weights="imagenet", input_tensor=None, input_shape=None, for_small=
         x = sepconv2d(728, name=prefix + "_sepconv3")(x)
         x = bn(name=prefix + "_sepconv3_bn")(x)
 
-        x = keras.layers.add([x, residual], name=prefix + "_add")
+        x = tf.keras.layers.add([x, residual], name=prefix + "_add")
 
     residual = ap(pool_size=2, strides=1)(x)  # 怪しいアレンジ
     residual = conv2d(1024, kernel_size=1, strides=2, name="block13_conv")(residual)
@@ -129,7 +134,7 @@ def xception(weights="imagenet", input_tensor=None, input_shape=None, for_small=
     x = bn(name="block13_sepconv2_bn")(x)
 
     x = mp(name="block13_pool")(x)
-    x = keras.layers.add([x, residual], name="block13_add")
+    x = tf.keras.layers.add([x, residual], name="block13_add")
 
     x = sepconv2d(1536, name="block14_sepconv1")(x)
     x = bn(name="block14_sepconv1_bn")(x)
@@ -139,8 +144,8 @@ def xception(weights="imagenet", input_tensor=None, input_shape=None, for_small=
     x = bn(name="block14_sepconv2_bn")(x)
     x = act(name="block14_sepconv2_act")(x)
 
-    inputs = keras.utils.get_source_inputs(input_tensor)
-    model = keras.models.Model(inputs, x, name="xception")
+    inputs = tf.keras.utils.get_source_inputs(input_tensor)
+    model = tf.keras.models.Model(inputs, x, name="xception")
 
     if weights == "imagenet":
         weights_path = hvd.get_file(

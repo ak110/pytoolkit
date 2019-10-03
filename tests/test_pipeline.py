@@ -1,12 +1,11 @@
 import pathlib
 
 import numpy as np
-import pytest
+import tensorflow as tf
 
 import pytoolkit as tk
 
 
-@pytest.mark.usefixtures("session")
 def test_keras_xor(tmpdir):
     """XORを学習してみるコード。"""
     models_dir = pathlib.Path(str(tmpdir))
@@ -15,12 +14,12 @@ def test_keras_xor(tmpdir):
     train_set = tk.data.Dataset(X.repeat(4096, axis=0), y.repeat(4096, axis=0))
 
     def create_model():
-        inputs = x = tk.keras.layers.Input(shape=(2,))
-        x = tk.keras.layers.Dense(16, use_bias=False)(x)
-        x = tk.keras.layers.BatchNormalization()(x)
-        x = tk.layers.DropActivation()(x)
-        x = tk.keras.layers.Dense(1, activation="sigmoid")(x)
-        model = tk.keras.models.Model(inputs=inputs, outputs=x)
+        inputs = x = tf.keras.layers.Input(shape=(2,))
+        x = tf.keras.layers.Dense(16, use_bias=False)(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Activation("relu")(x)
+        x = tf.keras.layers.Dense(1, activation="sigmoid")(x)
+        model = tf.keras.models.Model(inputs=inputs, outputs=x)
         tk.models.compile(
             model, "adam", "binary_crossentropy", [tk.metrics.binary_accuracy]
         )

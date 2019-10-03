@@ -5,17 +5,13 @@ import tensorflow as tf
 
 import pytoolkit as tk
 
-from . import keras
-
 _initialized = False
 
 
 def get():
-    """horovod.kerasモジュールを返す。"""
-    if keras == tf.keras:
-        import horovod.tensorflow.keras as hvd
-    else:
-        import horovod.keras as hvd
+    """horovod.tf.kerasモジュールを返す。"""
+    import horovod.tensorflow.keras as hvd
+
     return hvd
 
 
@@ -25,6 +21,13 @@ def init() -> None:
     if not _initialized:
         try:
             get().init()
+            gpus = tf.config.experimental.list_physical_devices("GPU")
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+            if gpus:
+                tf.config.experimental.set_visible_devices(
+                    gpus[get().local_rank()], "GPU"
+                )
             _initialized = True
         except ImportError:
             tk.log.get(__name__).warning("Horovod読み込み失敗", exc_info=True)
@@ -97,11 +100,11 @@ def bcast(buf, root=0):
 
 
 def get_file(name, url, **kwargs) -> str:
-    """local_masterだけkeras.utils.get_fileを呼び出す。"""
+    """local_masterだけtf.keras.utils.get_fileを呼び出す。"""
     if is_local_master():
-        keras.utils.get_file(name, url, **kwargs)
+        tf.keras.utils.get_file(name, url, **kwargs)
     barrier()
-    return keras.utils.get_file(name, url, **kwargs)
+    return tf.keras.utils.get_file(name, url, **kwargs)
 
 
 def split(dataset: tk.data.Dataset) -> tk.data.Dataset:

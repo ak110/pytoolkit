@@ -2,8 +2,9 @@
 
 import cv2
 import numpy as np
+import tensorflow as tf
 
-from . import K, keras
+K = tf.keras.backend
 
 
 class GradCamVisualizer:
@@ -17,9 +18,12 @@ class GradCamVisualizer:
     """
 
     def __init__(
-        self, model: keras.models.Model, output_index: int, pooling_class: type = None
+        self,
+        model: tf.keras.models.Model,
+        output_index: int,
+        pooling_class: type = None,
     ):
-        pooling_class = pooling_class or keras.layers.GlobalAveragePooling2D
+        pooling_class = pooling_class or tf.keras.layers.GlobalAveragePooling2D
         # pooling_classへの入力テンソルを取得
         map_output = None
         for layer in model.layers[::-1]:

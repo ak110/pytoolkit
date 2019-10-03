@@ -209,7 +209,7 @@ class RandomColorAugmentors(RandomCompose):
                     GaussNoise(p=0.125),
                     SpeckleNoise(p=0.125),
                     A.ISONoise(color_shift=(0, 0.05), intensity=(0, 0.5), p=0.125),
-                    A.JpegCompression(quality_lower=50, quality_upper=100, p=0.125),
+                    A.ImageCompression(quality_lower=50, quality_upper=100, p=0.125),
                 ]
             )
         super().__init__(argumentors, p=p)
@@ -540,7 +540,7 @@ class SpeckleNoise(A.ImageOnlyTransform):
     """Speckle noise。
 
     References:
-        - <https://github.com/keras-team/keras/blob/master/examples/image_ocr.py#L81>
+        - <https://github.com/tf.keras-team/tf.keras/blob/master/examples/image_ocr.py#L81>
 
     """
 

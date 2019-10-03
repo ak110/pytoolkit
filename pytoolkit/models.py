@@ -8,7 +8,6 @@ Horovodに対応した簡単なwrapperなど。
 from __future__ import annotations
 
 import pathlib
-import shutil
 import typing
 
 import numpy as np
@@ -16,14 +15,12 @@ import tensorflow as tf
 
 import pytoolkit as tk
 
-from . import keras
-
 # モデルの入出力の型
 ModelIOType = typing.Union[
     np.ndarray, typing.List[np.ndarray], typing.Dict[str, np.ndarray]
 ]
 # predictで使う型
-OnBatchFnType = typing.Callable[[keras.models.Model, ModelIOType], ModelIOType]
+OnBatchFnType = typing.Callable[[tf.keras.models.Model, ModelIOType], ModelIOType]
 
 
 def load(
@@ -39,19 +36,19 @@ def load(
         custom_objects.update(tk.get_custom_objects())
         if gpus is not None and gpus > 1:
             with tf.device("/cpu:0"):
-                model = keras.models.load_model(
+                model = tf.keras.models.load_model(
                     str(path), custom_objects=custom_objects, compile=compile
                 )
             model, _ = multi_gpu_model(model, batch_size=0, gpus=gpus)
         else:
-            model = keras.models.load_model(
+            model = tf.keras.models.load_model(
                 str(path), custom_objects=custom_objects, compile=compile
             )
     return model
 
 
 def load_weights(
-    model: keras.models.Model,
+    model: tf.keras.models.Model,
     path: tk.typing.PathLike,
     by_name: bool = False,
     skip_not_exist: bool = False,
@@ -68,7 +65,7 @@ def load_weights(
 
 
 def save(
-    model: keras.models.Model,
+    model: tf.keras.models.Model,
     path: tk.typing.PathLike,
     mode: str = "hdf5",
     include_optimizer: bool = False,
@@ -87,46 +84,22 @@ def save(
     if tk.hvd.is_master():
         with tk.log.trace_scope(f"save({path})"):
             path.parent.mkdir(parents=True, exist_ok=True)
-            if mode == "hdf5":
-                model.save(str(path), include_optimizer=include_optimizer)
-            elif mode == "saved_model":
-                if path.is_dir():
-                    shutil.rmtree(path)
-                tk.log.get(__name__).info(
-                    f"inpus={model.inputs} outputs={model.outputs}"
-                )
-                tf.saved_model.simple_save(
-                    keras.backend.get_session(),
+            if mode in ("hdf5", "saved_model"):
+                model.save(
                     str(path),
-                    inputs={x.name: x for x in model.inputs},
-                    outputs={x.name: x for x in model.outputs},
+                    overwrite=True,
+                    include_optimizer=include_optimizer,
+                    save_format={"hdf5": "h5", "saved_model": "tf"}[mode],
                 )
             elif mode == "onnx":
                 import onnxmltools
-                import tf2onnx
+                import keras2onnx
 
-                input_names = [x.name for x in model.inputs]
-                output_names = [x.name for x in model.outputs]
-                tk.log.get(__name__).info(
-                    f"input_names={input_names} output_names={output_names}"
-                )
-                onnx_graph = tf2onnx.tfonnx.process_tf_graph(
-                    keras.backend.get_session().graph,
-                    input_names=input_names,
-                    output_names=output_names,
-                )
-                onnx_model = onnx_graph.make_model("test")
+                onnx_model = keras2onnx.convert_keras(model, model.name)
                 path.parent.mkdir(parents=True, exist_ok=True)
                 onnxmltools.utils.save_model(onnx_model, str(path))
             elif mode == "tflite":
-                tk.log.get(__name__).info(
-                    f"inpus={model.inputs} outputs={model.outputs}"
-                )
-                tflite_model = tf.lite.TFLiteConverter.from_session(
-                    keras.backend.get_session(),
-                    input_tensors=model.inputs,
-                    output_tensors=model.outputs,
-                ).convert()
+                tflite_model = tf.lite.TFLiteConverter.from_keras_model(model).convert()
                 path.parent.mkdir(parents=True, exist_ok=True)
                 with path.open("wb") as f:
                     f.write(tflite_model)
@@ -135,7 +108,7 @@ def save(
     tk.hvd.barrier()
 
 
-def summary(model: keras.models.Model):
+def summary(model: tf.keras.models.Model):
     """summaryを実行するだけ。"""
     model.summary(
         print_fn=tk.log.get(__name__).info if tk.hvd.is_master() else lambda x: None
@@ -143,7 +116,7 @@ def summary(model: keras.models.Model):
 
 
 def plot(
-    model: keras.models.Model,
+    model: tf.keras.models.Model,
     to_file: tk.typing.PathLike = "model.svg",
     show_shapes: bool = True,
     show_layer_names: bool = True,
@@ -154,7 +127,7 @@ def plot(
     if tk.hvd.is_master():
         with tk.log.trace_scope(f"plot({path})"):
             path.parent.mkdir(parents=True, exist_ok=True)
-            keras.utils.plot_model(
+            tf.keras.utils.plot_model(
                 model,
                 str(path),
                 show_shapes=show_shapes,
@@ -165,12 +138,12 @@ def plot(
 
 
 def compile(
-    model: keras.models.Model, optimizer, loss, metrics=None, loss_weights=None
+    model: tf.keras.models.Model, optimizer, loss, metrics=None, loss_weights=None
 ):  # pylint: disable=redefined-builtin
     """compileするだけ。"""
     with tk.log.trace_scope("compile"):
         if tk.hvd.initialized():
-            optimizer = keras.optimizers.get(optimizer)
+            optimizer = tf.keras.optimizers.get(optimizer)
             optimizer = tk.hvd.get().DistributedOptimizer(
                 optimizer, compression=tk.hvd.get().Compression.fp16
             )
@@ -178,7 +151,7 @@ def compile(
 
 
 def fit(
-    model: keras.models.Model,
+    model: tf.keras.models.Model,
     train_set: tk.data.Dataset,
     train_data_loader: tk.data.DataLoader,
     val_set: tk.data.Dataset = None,
@@ -293,7 +266,7 @@ def make_callbacks(callbacks):
 
 
 def predict(
-    model: keras.models.Model,
+    model: tf.keras.models.Model,
     dataset: tk.data.Dataset,
     data_loader: tk.data.DataLoader,
     verbose: int = 1,
@@ -332,7 +305,7 @@ def predict(
 
 
 def predict_flow(
-    model: keras.models.Model,
+    model: tf.keras.models.Model,
     dataset: tk.data.Dataset,
     data_loader: tk.data.DataLoader,
     verbose: int = 1,
@@ -368,12 +341,12 @@ def _predict_flow(model, iterator, verbose, on_batch_fn, desc):
         yield from pred_batch
 
 
-def _predict_on_batch(model: keras.models.Model, X):
+def _predict_on_batch(model: tf.keras.models.Model, X):
     return model.predict_on_batch(X)
 
 
 def evaluate(
-    model: keras.models.Model,
+    model: tf.keras.models.Model,
     dataset: tk.data.Dataset,
     data_loader: tk.data.DataLoader,
     verbose: int = 1,
@@ -407,13 +380,13 @@ def evaluate(
 
 
 def multi_gpu_model(
-    model: keras.models.Model, batch_size: int, gpus: int = None
-) -> keras.models.Model:
+    model: tf.keras.models.Model, batch_size: int, gpus: int = None
+) -> tf.keras.models.Model:
     """複数GPUでデータ並列するモデルを作成する。
 
     References:
-        - <https://github.com/fchollet/keras/issues/2436>
-        - <https://github.com/kuza55/keras-extras/blob/master/utils/multi_gpu.py>
+        - <https://github.com/fchollet/tf.keras/issues/2436>
+        - <https://github.com/kuza55/tf.keras-extras/blob/master/utils/multi_gpu.py>
 
     """
     if gpus is None:
@@ -426,10 +399,10 @@ def multi_gpu_model(
     assert isinstance(model.outputs, list)
 
     with tk.log.trace_scope("multi_gpu_model"):
-        parallel_model = keras.utils.multi_gpu_model(model, gpus)
+        parallel_model = tf.keras.utils.multi_gpu_model(model, gpus)
 
         # Model.saveの置き換え
-        # https://github.com/fchollet/keras/issues/2436#issuecomment-294243024
+        # https://github.com/fchollet/tf.keras/issues/2436#issuecomment-294243024
         def _save(self_, *args, **kargs):
             assert self_ is not None  # noqa
             model.save(*args, **kargs)

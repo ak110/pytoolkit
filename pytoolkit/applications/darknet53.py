@@ -1,6 +1,8 @@
 """Darknet53。"""
 
-from .. import keras, hvd
+import tensorflow as tf
+
+from .. import hvd
 
 
 def darknet53(input_shape=None, input_tensor=None, weights="imagenet", for_small=False):
@@ -19,12 +21,12 @@ def darknet53(input_shape=None, input_tensor=None, weights="imagenet", for_small
         assert input_tensor is not None
     else:
         assert input_tensor is None
-        input_tensor = keras.layers.Input(input_shape)
+        input_tensor = tf.keras.layers.Input(input_shape)
     assert weights in (None, "imagenet")
 
     x = darknet_body(input_tensor, for_small=for_small)
-    inputs = keras.utils.get_source_inputs(input_tensor)
-    model = keras.models.Model(inputs, x, name="darknet53")
+    inputs = tf.keras.utils.get_source_inputs(input_tensor)
+    model = tf.keras.models.Model(inputs, x, name="darknet53")
 
     if weights == "imagenet":
         weights_path = hvd.get_file(
@@ -54,7 +56,7 @@ def darknet_body(x, for_small=False):
 def darknet_resblocks(x, num_filters, num_blocks, block_index, downsampling=True):
     """Darknet53用Residual blocks"""
     if downsampling:
-        x = keras.layers.ZeroPadding2D(
+        x = tf.keras.layers.ZeroPadding2D(
             ((1, 0), (1, 0)), name=f"block{block_index}_pad"
         )(x)
         x = darknet_conv_bn_act(
@@ -70,7 +72,7 @@ def darknet_resblocks(x, num_filters, num_blocks, block_index, downsampling=True
         x = darknet_conv_bn_act(
             num_filters // 1, 3, name=f"block{block_index + i}_conv2"
         )(x)
-        x = keras.layers.add([sc, x], name=f"block{block_index + i}_add")
+        x = tf.keras.layers.add([sc, x], name=f"block{block_index + i}_add")
     return x
 
 
@@ -78,17 +80,17 @@ def darknet_conv_bn_act(filters, kernel_size, name, strides=1, padding="same"):
     """Darknet53用Conv2D+BN+Activation"""
 
     def _container(x):
-        x = keras.layers.Conv2D(
+        x = tf.keras.layers.Conv2D(
             filters,
             kernel_size,
             strides=strides,
             padding=padding,
             use_bias=False,
-            kernel_regularizer=keras.regularizers.l2(1e-4),  # オリジナルは5e-4
+            kernel_regularizer=tf.keras.regularizers.l2(1e-4),  # オリジナルは5e-4
             name=name,
         )(x)
-        x = keras.layers.BatchNormalization(name=f"{name}_bn")(x)
-        x = keras.layers.LeakyReLU(alpha=0.1, name=f"{name}_act")(x)
+        x = tf.keras.layers.BatchNormalization(name=f"{name}_bn")(x)
+        x = tf.keras.layers.LeakyReLU(alpha=0.1, name=f"{name}_act")(x)
         return x
 
     return _container

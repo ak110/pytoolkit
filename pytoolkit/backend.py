@@ -1,9 +1,9 @@
-"""keras.backendやtensorflowの基礎的な関数など。"""
+"""tf.keras.backendやtensorflowの基礎的な関数など。"""
 
 import numpy as np
 import tensorflow as tf
 
-from . import K
+K = tf.keras.backend
 
 
 def clip64(x, epsilon=1e-7):

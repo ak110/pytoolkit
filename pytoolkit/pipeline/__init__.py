@@ -3,7 +3,7 @@
 
 from .cb import *
 from .core import *
-from .keras import *
 from .lgb import *
 from .sklearn import *
+from .keras import *
 from .xgb import *

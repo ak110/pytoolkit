@@ -1,5 +1,5 @@
 [MASTER]
-ignore=docs,tests
+#ignore=docs,tests
 extension-pkg-whitelist=numpy,cv2
 
 [MESSAGES CONTROL]

@@ -4,13 +4,14 @@ import pathlib
 import time
 
 import numpy as np
+import tensorflow as tf
 
 import pytoolkit as tk
 
-from . import K, keras
+K = tf.keras.backend
 
 
-class LearningRateStepDecay(keras.callbacks.Callback):
+class LearningRateStepDecay(tf.keras.callbacks.Callback):
     """よくある150epoch目と225epoch目に学習率を1/10するコールバック。"""
 
     def __init__(self, reduce_epoch_rates=(0.5, 0.75), factor=0.1, epochs=None):
@@ -31,6 +32,7 @@ class LearningRateStepDecay(keras.callbacks.Callback):
         ]
 
     def on_epoch_begin(self, epoch, logs=None):
+        del logs
         if epoch + 1 in self.reduce_epochs:
             lr1 = K.get_value(self.model.optimizer.lr)
             lr2 = lr1 * self.factor
@@ -40,11 +42,12 @@ class LearningRateStepDecay(keras.callbacks.Callback):
             )
 
     def on_train_end(self, logs=None):
+        del logs
         # 終わったら戻しておく
         K.set_value(self.model.optimizer.lr, self.start_lr)
 
 
-class CosineAnnealing(keras.callbacks.Callback):
+class CosineAnnealing(tf.keras.callbacks.Callback):
     """Cosine Annealing without restart。
 
     References:
@@ -61,11 +64,13 @@ class CosineAnnealing(keras.callbacks.Callback):
         self.start_lr = None
 
     def on_train_begin(self, logs=None):
+        del logs
         if not hasattr(self.model.optimizer, "lr"):
             raise ValueError('Optimizer must have a "lr" attribute.')
         self.start_lr = float(K.get_value(self.model.optimizer.lr))
 
     def on_epoch_begin(self, epoch, logs=None):
+        del logs
         lr_max = self.start_lr
         lr_min = self.start_lr * self.factor
         if epoch + 1 < self.warmup_epochs:
@@ -76,11 +81,12 @@ class CosineAnnealing(keras.callbacks.Callback):
         K.set_value(self.model.optimizer.lr, float(lr))
 
     def on_train_end(self, logs=None):
+        del logs
         # 終わったら戻しておく
         K.set_value(self.model.optimizer.lr, self.start_lr)
 
 
-class TSVLogger(keras.callbacks.Callback):
+class TSVLogger(tf.keras.callbacks.Callback):
     """ログを保存するコールバック。Horovod使用時はrank() == 0のみ有効。
 
     Args:
@@ -99,6 +105,7 @@ class TSVLogger(keras.callbacks.Callback):
         self.epoch_start_time = None
 
     def on_train_begin(self, logs=None):
+        del logs
         if self.enabled:
             self.filename.parent.mkdir(parents=True, exist_ok=True)
             self.log_file = self.filename.open(
@@ -115,6 +122,7 @@ class TSVLogger(keras.callbacks.Callback):
             self.log_writer = None
 
     def on_epoch_begin(self, epoch, logs=None):
+        del epoch, logs
         self.epoch_start_time = time.time()
 
     def on_epoch_end(self, epoch, logs=None):
@@ -140,12 +148,13 @@ class TSVLogger(keras.callbacks.Callback):
             self.log_file.flush()
 
     def on_train_end(self, logs=None):
+        del logs
         if self.log_file is not None:
             self.log_file.close()
         self.append = True  # 同じインスタンスの再利用時は自動的に追記にする
 
 
-class EpochLogger(keras.callbacks.Callback):
+class EpochLogger(tf.keras.callbacks.Callback):
     """DEBUGログを色々出力するcallback。Horovod使用時はrank() == 0のみ有効。"""
 
     def __init__(self, enabled=None):
@@ -155,9 +164,11 @@ class EpochLogger(keras.callbacks.Callback):
         self.epoch_start_time = None
 
     def on_train_begin(self, logs=None):
+        del logs
         self.train_start_time = time.time()
 
     def on_epoch_begin(self, epoch, logs=None):
+        del epoch, logs
         self.epoch_start_time = time.time()
 
     def on_epoch_end(self, epoch, logs=None):
@@ -177,7 +188,7 @@ class EpochLogger(keras.callbacks.Callback):
             )
 
 
-class Checkpoint(keras.callbacks.Callback):
+class Checkpoint(tf.keras.callbacks.Callback):
     """学習中に定期的に保存する。
 
     速度重視でinclude_optimizerはFalse固定。
@@ -195,38 +206,23 @@ class Checkpoint(keras.callbacks.Callback):
         self.target_epochs = {}
 
     def on_train_begin(self, logs=None):
+        del logs
         s = self.checkpoints + 1
         self.target_epochs = {self.params["epochs"] * (i + 1) // s for i in range(s)}
 
     def on_epoch_begin(self, epoch, logs=None):
+        del logs
         if epoch in self.target_epochs:
             if tk.hvd.is_master():
                 tk.log.get(__name__).info(
                     f"Epoch {epoch}: Saving model to {self.checkpoint_path}"
                 )
-                # 保存の真っ最中に死んだときに大丈夫なように少し気を使った処理をする。
-                # 一度.tmpに保存してから元のを.bkにリネームして.tmpを外して.bkを削除。
                 self.checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
-                temp_path = self.checkpoint_path.parent / (
-                    self.checkpoint_path.name + ".tmp"
-                )
-                backup_path = self.checkpoint_path.parent / (
-                    self.checkpoint_path.name + ".bk"
-                )
-                if temp_path.exists():
-                    temp_path.unlink()
-                if backup_path.exists():
-                    backup_path.unlink()
-                self.model.save(str(temp_path), include_optimizer=False)
-                if self.checkpoint_path.exists():
-                    self.checkpoint_path.rename(backup_path)
-                temp_path.rename(self.checkpoint_path)
-                if backup_path.exists():
-                    backup_path.unlink()
+                self.model.save(str(self.checkpoint_path))
             tk.hvd.barrier()
 
 
-class ErrorOnNaN(keras.callbacks.Callback):
+class ErrorOnNaN(tf.keras.callbacks.Callback):
     """NaNやinfで異常終了させる。"""
 
     def on_batch_end(self, batch, logs=None):

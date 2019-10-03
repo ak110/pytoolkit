@@ -11,7 +11,7 @@ import pathlib
 
 import numpy as np
 
-from .. import od, ndimage, utils
+from .. import ndimage, od, utils
 
 
 def load_od(coco_dir, year=2017):

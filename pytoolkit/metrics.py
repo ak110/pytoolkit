@@ -5,7 +5,7 @@ import tensorflow as tf
 
 import pytoolkit as tk
 
-from . import K
+K = tf.keras.backend
 
 
 def binary_accuracy(y_true, y_pred):

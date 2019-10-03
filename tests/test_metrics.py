@@ -1,13 +1,14 @@
 import numpy as np
 import pytest
+import tensorflow as tf
 
 import pytoolkit as tk
 
-K = tk.K
+K = tf.keras.backend
 
 
-def test_binary_iou(session):
+def test_binary_iou():
     y_true = K.constant(np.array([[0.0, 0.0, 1.0, 1.0]]))
     y_pred = K.constant(np.array([[0.0, 0.9, 0.8, 0.0]]))
-    metric = session.run(tk.metrics.binary_iou(y_true, y_pred, threshold=0.8))
-    assert metric == pytest.approx(1 / 3)
+    metric = tk.metrics.binary_iou(y_true, y_pred, threshold=0.8)
+    assert metric.numpy() == pytest.approx(1 / 3)

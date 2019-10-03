@@ -8,8 +8,7 @@ diskcache
 flake8
 flake8-docstrings
 git+https://github.com/cocodataset/cocoapi.git#egg=pycocotools&subdirectory=PythonAPI
-h5py
-keras
+keras2onnx
 matplotlib
 mypy
 numba
@@ -25,6 +24,5 @@ requests
 scikit-image
 scikit-learn
 scipy
-tensorflow>=1.14.0
-tf2onnx
+tensorflow>=2.0.0
 tqdm

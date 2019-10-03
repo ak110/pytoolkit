@@ -101,7 +101,8 @@ def better_exceptions():
 
 def format_exc(color=False, safe=True) -> str:
     """例外をbetter_exceptionsで整形して返す。"""
-    return format_exception(*sys.exc_info(), color=color, safe=safe)
+    exc, value, tb = sys.exc_info()
+    return format_exception(exc, value, tb, color=color, safe=safe)
 
 
 def format_exception(exc, value, tb, color=False, safe=True) -> str:
