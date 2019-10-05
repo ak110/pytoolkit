@@ -62,6 +62,35 @@ class RandomRotate(A.DualTransform):
 class RandomTransform(A.DualTransform):
     """Flip, Scale, Resize, Rotateをまとめて処理。"""
 
+    @classmethod
+    def create_refine(
+        cls,
+        width,
+        height,
+        flip_h=True,
+        flip_v=False,
+        translate_h=0.0625,
+        translate_v=0.0625,
+        border_mode="edge",
+        always_apply=False,
+        p=1,
+    ):
+        """Refined Data Augmentation <https://arxiv.org/abs/1909.09148> 用の控えめバージョンを作成する。"""
+        return cls(
+            width=width,
+            height=height,
+            flip_h=flip_h,
+            flip_v=flip_v,
+            translate_h=translate_h,
+            translate_v=translate_v,
+            border_mode=border_mode,
+            scale_prob=0,
+            aspect_prob=0,
+            rotate_prob=0,
+            always_apply=always_apply,
+            p=p,
+        )
+
     def __init__(
         self,
         width,

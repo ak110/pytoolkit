@@ -142,12 +142,16 @@ def compile(
 ):  # pylint: disable=redefined-builtin
     """compileするだけ。"""
     with tk.log.trace_scope("compile"):
+        kwargs = {}
         if tk.hvd.initialized():
             optimizer = tf.keras.optimizers.get(optimizer)
             optimizer = tk.hvd.get().DistributedOptimizer(
                 optimizer, compression=tk.hvd.get().Compression.fp16
             )
-        model.compile(optimizer, loss, metrics, loss_weights=loss_weights)
+            # Horovod: Specify `experimental_run_tf_function=False` to ensure TensorFlow
+            # uses hvd.DistributedOptimizer() to compute gradients.
+            kwargs["experimental_run_tf_function"] = False
+        model.compile(optimizer, loss, metrics, loss_weights=loss_weights, **kwargs)
 
 
 def fit(

@@ -6,7 +6,6 @@ sample: 学習時に使用する1件のデータ (1件以上のdataから作ら�
 batch: sampleのバッチサイズ個の集合
 
 """
-# pylint: disable=unsubscriptable-object
 from __future__ import annotations
 
 import abc

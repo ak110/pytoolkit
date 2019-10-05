@@ -21,6 +21,7 @@ class KerasModel(Model):
         create_model_fn: モデルを作成する関数。
         train_data_loader: 訓練データの読み込み
         val_data_loader: 検証データの読み込み
+        refine_data_loader: Refined Data Augmentation <https://arxiv.org/abs/1909.09148> 用
         models_dir: 保存先ディレクトリ
         model_name_format: モデルのファイル名のフォーマット。{fold}のところに数字が入る。
         skip_if_exists: モデルが存在してもスキップせず再学習するならFalse。
@@ -31,7 +32,8 @@ class KerasModel(Model):
 
     model_name_formatに"{fold}"が含まれない名前を指定した場合、
     cvではなくtrainを使うモードということにする。
-    このときtrainを何度読んでも同じモデルを使ったりする。
+
+    事前にself.modelsにモデルがある状態でcvやfitを呼んだ場合は追加学習ということにする。
 
     """
 
@@ -40,6 +42,7 @@ class KerasModel(Model):
         create_model_fn: typing.Callable[[], tf.keras.models.Model],
         train_data_loader: tk.data.DataLoader,
         val_data_loader: tk.data.DataLoader,
+        refine_data_loader: tk.data.DataLoader = None,
         *,
         models_dir: tk.typing.PathLike,
         model_name_format: str = "model.fold{fold}.h5",
@@ -56,6 +59,7 @@ class KerasModel(Model):
         self.create_model_fn = create_model_fn
         self.train_data_loader = train_data_loader
         self.val_data_loader = val_data_loader
+        self.refine_data_loader = refine_data_loader
         self.models_dir = pathlib.Path(models_dir)
         self.model_name_format = model_name_format
         self.skip_if_exists = skip_if_exists
@@ -65,6 +69,8 @@ class KerasModel(Model):
         self.parallel_cv = parallel_cv
         self.on_batch_fn = on_batch_fn
         self.models: typing.Optional[typing.List[tf.keras.models.Model]] = None
+        if self.parallel_cv:
+            assert self.refine_data_loader is None, "NotImplemented"
 
     def _save(self, models_dir: pathlib.Path):
         assert models_dir == self.models_dir
@@ -194,7 +200,6 @@ class KerasModel(Model):
         return scores
 
     def _serial_cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType):
-        self.models = []
         score_list = []
         score_weights = []
         for fold, (train_indices, val_indices) in enumerate(folds):
@@ -275,15 +280,19 @@ class KerasModel(Model):
         """
         # pylint: disable=function-redefined
         # 学習
-        if "{fold}" not in self.model_name_format and self.models is not None:
-            assert len(self.models) == 1
-            model = self.models[0]
+        if self.models is not None and len(self.models) > _fold:
+            model = self.models[_fold]
         else:
             model = self.create_model_fn()
         tk.log.get(__name__).info(
             f"train: {len(train_set)} samples, val: {len(val_set) if val_set is not None else 0} samples, batch_size: {self.train_data_loader.batch_size}x{tk.hvd.size()}"
         )
         tk.hvd.barrier()
+
+        if self.refine_data_loader is not None:
+            base_lr = tf.keras.backend.get_value(model.optimizer.lr)
+
+        # fit
         tk.models.fit(
             model,
             train_set=train_set,
@@ -292,14 +301,27 @@ class KerasModel(Model):
             val_data_loader=self.val_data_loader,
             **(self.fit_params or {}),
         )
+
+        # refine
+        if self.refine_data_loader is not None:
+            tf.keras.backend.set_value(model.optimizer.lr, base_lr / 100)
+            tk.models.fit(
+                model,
+                train_set=train_set,
+                train_data_loader=self.refine_data_loader,
+                val_set=val_set,
+                val_data_loader=self.val_data_loader,
+                epochs=50,
+            )
+
         model_path = self.models_dir / self.model_name_format.format(fold=_fold + 1)
         tk.models.save(model, model_path)
-        if "{fold}" not in self.model_name_format:
-            self.models = [model]
-        else:
-            if self.models is None:
-                self.models = []
-            self.models.append(model)
+        if self.models is None:
+            self.models = []
+        while len(self.models) <= _fold:
+            self.models.append(None)
+        self.models[_fold] = model
+
         # 訓練データと検証データの評価
         self.evaluate(train_set, prefix="")
         if val_set is None:
