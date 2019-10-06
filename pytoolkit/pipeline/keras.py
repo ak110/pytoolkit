@@ -46,7 +46,7 @@ class KerasModel(Model):
         *,
         models_dir: tk.typing.PathLike,
         model_name_format: str = "model.fold{fold}.h5",
-        skip_if_exists: bool = True,
+        skip_if_exists: bool = True,  # TODO: 実装
         fit_params: dict = None,
         load_model_fn: typing.Callable[[pathlib.Path], tf.keras.models.Model] = None,
         use_horovod: bool = False,
@@ -77,12 +77,19 @@ class KerasModel(Model):
 
     def _load(self, models_dir: pathlib.Path):
         assert models_dir == self.models_dir
-        load_model_fn = self.load_model_fn or tk.models.load
+
+        def load_model(path):
+            if self.load_model_fn:
+                return self.load_model_fn(path)
+            model = self.create_model_fn()
+            tk.models.load_weights(model, path)
+            return model
+
         self.models = []
         for fold in range(999):
             model_path = models_dir / self.model_name_format.format(fold=fold + 1)
             if model_path.exists():
-                self.models.append(load_model_fn(model_path))
+                self.models.append(load_model(model_path))
                 if "{fold}" not in self.model_name_format:
                     break
             else:
@@ -282,70 +289,76 @@ class KerasModel(Model):
         # 学習
         if self.models is not None and len(self.models) > _fold:
             model = self.models[_fold]
+            exists = True
         else:
             model = self.create_model_fn()
+            exists = False
         tk.log.get(__name__).info(
             f"train: {len(train_set)} samples, val: {len(val_set) if val_set is not None else 0} samples, batch_size: {self.train_data_loader.batch_size}x{tk.hvd.size()}"
         )
         tk.hvd.barrier()
 
-        if self.refine_data_loader is not None:
-            base_lr = tf.keras.backend.get_value(model.optimizer.lr)
+        if self.skip_if_exists and exists:
+            tk.log.get(__name__).info(f"Fold{_fold}: skip training.")
+        else:
+            if self.refine_data_loader is not None:
+                base_lr = tf.keras.backend.get_value(model.optimizer.lr)
 
-        # fit
-        tk.models.fit(
-            model,
-            train_set=train_set,
-            train_data_loader=self.train_data_loader,
-            val_set=val_set,
-            val_data_loader=self.val_data_loader,
-            **(self.fit_params or {}),
-        )
-
-        # refine
-        if self.refine_data_loader is not None:
-            tf.keras.backend.set_value(model.optimizer.lr, base_lr / 100)
+            # fit
             tk.models.fit(
                 model,
                 train_set=train_set,
-                train_data_loader=self.refine_data_loader,
+                train_data_loader=self.train_data_loader,
                 val_set=val_set,
                 val_data_loader=self.val_data_loader,
-                epochs=50,
+                **(self.fit_params or {}),
             )
 
-        model_path = self.models_dir / self.model_name_format.format(fold=_fold + 1)
-        tk.models.save(model, model_path)
-        if self.models is None:
-            self.models = []
-        while len(self.models) <= _fold:
-            self.models.append(None)
-        self.models[_fold] = model
+            # refine
+            if self.refine_data_loader is not None:
+                tf.keras.backend.set_value(model.optimizer.lr, base_lr / 100)
+                tk.models.fit(
+                    model,
+                    train_set=train_set,
+                    train_data_loader=self.refine_data_loader,
+                    val_set=val_set,
+                    val_data_loader=self.val_data_loader,
+                    epochs=50,
+                )
+
+            model_path = self.models_dir / self.model_name_format.format(fold=_fold + 1)
+            tk.models.save(model, model_path)
+            if self.models is None:
+                self.models = []
+            while len(self.models) <= _fold:
+                self.models.append(None)
+            self.models[_fold] = model
 
         # 訓練データと検証データの評価
-        self.evaluate(train_set, prefix="")
+        self.evaluate(train_set, prefix="", _fold=_fold)
         if val_set is None:
             return None
         return self.evaluate(val_set, prefix="val_")
 
     def evaluate(
-        self, dataset: tk.data.Dataset, prefix: str = ""
+        self, dataset: tk.data.Dataset, prefix: str = "", *, _fold: int = 0
     ) -> typing.Dict[str, float]:
         """評価して結果をINFOログ出力する。(KerasModel独自メソッド)
 
         Args:
             dataset: データ
             prefix: メトリクス名の接頭文字列。
+            _fold: 内部用。
 
         Returns:
             metricsの文字列と値のdict
 
         """
-        assert self.models is not None and len(self.models) == 1
+        assert self.models is not None
         assert self.preprocessors is None  # とりあえず未対応
         assert self.postprocessors is None  # とりあえず未対応
         evals = tk.models.evaluate(
-            self.models[0],
+            self.models[_fold],
             dataset,
             data_loader=self.val_data_loader,  # DataAugmentation無しで評価
             prefix=prefix,
