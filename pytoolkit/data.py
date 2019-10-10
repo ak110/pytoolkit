@@ -48,10 +48,11 @@ class Dataset:
         """データ件数を返す。"""
         return len(self.data)
 
-    def get_data(self, index: int) -> tuple:
+    def get_data(self, index: int) -> typing.Tuple[typing.Any, typing.Any]:
         """dataとlabelを返すだけの糖衣構文。"""
         if self.labels is None:
             return self.data[index], None
+        self.labels = typing.cast(np.ndarray, self.labels)
         return self.data[index], self.labels[index]
 
     def slice(self, rindex: typing.Sequence[int]) -> Dataset:

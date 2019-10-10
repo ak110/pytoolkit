@@ -35,7 +35,6 @@ def xception(weights="imagenet", input_tensor=None, input_shape=None, for_small=
         padding="same",
         use_bias=False,
         kernel_initializer="he_uniform",
-        kernel_regularizer=tf.keras.regularizers.l2(1e-4),
     )
     sepconv2d = functools.partial(
         tf.keras.layers.SeparableConv2D,
@@ -43,12 +42,8 @@ def xception(weights="imagenet", input_tensor=None, input_shape=None, for_small=
         padding="same",
         use_bias=False,
         kernel_initializer="he_uniform",
-        kernel_regularizer=tf.keras.regularizers.l2(1e-4),
     )
-    bn = functools.partial(
-        tf.keras.layers.BatchNormalization,
-        gamma_regularizer=tf.keras.regularizers.l2(1e-4),
-    )
+    bn = functools.partial(tf.keras.layers.BatchNormalization)
     act = functools.partial(tf.keras.layers.Activation, "relu")
     mp = functools.partial(
         tf.keras.layers.MaxPooling2D, pool_size=3, strides=2, padding="same"

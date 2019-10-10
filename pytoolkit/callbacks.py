@@ -23,6 +23,7 @@ class LearningRateStepDecay(tf.keras.callbacks.Callback):
         self.reduce_epochs = None
 
     def on_train_begin(self, logs=None):
+        del logs
         if not hasattr(self.model.optimizer, "lr"):
             raise ValueError('Optimizer must have a "lr" attribute.')
         self.start_lr = float(K.get_value(self.model.optimizer.lr))

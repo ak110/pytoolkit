@@ -142,16 +142,20 @@ def compile(
 ):  # pylint: disable=redefined-builtin
     """compileするだけ。"""
     with tk.log.trace_scope("compile"):
-        kwargs = {}
         if tk.hvd.initialized():
             optimizer = tf.keras.optimizers.get(optimizer)
             optimizer = tk.hvd.get().DistributedOptimizer(
                 optimizer, compression=tk.hvd.get().Compression.fp16
             )
-            # Horovod: Specify `experimental_run_tf_function=False` to ensure TensorFlow
-            # uses hvd.DistributedOptimizer() to compute gradients.
-            kwargs["experimental_run_tf_function"] = False
-        model.compile(optimizer, loss, metrics, loss_weights=loss_weights, **kwargs)
+        # Horovod: Specify `experimental_run_tf_function=False` to ensure TensorFlow
+        # uses hvd.DistributedOptimizer() to compute gradients.
+        model.compile(
+            optimizer,
+            loss,
+            metrics,
+            loss_weights=loss_weights,
+            experimental_run_tf_function=False,
+        )
 
 
 def fit(
@@ -252,6 +256,8 @@ def make_validation_freq(
         int(len(val_set) / (len(train_set) * max_val_per_train)),
         1,
     )
+    # ・最低でも10回くらいはやりたい
+    validation_freq = min(validation_freq, max(1, epochs // 10))
     # 最後のepochはvalidationしたいので、そこからvalidation_freq毎に。
     validation_freq = list(range(epochs, 0, -validation_freq))
     return validation_freq
