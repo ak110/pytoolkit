@@ -86,7 +86,12 @@ class App:
         """
         commands = self.commands.copy()
         if "ipy" not in commands:
-            commands["ipy"] = {"func": self._ipy, "logfile": False, "then": None}
+            commands["ipy"] = {
+                "func": self._ipy,
+                "logfile": False,
+                "then": None,
+                "use_horovod": False,
+            }
         command_names = list(commands)
         default = default or command_names[0]
 

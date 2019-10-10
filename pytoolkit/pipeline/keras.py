@@ -46,7 +46,7 @@ class KerasModel(Model):
         *,
         models_dir: tk.typing.PathLike,
         model_name_format: str = "model.fold{fold}.h5",
-        skip_if_exists: bool = True,  # TODO: 実装
+        skip_if_exists: bool = True,
         fit_params: dict = None,
         load_model_fn: typing.Callable[[pathlib.Path], tf.keras.models.Model] = None,
         use_horovod: bool = False,
@@ -76,8 +76,6 @@ class KerasModel(Model):
         assert models_dir == self.models_dir
 
     def _load(self, models_dir: pathlib.Path):
-        assert models_dir == self.models_dir
-
         def load_model(path):
             if self.load_model_fn:
                 return self.load_model_fn(path)

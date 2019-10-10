@@ -18,5 +18,5 @@ popd
 
 pylint -j0 pytoolkit scripts
 
-pytest
+CUDA_VISIBLE_DEVICES=none pytest
 

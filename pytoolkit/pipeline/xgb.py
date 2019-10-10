@@ -19,11 +19,11 @@ class XGBModel(Model):
     Args:
         params: XGBoostのパラメータ
         nfold: cvの分割数
-        early_stopping_rounds: xgb.cvのパラメータ
-        num_boost_round: xgb.cvのパラメータ
-        verbose_eval: xgb.cvのパラメータ
-        callbacks: xgb.cvのパラメータ
-        cv_params: xgb.cvのパラメータ (kwargs)
+        early_stopping_rounds: xgboost.cvのパラメータ
+        num_boost_round: xgboost.cvのパラメータ
+        verbose_eval: xgboost.cvのパラメータ
+        callbacks: xgboost.cvのパラメータ
+        cv_params: xgboost.cvのパラメータ (kwargs)
 
     """
 
@@ -39,7 +39,7 @@ class XGBModel(Model):
         preprocessors: tk.pipeline.EstimatorListType = None,
         postprocessors: tk.pipeline.EstimatorListType = None,
     ):
-        import xgboost as xgb
+        import xgboost
 
         super().__init__(preprocessors, postprocessors)
         self.params = params
@@ -49,30 +49,29 @@ class XGBModel(Model):
         self.verbose_eval = verbose_eval
         self.callbacks = callbacks
         self.cv_params = cv_params
-        self.gbms_: typing.Optional[typing.List[xgb.Booster]] = None
+        self.gbms_: typing.Optional[typing.List[xgboost.Booster]] = None
+        self.best_ntree_limit_: typing.Optional[int] = None
 
     def _save(self, models_dir: pathlib.Path):
         assert self.gbms_ is not None
-        models_dir = pathlib.Path(models_dir)
-        models_dir.mkdir(parents=True, exist_ok=True)
-        for fold, gbm in enumerate(self.gbms_):
-            tk.utils.dump(gbm, models_dir / f"model.fold{fold}.pkl")
+        tk.utils.dump(self.gbms_, models_dir / f"model.pkl")
+        tk.utils.dump(self.best_ntree_limit_, models_dir / f"best_ntree_limit.pkl")
         # ついでにfeature_importanceも。
         df_importance = self.feature_importance()
         df_importance.to_excel(str(models_dir / "feature_importance.xlsx"))
 
     def _load(self, models_dir: pathlib.Path):
-        self.gbms_ = [
-            tk.utils.load(models_dir / f"model.fold{fold}.pkl")
-            for fold in range(self.nfold)
-        ]
+        self.gbms_ = tk.utils.load(models_dir / f"model.pkl")
+        self.best_ntree_limit_ = tk.utils.load(models_dir / f"best_ntree_limit.pkl")
+        assert self.gbms_ is not None
+        assert len(self.gbms_) == self.nfold
 
     def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
-        import xgboost as xgb
+        import xgboost
 
         assert isinstance(dataset.data, pd.DataFrame)
 
-        train_set = xgb.DMatrix(
+        train_set = xgboost.DMatrix(
             data=dataset.data,
             label=dataset.labels,
             weight=dataset.weights,
@@ -85,7 +84,7 @@ class XGBModel(Model):
             self.gbms_.clear()
             self.gbms_.extend([f.bst for f in env.cvfolds])
 
-        eval_hist = xgb.cv(
+        eval_hist = xgboost.cv(
             self.params,
             dtrain=train_set,
             folds=folds,
@@ -101,17 +100,23 @@ class XGBModel(Model):
                 name, score = k[:-5], v.values[-1]
                 scores[name] = score
                 tk.log.get(__name__).info(f"{name}: {score}")
+            self.best_ntree_limit_ = len(v)
 
         return scores
 
     def _predict(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:
-        import xgboost as xgb
+        import xgboost
 
         assert self.gbms_ is not None
+        assert self.best_ntree_limit_ is not None
         assert isinstance(dataset.data, pd.DataFrame)
 
-        data = xgb.DMatrix(data=dataset.data, feature_names=dataset.data.columns.values)
-        return np.array([gbm.predict(data) for gbm in self.gbms_])
+        data = xgboost.DMatrix(
+            data=dataset.data, feature_names=dataset.data.columns.values
+        )
+        return np.array(
+            [gbm.predict(data, ntree_limit=gbm.best_ntree_limit) for gbm in self.gbms_]
+        )
 
     def feature_importance(self, importance_type: str = "gain"):
         """Feature ImportanceをDataFrameで返す。"""

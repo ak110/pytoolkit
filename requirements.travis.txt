@@ -6,7 +6,8 @@ black
 category_encoders
 diskcache
 flake8
-flake8-docstrings
+flake8-bugbear
+flake8-comprehensions
 git+https://github.com/cocodataset/cocoapi.git#egg=pycocotools&subdirectory=PythonAPI
 keras2onnx
 matplotlib
