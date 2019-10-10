@@ -1,5 +1,6 @@
 """セマンティックセグメンテーションの評価。"""
 import typing
+import warnings
 
 import numpy as np
 
@@ -40,6 +41,7 @@ def evaluate_ss(
     y_true: typing.Iterable[np.ndarray],
     y_pred: typing.Iterable[np.ndarray],
     threshold: float = 0.5,
+    multilabel: bool = False,
 ) -> typing.Dict[str, typing.Any]:
     """semantic segmentationの各種metricsを算出してdictで返す。
 
@@ -49,6 +51,7 @@ def evaluate_ss(
         y_true: ラベル (shape=(N, H, W) or (N, H, W, C))
         y_pred: 推論結果 (shape=(N, H, W) or (N, H, W, C))
         threshold: 閾値 (ラベルと推論結果と両方に適用)
+        multilabel: マルチラベルならTrue、多クラスならFalse。
 
     Returns:
         各種metrics
@@ -72,9 +75,21 @@ def evaluate_ss(
             yp = np.expand_dims(yp, axis=-1)
         assert np.ndim(yt) == 3  # (H, W, C)
         assert np.ndim(yp) == 3  # (H, W, C)
+        if yt.shape[:2] != yp.shape[:2]:
+            warnings.warn(f"Predictions need resize.")  # リサイズ忘れちゃダメだぞ警告
+            yp = tk.ndimage.resize(yp, width=yt.shape[1], height=yt.shape[0])
         assert yt.shape == yp.shape
-        p_true = yt >= threshold
-        p_pred = yp >= threshold
+
+        if multilabel or yt.shape[-1] == 1:
+            # マルチラベルか2クラス分類の場合、閾値以上か否かを見る
+            p_true = yt >= threshold
+            p_pred = yp >= threshold
+        else:
+            # 多クラス分類の場合、argmaxしてonehot化
+            p_true = np.zeros(yt.shape, dtype=bool)
+            p_true[yt.argmax(axis=-1)] = True
+            p_pred = np.zeros(yp.shape, dtype=bool)
+            p_pred[yp.argmax(axis=-1)] = True
         n_true = ~p_true
         n_pred = ~p_pred
         tp = np.sum(p_true & p_pred, axis=(0, 1))  # (C,)
