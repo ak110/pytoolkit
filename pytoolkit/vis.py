@@ -31,11 +31,10 @@ class GradCamVisualizer:
                 map_output = layer.input
                 break
         assert map_output is not None
-        # 関数を作成
-        grad = K.gradients(model.output[0, output_index], map_output)[0]
-        mask = K.maximum(0.0, K.sum(map_output * grad, axis=-1)[0, :, :])
-        mask = mask / (K.max(mask) + 1e-3)  # [0, 1)
-        self.get_mask_func = K.function(model.inputs + [K.learning_phase()], [mask])
+        self.grad_model = tf.keras.models.Model(
+            model.inputs, [map_output, model.output]
+        )
+        self.output_index = output_index
 
     def draw(
         self,
@@ -66,6 +65,8 @@ class GradCamVisualizer:
         }[interpolation]
 
         mask = self.get_mask(model_inputs)
+        assert len(mask) == 1
+        mask = mask[0, :, :]
         mask = cv2.resize(
             mask,
             (source_image.shape[1], source_image.shape[0]),
@@ -73,16 +74,29 @@ class GradCamVisualizer:
         )
         mask = np.uint8(256 * mask)  # [0-255]
 
-        heatmap = cv2.applyColorMap(mask, cv2.COLORMAP_JET)
+        heatmap = cv2.applyColorMap(mask, cv2.COLORMAP_CIVIDIS)
         heatmap = heatmap[..., ::-1]  # BGR to RGB
 
         result_image = np.uint8(heatmap * alpha + source_image * (1 - alpha))
         return result_image
 
-    def get_mask(self, model_inputs: np.ndarray) -> np.ndarray:
+    def get_mask(self, model_inputs):
         """可視化してマスクを返す。マスクの値は`[0, 1)`。"""
         if not isinstance(model_inputs, list):
             model_inputs = [model_inputs]
-        mask = self.get_mask_func(model_inputs + [0])[0]
-        assert len(mask.shape) == 2
+        mask = GradCamVisualizer._get_mask(
+            self.grad_model, model_inputs, self.output_index
+        ).numpy()
+        assert mask.ndim == 3  # (N, H, W)
+        return mask
+
+    @staticmethod
+    @tf.function
+    def _get_mask(grad_model, model_inputs, class_index):
+        with tf.GradientTape() as tape:
+            map_output, predictions = grad_model(model_inputs, training=False)
+            model_output = predictions[:, class_index]
+        grads = tape.gradient(model_output, map_output)
+        mask = K.sum(map_output * grads, axis=-1)
+        mask = tf.nn.relu(mask) / (K.max(mask) + K.epsilon())
         return mask

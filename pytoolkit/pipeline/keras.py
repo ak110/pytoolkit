@@ -338,7 +338,7 @@ class KerasModel(Model):
         self.evaluate(train_set, prefix="", _fold=_fold)
         if val_set is None:
             return None
-        return self.evaluate(val_set, prefix="val_")
+        return self.evaluate(val_set, prefix="val_", _fold=_fold)
 
     def evaluate(
         self, dataset: tk.data.Dataset, prefix: str = "", *, _fold: int = 0

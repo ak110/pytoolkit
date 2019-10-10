@@ -26,7 +26,7 @@ cookiecutter gh:ak110/cookiecutter-pytoolkit
 - pandas
 - scikit-learn
 - scipy
-- tensorflow>=2.0.0
+- tensorflow-gpu>=2.0.0
 
 ## 使うときに動的にimportしている依存ライブラリ
 

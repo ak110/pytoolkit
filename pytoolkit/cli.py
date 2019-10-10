@@ -50,12 +50,15 @@ class App:
 
         return _decorator
 
-    def command(self, logfile: bool = True, then: str = None):
+    def command(
+        self, logfile: bool = True, then: str = None, use_horovod: bool = False
+    ):
         """コマンドの追加用デコレーター。
 
         Args:
-            logfile: ログファイルを出力するのか否か。
-            then: 当該コマンドが終わった後に続けて実行するコマンドの名前。
+            logfile: ログファイルを出力するのか否か
+            then: 当該コマンドが終わった後に続けて実行するコマンドの名前
+            use_horovod: horovodを使うならTrue
 
         """
         assert not logfile or self.output_dir is not None
@@ -67,6 +70,7 @@ class App:
                 "func": func,
                 "logfile": logfile,
                 "then": then,
+                "use_horovod": use_horovod,
             }
             return func
 
@@ -97,6 +101,9 @@ class App:
             assert self.current_command is not None
             command = commands[self.current_command]
 
+            # horovod
+            if command["use_horovod"]:
+                tk.hvd.init()
             # ログ初期化
             tk.log.init(
                 self.output_dir / f"{command['func'].__name__}.log"

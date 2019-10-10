@@ -65,12 +65,22 @@ def is_local_master() -> bool:
 
 def allgather(value):
     """全ワーカーからデータを集める。"""
-    return get().allgather(value) if initialized() else value
+    if initialized():
+        value = get().allgather(value)
+        # tensorが来たらnumpy化
+        if hasattr(value, "numpy"):
+            value = value.numpy()
+    return value
 
 
 def allreduce(value, average: bool = True):
     """全ワーカーからデータを集める。"""
-    return get().allreduce(value, average=average) if initialized() else value
+    if initialized():
+        value = get().allreduce(value, average=average)
+        # tensorが来たらnumpy化
+        if hasattr(value, "numpy"):
+            value = value.numpy()
+    return value
 
 
 def barrier() -> None:
@@ -119,8 +129,6 @@ def split(dataset: tk.data.Dataset) -> tk.data.Dataset:
         分割後のデータセット
 
     """
-    from . import data
-
-    if not initialized():
-        return dataset
-    return data.split(dataset, get().size())[get().rank()]
+    if initialized():
+        dataset = tk.data.split(dataset, get().size())[get().rank()]
+    return dataset

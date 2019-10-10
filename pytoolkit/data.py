@@ -156,7 +156,7 @@ class Dataset:
 def split(dataset: Dataset, count: int, shuffle=False):
     """Datasetを指定個数に分割する。"""
     dataset_size = len(dataset)
-    sub_size = dataset_size // count
+    sub_size = -(-dataset_size // count)  # 端数切り上げ
     assert sub_size > 0
     indices = np.arange(dataset_size)
     if shuffle:
