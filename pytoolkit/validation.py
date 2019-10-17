@@ -73,7 +73,11 @@ def pseudo_labeling(
     ) * pl_weight
     dataset.weights = np.concatenate([w_train, w_test * pl_weight])
 
-    folds = concat_folds(folds1, folds2, len(train_set))
+    # train_indicesをtrainとtestでconcatしたものにする。val_indicesはtrainのみ。
+    folds = [
+        (np.concatenate([f1_t, np.asarray(f2_t) + len(train_set)]), f1_v)
+        for (f1_t, f1_v), (f2_t, _) in zip(folds1, folds2)
+    ]
     return dataset, folds
 
 
@@ -83,8 +87,8 @@ def concat_folds(folds1: FoldsType, folds2: FoldsType, fold2_offset: int) -> Fol
 
     return [
         (
-            np.concatenate([f1_t, f2_t + fold2_offset]),
-            np.concatenate([f1_v, f2_v + fold2_offset]),
+            np.concatenate([f1_t, np.asarray(f2_t) + fold2_offset]),
+            np.concatenate([f1_v, np.asarray(f2_v) + fold2_offset]),
         )
         for (f1_t, f1_v), (f2_t, f2_v) in zip(folds1, folds2)
     ]

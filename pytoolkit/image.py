@@ -1,5 +1,7 @@
 """画像処理関連。"""
 # pylint: disable=arguments-differ,abstract-method
+from __future__ import annotations
+
 import random
 import warnings
 

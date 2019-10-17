@@ -24,7 +24,8 @@ class KerasModel(Model):
         refine_data_loader: Refined Data Augmentation <https://arxiv.org/abs/1909.09148> 用
         models_dir: 保存先ディレクトリ
         model_name_format: モデルのファイル名のフォーマット。{fold}のところに数字が入る。
-        skip_if_exists: モデルが存在してもスキップせず再学習するならFalse。
+        skip_if_exists: cv()でモデルが存在するときスキップするならTrue。
+        skip_folds: cv()で（skip_if_existsとは関係なく）スキップするfold。[0, nfold)
         fit_params: tk.models.fit()のパラメータ
         load_model_fn: モデルを読み込む関数
         use_horovod: 推論時にMPIによる分散処理をするか否か。(学習時は常にTrue)
@@ -47,6 +48,7 @@ class KerasModel(Model):
         models_dir: tk.typing.PathLike,
         model_name_format: str = "model.fold{fold}.h5",
         skip_if_exists: bool = True,
+        skip_folds: typing.Sequence[int] = (),
         fit_params: dict = None,
         load_model_fn: typing.Callable[[pathlib.Path], tf.keras.models.Model] = None,
         use_horovod: bool = False,
@@ -63,6 +65,7 @@ class KerasModel(Model):
         self.models_dir = pathlib.Path(models_dir)
         self.model_name_format = model_name_format
         self.skip_if_exists = skip_if_exists
+        self.skip_folds = skip_folds
         self.fit_params = fit_params
         self.load_model_fn = load_model_fn
         self.use_horovod = use_horovod
@@ -76,18 +79,11 @@ class KerasModel(Model):
         assert models_dir == self.models_dir
 
     def _load(self, models_dir: pathlib.Path):
-        def load_model(path):
-            if self.load_model_fn:
-                return self.load_model_fn(path)
-            model = self.create_model_fn()
-            tk.models.load_weights(model, path)
-            return model
-
         self.models = []
         for fold in range(999):
             model_path = models_dir / self.model_name_format.format(fold=fold + 1)
             if model_path.exists():
-                self.models.append(load_model(model_path))
+                self.models.append(self._load_model(model_path))
                 if "{fold}" not in self.model_name_format:
                     break
             else:
@@ -213,7 +209,7 @@ class KerasModel(Model):
             )
             train_set = dataset.slice(train_indices)
             val_set = dataset.slice(val_indices)
-            scores = self.train(train_set, val_set, _fold=fold)
+            scores = self.train(train_set, val_set, fold=fold)
             score_list.append(scores)
             score_weights.append(len(val_indices))
 
@@ -254,55 +250,65 @@ class KerasModel(Model):
 
     @typing.overload
     def train(
-        self, train_set: tk.data.Dataset, val_set: None = None, *, _fold: int = 0
+        self, train_set: tk.data.Dataset, val_set: None = None, fold: int = 0
     ) -> None:
         pass
 
     @typing.overload
     def train(
-        self, train_set: tk.data.Dataset, val_set: tk.data.Dataset, *, _fold: int = 0
+        self, train_set: tk.data.Dataset, val_set: tk.data.Dataset, fold: int = 0
     ) -> typing.Dict[str, float]:
         # pylint: disable=function-redefined
         pass
 
     def train(
-        self,
-        train_set: tk.data.Dataset,
-        val_set: tk.data.Dataset = None,
-        *,
-        _fold: int = 0,
+        self, train_set: tk.data.Dataset, val_set: tk.data.Dataset = None, fold: int = 0
     ) -> typing.Optional[typing.Dict[str, float]]:
         """1fold分の学習。(KerasModel独自メソッド)
 
         Args:
             train_set: 訓練データ
             val_set: 検証データ
-            _fold: 内部用
+            fold: 何番目のモデルを使うか
 
         Returns:
             メトリクス名と値のdict
 
         """
         # pylint: disable=function-redefined
-        # 学習
-        if self.models is not None and len(self.models) > _fold:
-            model = self.models[_fold]
-            exists = True
-        else:
-            model = self.create_model_fn()
-            exists = False
+        tk.hvd.barrier()
         tk.log.get(__name__).info(
             f"train: {len(train_set)} samples, val: {len(val_set) if val_set is not None else 0} samples, batch_size: {self.train_data_loader.batch_size}x{tk.hvd.size()}"
         )
-        tk.hvd.barrier()
 
-        if self.skip_if_exists and exists:
-            tk.log.get(__name__).info(f"Fold{_fold}: skip training.")
+        if self.models is None:
+            self.models = []
+        while len(self.models) <= fold:
+            self.models.append(None)
+
+        model_path = self.models_dir / self.model_name_format.format(fold=fold + 1)
+
+        if self.skip_if_exists and model_path.exists():
+            tk.log.get(__name__).info(
+                f"Fold{fold + 1}: Loading '{model_path}'... (skip_if_exists)"
+            )
+            self.models[fold] = self._load_model(model_path)
+        elif fold in self.skip_folds and model_path.exists():
+            tk.log.get(__name__).info(
+                f"Fold{fold + 1}: Loading '{model_path}'... (skip_folds)"
+            )
+            self.models[fold] = self._load_model(model_path)
         else:
+            if self.models[fold] is not None:
+                model = self.models[fold]  # 既にあればそれを使う
+            else:
+                model = self.create_model_fn()
+
             if self.refine_data_loader is not None:
                 base_lr = tf.keras.backend.get_value(model.optimizer.lr)
 
             # fit
+            tk.hvd.barrier()
             tk.models.fit(
                 model,
                 train_set=train_set,
@@ -324,29 +330,28 @@ class KerasModel(Model):
                     epochs=50,
                 )
 
-            model_path = self.models_dir / self.model_name_format.format(fold=_fold + 1)
             tk.models.save(model, model_path)
-            if self.models is None:
-                self.models = []
-            while len(self.models) <= _fold:
-                self.models.append(None)
-            self.models[_fold] = model
+            # メモリを食いがちなので学習完了後は再構築する (TODO: 仮)
+            model = self._load_model(model_path)
+
+            self.models[fold] = model
 
         # 訓練データと検証データの評価
-        self.evaluate(train_set, prefix="", _fold=_fold)
+        tk.hvd.barrier()
+        self.evaluate(train_set, prefix="", fold=fold)
         if val_set is None:
             return None
-        return self.evaluate(val_set, prefix="val_", _fold=_fold)
+        return self.evaluate(val_set, prefix="val_", fold=fold)
 
     def evaluate(
-        self, dataset: tk.data.Dataset, prefix: str = "", *, _fold: int = 0
+        self, dataset: tk.data.Dataset, prefix: str = "", fold: int = 0
     ) -> typing.Dict[str, float]:
         """評価して結果をINFOログ出力する。(KerasModel独自メソッド)
 
         Args:
             dataset: データ
-            prefix: メトリクス名の接頭文字列。
-            _fold: 内部用。
+            prefix: メトリクス名の接頭文字列
+            fold: 何番目のモデルを使うか
 
         Returns:
             metricsの文字列と値のdict
@@ -356,7 +361,7 @@ class KerasModel(Model):
         assert self.preprocessors is None  # とりあえず未対応
         assert self.postprocessors is None  # とりあえず未対応
         evals = tk.models.evaluate(
-            self.models[_fold],
+            self.models[fold],
             dataset,
             data_loader=self.val_data_loader,  # DataAugmentation無しで評価
             prefix=prefix,
@@ -370,17 +375,29 @@ class KerasModel(Model):
         return evals
 
     def predict_flow(
-        self, dataset: tk.data.Dataset
+        self, dataset: tk.data.Dataset, fold: int = 0
     ) -> typing.Iterator[tk.models.ModelIOType]:
         """予測。
 
         Args:
             dataset: データセット
+            fold: 何番目のモデルを使うか
 
         """
-        assert self.models is not None and len(self.models) == 1
+        assert self.models is not None
         assert self.preprocessors is None  # とりあえず未対応
         assert self.postprocessors is None  # とりあえず未対応
         return tk.models.predict_flow(
-            self.models[0], dataset, self.val_data_loader, on_batch_fn=self.on_batch_fn
+            self.models[fold],
+            dataset,
+            self.val_data_loader,
+            on_batch_fn=self.on_batch_fn,
         )
+
+    def _load_model(self, model_path: pathlib.Path) -> tf.keras.models.Model:
+        """モデルの読み込み"""
+        if self.load_model_fn:
+            return self.load_model_fn(model_path)
+        model = self.create_model_fn()
+        tk.models.load_weights(model, model_path)
+        return model

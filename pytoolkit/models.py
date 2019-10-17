@@ -27,23 +27,15 @@ def load(
     path: tk.typing.PathLike,
     custom_objects: dict = None,
     compile: bool = False,  # pylint: disable=redefined-outer-name
-    gpus: int = None,
 ):
     """モデルの読み込み。"""
     path = pathlib.Path(path)
     with tk.log.trace_scope(f"load({path})"):
         custom_objects = custom_objects.copy() if custom_objects else {}
         custom_objects.update(tk.get_custom_objects())
-        if gpus is not None and gpus > 1:
-            with tf.device("/cpu:0"):
-                model = tf.keras.models.load_model(
-                    str(path), custom_objects=custom_objects, compile=compile
-                )
-            model, _ = multi_gpu_model(model, batch_size=0, gpus=gpus)
-        else:
-            model = tf.keras.models.load_model(
-                str(path), custom_objects=custom_objects, compile=compile
-            )
+        model = tf.keras.models.load_model(
+            str(path), custom_objects=custom_objects, compile=compile
+        )
     return model
 
 
@@ -203,7 +195,8 @@ def fit(
         validation_freq = make_validation_freq(
             validation_freq, epochs, train_set, val_set
         )
-    assert (val_set is None) == (val_data_loader is None)
+    if val_set is not None:
+        assert val_data_loader is not None
 
     train_iterator = train_data_loader.iter(train_set, shuffle=True, use_horovod=True)
     val_iterator = (
@@ -389,41 +382,59 @@ def evaluate(
         return evals
 
 
-def multi_gpu_model(
-    model: tf.keras.models.Model, batch_size: int, gpus: int = None
-) -> tf.keras.models.Model:
-    """複数GPUでデータ並列するモデルを作成する。
+def freeze_layers(
+    model: typing.Union[tf.keras.models.Model, tf.keras.layers.Layer], layer_class: type
+):
+    """指定したレイヤーをfreezeする。"""
+    for layer in model.layers:
+        if isinstance(layer, layer_class):
+            layer.trainable = False
+        if hasattr(layer, "layers") and len(layer.layers) > 0:
+            freeze_layers(layer, layer_class)
 
-    References:
-        - <https://github.com/fchollet/tf.keras/issues/2436>
-        - <https://github.com/kuza55/tf.keras-extras/blob/master/utils/multi_gpu.py>
+
+def predict_on_batch_augmented(
+    model: tf.keras.models.Model,
+    X_batch: np.ndarray,
+    flip: typing.Tuple[bool, bool] = (False, True),
+    crop_size: typing.Tuple[int, int] = (3, 3),
+    padding_size: typing.Tuple[int, int] = (32, 32),
+    padding_mode: str = "edge",
+) -> typing.List[np.ndarray]:
+    """ミニバッチ1個分の予測処理＆TTA。
+
+    Args:
+        model: モデル。
+        X_batch: データ。
+        flip: 水平/垂直方向の反転を行うか否か。(v, h)
+        crop_size: 縦横のcropのパターンの数。(v, h)
+        padding_size: crop前にパディングするサイズ。(v, h)
+        padding_mode: パディングの種類。(np.padのmode)
+
+    Returns:
+        予測結果のリスト。
 
     """
-    if gpus is None:
-        gpus = tk.dl.get_gpu_count()
-        tk.log.get(__name__).info(f"gpu count = {gpus}")
-    if gpus <= 1:
-        return model, batch_size
-
-    assert isinstance(model.inputs, list)
-    assert isinstance(model.outputs, list)
-
-    with tk.log.trace_scope("multi_gpu_model"):
-        parallel_model = tf.keras.utils.multi_gpu_model(model, gpus)
-
-        # Model.saveの置き換え
-        # https://github.com/fchollet/tf.keras/issues/2436#issuecomment-294243024
-        def _save(self_, *args, **kargs):
-            assert self_ is not None  # noqa
-            model.save(*args, **kargs)
-
-        def _save_weights(self_, *args, **kargs):
-            assert self_ is not None  # noqa
-            model.save_weights(*args, **kargs)
-
-        parallel_model.save = type(model.save)(_save, parallel_model)
-        parallel_model.save_weights = type(model.save_weights)(
-            _save_weights, parallel_model
-        )
-
-        return parallel_model, batch_size * gpus
+    shape = X_batch.shape
+    X_batch = np.pad(
+        X_batch,
+        (
+            (0, 0),
+            (padding_size[0], padding_size[0]),
+            (padding_size[1], padding_size[1]),
+            (0, 0),
+        ),
+        mode=padding_mode,
+    )
+    result = []
+    for y in np.linspace(0, padding_size[0] * 2, crop_size[0], dtype=np.int32):
+        for x in np.linspace(0, padding_size[1] * 2, crop_size[1], dtype=np.int32):
+            X = X_batch[:, x : x + shape[1], y : y + shape[2], :]
+            result.append(model.predict_on_batch(X))
+            if flip[0]:
+                result.append(model.predict_on_batch(X[:, ::-1, :, :]))
+            if flip[1]:
+                result.append(model.predict_on_batch(X[:, :, ::-1, :]))
+            if flip[0] and flip[1]:
+                result.append(model.predict_on_batch(X[:, ::-1, ::-1, :]))
+    return result

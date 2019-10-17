@@ -43,7 +43,6 @@ cookiecutter gh:ak110/cookiecutter-pytoolkit
 - mpi4py
 - onnxmltools
 - optuna
-- pydensecrf
 - python-dotenv
 - requests
 - tf2onnx
