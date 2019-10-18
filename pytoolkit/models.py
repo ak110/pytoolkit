@@ -177,7 +177,7 @@ def fit(
         validation_freq: 検証を行うエポック数の間隔、またはエポック数のリスト。0ならvalidationしない(独自仕様)。"auto"なら適当に決める(独自仕様)。
         class_weight: クラスごとの重みのdict
         epochs: エポック数
-        callbacks: コールバック。EpochLoggerとErrorOnNaNは自動追加。
+        callbacks: コールバック。EpochLoggerとErrorOnNaNとhorovod関連は自動追加。
         verbose: 1ならプログレスバー表示、2ならepoch毎の結果だけ表示。
         initial_epoch: 学習を開始するエポック数 - 1
         use_multiprocessing: Trueならマルチプロセス
@@ -205,7 +205,7 @@ def fit(
         else None
     )
 
-    callbacks = make_callbacks(callbacks)
+    callbacks = make_callbacks(callbacks, training=True)
 
     fit_kwargs = {}
     if validation_freq is not None:
@@ -256,12 +256,12 @@ def make_validation_freq(
     return validation_freq
 
 
-def make_callbacks(callbacks):
+def make_callbacks(callbacks, training: bool) -> list:
     """callbacksをいい感じにする。"""
-    callbacks = (callbacks or []) + [
-        tk.callbacks.EpochLogger(),
-        tk.callbacks.ErrorOnNaN(),
-    ]
+    callbacks = (callbacks or []).copy()
+    if training:
+        callbacks.append(tk.callbacks.EpochLogger())
+        callbacks.append(tk.callbacks.ErrorOnNaN())
     if tk.hvd.initialized() and tk.hvd.size() > 1:
         callbacks.append(tk.hvd.get().callbacks.BroadcastGlobalVariablesCallback(0))
         callbacks.append(tk.hvd.get().callbacks.MetricAverageCallback())
@@ -272,6 +272,7 @@ def predict(
     model: tf.keras.models.Model,
     dataset: tk.data.Dataset,
     data_loader: tk.data.DataLoader,
+    callbacks: list = None,
     verbose: int = 1,
     use_horovod: bool = False,
     on_batch_fn: OnBatchFnType = None,
@@ -282,7 +283,8 @@ def predict(
         model: モデル
         dataset: 予測したい入力データ
         data_loader: データの読み込み
-        verbose: プログレスバー(tqdm)を表示するか否か
+        callbacks: コールバック
+        verbose: プログレスバーを表示するか否か
         use_horovod: MPIによる分散処理をするか否か
         on_batch_fn: モデルとミニバッチ分の入力データを受け取り、予測結果を返す処理。(TTA用)
         flow: 結果をgeneratorで返すならTrue
@@ -294,15 +296,21 @@ def predict(
     """
     with tk.log.trace_scope("predict"):
         verbose = verbose if tk.hvd.is_master() else 0
+        callbacks = make_callbacks(callbacks, training=False)
         dataset = tk.hvd.split(dataset) if use_horovod else dataset
         iterator = data_loader.iter(dataset)
         if on_batch_fn is not None:
             values = _predict_flow(
-                model, iterator, verbose, on_batch_fn, desc="predict"
+                model=model,
+                iterator=iterator,
+                callbacks=callbacks,
+                verbose=verbose,
+                on_batch_fn=on_batch_fn,
+                desc="predict",
             )
             values = np.array(list(values))
         else:
-            values = model.predict(iterator, verbose=verbose)
+            values = model.predict(iterator, verbose=verbose, callbacks=callbacks)
         values = tk.hvd.allgather(values) if use_horovod else values
         return values
 
@@ -311,6 +319,7 @@ def predict_flow(
     model: tf.keras.models.Model,
     dataset: tk.data.Dataset,
     data_loader: tk.data.DataLoader,
+    callbacks: list = None,
     verbose: int = 1,
     on_batch_fn: OnBatchFnType = None,
     desc: str = "predict",
@@ -321,6 +330,7 @@ def predict_flow(
         model: モデル
         dataset: 予測したい入力データ
         data_loader: データの読み込み
+        callbacks: コールバック
         verbose: プログレスバー(tqdm)を表示するか否か
         on_batch_fn: モデルとミニバッチ分の入力データを受け取り、予測結果を返す処理。(TTA用)
         flow: 結果をgeneratorで返すならTrue
@@ -331,17 +341,42 @@ def predict_flow(
 
     """
     with tk.log.trace_scope("predict"):
+        callbacks = make_callbacks(callbacks, training=False)
         iterator = data_loader.iter(dataset)
-        return _predict_flow(model, iterator, verbose, on_batch_fn, desc)
+        return _predict_flow(
+            model=model,
+            iterator=iterator,
+            callbacks=callbacks,
+            verbose=verbose,
+            on_batch_fn=on_batch_fn,
+            desc=desc,
+        )
 
 
-def _predict_flow(model, iterator, verbose, on_batch_fn, desc):
+def _predict_flow(
+    model: tf.keras.models.Model,
+    iterator: tk.data.Iterator,
+    callbacks: list,
+    verbose: int,
+    on_batch_fn: OnBatchFnType = None,
+    desc: str = "predict",
+):
     on_batch_fn = on_batch_fn or _predict_on_batch
+    for cb in callbacks:
+        cb.on_predict_begin()
+    batch = 0
     for X, _ in tk.utils.tqdm(
         iterator, desc=desc, total=len(iterator), disable=verbose < 1
     ):
+        for cb in callbacks:
+            cb.on_predict_batch_begin(batch)
         pred_batch = on_batch_fn(model, X)
+        for cb in callbacks:
+            cb.on_predict_batch_end(batch)
         yield from pred_batch
+        batch += 1
+    for cb in callbacks:
+        cb.on_predict_end()
 
 
 def _predict_on_batch(model: tf.keras.models.Model, X):
@@ -352,6 +387,7 @@ def evaluate(
     model: tf.keras.models.Model,
     dataset: tk.data.Dataset,
     data_loader: tk.data.DataLoader,
+    callbacks: list = None,
     verbose: int = 1,
     prefix: str = "",
     use_horovod: bool = False,
@@ -362,6 +398,7 @@ def evaluate(
         model: モデル。
         dataset: データ。
         data_loader: データの読み込み
+        callbacks: コールバック
         verbose: 1ならプログレスバー表示。
         prefix: メトリクス名の接頭文字列。
         use_horovod: MPIによる分散処理をするか否か。
@@ -371,9 +408,11 @@ def evaluate(
 
     """
     with tk.log.trace_scope("evaluate"):
+        verbose = verbose if tk.hvd.is_master() else 0
+        callbacks = make_callbacks(callbacks, training=False)
         dataset = tk.hvd.split(dataset) if use_horovod else dataset
         iterator = data_loader.iter(dataset)
-        values = model.evaluate(iterator, verbose=verbose if tk.hvd.is_master() else 0)
+        values = model.evaluate(iterator, verbose=verbose, callbacks=callbacks)
         values = tk.hvd.allreduce(values) if use_horovod else values
         if len(model.metrics_names) == 1:
             evals = {prefix + model.metrics_names[0]: values}
@@ -388,7 +427,7 @@ def freeze_layers(
     """指定したレイヤーをfreezeする。"""
     for layer in model.layers:
         if isinstance(layer, layer_class):
-            layer.trainable = False
+            typing.cast(tf.keras.layers.Layer, layer).trainable = False
         if hasattr(layer, "layers") and len(layer.layers) > 0:
             freeze_layers(layer, layer_class)
 

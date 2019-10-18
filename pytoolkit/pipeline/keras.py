@@ -182,7 +182,7 @@ class KerasModel(Model):
             train_sets.append(dataset.slice(train_indices))
             val_sets.append(dataset.slice(val_indices))
 
-        model.fit_generator(
+        model.fit(
             generator(train_sets, self.train_data_loader),
             steps_per_epoch=-(-len(train_sets[0]) // self.train_data_loader.batch_size),
             validation_data=generator(val_sets, self.val_data_loader),
@@ -190,7 +190,7 @@ class KerasModel(Model):
             **(self.fit_params or {}),
         )
 
-        evals = model.evaluate_generator(
+        evals = model.evaluate(
             generator(val_sets, self.val_data_loader),
             -(-len(val_sets[0]) // self.val_data_loader.batch_size) * 3,
         )
