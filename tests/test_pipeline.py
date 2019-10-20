@@ -1,4 +1,5 @@
 import pathlib
+import typing
 
 import numpy as np
 import tensorflow as tf
@@ -13,39 +14,44 @@ def test_keras_xor(tmpdir):
     y = np.array([0, 1, 1, 0], dtype=np.int32)
     train_set = tk.data.Dataset(X.repeat(4096, axis=0), y.repeat(4096, axis=0))
 
-    def create_model():
-        inputs = x = tf.keras.layers.Input(shape=(2,))
-        x = tf.keras.layers.Dense(16, use_bias=False)(x)
-        x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.Activation("relu")(x)
-        x = tf.keras.layers.Dense(1, activation="sigmoid")(x)
-        model = tf.keras.models.Model(inputs=inputs, outputs=x)
-        tk.models.compile(
-            model, "adam", "binary_crossentropy", [tk.metrics.binary_accuracy]
-        )
-        return model
+    class MyModel(tk.pipeline.KerasModel):
+        def create_network(self) -> tf.keras.models.Model:
+            inputs = x = tf.keras.layers.Input(shape=(2,))
+            x = tf.keras.layers.Dense(16, use_bias=False)(x)
+            x = tf.keras.layers.BatchNormalization()(x)
+            x = tf.keras.layers.Activation("relu")(x)
+            x = tf.keras.layers.Dense(1, activation="sigmoid")(x)
+            model = tf.keras.models.Model(inputs=inputs, outputs=x)
+            tk.models.compile(
+                model, "adam", "binary_crossentropy", [tk.metrics.binary_accuracy]
+            )
+            return model
 
-    def create_pipeline():
-        return tk.pipeline.KerasModel(
-            create_model_fn=create_model,
-            train_data_loader=tk.data.DataLoader(),
-            val_data_loader=tk.data.DataLoader(),
-            fit_params={
-                "epochs": 8,
-                "verbose": 2,
-                "callbacks": [
-                    tk.callbacks.LearningRateStepDecay(),
-                    tk.callbacks.CosineAnnealing(),
-                    tk.callbacks.TSVLogger(models_dir / "history.tsv"),
-                    tk.callbacks.Checkpoint(models_dir / "checkpoint.h5"),
-                ],
-            },
-            models_dir=models_dir,
-            model_name_format="model.h5",
-            use_horovod=True,
-        )
+        def create_optimizer(
+            self, mode: str
+        ) -> typing.Union[str, tf.keras.optimizers.Optimizer]:
+            return "adam"
 
-    model = create_pipeline()
+        def create_loss(self, model: tf.keras.models.Model) -> tuple:
+            return "binary_crossentropy", [tk.metrics.binary_accuracy]
+
+    model = MyModel(
+        train_data_loader=tk.data.DataLoader(),
+        val_data_loader=tk.data.DataLoader(),
+        fit_params={
+            "epochs": 8,
+            "verbose": 2,
+            "callbacks": [
+                tk.callbacks.LearningRateStepDecay(),
+                tk.callbacks.CosineAnnealing(),
+                tk.callbacks.TSVLogger(models_dir / "history.tsv"),
+                tk.callbacks.Checkpoint(models_dir / "checkpoint.h5"),
+            ],
+        },
+        models_dir=models_dir,
+        model_name_format="model.h5",
+        use_horovod=True,
+    )
     model.check()
     model.train(train_set, train_set)
 

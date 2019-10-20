@@ -130,7 +130,10 @@ def plot(
 
 
 def compile(
-    model: tf.keras.models.Model, optimizer, loss, metrics=None, loss_weights=None
+    model: tf.keras.models.Model,
+    optimizer: typing.Union[str, tf.keras.optimizers.Optimizer],
+    loss,
+    metrics=None,
 ):  # pylint: disable=redefined-builtin
     """compileするだけ。"""
     with tk.log.trace_scope("compile"):
@@ -141,13 +144,7 @@ def compile(
             )
         # Horovod: Specify `experimental_run_tf_function=False` to ensure TensorFlow
         # uses hvd.DistributedOptimizer() to compute gradients.
-        model.compile(
-            optimizer,
-            loss,
-            metrics,
-            loss_weights=loss_weights,
-            experimental_run_tf_function=False,
-        )
+        model.compile(optimizer, loss, metrics, experimental_run_tf_function=False)
 
 
 def fit(

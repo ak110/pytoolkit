@@ -1,6 +1,7 @@
 """Keras"""
 from __future__ import annotations
 
+import abc
 import pathlib
 import typing
 
@@ -12,13 +13,12 @@ import pytoolkit as tk
 from .core import Model
 
 
-class KerasModel(Model):
+class KerasModel(Model, metaclass=abc.ABCMeta):
     """Kerasのモデル。
 
     _saveではなく学習時にsaveしてしまっているので注意。
 
     Args:
-        create_model_fn: モデルを作成する関数。
         train_data_loader: 訓練データの読み込み
         val_data_loader: 検証データの読み込み
         refine_data_loader: Refined Data Augmentation <https://arxiv.org/abs/1909.09148> 用
@@ -27,7 +27,6 @@ class KerasModel(Model):
         skip_if_exists: cv()でモデルが存在するときスキップするならTrue。
         skip_folds: cv()で（skip_if_existsとは関係なく）スキップするfold。[0, nfold)
         fit_params: tk.models.fit()のパラメータ
-        load_model_fn: モデルを読み込む関数
         use_horovod: 推論時にMPIによる分散処理をするか否か。(学習時は常にTrue)
         parallel_cv: lgb.cvなどのように全foldまとめて処理するならTrue
 
@@ -40,7 +39,6 @@ class KerasModel(Model):
 
     def __init__(
         self,
-        create_model_fn: typing.Callable[[], tf.keras.models.Model],
         train_data_loader: tk.data.DataLoader,
         val_data_loader: tk.data.DataLoader,
         refine_data_loader: tk.data.DataLoader = None,
@@ -50,7 +48,6 @@ class KerasModel(Model):
         skip_if_exists: bool = True,
         skip_folds: typing.Sequence[int] = (),
         fit_params: dict = None,
-        load_model_fn: typing.Callable[[pathlib.Path], tf.keras.models.Model] = None,
         use_horovod: bool = False,
         parallel_cv: bool = False,
         on_batch_fn: tk.models.OnBatchFnType = None,
@@ -58,7 +55,6 @@ class KerasModel(Model):
         postprocessors: tk.pipeline.EstimatorListType = None,
     ):
         super().__init__(preprocessors, postprocessors)
-        self.create_model_fn = create_model_fn
         self.train_data_loader = train_data_loader
         self.val_data_loader = val_data_loader
         self.refine_data_loader = refine_data_loader
@@ -67,7 +63,6 @@ class KerasModel(Model):
         self.skip_if_exists = skip_if_exists
         self.skip_folds = skip_folds
         self.fit_params = fit_params
-        self.load_model_fn = load_model_fn
         self.use_horovod = use_horovod
         self.parallel_cv = parallel_cv
         self.on_batch_fn = on_batch_fn
@@ -83,7 +78,7 @@ class KerasModel(Model):
         for fold in range(999):
             model_path = models_dir / self.model_name_format.format(fold=fold + 1)
             if model_path.exists():
-                self.models.append(self._load_model(model_path))
+                self.models.append(self.load_model(model_path))
                 if "{fold}" not in self.model_name_format:
                     break
             else:
@@ -97,7 +92,7 @@ class KerasModel(Model):
             return self._serial_cv(dataset, folds)
 
     def _parallel_cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType):
-        self.models = [self.create_model_fn() for _ in folds]
+        self.models = [self.create_model() for _ in folds]
 
         inputs = []
         targets = []
@@ -238,7 +233,7 @@ class KerasModel(Model):
             self
 
         """
-        model = self.create_model_fn()
+        model = self.create_model()
         # summary表示
         tk.models.summary(model)
         # グラフを出力
@@ -292,20 +287,17 @@ class KerasModel(Model):
             tk.log.get(__name__).info(
                 f"Fold{fold + 1}: Loading '{model_path}'... (skip_if_exists)"
             )
-            self.models[fold] = self._load_model(model_path)
+            self.models[fold] = self.load_model(model_path)
         elif fold in self.skip_folds and model_path.exists():
             tk.log.get(__name__).info(
                 f"Fold{fold + 1}: Loading '{model_path}'... (skip_folds)"
             )
-            self.models[fold] = self._load_model(model_path)
+            self.models[fold] = self.load_model(model_path)
         else:
             if self.models[fold] is not None:
                 model = self.models[fold]  # 既にあればそれを使う
             else:
-                model = self.create_model_fn()
-
-            if self.refine_data_loader is not None:
-                base_lr = tf.keras.backend.get_value(model.optimizer.lr)
+                model = self.create_model()
 
             # fit
             tk.hvd.barrier()
@@ -320,7 +312,8 @@ class KerasModel(Model):
 
             # refine
             if self.refine_data_loader is not None:
-                tf.keras.backend.set_value(model.optimizer.lr, base_lr / 100)
+                tk.models.freeze_layers(model, tf.keras.layers.BatchNormalization)
+                self.compile_model(model, mode="refine")
                 tk.models.fit(
                     model,
                     train_set=train_set,
@@ -332,7 +325,7 @@ class KerasModel(Model):
 
             tk.models.save(model, model_path)
             # メモリを食いがちなので学習完了後は再構築する (TODO: 仮)
-            model = self._load_model(model_path)
+            model = self.load_model(model_path)
 
             self.models[fold] = model
 
@@ -394,10 +387,34 @@ class KerasModel(Model):
             on_batch_fn=self.on_batch_fn,
         )
 
-    def _load_model(self, model_path: pathlib.Path) -> tf.keras.models.Model:
-        """モデルの読み込み"""
-        if self.load_model_fn:
-            return self.load_model_fn(model_path)
-        model = self.create_model_fn()
+    def load_model(self, model_path: pathlib.Path) -> tf.keras.models.Model:
+        """モデルの読み込み。必要に応じてオーバーライドする。"""
+        model = self.create_model()
         tk.models.load_weights(model, model_path)
         return model
+
+    def create_model(self, mode: str = "train") -> tf.keras.models.Model:
+        """モデルの作成。必要に応じてオーバーライドする。"""
+        model = self.create_network()
+        self.compile_model(model, mode)
+        return model
+
+    def compile_model(self, model: tf.keras.models.Mode, mode: str = "train") -> None:
+        """モデルのコンパイル。必要に応じてオーバーライドする。"""
+        optimizer = self.create_optimizer(mode)
+        loss, metrics = self.create_loss(model)
+        tk.models.compile(model, optimizer, loss, metrics)
+
+    @abc.abstractmethod
+    def create_network(self) -> tf.keras.models.Model:
+        """ネットワークの作成。"""
+
+    @abc.abstractmethod
+    def create_optimizer(
+        self, mode: str
+    ) -> typing.Union[str, tf.keras.optimizers.Optimizer]:
+        """optimizerの作成。"""
+
+    @abc.abstractmethod
+    def create_loss(self, model: tf.keras.models.Model) -> tuple:
+        """lossとmetricsの作成。"""
