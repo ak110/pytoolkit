@@ -22,14 +22,9 @@ def test_keras_xor(tmpdir):
             x = tf.keras.layers.Activation("relu")(x)
             x = tf.keras.layers.Dense(1, activation="sigmoid")(x)
             model = tf.keras.models.Model(inputs=inputs, outputs=x)
-            tk.models.compile(
-                model, "adam", "binary_crossentropy", [tk.metrics.binary_accuracy]
-            )
             return model
 
-        def create_optimizer(
-            self, mode: str
-        ) -> typing.Union[str, tf.keras.optimizers.Optimizer]:
+        def create_optimizer(self, mode: str) -> tk.models.OptimizerType:
             return "adam"
 
         def create_loss(self, model: tf.keras.models.Model) -> tuple:

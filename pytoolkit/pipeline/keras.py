@@ -410,9 +410,7 @@ class KerasModel(Model, metaclass=abc.ABCMeta):
         """ネットワークの作成。"""
 
     @abc.abstractmethod
-    def create_optimizer(
-        self, mode: str
-    ) -> typing.Union[str, tf.keras.optimizers.Optimizer]:
+    def create_optimizer(self, mode: str) -> tk.models.OptimizerType:
         """optimizerの作成。"""
 
     @abc.abstractmethod

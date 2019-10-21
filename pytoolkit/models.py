@@ -21,6 +21,15 @@ ModelIOType = typing.Union[
 ]
 # predictで使う型
 OnBatchFnType = typing.Callable[[tf.keras.models.Model, ModelIOType], ModelIOType]
+# compileで使う型
+OptimizerType = typing.Union[str, tf.keras.optimizers.Optimizer]
+LossType = typing.Union[
+    str, tf.keras.losses.Loss, typing.Callable[[tf.Tensor, tf.Tensor], tf.Tensor]
+]
+MetricType = typing.Union[
+    str, tf.keras.metrics.Metric, typing.Callable[[tf.Tensor, tf.Tensor], tf.Tensor]
+]
+MetricsType = typing.List[MetricType]
 
 
 def load(
@@ -131,9 +140,9 @@ def plot(
 
 def compile(
     model: tf.keras.models.Model,
-    optimizer: typing.Union[str, tf.keras.optimizers.Optimizer],
-    loss,
-    metrics=None,
+    optimizer: OptimizerType,
+    loss: LossType,
+    metrics: MetricsType = None,
 ):  # pylint: disable=redefined-builtin
     """compileするだけ。"""
     with tk.log.trace_scope("compile"):
