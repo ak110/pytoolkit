@@ -77,3 +77,26 @@ def test_WrappedTranslateY(data_dir, save_dir):
             save_dir / f"Lenna.WrappedTranslateY.{s:+.2f}.png",
             aug.apply(image=img, scale=s),
         )
+
+
+def test_gray_scale(data_dir):
+    """WrappedTranslateX"""
+    img = tk.ndimage.load(data_dir / "Lenna.png", grayscale=True)
+    aug = A.Compose(
+        [
+            A.OneOf(
+                [
+                    tk.image.Standardize(),
+                    tk.image.ToGrayScale(p=0.125),
+                    tk.image.RandomBinarize(p=0.125),
+                ],
+                p=0.25,
+            ),
+            tk.image.RandomRotate(),
+            tk.image.RandomTransform(256, 256),
+            tk.image.RandomColorAugmentors(noisy=True),
+            tk.image.SpeckleNoise(),
+        ]
+    )
+    img = aug(image=img)["image"]
+    assert img.shape == (256, 256, 1)

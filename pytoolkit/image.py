@@ -240,11 +240,12 @@ class RandomColorAugmentors(RandomCompose):
     """色関連のDataAugmentationをいくつかまとめたもの。
 
     Args:
-        noisy (bool): Trueを指定すると細かいノイズ系も有効になる。
+        noisy: Trueを指定すると細かいノイズ系も有効になる。
+        grayscale: RGBではなくグレースケールならTrue。
 
     """
 
-    def __init__(self, noisy=False, p=1):
+    def __init__(self, noisy: bool = False, grayscale: bool = False, p=1):
         argumentors = [
             RandomBrightness(p=0.25),
             RandomContrast(p=0.25),
@@ -264,9 +265,12 @@ class RandomColorAugmentors(RandomCompose):
                     A.IAASharpen(alpha=(0, 0.5), p=0.125),
                     GaussNoise(p=0.125),
                     SpeckleNoise(p=0.125),
-                    A.ISONoise(color_shift=(0, 0.05), intensity=(0, 0.5), p=0.125),
                     A.ImageCompression(quality_lower=50, quality_upper=100, p=0.125),
                 ]
+            )
+        if not grayscale and noisy:
+            argumentors.extend(
+                [A.ISONoise(color_shift=(0, 0.05), intensity=(0, 0.5), p=0.125)]
             )
         super().__init__(argumentors, p=p)
 
@@ -369,6 +373,8 @@ class RandomSaturation(A.ImageOnlyTransform):
         self.alpha = alpha
 
     def apply(self, image, alpha, **params):
+        if image.shape[-1] != 3:
+            return image
         return tk.ndimage.saturation(image, alpha)
 
     def get_params(self):
@@ -387,6 +393,8 @@ class RandomHue(A.ImageOnlyTransform):
         self.beta = beta
 
     def apply(self, image, alpha, beta, **params):
+        if image.shape[-1] != 3:
+            return image
         return tk.ndimage.hue_lite(image, alpha, beta)
 
     def get_params(self):

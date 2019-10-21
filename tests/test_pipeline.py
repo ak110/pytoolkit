@@ -1,5 +1,4 @@
 import pathlib
-import typing
 
 import numpy as np
 import tensorflow as tf
