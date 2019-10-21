@@ -146,7 +146,10 @@ def test_SubpixelConv2D():
 
 
 def test_WSConv2D():
-    _predict_layer(tk.layers.WSConv2D(filters=2), np.zeros((1, 8, 8, 3)))
+    _predict_layer(
+        tk.layers.WSConv2D(filters=2, kernel_size=3, padding="same"),
+        np.zeros((1, 8, 8, 3)),
+    )
 
 
 def test_OctaveConv2D():

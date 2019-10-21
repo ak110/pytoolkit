@@ -841,60 +841,8 @@ class SubpixelConv2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-class WSConv2D(tf.keras.layers.Layer):
+class WSConv2D(tf.keras.layers.Conv2D):
     """Weight StandardizationなConv2D <https://arxiv.org/abs/1903.10520>"""
-
-    def __init__(
-        self,
-        filters,
-        kernel_size=3,
-        strides=1,
-        use_bias=False,
-        activation=None,
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
-        self.filters = filters
-        self.kernel_size = tk.utils.normalize_tuple(kernel_size, 2)
-        self.strides = tk.utils.normalize_tuple(strides, 2)
-        self.activation = tf.keras.activations.get(activation)
-        self.use_bias = use_bias
-        self.kernel = None
-        self.bias = None
-
-    def compute_output_shape(self, input_shape):
-        assert len(input_shape) == 4
-        input_shape = list(input_shape)
-        input_shape[1] = (
-            None
-            if input_shape[1] is None
-            else (input_shape[1] + input_shape[1] % self.strides[0]) // self.strides[0]
-        )
-        input_shape[2] = (
-            None
-            if input_shape[2] is None
-            else (input_shape[2] + input_shape[2] % self.strides[1]) // self.strides[1]
-        )
-        input_shape[-1] = self.filters
-        return tuple(input_shape)
-
-    def build(self, input_shape):
-        in_filters = int(input_shape[-1])
-        self.kernel = self.add_weight(
-            shape=(self.kernel_size[0], self.kernel_size[1], in_filters, self.filters),
-            initializer=tf.keras.initializers.he_uniform(),
-            regularizer=tf.keras.regularizers.l2(1e-4),
-            name="kernel",
-        )
-        if self.use_bias:
-            self.bias = self.add_weight(
-                shape=(self.filters,),
-                initializer=tf.keras.initializers.zeros(),
-                name="bias",
-            )
-        else:
-            self.bias = None
-        super().build(input_shape)
 
     def call(self, inputs, **kwargs):
         del kwargs
@@ -903,23 +851,19 @@ class WSConv2D(tf.keras.layers.Layer):
         kernel_std = K.std(self.kernel, axis=[0, 1, 2])
         kernel = (self.kernel - kernel_mean) / (kernel_std + 1e-5)
 
-        outputs = K.conv2d(inputs, kernel, padding="same", strides=self.strides)
+        outputs = K.conv2d(
+            inputs,
+            kernel,
+            strides=self.strides,
+            padding=self.padding,
+            data_format=self.data_format,
+            dilation_rate=self.dilation_rate,
+        )
         if self.use_bias:
-            outputs = K.bias_add(outputs, self.bias, "channels_last")
+            outputs = K.bias_add(outputs, self.bias, self.data_format)
         if self.activation is not None:
             outputs = self.activation(outputs)
         return outputs
-
-    def get_config(self):
-        config = {
-            "filters": self.filters,
-            "kernel_size": self.kernel_size,
-            "strides": self.strides,
-            "use_bias": self.use_bias,
-            "activation": tf.keras.activations.serialize(self.activation),
-        }
-        base_config = super().get_config()
-        return dict(list(base_config.items()) + list(config.items()))
 
 
 class OctaveConv2D(tf.keras.layers.Layer):
