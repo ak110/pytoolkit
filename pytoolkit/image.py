@@ -60,6 +60,9 @@ class RandomRotate(A.DualTransform):
     def get_params(self):
         return {"degrees": random.uniform(-self.degrees, self.degrees)}
 
+    def get_transform_init_args_names(self):
+        return ("degrees", "expand", "border_mode")
+
 
 class RandomTransform(A.DualTransform):
     """Flip, Scale, Resize, Rotateをまとめて処理。"""
@@ -192,6 +195,25 @@ class RandomTransform(A.DualTransform):
     def targets_as_params(self):
         return ["image"]
 
+    def get_transform_init_args_names(self):
+        return (
+            "width",
+            "height",
+            "flip_h",
+            "flip_v",
+            "translate_h",
+            "translate_v",
+            "scale_prob",
+            "scale_range",
+            "base_scale",
+            "aspect_prob",
+            "aspect_range",
+            "rotate_prob",
+            "rotate_range",
+            "interp",
+            "border_mode",
+        )
+
 
 class Resize(A.DualTransform):
     """リサイズ。"""
@@ -209,6 +231,9 @@ class Resize(A.DualTransform):
 
     def apply_to_keypoint(self, keypoint, **params):
         raise keypoint
+
+    def get_transform_init_args_names(self):
+        return ("width", "height")
 
 
 class RandomColorAugmentors(RandomCompose):
@@ -245,6 +270,9 @@ class RandomColorAugmentors(RandomCompose):
             )
         super().__init__(argumentors, p=p)
 
+    def get_transform_init_args_names(self):
+        return ("noisy",)
+
 
 class GaussNoise(A.ImageOnlyTransform):
     """ガウシアンノイズ。"""
@@ -260,6 +288,9 @@ class GaussNoise(A.ImageOnlyTransform):
     def get_params(self):
         return {"scale": random.uniform(*self.scale)}
 
+    def get_transform_init_args_names(self):
+        return ("scale",)
+
 
 class RandomBlur(A.ImageOnlyTransform):
     """ぼかし。"""
@@ -273,6 +304,9 @@ class RandomBlur(A.ImageOnlyTransform):
 
     def get_params(self):
         return {"sigma": random.uniform(*self.sigma)}
+
+    def get_transform_init_args_names(self):
+        return ("sigma",)
 
 
 class RandomUnsharpMask(A.ImageOnlyTransform):
@@ -289,6 +323,9 @@ class RandomUnsharpMask(A.ImageOnlyTransform):
     def get_params(self):
         return {"alpha": random.uniform(*self.alpha)}
 
+    def get_transform_init_args_names(self):
+        return ("sigma", "alpha")
+
 
 class RandomBrightness(A.ImageOnlyTransform):
     """明度の変更。"""
@@ -302,6 +339,9 @@ class RandomBrightness(A.ImageOnlyTransform):
 
     def get_params(self):
         return {"shift": random.uniform(*self.shift)}
+
+    def get_transform_init_args_names(self):
+        return ("shift",)
 
 
 class RandomContrast(A.ImageOnlyTransform):
@@ -317,6 +357,9 @@ class RandomContrast(A.ImageOnlyTransform):
     def get_params(self):
         return {"alpha": _random_loguniform(*self.alpha)}
 
+    def get_transform_init_args_names(self):
+        return ("alpha",)
+
 
 class RandomSaturation(A.ImageOnlyTransform):
     """彩度の変更。"""
@@ -330,6 +373,9 @@ class RandomSaturation(A.ImageOnlyTransform):
 
     def get_params(self):
         return {"alpha": _random_loguniform(*self.alpha)}
+
+    def get_transform_init_args_names(self):
+        return ("alpha",)
 
 
 class RandomHue(A.ImageOnlyTransform):
@@ -361,6 +407,9 @@ class RandomHue(A.ImageOnlyTransform):
             ),
         }
 
+    def get_transform_init_args_names(self):
+        return ("alpha", "beta")
+
 
 class RandomEqualize(A.ImageOnlyTransform):
     """ヒストグラム平坦化。
@@ -375,6 +424,9 @@ class RandomEqualize(A.ImageOnlyTransform):
     def apply(self, image, **params):
         return tk.ndimage.equalize(image)
 
+    def get_transform_init_args_names(self):
+        return ()
+
 
 class RandomAutoContrast(A.ImageOnlyTransform):
     """オートコントラスト。
@@ -388,6 +440,9 @@ class RandomAutoContrast(A.ImageOnlyTransform):
 
     def apply(self, image, **params):
         return tk.ndimage.auto_contrast(image)
+
+    def get_transform_init_args_names(self):
+        return ()
 
 
 class RandomPosterize(A.ImageOnlyTransform):
@@ -409,6 +464,9 @@ class RandomPosterize(A.ImageOnlyTransform):
 
     def get_params(self):
         return {"bits": random.randint(*self.bits)}
+
+    def get_transform_init_args_names(self):
+        return ("bits",)
 
 
 class RandomAlpha(A.ImageOnlyTransform):
@@ -448,6 +506,9 @@ class RandomAlpha(A.ImageOnlyTransform):
             alpha=self.alpha,
             max_tries=self.max_tries,
         )
+
+    def get_transform_init_args_names(self):
+        return ("alpha", "scale_low", "scale_high", "rate_1", "rate_2", "max_tries")
 
 
 class RandomErasing(A.ImageOnlyTransform):
@@ -532,12 +593,26 @@ class RandomErasing(A.ImageOnlyTransform):
             )
         return image
 
+    def get_transform_init_args_names(self):
+        return (
+            "scale_low",
+            "scale_high",
+            "rate_1",
+            "rate_2",
+            "object_aware",
+            "object_aware_prob",
+            "max_tries",
+        )
+
 
 class Standardize(A.ImageOnlyTransform):
     """標準化。0～255に適当に収める。"""
 
     def apply(self, image, **params):
         return tk.ndimage.standardize(image)
+
+    def get_transform_init_args_names(self):
+        return ()
 
 
 class ToGrayScale(A.ImageOnlyTransform):
@@ -550,6 +625,9 @@ class ToGrayScale(A.ImageOnlyTransform):
         image = np.tile(np.expand_dims(image, axis=-1), (1, 1, start_shape[-1]))
         assert image.shape == start_shape
         return image
+
+    def get_transform_init_args_names(self):
+        return ()
 
 
 class RandomBinarize(A.ImageOnlyTransform):
@@ -565,6 +643,9 @@ class RandomBinarize(A.ImageOnlyTransform):
 
     def get_params(self):
         return {"threshold": random.uniform(*self.threshold)}
+
+    def get_transform_init_args_names(self):
+        return ("threshold",)
 
 
 class SpeckleNoise(A.ImageOnlyTransform):
@@ -588,6 +669,9 @@ class SpeckleNoise(A.ImageOnlyTransform):
     def get_params(self):
         return {"scale": random.uniform(*self.scale)}
 
+    def get_transform_init_args_names(self):
+        return ("scale",)
+
 
 class WrappedTranslateX(A.ImageOnlyTransform):
     """水平に移動してはみ出た分を反対側にくっつける。"""
@@ -604,6 +688,9 @@ class WrappedTranslateX(A.ImageOnlyTransform):
     def get_params(self):
         return {"scale": random.uniform(*self.scale)}
 
+    def get_transform_init_args_names(self):
+        return ("scale",)
+
 
 class WrappedTranslateY(A.ImageOnlyTransform):
     """垂直に移動してはみ出た分を反対側にくっつける。"""
@@ -619,6 +706,9 @@ class WrappedTranslateY(A.ImageOnlyTransform):
 
     def get_params(self):
         return {"scale": random.uniform(*self.scale)}
+
+    def get_transform_init_args_names(self):
+        return ("scale",)
 
 
 def _random_loguniform(lower: float, upper: float) -> float:
