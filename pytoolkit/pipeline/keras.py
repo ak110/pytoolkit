@@ -26,6 +26,9 @@ class KerasModel(Model, metaclass=abc.ABCMeta):
         model_name_format: モデルのファイル名のフォーマット。{fold}のところに数字が入る。
         skip_if_exists: cv()でモデルが存在するときスキップするならTrue。
         skip_folds: cv()で（skip_if_existsとは関係なく）スキップするfold。[0, nfold)
+        epochs: tk.models.fit()のパラメータ
+        refine_epochs: tk.models.fit()のパラメータ (refine時)
+        callbacks: tk.models.fit()のパラメータ
         fit_params: tk.models.fit()のパラメータ
         use_horovod: 推論時にMPIによる分散処理をするか否か。(学習時は常にTrue)
         parallel_cv: lgb.cvなどのように全foldまとめて処理するならTrue
@@ -43,6 +46,9 @@ class KerasModel(Model, metaclass=abc.ABCMeta):
         val_data_loader: tk.data.DataLoader,
         refine_data_loader: tk.data.DataLoader = None,
         *,
+        epochs: int,
+        refine_epochs: int = 50,
+        callbacks: typing.List[tf.keras.callbacks.Callback] = None,
         models_dir: tk.typing.PathLike,
         model_name_format: str = "model.fold{fold}.h5",
         skip_if_exists: bool = True,
@@ -62,6 +68,9 @@ class KerasModel(Model, metaclass=abc.ABCMeta):
         self.model_name_format = model_name_format
         self.skip_if_exists = skip_if_exists
         self.skip_folds = skip_folds
+        self.epochs = epochs
+        self.refine_epochs = refine_epochs
+        self.callbacks = callbacks
         self.fit_params = fit_params
         self.use_horovod = use_horovod
         self.parallel_cv = parallel_cv
@@ -182,6 +191,8 @@ class KerasModel(Model, metaclass=abc.ABCMeta):
             steps_per_epoch=-(-len(train_sets[0]) // self.train_data_loader.batch_size),
             validation_data=generator(val_sets, self.val_data_loader),
             validation_steps=-(-len(val_sets[0]) // self.val_data_loader.batch_size),
+            epochs=self.epochs,
+            callbacks=self.callbacks,
             **(self.fit_params or {}),
         )
 
@@ -285,19 +296,22 @@ class KerasModel(Model, metaclass=abc.ABCMeta):
 
         if self.skip_if_exists and model_path.exists():
             tk.log.get(__name__).info(
-                f"Fold{fold + 1}: Loading '{model_path}'... (skip_if_exists)"
+                f"Fold {fold + 1}: Loading '{model_path}'... (skip_if_exists)"
             )
             self.models[fold] = self.load_model(model_path)
+            trained = False
         elif fold in self.skip_folds and model_path.exists():
             tk.log.get(__name__).info(
-                f"Fold{fold + 1}: Loading '{model_path}'... (skip_folds)"
+                f"Fold {fold + 1}: Loading '{model_path}'... (skip_folds)"
             )
             self.models[fold] = self.load_model(model_path)
+            trained = False
         else:
             if self.models[fold] is not None:
                 model = self.models[fold]  # 既にあればそれを使う
             else:
                 model = self.create_model()
+            trained = True
 
             # fit
             tk.hvd.barrier()
@@ -307,11 +321,16 @@ class KerasModel(Model, metaclass=abc.ABCMeta):
                 train_data_loader=self.train_data_loader,
                 val_set=val_set,
                 val_data_loader=self.val_data_loader,
+                epochs=self.epochs,
+                callbacks=self.callbacks,
                 **(self.fit_params or {}),
             )
 
             # refine
             if self.refine_data_loader is not None:
+                tk.log.get(__name__).info(
+                    f"Fold {fold + 1}: Refining {self.refine_epochs} epochs..."
+                )
                 tk.models.freeze_layers(model, tf.keras.layers.BatchNormalization)
                 self.compile_model(model, mode="refine")
                 tk.models.fit(
@@ -320,13 +339,10 @@ class KerasModel(Model, metaclass=abc.ABCMeta):
                     train_data_loader=self.refine_data_loader,
                     val_set=val_set,
                     val_data_loader=self.val_data_loader,
-                    epochs=50,
+                    epochs=self.refine_epochs,
                 )
 
             tk.models.save(model, model_path)
-            # メモリを食いがちなので学習完了後は再構築する (TODO: 仮)
-            model = self.load_model(model_path)
-
             self.models[fold] = model
 
         # 訓練データと検証データの評価
@@ -334,7 +350,16 @@ class KerasModel(Model, metaclass=abc.ABCMeta):
         self.evaluate(train_set, prefix="", fold=fold)
         if val_set is None:
             return None
-        return self.evaluate(val_set, prefix="val_", fold=fold)
+        evals = self.evaluate(val_set, prefix="val_", fold=fold)
+
+        # メモリを食いがちなので学習完了後は再構築する
+        if trained:
+            del model
+            self.models[fold] = None
+            tk.hvd.clear()
+            self.models[fold] = self.load_model(model_path)
+
+        return evals
 
     def evaluate(
         self, dataset: tk.data.Dataset, prefix: str = "", fold: int = 0

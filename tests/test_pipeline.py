@@ -32,16 +32,14 @@ def test_keras_xor(tmpdir):
     model = MyModel(
         train_data_loader=tk.data.DataLoader(),
         val_data_loader=tk.data.DataLoader(),
-        fit_params={
-            "epochs": 8,
-            "verbose": 2,
-            "callbacks": [
-                tk.callbacks.LearningRateStepDecay(),
-                tk.callbacks.CosineAnnealing(),
-                tk.callbacks.TSVLogger(models_dir / "history.tsv"),
-                tk.callbacks.Checkpoint(models_dir / "checkpoint.h5"),
-            ],
-        },
+        epochs=8,
+        callbacks=[
+            tk.callbacks.LearningRateStepDecay(),
+            tk.callbacks.CosineAnnealing(),
+            tk.callbacks.TSVLogger(models_dir / "history.tsv"),
+            tk.callbacks.Checkpoint(models_dir / "checkpoint.h5"),
+        ],
+        fit_params={"verbose": 2},
         models_dir=models_dir,
         model_name_format="model.h5",
         use_horovod=True,
