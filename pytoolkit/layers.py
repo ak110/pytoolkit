@@ -4,18 +4,12 @@ import tensorflow as tf
 
 import pytoolkit as tk
 
+from . import utils as tk_utils
+
 K = tf.keras.backend
 
 
-def get_custom_objects():
-    """独自オブジェクトのdictを返す。"""
-    return {
-        name: obj
-        for name, obj in globals().items()
-        if isinstance(obj, type) and issubclass(obj, tf.keras.layers.Layer)
-    }
-
-
+@tk_utils.register_keras_custom_object
 class ConvertColor(tf.keras.layers.Layer):
     """ColorNet <https://arxiv.org/abs/1902.00267> 用の色変換とついでにスケーリング。
 
@@ -118,6 +112,7 @@ class ConvertColor(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+@tk_utils.register_keras_custom_object
 class RemoveMask(tf.keras.layers.Layer):
     """マスクを取り除く。"""
 
@@ -134,6 +129,7 @@ class RemoveMask(tf.keras.layers.Layer):
         return inputs
 
 
+@tk_utils.register_keras_custom_object
 class Resize2D(tf.keras.layers.Layer):
     """リサイズ。
 
@@ -196,6 +192,7 @@ class Resize2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+@tk_utils.register_keras_custom_object
 class Pad2D(tf.keras.layers.Layer):
     """tf.padするレイヤー。"""
 
@@ -247,6 +244,7 @@ class Pad2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+@tk_utils.register_keras_custom_object
 class PadChannel2D(tf.keras.layers.Layer):
     """チャンネルに対してtf.padするレイヤー。"""
 
@@ -284,6 +282,7 @@ class PadChannel2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+@tk_utils.register_keras_custom_object
 class CoordChannel1D(tf.keras.layers.Layer):
     """CoordConvなレイヤー。
 
@@ -309,6 +308,7 @@ class CoordChannel1D(tf.keras.layers.Layer):
         return K.concatenate([inputs] + [pad_channel], axis=-1)
 
 
+@tk_utils.register_keras_custom_object
 class CoordChannel2D(tf.keras.layers.Layer):
     """CoordConvなレイヤー。
 
@@ -354,6 +354,7 @@ class CoordChannel2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+@tk_utils.register_keras_custom_object
 class ChannelPair2D(tf.keras.layers.Layer):
     """チャンネル同士の2個の組み合わせの積。"""
 
@@ -369,32 +370,7 @@ class ChannelPair2D(tf.keras.layers.Layer):
         )
 
 
-class StocasticAdd(tf.keras.layers.Layer):
-    """Stochastic Depth <http://arxiv.org/abs/1603.09382>"""
-
-    def __init__(self, drop_rate, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.drop_rate = drop_rate
-
-    def compute_output_shape(self, input_shape):
-        assert len(input_shape) == 2
-        assert input_shape[0] == input_shape[1]
-        return input_shape[0]
-
-    def call(self, inputs, training=None, **kwargs):  # pylint: disable=arguments-differ
-        del kwargs
-        base, residual = inputs
-
-        def _train():
-            drop = K.random_binomial((), p=self.drop_rate)
-            return K.switch(drop, lambda: base, lambda: base + residual)
-
-        def _test():
-            return base + residual * self.drop_rate
-
-        return K.in_train_phase(_train, _test, training)
-
-
+@tk_utils.register_keras_custom_object
 class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
     """Sync BN。"""
 
@@ -450,6 +426,7 @@ class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
         return inputs * K.cast(a, K.dtype(inputs)) + K.cast(b, K.dtype(inputs))
 
 
+@tk_utils.register_keras_custom_object
 class GroupNormalization(tf.keras.layers.Layer):
     """Group Normalization。
 
@@ -571,6 +548,7 @@ class GroupNormalization(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+@tk_utils.register_keras_custom_object
 class InstanceNormalization(tf.keras.layers.Layer):
     """Instance Normalization"""
 
@@ -663,6 +641,7 @@ class InstanceNormalization(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+@tk_utils.register_keras_custom_object
 class MixFeat(tf.keras.layers.Layer):
     """MixFeat <https://openreview.net/forum?id=HygT9oRqFX>"""
 
@@ -710,6 +689,7 @@ class MixFeat(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+@tk_utils.register_keras_custom_object
 class DropActivation(tf.keras.layers.Layer):
     """Drop-Activation <https://arxiv.org/abs/1811.05850>"""
 
@@ -738,6 +718,7 @@ class DropActivation(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+@tk_utils.register_keras_custom_object
 class ParallelGridPooling2D(tf.keras.layers.Layer):
     """Parallel Grid Poolingレイヤー。
 
@@ -784,6 +765,7 @@ class ParallelGridPooling2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+@tk_utils.register_keras_custom_object
 class ParallelGridGather(tf.keras.layers.Layer):
     """ParallelGridPoolingでparallelにしたのを戻すレイヤー。"""
 
@@ -812,6 +794,7 @@ class ParallelGridGather(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+@tk_utils.register_keras_custom_object
 class SubpixelConv2D(tf.keras.layers.Layer):
     """Sub-Pixel Convolutional Layer。
 
@@ -841,6 +824,7 @@ class SubpixelConv2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+@tk_utils.register_keras_custom_object
 class WSConv2D(tf.keras.layers.Conv2D):
     """Weight StandardizationなConv2D <https://arxiv.org/abs/1903.10520>"""
 
@@ -866,93 +850,14 @@ class WSConv2D(tf.keras.layers.Conv2D):
         return outputs
 
 
-class OctaveConv2D(tf.keras.layers.Layer):
-    """Octave Convolutional Layer <https://arxiv.org/abs/1904.05049>"""
-
-    def __init__(self, filters, strides=1, alpha=0.5, **kwargs):
-        super().__init__(**kwargs)
-        self.filters = filters
-        self.alpha = alpha
-        self.strides = tk.utils.normalize_tuple(strides, 2)
-        self.filters_l = int(self.filters * self.alpha)
-        self.filters_h = self.filters - self.filters_l
-        self.kernel_ll = None
-        self.kernel_hl = None
-        self.kernel_lh = None
-        self.kernel_hh = None
-
-    def compute_output_shape(self, input_shape):
-        assert len(input_shape) == 2
-        assert len(input_shape[0]) == 4 and len(input_shape[1]) == 4
-        assert input_shape[0][1] * 2 == input_shape[1][1]
-        assert input_shape[0][2] * 2 == input_shape[1][2]
-        input_shape = [list(input_shape[0]), list(input_shape[1])]
-        input_shape[0][-1] = self.filters_l
-        input_shape[1][-1] = self.filters_h
-        return [tuple(input_shape[0]), tuple(input_shape[1])]
-
-    def build(self, input_shape):
-        in_filters_l = int(input_shape[0][-1])
-        in_filters_h = int(input_shape[1][-1])
-        self.kernel_ll = self.add_weight(
-            shape=(3, 3, in_filters_l, self.filters_l),
-            initializer=tf.keras.initializers.he_uniform(),
-            regularizer=tf.keras.regularizers.l2(1e-4),
-            name="kernel_ll",
-        )
-        self.kernel_hl = self.add_weight(
-            shape=(3, 3, in_filters_h, self.filters_l),
-            initializer=tf.keras.initializers.he_uniform(),
-            regularizer=tf.keras.regularizers.l2(1e-4),
-            name="kernel_hl",
-        )
-        self.kernel_lh = self.add_weight(
-            shape=(3, 3, in_filters_l, self.filters_h),
-            initializer=tf.keras.initializers.he_uniform(),
-            regularizer=tf.keras.regularizers.l2(1e-4),
-            name="kernel_lh",
-        )
-        self.kernel_hh = self.add_weight(
-            shape=(3, 3, in_filters_h, self.filters_h),
-            initializer=tf.keras.initializers.he_uniform(),
-            regularizer=tf.keras.regularizers.l2(1e-4),
-            name="kernel_hh",
-        )
-        super().build(input_shape)
-
-    def call(self, inputs, **kwargs):
-        del kwargs
-        input_l, input_h = inputs
-
-        ll = K.conv2d(input_l, self.kernel_ll, padding="same", strides=self.strides)
-
-        hl = K.pool2d(input_h, (2, 2), (2, 2), padding="same", pool_mode="avg")
-        hl = K.conv2d(hl, self.kernel_hl, padding="same", strides=self.strides)
-
-        lh = K.conv2d(input_l, self.kernel_lh, padding="same", strides=self.strides)
-        lh = K.resize_images(
-            lh, 2, 2, data_format="channels_last", interpolation="bilinear"
-        )
-
-        hh = K.conv2d(input_h, self.kernel_hh, padding="same", strides=self.strides)
-
-        output_l = ll + hl
-        output_h = hh + lh
-        return [output_l, output_h]
-
-    def get_config(self):
-        config = {"filters": self.filters, "strides": self.strides, "alpha": self.alpha}
-        base_config = super().get_config()
-        return dict(list(base_config.items()) + list(config.items()))
-
-
+@tk_utils.register_keras_custom_object
 class BlurPooling2D(tf.keras.layers.Layer):
     """Blur Pooling Layer <https://arxiv.org/abs/1904.11486>"""
 
     def __init__(self, taps=5, strides=2, **kwargs):
         super().__init__(**kwargs)
         self.taps = taps
-        self.strides = tk.utils.normalize_tuple(strides, 2)
+        self.strides = tk_utils.normalize_tuple(strides, 2)
 
     def compute_output_shape(self, input_shape):
         assert len(input_shape) == 4
@@ -990,6 +895,7 @@ class BlurPooling2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+@tk_utils.register_keras_custom_object
 class ScaleValue(tf.keras.layers.Layer):
     """値だけをスケーリングしてシフトするレイヤー。回帰の出力前とかに。"""
 
@@ -1019,6 +925,7 @@ class ScaleValue(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+@tk_utils.register_keras_custom_object
 class ScaleGradient(tf.keras.layers.Layer):
     """勾配だけをスケーリングするレイヤー。転移学習するときとかに。"""
 
@@ -1047,6 +954,7 @@ class ScaleGradient(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+@tk_utils.register_keras_custom_object
 class ImputeNaN(tf.keras.layers.Layer):
     """NaNを適当な値に変換する層。"""
 
@@ -1096,76 +1004,7 @@ class ImputeNaN(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-class SoftGate(tf.keras.layers.Layer):
-    """LIP用の層。sigmoidして定数倍するだけ。"""
-
-    def __init__(self, coeff=12.0, **kwargs):
-        super().__init__(**kwargs)
-        self.coeff = coeff
-
-    def compute_output_shape(self, input_shape):
-        return input_shape
-
-    def call(self, inputs, **kwargs):
-        del kwargs
-        return K.sigmoid(inputs) * self.coeff
-
-    def get_config(self):
-        config = {"coeff": self.coeff}
-        base_config = super().get_config()
-        return dict(list(base_config.items()) + list(config.items()))
-
-
-class LIP2D(tf.keras.layers.Layer):
-    """LIP <https://arxiv.org/abs/1908.04156>"""
-
-    def __init__(self, pool_size=3, strides=2, padding="same", **kargs):
-        super().__init__(**kargs)
-        self.pool_size = tk.utils.normalize_tuple(pool_size, 2)
-        self.strides = tk.utils.normalize_tuple(strides, 2)
-        self.padding = padding
-
-    def compute_output_shape(self, input_shape):
-        return tf.keras.layers.AveragePooling2D(
-            pool_size=self.pool_size, strides=self.strides, padding=self.padding
-        ).compute_output_shape(input_shape[0])
-
-    def call(self, inputs, **kwargs):
-        del kwargs
-        x, logit = inputs
-
-        weights = K.exp(logit)
-        x = x * weights
-        x = K.pool2d(
-            x,
-            self.pool_size,
-            self.strides,
-            self.padding,
-            "channels_last",
-            pool_mode="avg",
-        )
-        weights = K.pool2d(
-            weights,
-            self.pool_size,
-            self.strides,
-            self.padding,
-            "channels_last",
-            pool_mode="avg",
-        )
-        outputs = x / weights
-
-        return outputs
-
-    def get_config(self):
-        config = {
-            "pool_size": self.pool_size,
-            "strides": self.strides,
-            "padding": self.padding,
-        }
-        base_config = super().get_config()
-        return dict(list(base_config.items()) + list(config.items()))
-
-
+@tk_utils.register_keras_custom_object
 class GeM2D(tf.keras.layers.Layer):
     """Generalized Mean Pooling (GeM) <https://github.com/filipradenovic/cnnimageretrieval-pytorch>"""
 
@@ -1191,6 +1030,7 @@ class GeM2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+@tk_utils.register_keras_custom_object
 class PositionalEncoding(tf.keras.layers.Layer):
     """Positional Encodingレイヤー。
 
@@ -1221,6 +1061,7 @@ class PositionalEncoding(tf.keras.layers.Layer):
         return inputs + pe
 
 
+@tk_utils.register_keras_custom_object
 class MultiHeadAttention(tf.keras.layers.Layer):
     """Multi-head Attetion"""
 
@@ -1323,6 +1164,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+@tk_utils.register_keras_custom_object
 class MultiHeadAttention2D(tf.keras.layers.Layer):
     """Multi-head Attetionの2D版のようなもの。(怪)"""
 

@@ -51,7 +51,11 @@ class App:
         return _decorator
 
     def command(
-        self, logfile: bool = True, then: str = None, use_horovod: bool = False
+        self,
+        logfile: bool = True,
+        then: str = None,
+        use_horovod: bool = False,
+        args: typing.Dict[str, typing.Dict[str, typing.Any]] = None,
     ):
         """コマンドの追加用デコレーター。
 
@@ -59,6 +63,7 @@ class App:
             logfile: ログファイルを出力するのか否か
             then: 当該コマンドが終わった後に続けて実行するコマンドの名前
             use_horovod: horovodを使うならTrue
+            args: add_argumentの引数。(例: args={"--x": {"type": int}})
 
         """
         assert not logfile or self.output_dir is not None
@@ -71,16 +76,17 @@ class App:
                 "logfile": logfile,
                 "then": then,
                 "use_horovod": use_horovod,
+                "args": args,
             }
             return func
 
         return _decorator
 
-    def run(self, argv: list = None, default: str = None):
+    def run(self, argv: typing.Sequence[str] = None, default: str = None):
         """実行。
 
         Args:
-            args: 引数。(既定値はsys.argv)
+            argv: 引数。(既定値はsys.argv)
             default: 未指定時に実行するコマンド名 (既定値は先頭のコマンド)
 
         """
@@ -91,17 +97,20 @@ class App:
                 "logfile": False,
                 "then": None,
                 "use_horovod": False,
+                "args": None,
             }
-        command_names = list(commands)
-        default = default or command_names[0]
+        default = default or list(commands)[0]
 
         parser = argparse.ArgumentParser()
-        parser.add_argument(
-            "command", choices=command_names, nargs="?", default=default
-        )
-        args = parser.parse_args(argv)
+        subparsers = parser.add_subparsers(dest="command")
+        for command_name, command in commands.items():
+            p = subparsers.add_parser(command_name)
+            for k, v in (command["args"] or {}).items():
+                p.add_argument(k, **v)
+        args = vars(parser.parse_args(argv))
 
-        self.current_command = args.command
+        self.current_command = args["command"] or default
+        args.pop("command")
         while True:
             assert self.current_command is not None
             command = commands[self.current_command]
@@ -121,7 +130,7 @@ class App:
                     f()
             try:
                 with tk.log.trace_scope(command["func"].__qualname__):
-                    command["func"]()
+                    command["func"](**args)
             except BaseException as e:
                 # KeyboardInterrupt以外で、かつ
                 # ログファイルを出力する(ような重要な)コマンドの場合のみ通知を送信
@@ -138,6 +147,7 @@ class App:
             self.current_command = command["then"]
             if self.current_command is None:
                 break
+            args = {}
 
     def _ipy(self):
         """自動追加されるコマンド。ipython。"""

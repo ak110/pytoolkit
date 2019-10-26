@@ -42,9 +42,31 @@ def binary_focal_loss(
         alpha (float or None): class 1の重み。論文では0.25。
 
     """
-    loss = tk.backend.binary_focal_loss(
-        y_true, y_pred, gamma=gamma, from_logits=from_logits, alpha=alpha
-    )
+    assert alpha is None or 0 <= alpha <= 1
+
+    if from_logits:
+        y_pred, y_logit = K.sigmoid(y_pred), y_pred
+    else:
+        y_logit = tk.backend.logit(y_pred)
+
+    y_pred_inv = K.cast(1 - tk.backend.clip64(y_pred), "float32")
+
+    # 前提知識:
+    # -log(sigmoid(x)) = log(1 + exp(-x))
+    #                  = -x + log(exp(x) + 1)
+    #                  = -x + log1p(exp(x))
+    # -log(1 - sigmoid(x)) = log(exp(x) + 1)
+    #                      = log1p(exp(x))
+
+    t = tf.math.log1p(K.exp(y_logit))
+    loss1 = y_true * (y_pred_inv ** gamma) * (-y_logit + t)
+    loss2 = (1 - y_true) * (y_pred ** gamma) * t
+
+    if alpha is None:
+        loss = loss1 + loss2
+    else:
+        loss = (2 * alpha) * loss1 + (2 * (1 - alpha)) * loss2
+
     return reduce(loss, reduce_mode)
 
 

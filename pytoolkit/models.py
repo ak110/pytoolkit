@@ -38,10 +38,7 @@ def load(
     compile: bool = False,  # pylint: disable=redefined-outer-name
 ):
     """モデルの読み込み。"""
-    path = pathlib.Path(path)
     with tk.log.trace_scope(f"load({path})"):
-        custom_objects = custom_objects.copy() if custom_objects else {}
-        custom_objects.update(tk.get_custom_objects())
         model = tf.keras.models.load_model(
             str(path), custom_objects=custom_objects, compile=compile
         )

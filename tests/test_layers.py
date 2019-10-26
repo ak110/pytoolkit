@@ -152,11 +152,6 @@ def test_WSConv2D():
     )
 
 
-def test_OctaveConv2D():
-    X = [np.zeros((1, 4, 4, 8)), np.zeros((1, 8, 8, 8))]
-    _predict_layer(tk.layers.OctaveConv2D(filters=4), X)
-
-
 def test_BlurPooling2D():
     X = np.zeros((1, 5, 5, 2))
     X[0, 2, 2, 0] = 1

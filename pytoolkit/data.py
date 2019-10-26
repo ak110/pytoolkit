@@ -392,9 +392,10 @@ class RandomIterator(Iterator):
     def sample_batch_indices(self, index: int) -> typing.Sequence[int]:
         """1ミニバッチ分のindexの配列を返す。"""
         offset = self.batch_size * index
-        return sum(
-            [indices[offset : offset + self.batch_size] for indices in self.indices], []
-        )
+        indices_list = [
+            indices[offset : offset + self.batch_size] for indices in self.indices
+        ]
+        return sum(indices_list, [])
 
     @staticmethod
     def _generate_shuffled_indices(data_count):

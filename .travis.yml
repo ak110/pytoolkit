@@ -17,6 +17,6 @@ install:
 script:
   - black --check .
   - flake8
-  - mypy pytoolkit scripts
+  - mypy pytoolkit scripts tests
   - pylint --jobs=4 pytoolkit scripts
   - pytest

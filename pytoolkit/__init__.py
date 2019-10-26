@@ -33,11 +33,3 @@ from . import (
     vis,
     web,
 )
-
-
-def get_custom_objects():
-    """独自オブジェクトのdictを返す。"""
-    custom_objects = {}
-    custom_objects.update(layers.get_custom_objects())
-    custom_objects.update(optimizers.get_custom_objects())
-    return custom_objects

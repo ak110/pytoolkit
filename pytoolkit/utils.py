@@ -9,6 +9,7 @@ import typing
 
 import joblib
 import numpy as np
+import tensorflow as tf
 
 import pytoolkit as tk
 
@@ -30,6 +31,12 @@ def normalize_tuple(value, n: int) -> tuple:
         value = tuple(value)
         assert len(value) == n
         return value
+
+
+def register_keras_custom_object(cls):
+    """tf.kerasのcustom_objectsに登録するデコレーター。"""
+    tf.keras.utils.get_custom_objects()[cls.__name__] = cls
+    return cls
 
 
 def memoize(func):
