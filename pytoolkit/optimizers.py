@@ -12,14 +12,11 @@ K = tf.keras.backend
 class SGDEx(tf.keras.optimizers.SGD):
     """重み別に学習率の係数を設定できるSGD。
 
-    lr_multipliersは、Layerをキーとし、学習率の係数を値としたdict。
+    lr_multipliersは、Layerまたは各weightのnameをキーとし、学習率の係数を値としたdict。
 
-    # 例
+    例::
 
-    ```py
-    lr_multipliers = {}
-    lr_multipliers.update(zip(basenet.layers, [0.01] * len(basenet.layers)))
-    ```
+        lr_multipliers = {basenet: 0.1}
 
     """
 

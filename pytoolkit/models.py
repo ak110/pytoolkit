@@ -245,18 +245,21 @@ def make_validation_freq(
     """validation_freqをほどよい感じに作成する。"""
     if val_set is None:
         return None
-    # ・sqrt(epochs)回くらいやれば十分？ (指標にも依るが…)
-    # ・valがtrainの10%未満くらいなら毎回やっても問題無い
+    # sqrt(epochs)回くらいやれば十分？ (指標にも依るが…)
+    # valがtrainの10%未満くらいなら毎回やっても問題無い
     validation_freq = max(
         int(np.sqrt(epochs)),
         int(len(val_set) / (len(train_set) * max_val_per_train)),
         1,
     )
-    # ・最低でも10回くらいはやりたい
+    # 最低でも10回くらいはやりたい
     validation_freq = min(validation_freq, max(1, epochs // 10))
     # 最後のepochはvalidationしたいので、そこからvalidation_freq毎に。
-    validation_freq = list(range(epochs, 0, -validation_freq))
-    return validation_freq
+    validation_list = list(range(epochs, 0, -validation_freq))
+    # あまり早いepochではやらない
+    if len(validation_list) >= 2 and validation_list[0] < validation_freq:
+        validation_list = validation_list[1:]
+    return validation_list
 
 
 def make_callbacks(callbacks, training: bool) -> list:

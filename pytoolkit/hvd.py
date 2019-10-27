@@ -21,6 +21,11 @@ def init() -> None:
     if not _initialized:
         try:
             get().init()
+
+            # mpi4pyを使うにはmulti-threadingが必要らしい
+            # https://github.com/horovod/horovod#mpi4py
+            assert get().mpi_threads_supported()
+
             gpus = tf.config.experimental.list_physical_devices("GPU")
             for gpu in gpus:
                 tf.config.experimental.set_memory_growth(gpu, True)
@@ -133,9 +138,6 @@ def barrier() -> None:
     """全員が揃うまで待つ。"""
     if not initialized():
         return
-    import mpi4py
-
-    mpi4py.rc.initialize = False
     from mpi4py import MPI
 
     comm = MPI.COMM_WORLD
@@ -146,9 +148,6 @@ def bcast(buf, root=0):
     """MPI_Bcastを呼び出す。"""
     if not initialized():
         return buf
-    import mpi4py
-
-    mpi4py.rc.initialize = False
     from mpi4py import MPI
 
     comm = MPI.COMM_WORLD
