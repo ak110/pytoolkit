@@ -313,6 +313,9 @@ class KerasModel(Model, metaclass=abc.ABCMeta):
                 model = self.create_model()
             trained = True
 
+            if self.refine_data_loader is not None:
+                start_lr = tf.keras.backend.get_value(model.optimizer.lr)
+
             # fit
             tk.hvd.barrier()
             tk.models.fit(
@@ -332,7 +335,8 @@ class KerasModel(Model, metaclass=abc.ABCMeta):
                     f"Fold {fold + 1}: Refining {self.refine_epochs} epochs..."
                 )
                 tk.models.freeze_layers(model, tf.keras.layers.BatchNormalization)
-                self.compile_model(model, mode="refine")
+                tk.models.recompile(model)
+                tf.keras.backend.set_value(model.optimizer.lr, start_lr / 100)
                 tk.models.fit(
                     model,
                     train_set=train_set,

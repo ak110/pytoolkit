@@ -150,7 +150,25 @@ def compile(
             )
         # Horovod: Specify `experimental_run_tf_function=False` to ensure TensorFlow
         # uses hvd.DistributedOptimizer() to compute gradients.
-        model.compile(optimizer, loss, metrics, experimental_run_tf_function=False)
+        model.compile(
+            optimizer=optimizer,
+            loss=loss,
+            metrics=metrics,
+            experimental_run_tf_function=False,
+        )
+
+
+def recompile(model: tf.keras.models.Model):
+    """optimizerなどを再利用してコンパイル。"""
+    with tk.log.trace_scope("recompile"):
+        # Horovod: Specify `experimental_run_tf_function=False` to ensure TensorFlow
+        # uses hvd.DistributedOptimizer() to compute gradients.
+        model.compile(
+            optimizer=model.optimizer,
+            loss=model.loss,
+            metrics=model.metrics,
+            experimental_run_tf_function=False,
+        )
 
 
 def fit(
