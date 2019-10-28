@@ -1,5 +1,4 @@
 """DeepLearning(主にKeras)関連。"""
-import csv
 import pathlib
 import time
 
@@ -24,9 +23,9 @@ class LearningRateStepDecay(tf.keras.callbacks.Callback):
 
     def on_train_begin(self, logs=None):
         del logs
-        if not hasattr(self.model.optimizer, "lr"):
-            raise ValueError('Optimizer must have a "lr" attribute.')
-        self.start_lr = float(K.get_value(self.model.optimizer.lr))
+        if not hasattr(self.model.optimizer, "learning_rate"):
+            raise ValueError('Optimizer must have a "learning_rate" attribute.')
+        self.start_lr = float(K.get_value(self.model.optimizer.learning_rate))
         epochs = self.epochs or self.params["epochs"]
         self.reduce_epochs = [
             min(max(int(epochs * r), 1), epochs) for r in self.reduce_epoch_rates
@@ -35,9 +34,9 @@ class LearningRateStepDecay(tf.keras.callbacks.Callback):
     def on_epoch_begin(self, epoch, logs=None):
         del logs
         if epoch + 1 in self.reduce_epochs:
-            lr1 = K.get_value(self.model.optimizer.lr)
+            lr1 = K.get_value(self.model.optimizer.learning_rate)
             lr2 = lr1 * self.factor
-            K.set_value(self.model.optimizer.lr, lr2)
+            K.set_value(self.model.optimizer.learning_rate, lr2)
             tk.log.get(__name__).info(
                 f"Epoch {epoch + 1}: Learning rate {lr1:.1e} -> {lr2:.1e}"
             )
@@ -45,7 +44,7 @@ class LearningRateStepDecay(tf.keras.callbacks.Callback):
     def on_train_end(self, logs=None):
         del logs
         # 終わったら戻しておく
-        K.set_value(self.model.optimizer.lr, self.start_lr)
+        K.set_value(self.model.optimizer.learning_rate, self.start_lr)
 
 
 class CosineAnnealing(tf.keras.callbacks.Callback):
@@ -66,93 +65,25 @@ class CosineAnnealing(tf.keras.callbacks.Callback):
 
     def on_train_begin(self, logs=None):
         del logs
-        if not hasattr(self.model.optimizer, "lr"):
-            raise ValueError('Optimizer must have a "lr" attribute.')
-        self.start_lr = float(K.get_value(self.model.optimizer.lr))
+        if not hasattr(self.model.optimizer, "learning_rate"):
+            raise ValueError('Optimizer must have a "learning_rate" attribute.')
+        self.start_lr = float(K.get_value(self.model.optimizer.learning_rate))
 
     def on_epoch_begin(self, epoch, logs=None):
         del logs
         lr_max = self.start_lr
         lr_min = self.start_lr * self.factor
         if epoch + 1 < self.warmup_epochs:
-            lr = lr_max * (epoch + 1) / self.warmup_epochs
+            learning_rate = lr_max * (epoch + 1) / self.warmup_epochs
         else:
             r = (epoch + 1) / (self.epochs or self.params["epochs"])
-            lr = lr_min + 0.5 * (lr_max - lr_min) * (1 + np.cos(np.pi * r))
-        K.set_value(self.model.optimizer.lr, float(lr))
+            learning_rate = lr_min + 0.5 * (lr_max - lr_min) * (1 + np.cos(np.pi * r))
+        K.set_value(self.model.optimizer.learning_rate, float(learning_rate))
 
     def on_train_end(self, logs=None):
         del logs
         # 終わったら戻しておく
-        K.set_value(self.model.optimizer.lr, self.start_lr)
-
-
-class TSVLogger(tf.keras.callbacks.Callback):
-    """ログを保存するコールバック。Horovod使用時はrank() == 0のみ有効。
-
-    Args:
-        filename: 保存先ファイル名。「{metric}」はmetricの値に置換される。str or pathlib.Path
-        append: 追記するのか否か。
-
-    """
-
-    def __init__(self, filename, append=False, enabled=None):
-        super().__init__()
-        self.filename = pathlib.Path(filename)
-        self.append = append
-        self.enabled = enabled if enabled is not None else tk.hvd.is_master()
-        self.log_file = None
-        self.log_writer = None
-        self.epoch_start_time = None
-
-    def on_train_begin(self, logs=None):
-        del logs
-        if self.enabled:
-            self.filename.parent.mkdir(parents=True, exist_ok=True)
-            self.log_file = self.filename.open(
-                "a" if self.append else "w", buffering=65536
-            )
-            self.log_writer = csv.writer(
-                self.log_file, delimiter="\t", lineterminator="\n"
-            )
-            self.log_writer.writerow(
-                ["epoch", "lr"] + self.params["metrics"] + ["time"]
-            )
-        else:
-            self.log_file = None
-            self.log_writer = None
-
-    def on_epoch_begin(self, epoch, logs=None):
-        del epoch, logs
-        self.epoch_start_time = time.time()
-
-    def on_epoch_end(self, epoch, logs=None):
-        assert self.epoch_start_time is not None
-        logs = logs or {}
-        logs["lr"] = K.get_value(self.model.optimizer.lr)
-        elapsed_time = time.time() - self.epoch_start_time
-
-        def _format_metric(logs, k):
-            value = logs.get(k)
-            if value is None:
-                return "<none>"
-            return f"{value:.4f}"
-
-        metrics = [_format_metric(logs, k) for k in self.params["metrics"]]
-        row = (
-            [epoch + 1, format(logs["lr"], ".1e")]
-            + metrics
-            + [str(int(np.ceil(elapsed_time)))]
-        )
-        if self.log_file is not None:
-            self.log_writer.writerow(row)
-            self.log_file.flush()
-
-    def on_train_end(self, logs=None):
-        del logs
-        if self.log_file is not None:
-            self.log_file.close()
-        self.append = True  # 同じインスタンスの再利用時は自動的に追記にする
+        K.set_value(self.model.optimizer.learning_rate, self.start_lr)
 
 
 class EpochLogger(tf.keras.callbacks.Callback):
@@ -175,7 +106,7 @@ class EpochLogger(tf.keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
         assert self.train_start_time is not None
         assert self.epoch_start_time is not None
-        lr = K.get_value(self.model.optimizer.lr)
+        lr = K.get_value(self.model.optimizer.learning_rate)
         now = time.time()
         elapsed_time = now - self.epoch_start_time
         time_per_epoch = (now - self.train_start_time) / (epoch + 1)
@@ -185,7 +116,7 @@ class EpochLogger(tf.keras.callbacks.Callback):
         )
         if self.enabled:
             tk.log.get(__name__).debug(
-                f"Epoch {epoch + 1:3d}: lr={lr:.1e} {metrics} time={int(np.ceil(elapsed_time))} ETA={int(np.ceil(eta))}"
+                f"Epoch {epoch + 1:3d}: learning_rate={lr:.1e} {metrics} time={int(np.ceil(elapsed_time))} ETA={int(np.ceil(eta))}"
             )
 
 

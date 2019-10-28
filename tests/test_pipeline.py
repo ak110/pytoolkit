@@ -36,7 +36,6 @@ def test_keras_xor(tmpdir):
         callbacks=[
             tk.callbacks.LearningRateStepDecay(),
             tk.callbacks.CosineAnnealing(),
-            tk.callbacks.TSVLogger(models_dir / "history.tsv"),
             tk.callbacks.Checkpoint(models_dir / "checkpoint.h5"),
         ],
         fit_params={"verbose": 2},

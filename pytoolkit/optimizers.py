@@ -22,6 +22,7 @@ class SGDEx(tf.keras.optimizers.SGD):
 
     def __init__(
         self,
+        lr=None,  # deprecated
         learning_rate=0.1,
         lr_multipliers=None,
         momentum=0.9,
@@ -29,6 +30,7 @@ class SGDEx(tf.keras.optimizers.SGD):
         nesterov=True,
         **kwargs,
     ):
+        assert lr is None
         super().__init__(
             learning_rate=learning_rate,
             momentum=momentum,
@@ -88,6 +90,7 @@ class SAdam(tf.keras.optimizers.Optimizer):
 
     def __init__(
         self,
+        lr=None,  # deprecated
         learning_rate=1e-3,
         beta_1=0.95,
         beta_2=0.999,
@@ -95,6 +98,7 @@ class SAdam(tf.keras.optimizers.Optimizer):
         name="SAdam",
         **kwargs,
     ):
+        assert lr is None
         super().__init__(name, **kwargs)
         self._set_hyper("learning_rate", kwargs.get("lr", learning_rate))
         self._set_hyper("beta_1", beta_1)
