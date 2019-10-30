@@ -28,6 +28,14 @@ pytoolkit.pipeline.keras module
    :undoc-members:
    :show-inheritance:
 
+pytoolkit.pipeline.keras\_test module
+-------------------------------------
+
+.. automodule:: pytoolkit.pipeline.keras_test
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 pytoolkit.pipeline.lgb module
 -----------------------------
 

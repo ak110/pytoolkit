@@ -7,16 +7,12 @@ flake8
 
 mypy pytoolkit scripts
 
-pushd tests/
-./touch.sh
-popd
-
 pushd docs/
 ./update.sh
 make html
 popd
 
-pylint -j0 pytoolkit scripts tests
+pylint -j0 pytoolkit scripts
 
 CUDA_VISIBLE_DEVICES=none pytest
 

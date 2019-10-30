@@ -12,6 +12,14 @@ pytoolkit.datasets.coco module
    :undoc-members:
    :show-inheritance:
 
+pytoolkit.datasets.coco\_test module
+------------------------------------
+
+.. automodule:: pytoolkit.datasets.coco_test
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 pytoolkit.datasets.ic module
 ----------------------------
 
@@ -48,6 +56,14 @@ pytoolkit.datasets.voc module
 -----------------------------
 
 .. automodule:: pytoolkit.datasets.voc
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pytoolkit.datasets.voc\_test module
+-----------------------------------
+
+.. automodule:: pytoolkit.datasets.voc_test
    :members:
    :undoc-members:
    :show-inheritance:

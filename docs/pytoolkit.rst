@@ -54,6 +54,14 @@ pytoolkit.cli module
    :undoc-members:
    :show-inheritance:
 
+pytoolkit.conftest module
+-------------------------
+
+.. automodule:: pytoolkit.conftest
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 pytoolkit.data module
 ---------------------
 

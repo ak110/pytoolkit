@@ -6,14 +6,6 @@ import pytest
 sys.path.append(str(pathlib.Path(__file__).parent.parent))
 
 
-@pytest.fixture(scope="session", autouse=True)
-def global_setup():
-    """pytestセッション全体での初期化。"""
-    import matplotlib
-
-    matplotlib.use("Agg")
-
-
 @pytest.fixture()
 def check_dir():
     """目視確認用の結果のディレクトリ。"""
@@ -23,4 +15,4 @@ def check_dir():
 @pytest.fixture()
 def data_dir():
     """テストデータのディレクトリ。"""
-    return pathlib.Path(__file__).resolve().parent / "data"
+    return pathlib.Path(__file__).resolve().parent / "_test_data"

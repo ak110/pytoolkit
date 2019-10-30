@@ -25,7 +25,7 @@ def _main():
 
     tk.utils.better_exceptions()
     base_dir = pathlib.Path(__file__).resolve().parent.parent
-    data_dir = base_dir / "tests" / "data"
+    data_dir = base_dir / "pytoolkit" / "_test_data"
     save_dir = base_dir / "___check" / "bench"
     save_dir.mkdir(parents=True, exist_ok=True)
 
