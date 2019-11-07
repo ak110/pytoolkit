@@ -20,10 +20,10 @@ pytoolkit.datasets.coco\_test module
    :undoc-members:
    :show-inheritance:
 
-pytoolkit.datasets.ic module
-----------------------------
+pytoolkit.datasets.ic\_ module
+------------------------------
 
-.. automodule:: pytoolkit.datasets.ic
+.. automodule:: pytoolkit.datasets.ic_
    :members:
    :undoc-members:
    :show-inheritance:

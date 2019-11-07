@@ -27,9 +27,24 @@ def binary_crossentropy(
         alpha (float or None): class 1の重み。
 
     """
-    loss = tk.backend.binary_crossentropy(
-        y_true, y_pred, from_logits=from_logits, alpha=alpha
-    )
+    assert alpha is None or 0 <= alpha <= 1
+
+    if not from_logits:
+        y_pred = tk.backend.logit(y_pred)
+
+    # 前提知識:
+    # -log(sigmoid(x)) = log(1 + exp(-x))
+    #                  = -x + log(exp(x) + 1)
+    #                  = -x + log1p(exp(x))
+    # -log(1 - sigmoid(x)) = log(exp(x) + 1)
+    #                      = log1p(exp(x))
+
+    if alpha is None:
+        loss = tf.math.log1p(K.exp(y_pred)) - y_true * y_pred
+    else:
+        t = 2 * alpha * y_true - alpha - y_true + 1
+        loss = 2 * (t * tf.math.log1p(K.exp(y_pred)) - alpha * y_true * y_pred)
+
     return reduce(loss, reduce_mode)
 
 
@@ -213,7 +228,8 @@ def lovasz_binary_crossentropy(
         y_pred = K.clip(y_pred, lpsilon, -lpsilon)
     else:
         y_pred = K.clip(y_pred, epsilon, 1 - epsilon)
-    errors = tk.backend.binary_crossentropy(y_true, y_pred, from_logits=from_logits)
+        y_pred = tk.backend.logit(y_pred)
+    errors = tf.math.log1p(K.exp(y_pred)) - y_true * y_pred  # bce
     errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
     weights = tk.backend.lovasz_weights(y_true, perm, alpha=alpha)
     loss = tf.tensordot(errors_sorted, tf.stop_gradient(weights), 1)

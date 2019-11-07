@@ -523,8 +523,7 @@ class GroupNormalization(tf.keras.layers.Layer):
         if self.center:
             x = x + self.beta
         # tf.keras用
-        if hasattr(x, "set_shape"):
-            x.set_shape(K.int_shape(inputs))
+        x.set_shape(K.int_shape(inputs))
         return x
 
     def get_config(self):

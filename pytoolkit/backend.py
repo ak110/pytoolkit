@@ -22,29 +22,6 @@ def logit(x, epsilon=1e-7):
     return K.log(K.cast(x / (1 - x), "float32"))
 
 
-def binary_crossentropy(y_true, y_pred, from_logits=False, alpha=None):
-    """クラス間のバランス補正ありのbinary_crossentropy。"""
-    assert alpha is None or 0 <= alpha <= 1
-
-    if not from_logits:
-        y_pred = logit(y_pred)
-
-    # 前提知識:
-    # -log(sigmoid(x)) = log(1 + exp(-x))
-    #                  = -x + log(exp(x) + 1)
-    #                  = -x + log1p(exp(x))
-    # -log(1 - sigmoid(x)) = log(exp(x) + 1)
-    #                      = log1p(exp(x))
-
-    if alpha is None:
-        loss = tf.math.log1p(K.exp(y_pred)) - y_true * y_pred
-    else:
-        t = 2 * alpha * y_true - alpha - y_true + 1
-        loss = 2 * (t * tf.math.log1p(K.exp(y_pred)) - alpha * y_true * y_pred)
-
-    return loss
-
-
 def lovasz_weights(y_true, perm, alpha=None):
     """Lovasz hingeなどの損失の重み付け部分。"""
     y_true_sorted = K.gather(y_true, perm)
