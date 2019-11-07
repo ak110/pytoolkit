@@ -27,7 +27,8 @@ class KerasModel(Model, metaclass=abc.ABCMeta):
         skip_if_exists: cv()でモデルが存在するときスキップするならTrue。
         skip_folds: cv()で（skip_if_existsとは関係なく）スキップするfold。[0, nfold)
         epochs: tk.models.fit()のパラメータ
-        refine_epochs: tk.models.fit()のパラメータ (refine時)
+        refine_epochs: refineのエポック数
+        refine_lr_factor: refineの学習率の係数。初期学習率×refine_lr_factorがrefine時の学習率になる。
         callbacks: tk.models.fit()のパラメータ
         fit_params: tk.models.fit()のパラメータ
         use_horovod: 推論時にMPIによる分散処理をするか否か。(学習時は常にTrue)
@@ -48,6 +49,7 @@ class KerasModel(Model, metaclass=abc.ABCMeta):
         *,
         epochs: int,
         refine_epochs: int = 50,
+        refine_lr_factor: float = 0.01,
         callbacks: typing.List[tf.keras.callbacks.Callback] = None,
         models_dir: tk.typing.PathLike,
         model_name_format: str = "model.fold{fold}.h5",
@@ -70,6 +72,7 @@ class KerasModel(Model, metaclass=abc.ABCMeta):
         self.skip_folds = skip_folds
         self.epochs = epochs
         self.refine_epochs = refine_epochs
+        self.refine_lr_factor = refine_lr_factor
         self.callbacks = callbacks
         self.fit_params = fit_params
         self.use_horovod = use_horovod
@@ -336,7 +339,9 @@ class KerasModel(Model, metaclass=abc.ABCMeta):
                 )
                 tk.models.freeze_layers(model, tf.keras.layers.BatchNormalization)
                 tk.models.recompile(model)
-                tf.keras.backend.set_value(model.optimizer.lr, start_lr / 100)
+                tf.keras.backend.set_value(
+                    model.optimizer.lr, start_lr * self.refine_lr_factor
+                )
                 tk.models.fit(
                     model,
                     train_set=train_set,
