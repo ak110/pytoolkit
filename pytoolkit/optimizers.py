@@ -22,12 +22,12 @@ class SGDEx(tf.keras.optimizers.SGD):
 
     def __init__(
         self,
-        lr=None,  # deprecated
-        learning_rate=0.1,
+        learning_rate,
         lr_multipliers=None,
         momentum=0.9,
         decay=0.0,
         nesterov=True,
+        lr=None,  # deprecated
         **kwargs,
     ):
         assert lr is None
@@ -90,12 +90,12 @@ class SAdam(tf.keras.optimizers.Optimizer):
 
     def __init__(
         self,
-        lr=None,  # deprecated
         learning_rate=1e-3,
         beta_1=0.95,
         beta_2=0.999,
         l2=0,
         name="SAdam",
+        lr=None,  # deprecated
         **kwargs,
     ):
         assert lr is None
