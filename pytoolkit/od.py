@@ -358,9 +358,8 @@ def confusion_matrix(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=
                             if found:
                                 cm[-1, pc] += 1  # 誤検出(重複&クラス違い)
                             else:
-                                found = (
-                                    True
-                                )  # ここでFound=Trueは微妙だが、gt_classの数が合わなくなるので1個だけにする。。
+                                # ここでFound=Trueは微妙だが、gt_classの数が合わなくなるので1個だけにする。。
+                                found = True
                                 cm[gt_class, pc] += 1  # 誤検出(クラス違い)
                         # 一度カウントしたものは次から無視
                         pred_enabled[pred_ix] = False
