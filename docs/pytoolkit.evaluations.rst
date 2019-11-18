@@ -28,10 +28,26 @@ pytoolkit.evaluations.regression module
    :undoc-members:
    :show-inheritance:
 
+pytoolkit.evaluations.regression\_test module
+---------------------------------------------
+
+.. automodule:: pytoolkit.evaluations.regression_test
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 pytoolkit.evaluations.ss module
 -------------------------------
 
 .. automodule:: pytoolkit.evaluations.ss
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pytoolkit.evaluations.ss\_test module
+-------------------------------------
+
+.. automodule:: pytoolkit.evaluations.ss_test
    :members:
    :undoc-members:
    :show-inheritance:
