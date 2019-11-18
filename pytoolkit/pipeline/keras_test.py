@@ -13,23 +13,21 @@ def test_keras_xor(tmpdir):
     y = np.array([0, 1, 1, 0], dtype=np.int32)
     train_set = tk.data.Dataset(X.repeat(4096, axis=0), y.repeat(4096, axis=0))
 
-    class MyModel(tk.pipeline.KerasModel):
-        def create_network(self) -> tf.keras.models.Model:
-            inputs = x = tf.keras.layers.Input(shape=(2,))
-            x = tf.keras.layers.Dense(16, use_bias=False)(x)
-            x = tf.keras.layers.BatchNormalization()(x)
-            x = tf.keras.layers.Activation("relu")(x)
-            x = tf.keras.layers.Dense(1, activation="sigmoid")(x)
-            model = tf.keras.models.Model(inputs=inputs, outputs=x)
-            return model
+    def create_network() -> tf.keras.models.Model:
+        inputs = x = tf.keras.layers.Input(shape=(2,))
+        x = tf.keras.layers.Dense(16, use_bias=False)(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Activation("relu")(x)
+        x = tf.keras.layers.Dense(1, activation="sigmoid")(x)
+        model = tf.keras.models.Model(inputs=inputs, outputs=x)
+        tk.models.compile(
+            model, "adam", "binary_crossentropy", [tk.metrics.binary_accuracy]
+        )
+        return model
 
-        def create_optimizer(self, mode: str) -> tk.models.OptimizerType:
-            return "adam"
-
-        def create_loss(self, model: tf.keras.models.Model) -> tuple:
-            return "binary_crossentropy", [tk.metrics.binary_accuracy]
-
-    model = MyModel(
+    model = tk.pipeline.KerasModel(
+        create_network_fn=create_network,
+        nfold=1,
         train_data_loader=tk.data.DataLoader(),
         val_data_loader=tk.data.DataLoader(),
         epochs=8,

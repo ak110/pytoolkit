@@ -654,13 +654,14 @@ def perspective_transform(
         "wrap": cv2.BORDER_WRAP,
     }[border_mode]
 
-    # 縮小ならINTER_AREA
-    sh, sw = rgb.shape[:2]
-    dr = transform_points([(0, 0), (sw, 0), (sw, sh), (0, sh)], m)
-    dw = min(np.linalg.norm(dr[1] - dr[0]), np.linalg.norm(dr[2] - dr[3]))
-    dh = min(np.linalg.norm(dr[3] - dr[0]), np.linalg.norm(dr[2] - dr[1]))
-    if dw <= sw or dh <= sh:
-        cv2_interp = cv2.INTER_AREA
+    if cv2_interp != cv2.INTER_NEAREST:
+        # 縮小ならINTER_AREA
+        sh, sw = rgb.shape[:2]
+        dr = transform_points([(0, 0), (sw, 0), (sw, sh), (0, sh)], m)
+        dw = min(np.linalg.norm(dr[1] - dr[0]), np.linalg.norm(dr[2] - dr[3]))
+        dh = min(np.linalg.norm(dr[3] - dr[0]), np.linalg.norm(dr[2] - dr[1]))
+        if dw <= sw or dh <= sh:
+            cv2_interp = cv2.INTER_AREA
 
     if rgb.ndim == 2 or rgb.shape[-1] in (1, 3):
         rgb = cv2.warpPerspective(

@@ -125,13 +125,16 @@ def plot(
     if tk.hvd.is_master():
         with tk.log.trace_scope(f"plot({path})"):
             path.parent.mkdir(parents=True, exist_ok=True)
-            tf.keras.utils.plot_model(
-                model,
-                str(path),
-                show_shapes=show_shapes,
-                show_layer_names=show_layer_names,
-                rankdir=rankdir,
-            )
+            try:
+                tf.keras.utils.plot_model(
+                    model,
+                    str(path),
+                    show_shapes=show_shapes,
+                    show_layer_names=show_layer_names,
+                    rankdir=rankdir,
+                )
+            except ValueError:
+                pass  # "Cannot embed the 'svg' image format" (tf >= 1.14)
     tk.hvd.barrier()
 
 

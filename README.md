@@ -16,6 +16,8 @@
 cookiecutter gh:ak110/cookiecutter-pytoolkit
 ```
 
+<https://github.com/ak110/cookiecutter-pytoolkit>
+
 ## importするために最低限必要なライブラリ
 
 - Pillow
