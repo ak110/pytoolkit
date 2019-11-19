@@ -61,9 +61,15 @@ def load_weights(
             model.load_weights(str(path), by_name=by_name)
             if verbose:
                 new_weights = model.get_weights()
-                changed_params = np.sum(old_weights != new_weights)
+                changed_params = np.sum(
+                    [
+                        np.sum(np.not_equal(w1, w2))
+                        for w1, w2 in zip(old_weights, new_weights)
+                    ]
+                )
+                num_params = np.sum([w.size for w in new_weights])
                 tk.log.get(__name__).info(
-                    f"{changed_params:,} params chagnged. ({changed_params / new_weights.size:.1%}%)"
+                    f"{changed_params:,} params chagnged. ({changed_params / num_params:.1%}%)"
                 )
     elif skip_not_exist:
         tk.log.get(__name__).info(f"{path} is not found.")

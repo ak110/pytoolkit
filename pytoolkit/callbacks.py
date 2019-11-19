@@ -55,12 +55,15 @@ class CosineAnnealing(tf.keras.callbacks.Callback):
 
     """
 
-    def __init__(self, factor=0.01, epochs=None, warmup_epochs=5):
+    def __init__(
+        self, factor=0.01, epochs=None, warmup_epochs=5, warmup_reset_state=True
+    ):
         assert factor < 1
         super().__init__()
         self.factor = factor
         self.epochs = epochs
         self.warmup_epochs = warmup_epochs
+        self.warmup_reset_state = warmup_reset_state
         self.start_lr = None
 
     def on_train_begin(self, logs=None):
@@ -79,6 +82,11 @@ class CosineAnnealing(tf.keras.callbacks.Callback):
             r = (epoch + 1) / (self.epochs or self.params["epochs"])
             learning_rate = lr_min + 0.5 * (lr_max - lr_min) * (1 + np.cos(np.pi * r))
         K.set_value(self.model.optimizer.learning_rate, float(learning_rate))
+        # warmup時、optimizerの状態をゼロ埋めする (SGDなど前提で種類無視して0にするので注意)
+        # https://twitter.com/ak11/status/1194763993082023936
+        if self.warmup_reset_state and 2 <= epoch + 1 <= self.warmup_epochs:
+            state = self.model.optimizer.get_weights()
+            self.model.optimizer.set_weights([np.zeros_like(w) for w in state])
 
     def on_train_end(self, logs=None):
         del logs
