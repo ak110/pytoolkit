@@ -69,7 +69,7 @@ def load_weights(
                 )
                 num_params = np.sum([w.size for w in new_weights])
                 tk.log.get(__name__).info(
-                    f"{changed_params:,} params chagnged. ({changed_params / num_params:.1%}%)"
+                    f"{changed_params:,} params chagnged. ({changed_params / num_params:.1%})"
                 )
     elif skip_not_exist:
         tk.log.get(__name__).info(f"{path} is not found.")

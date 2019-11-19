@@ -3,6 +3,7 @@ import numbers
 import typing
 
 import numpy as np
+import scipy
 
 
 def set_ndarray_format() -> None:
@@ -35,6 +36,11 @@ def logit(x, epsilon=1e-7):
     """シグモイド関数の逆関数。"""
     x = np.clip(x, epsilon, 1 - epsilon)
     return np.log(x / (1 - x))
+
+
+def softmax(x, axis=-1):
+    """ソフトマックス関数。"""
+    return scipy.special.softmax(x, axis=axis)
 
 
 def cosine_most_similars(
