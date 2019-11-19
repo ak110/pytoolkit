@@ -41,11 +41,9 @@ def listup_classification(
                 return False
             return True
 
-        class_names = list(
-            sorted(p.name for p in dirpath.iterdir() if _is_valid_classdir(p))
-        )
-    else:
-        class_names = list(class_names)
+        class_names = sorted(p.name for p in dirpath.iterdir() if _is_valid_classdir(p))
+
+    class_names = list(class_names)
 
     # 各クラスのデータを列挙
     X: list = []

@@ -74,8 +74,8 @@ def load_cityscapes(
     X_dir = data_dir / "leftImg8bit"
     y_dir = data_dir / name
 
-    X_train = np.array(list(sorted((X_dir / "train").glob("*/*.png"))))
-    X_val = np.array(list(sorted((X_dir / "val").glob("*/*.png"))))
+    X_train = np.array(sorted((X_dir / "train").glob("*/*.png")))
+    X_val = np.array(sorted((X_dir / "val").glob("*/*.png")))
     y_train = np.array(
         [
             y_dir

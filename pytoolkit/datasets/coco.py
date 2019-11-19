@@ -8,10 +8,53 @@
 
 """
 import pathlib
+import typing
 
 import numpy as np
 
-from .. import ndimage, od, utils
+import pytoolkit as tk
+
+
+def load_coco_od(coco_dir, use_crowded=False):
+    """MSCOCOの物体検出のデータを読み込む。"""
+    from chainercv.datasets.coco.coco_bbox_dataset import COCOBboxDataset
+
+    ds_train = COCOBboxDataset(
+        data_dir=str(coco_dir),
+        split="train",
+        year="2017",
+        use_crowded=use_crowded,
+        return_area=True,
+        return_crowded=True,
+    )
+    ds_val = COCOBboxDataset(
+        data_dir=str(coco_dir),
+        split="val",
+        year="2017",
+        use_crowded=use_crowded,
+        return_area=True,
+        return_crowded=True,
+    )
+
+    class COCOODDataset(tk.data.Dataset):
+        def __init__(self, ds):
+            self.ds = ds
+            super().__init__(data=np.arange(len(self.ds)))
+
+        def get_data(self, index: int) -> typing.Tuple[typing.Any, typing.Any]:
+            img, bboxes, classes, areas, crowdeds = self.ds[index]
+            y = tk.od.ObjectsAnnotation(
+                path=None,
+                width=img.shape[1],
+                height=img.shape[0],
+                classes=classes,
+                bboxes=bboxes,
+                areas=areas,
+                crowdeds=crowdeds,
+            )
+            return img, y
+
+    return COCOODDataset(ds_train), COCOODDataset(ds_val)
 
 
 def load_od(coco_dir, year=2017):
@@ -67,7 +110,7 @@ def load_od_data(coco_dir, data_name):
                 crowdeds.append(obj["iscrowd"])
 
         annotations.append(
-            od.ObjectsAnnotation(
+            tk.od.ObjectsAnnotation(
                 path=coco_dir / dirname / filename,
                 width=width,
                 height=height,
@@ -123,7 +166,7 @@ def load_ss_data(coco_dir, data_name, cache_dir, input_size=None):
     }
 
     X, y = [], []
-    for entry in utils.tqdm(coco.loadImgs(coco.getImgIds()), desc="load_ss_data"):
+    for entry in tk.utils.tqdm(coco.loadImgs(coco.getImgIds()), desc="load_ss_data"):
         dirname, filename = entry["coco_url"].split("/")[-2:]
         save_path = cache_dir / dirname / (filename + ".npy")
         X.append(coco_dir / dirname / filename)
@@ -146,7 +189,7 @@ def load_ss_data(coco_dir, data_name, cache_dir, input_size=None):
             mask = np.where(mask, np.uint8(255), np.uint8(0))
             # リサイズ
             if input_size is not None:
-                mask = ndimage.resize(mask, input_size[1], input_size[0])
+                mask = tk.ndimage.resize(mask, input_size[1], input_size[0])
             # 保存
             save_path.parent.mkdir(parents=True, exist_ok=True)
             np.save(str(save_path), mask)

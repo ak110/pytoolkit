@@ -50,12 +50,21 @@ def load_weights(
     path: tk.typing.PathLike,
     by_name: bool = False,
     skip_not_exist: bool = False,
+    verbose: bool = True,
 ):
     """モデルの重みの読み込み。"""
     path = pathlib.Path(path)
     if path.exists():
         with tk.log.trace_scope(f"load_weights({path})"):
+            if verbose:
+                old_weights = model.get_weights()
             model.load_weights(str(path), by_name=by_name)
+            if verbose:
+                new_weights = model.get_weights()
+                changed_params = np.sum(old_weights != new_weights)
+                tk.log.get(__name__).info(
+                    f"{changed_params:,} params chagnged. ({changed_params / new_weights.size:.1%}%)"
+                )
     elif skip_not_exist:
         tk.log.get(__name__).info(f"{path} is not found.")
     else:

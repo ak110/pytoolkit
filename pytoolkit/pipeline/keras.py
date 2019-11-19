@@ -320,19 +320,20 @@ class KerasModel(Model):
 
             # fit
             tk.hvd.barrier()
-            tk.models.fit(
-                self.models[fold],
-                train_set=train_set,
-                train_data_loader=self.train_data_loader,
-                val_set=val_set,
-                val_data_loader=self.val_data_loader,
-                epochs=self.epochs,
-                callbacks=self.callbacks,
-                **(self.fit_params or {}),
-            )
+            if self.epochs > 0:
+                tk.models.fit(
+                    self.models[fold],
+                    train_set=train_set,
+                    train_data_loader=self.train_data_loader,
+                    val_set=val_set,
+                    val_data_loader=self.val_data_loader,
+                    epochs=self.epochs,
+                    callbacks=self.callbacks,
+                    **(self.fit_params or {}),
+                )
 
             # refine
-            if self.refine_data_loader is not None:
+            if self.refine_data_loader is not None and self.refine_epochs > 0:
                 tk.log.get(__name__).info(
                     f"Fold {fold + 1}: Refining {self.refine_epochs} epochs..."
                 )
