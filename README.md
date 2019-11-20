@@ -10,6 +10,8 @@
 
 `git submodule add https://github.com/ak110/pytoolkit.git` で配置して `import pytoolkit as tk` とかで使う。
 
+(一応 `pip install --user -e .` とかもできるようにしているけどバージョニングとかはちゃんとしてないので基本的にはsubmoduleでコミット単位で紐付け。)
+
 ## cookiecutter
 
 ```bash
@@ -20,14 +22,14 @@ cookiecutter gh:ak110/cookiecutter-pytoolkit
 
 ## importするために最低限必要なライブラリ
 
-- Pillow
 - albumentations
+  - Pillow
+  - opencv-python-headless
+  - scipy
+  - numpy
 - numba
-- numpy
-- opencv-python
 - pandas
 - scikit-learn
-- scipy
 - tensorflow-gpu>=2.0.0
 
 ## 使うときに動的にimportしている依存ライブラリ

@@ -16,7 +16,12 @@ import pytoolkit as tk
 
 
 def load_coco_od(coco_dir, use_crowded=False):
-    """MSCOCOの物体検出のデータを読み込む。"""
+    """COCOの物体検出のデータを読み込む。
+
+    References:
+        - <https://chainercv.readthedocs.io/en/stable/reference/datasets.html#cocobboxdataset>
+
+    """
     from chainercv.datasets.coco.coco_bbox_dataset import COCOBboxDataset
 
     ds_train = COCOBboxDataset(
@@ -43,8 +48,15 @@ def load_coco_od(coco_dir, use_crowded=False):
 
         def get_data(self, index: int) -> typing.Tuple[typing.Any, typing.Any]:
             img, bboxes, classes, areas, crowdeds = self.ds[index]
+
+            # (ymin,xmin,ymax,xmax) -> (xmin,ymin,xmax,ymax)
+            bboxes = bboxes[:, [1, 0, 3, 2]].astype(np.float32)
+            bboxes[:, [0, 2]] /= img.shape[1]
+            bboxes[:, [1, 3]] /= img.shape[0]
+
+            X = np.transpose(img, (1, 2, 0)).astype(np.uint8)
             y = tk.od.ObjectsAnnotation(
-                path=None,
+                path=self._get_path(index),
                 width=img.shape[1],
                 height=img.shape[0],
                 classes=classes,
@@ -52,7 +64,16 @@ def load_coco_od(coco_dir, use_crowded=False):
                 areas=areas,
                 crowdeds=crowdeds,
             )
-            return img, y
+
+            assert img.shape[-1] == 3  # RGB
+            return X, y
+
+        def _get_path(self, index: int) -> pathlib.Path:
+            # https://github.com/chainer/chainercv/blob/fddc813/chainercv/datasets/coco/coco_instances_base_dataset.py#L66
+            return (
+                pathlib.Path(self.ds.img_root)
+                / self.ds.id_to_prop[self.ds.ids[index]]["file_name"]
+            )
 
     return COCOODDataset(ds_train), COCOODDataset(ds_val)
 

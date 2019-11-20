@@ -147,7 +147,9 @@ def load(
     return img
 
 
-def save(path: typing.Union[str, pathlib.Path], img: np.ndarray):
+def save(
+    path: typing.Union[str, pathlib.Path], img: np.ndarray, jpeg_quality: int = None
+):
     """画像の保存。
 
     やや余計なお世話だけど0～255にクリッピング(飽和)してから保存する。
@@ -155,6 +157,7 @@ def save(path: typing.Union[str, pathlib.Path], img: np.ndarray):
     Args:
         path: 保存先ファイルパス。途中のディレクトリが無ければ自動的に作成。
         img: 画像のndarray。shape=(height, width, 3)のRGB画像。dtypeはnp.uint8
+        jpeg_quality: 1～100で指定する。
 
     """
     assert len(img.shape) == 3
@@ -169,8 +172,10 @@ def save(path: typing.Union[str, pathlib.Path], img: np.ndarray):
     suffix = path.suffix.lower()
     if suffix == ".npy":
         np.save(str(path), img)
+        assert jpeg_quality is None
     elif suffix == ".npz":
         np.savez_compressed(str(path), img)
+        assert jpeg_quality is None
     else:
         assert img.shape[-1] in (1, 3, 4)
         if img.shape[-1] == 1:
@@ -181,7 +186,10 @@ def save(path: typing.Union[str, pathlib.Path], img: np.ndarray):
             pil_img = PIL.Image.fromarray(img, "RGBA")
         else:
             raise RuntimeError(f"Unknown format: shape={img.shape}")
-        pil_img.save(path)
+        kwargs = {}
+        if jpeg_quality is not None:
+            kwargs["quality"] = jpeg_quality
+        pil_img.save(path, **kwargs)
 
 
 def rotate(
