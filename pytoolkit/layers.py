@@ -641,6 +641,98 @@ class InstanceNormalization(tf.keras.layers.Layer):
 
 
 @tk_utils.register_keras_custom_object
+class RMSNormalization(tf.keras.layers.Layer):
+    """Root Mean Square Layer Normalization <https://arxiv.org/abs/1910.07467>"""
+
+    def __init__(
+        self,
+        axis=-1,
+        epsilon=1e-7,
+        center=True,
+        scale=True,
+        beta_initializer="zeros",
+        gamma_initializer="ones",
+        beta_regularizer=None,
+        gamma_regularizer=None,
+        beta_constraint=None,
+        gamma_constraint=None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.supports_masking = True
+        self.axis = axis
+        self.epsilon = epsilon
+        self.center = center
+        self.scale = scale
+        self.beta_initializer = tf.keras.initializers.get(beta_initializer)
+        self.gamma_initializer = tf.keras.initializers.get(gamma_initializer)
+        self.beta_regularizer = tf.keras.regularizers.get(beta_regularizer)
+        self.gamma_regularizer = tf.keras.regularizers.get(gamma_regularizer)
+        self.beta_constraint = tf.keras.constraints.get(beta_constraint)
+        self.gamma_constraint = tf.keras.constraints.get(gamma_constraint)
+        self.beta = None
+        self.gamma = None
+
+    def build(self, input_shape):
+        affine_shape = (input_shape[-1],)
+        if self.scale:
+            self.gamma = self.add_weight(
+                shape=affine_shape,
+                name="gamma",
+                initializer=self.gamma_initializer,
+                regularizer=self.gamma_regularizer,
+                constraint=self.gamma_constraint,
+            )
+        else:
+            self.gamma = None
+        if self.center:
+            self.beta = self.add_weight(
+                shape=affine_shape,
+                name="beta",
+                initializer=self.beta_initializer,
+                regularizer=self.beta_regularizer,
+                constraint=self.beta_constraint,
+            )
+        else:
+            self.beta = None
+        super().build(input_shape)
+
+    def call(self, inputs, **kwargs):
+        del kwargs
+
+        ms = tf.math.reduce_mean(inputs ** 2, axis=self.axis, keepdims=True)
+        outputs = inputs * tf.math.rsqrt(ms + self.epsilon)
+
+        broadcast_shape = (1,) * (K.ndim(inputs) - 1) + (-1,)
+        if self.scale:
+            outputs = outputs * tf.reshape(self.gamma, broadcast_shape)
+        if self.center:
+            outputs = outputs + tf.reshape(self.beta, broadcast_shape)
+
+        return outputs
+
+    def get_config(self):
+        config = {
+            "axis": self.axis,
+            "epsilon": self.epsilon,
+            "center": self.center,
+            "scale": self.scale,
+            "beta_initializer": tf.keras.initializers.serialize(self.beta_initializer),
+            "gamma_initializer": tf.keras.initializers.serialize(
+                self.gamma_initializer
+            ),
+            "beta_regularizer": tf.keras.regularizers.serialize(self.beta_regularizer),
+            "gamma_regularizer": tf.keras.regularizers.serialize(
+                self.gamma_regularizer
+            ),
+            "beta_constraint": tf.keras.constraints.serialize(self.beta_constraint),
+            "gamma_constraint": tf.keras.constraints.serialize(self.gamma_constraint),
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
+@tk_utils.register_keras_custom_object
 class MixFeat(tf.keras.layers.Layer):
     """MixFeat <https://openreview.net/forum?id=HygT9oRqFX>"""
 

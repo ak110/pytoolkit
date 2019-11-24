@@ -118,7 +118,7 @@ class XGBModel(Model):
             [gbm.predict(data, ntree_limit=gbm.best_ntree_limit) for gbm in self.gbms_]
         )
 
-    def feature_importance(self, importance_type: str = "gain"):
+    def feature_importance(self, importance_type: str = "total_gain"):
         """Feature ImportanceをDataFrameで返す。"""
         assert self.gbms_ is not None
 
