@@ -733,6 +733,111 @@ class RMSNormalization(tf.keras.layers.Layer):
 
 
 @tk_utils.register_keras_custom_object
+class FilterResponseNormalization(tf.keras.layers.Layer):
+    """Filter Response Normalization Layer <https://arxiv.org/abs/1911.09737>"""
+
+    def __init__(
+        self,
+        epsilon=1e-6,
+        center=True,
+        scale=True,
+        activate=True,
+        tau_initializer="zeros",
+        beta_initializer="zeros",
+        gamma_initializer="ones",
+        tau_regularizer=None,
+        beta_regularizer=None,
+        gamma_regularizer=None,
+        tau_constraint=None,
+        beta_constraint=None,
+        gamma_constraint=None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.supports_masking = True
+        self.epsilon = epsilon
+        self.center = center
+        self.scale = scale
+        self.activate = activate
+        self.tau_initializer = tf.keras.initializers.get(tau_initializer)
+        self.beta_initializer = tf.keras.initializers.get(beta_initializer)
+        self.gamma_initializer = tf.keras.initializers.get(gamma_initializer)
+        self.tau_regularizer = tf.keras.regularizers.get(tau_regularizer)
+        self.beta_regularizer = tf.keras.regularizers.get(beta_regularizer)
+        self.gamma_regularizer = tf.keras.regularizers.get(gamma_regularizer)
+        self.tau_constraint = tf.keras.constraints.get(tau_constraint)
+        self.beta_constraint = tf.keras.constraints.get(beta_constraint)
+        self.gamma_constraint = tf.keras.constraints.get(gamma_constraint)
+        self.tau = None
+        self.beta = None
+        self.gamma = None
+
+    def build(self, input_shape):
+        affine_shape = (input_shape[-1],)
+        if self.scale:
+            self.gamma = self.add_weight(
+                shape=affine_shape,
+                name="gamma",
+                initializer=self.gamma_initializer,
+                regularizer=self.gamma_regularizer,
+                constraint=self.gamma_constraint,
+            )
+        if self.center:
+            self.beta = self.add_weight(
+                shape=affine_shape,
+                name="beta",
+                initializer=self.beta_initializer,
+                regularizer=self.beta_regularizer,
+                constraint=self.beta_constraint,
+            )
+        if self.activate:
+            self.tau = self.add_weight(
+                shape=affine_shape,
+                name="tau",
+                initializer=self.tau_initializer,
+                regularizer=self.tau_regularizer,
+                constraint=self.tau_constraint,
+            )
+        super().build(input_shape)
+
+    def call(self, inputs, **kwargs):
+        del kwargs
+        x = inputs
+        nu2 = tf.reduce_mean(tf.square(x), axis=[1, 2], keepdims=True)
+        x *= tf.math.rsqrt(nu2 + tf.abs(self.epsilon))
+        if self.scale:
+            x *= self.gamma
+        if self.center:
+            x += self.beta
+        if self.activate:
+            x = tf.maximum(x, self.tau)
+        return x
+
+    def get_config(self):
+        config = {
+            "epsilon": self.epsilon,
+            "center": self.center,
+            "scale": self.scale,
+            "activate": self.activate,
+            "tau_initializer": tf.keras.initializers.serialize(self.tau_initializer),
+            "beta_initializer": tf.keras.initializers.serialize(self.beta_initializer),
+            "gamma_initializer": tf.keras.initializers.serialize(
+                self.gamma_initializer
+            ),
+            "tau_regularizer": tf.keras.regularizers.serialize(self.tau_regularizer),
+            "beta_regularizer": tf.keras.regularizers.serialize(self.beta_regularizer),
+            "gamma_regularizer": tf.keras.regularizers.serialize(
+                self.gamma_regularizer
+            ),
+            "tau_constraint": tf.keras.constraints.serialize(self.tau_constraint),
+            "beta_constraint": tf.keras.constraints.serialize(self.beta_constraint),
+            "gamma_constraint": tf.keras.constraints.serialize(self.gamma_constraint),
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
+@tk_utils.register_keras_custom_object
 class MixFeat(tf.keras.layers.Layer):
     """MixFeat <https://openreview.net/forum?id=HygT9oRqFX>"""
 
