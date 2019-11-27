@@ -247,7 +247,7 @@ def lovasz_softmax(y_true, y_pred, per_sample=True):
 
         return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=tf.float32)
 
-    num_classes = K.int_shape(y_true)[-1]
+    num_classes = K.int_shape(y_pred)[-1]
     y_pred = K.reshape(y_pred, (-1, num_classes))
     y_true = K.reshape(y_true, (-1, num_classes))
     losses = []
