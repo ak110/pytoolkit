@@ -158,6 +158,7 @@ def compile(
     optimizer: OptimizerType,
     loss: LossType,
     metrics: MetricsType = None,
+    experimental_run_tf_function: bool = False,
 ):  # pylint: disable=redefined-builtin
     """compileするだけ。"""
     with tk.log.trace_scope("compile"):
@@ -172,7 +173,7 @@ def compile(
             optimizer=optimizer,
             loss=loss,
             metrics=metrics,
-            experimental_run_tf_function=False,
+            experimental_run_tf_function=experimental_run_tf_function,
         )
 
 

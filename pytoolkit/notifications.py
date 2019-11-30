@@ -1,6 +1,6 @@
 """学習結果の通知。
 
-.envからURLを取得して通知する。(無ければログ出力のみ)
+環境変数や.envからURLを取得して通知する。(無ければログ出力のみ)
 
 - SLACK_URL: SlackのIncoming WebhooksのURL <https://api.slack.com/incoming-webhooks>
   例: https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX
@@ -11,7 +11,7 @@
 import json
 import numbers
 import os
-import pathlib
+import shlex
 import sys
 
 import numpy as np
@@ -43,19 +43,23 @@ def post_evals(evals: dict):
 
 def post(text: str):
     """通知。"""
-    module_name = f"{pathlib.Path(sys.argv[0]).name}\n"
+    pre_text = f"{' '.join([shlex.quote(a) for a in sys.argv])}\n"
     tk.log.get(__name__).debug(f"Notification:\n{text}")
 
     if tk.hvd.is_master():
         try:
-            import dotenv
-            import requests
+            try:
+                import dotenv
 
-            dotenv.load_dotenv()
+                dotenv.load_dotenv()
+            except BaseException:
+                tk.log.get(__name__).warning("dotenv読み込み失敗", exc_info=True)
+
+            import requests
 
             slack_url = os.environ.get("SLACK_URL", "")
             if len(slack_url) > 0:
-                data = {"text": f"{module_name}```\n{text}```\n<!channel>"}
+                data = {"text": f"{pre_text}```\n{text}```\n<!channel>"}
                 r = requests.post(
                     slack_url,
                     data=json.dumps(data),
@@ -65,7 +69,7 @@ def post(text: str):
 
             line_token = os.environ.get("LINE_TOKEN", "")
             if len(line_token) > 0:
-                data = {"message": module_name + text}
+                data = {"message": pre_text + text}
                 r = requests.post(
                     "https://notify-api.line.me/api/notify",
                     data=data,

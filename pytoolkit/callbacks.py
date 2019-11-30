@@ -124,7 +124,7 @@ class EpochLogger(tf.keras.callbacks.Callback):
         )
         if self.enabled:
             tk.log.get(__name__).debug(
-                f"Epoch {epoch + 1:3d}: learning_rate={lr:.1e} {metrics} time={int(np.ceil(elapsed_time))} ETA={int(np.ceil(eta))}"
+                f"Epoch {epoch + 1:3d}: lr={lr:.1e} {metrics} time={int(np.ceil(elapsed_time))} ETA={int(np.ceil(eta))}"
             )
 
 
