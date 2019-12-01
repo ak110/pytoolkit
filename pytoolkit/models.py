@@ -253,8 +253,12 @@ def fit(
 
     with tk.log.trace_scope("fit"):
         model.fit(
-            train_iterator,
-            validation_data=val_iterator,
+            train_iterator.ds,
+            steps_per_epoch=train_iterator.steps_per_epoch,
+            validation_data=val_iterator.ds if val_iterator is not None else None,
+            validation_steps=val_iterator.steps_per_epoch
+            if val_iterator is not None
+            else None,
             class_weight=class_weight,
             epochs=epochs,
             callbacks=callbacks,
@@ -264,15 +268,6 @@ def fit(
             workers=workers,
             max_queue_size=max_queue_size,
             **fit_kwargs,
-        )
-
-    # DataLoaderの処理時間を表示
-    tk.log.get(__name__).info(
-        f"train_iterator: {train_iterator.seconds_per_step * 1000:4.0f}ms/step"
-    )
-    if val_iterator is not None:
-        tk.log.get(__name__).info(
-            f"val_iterator:   {val_iterator.seconds_per_step * 1000:4.0f}ms/step"
         )
 
 
@@ -409,7 +404,7 @@ def _predict_flow(
         cb.on_predict_begin()
     batch = 0
     for X, _ in tk.utils.tqdm(
-        iterator, desc=desc, total=len(iterator), disable=verbose < 1
+        iterator.ds, desc=desc, total=iterator.steps_per_epoch, disable=verbose < 1
     ):
         for cb in callbacks:
             cb.on_predict_batch_begin(batch)

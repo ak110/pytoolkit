@@ -8,10 +8,8 @@ batch: sampleのバッチサイズ個の集合
 """
 from __future__ import annotations
 
-import abc
 import dataclasses
 import random
-import time
 import typing
 
 import numpy as np
@@ -172,12 +170,15 @@ class DataLoader:
     """データをモデルに渡す処理をするクラス。
 
     継承してカスタマイズする。ここでData Augmentationとかをする。
-    このクラス自体はステートレスにしておき、Iteratorが状態を持つ。
 
     Args:
         batch_size: バッチサイズ
         data_per_sample: sampleあたりのデータ数。mixupとかするなら2にする。
         parallel: サンプル単位でスレッド並列するならTrue
+
+    Attributes:
+        get_data_Tout: self.get_dataの出力の型 (必要に応じて派生先で書き換える)
+        get_sample_Tout: self.get_sampleの出力の型 (必要に応じて派生先で書き換える)
 
     """
 
@@ -185,6 +186,8 @@ class DataLoader:
         self.batch_size = batch_size
         self.data_per_sample = data_per_sample
         self.parallel = parallel
+        self.get_data_Tout = (tf.uint8, tf.float32)
+        self.get_sample_Tout = (tf.float32, tf.float32)
 
     def iter(
         self, dataset: Dataset, shuffle: bool = False, use_horovod: bool = False
@@ -200,44 +203,53 @@ class DataLoader:
             Iterator
 
         """
-        if shuffle:
-            return RandomIterator(
-                self, dataset, self.batch_size, self.data_per_sample, use_horovod
+
+        def get_data(i):
+            return self.get_data(dataset, i)
+
+        def get_sample(*args):
+            return self.get_sample([args[i : i + 2] for i in range(0, len(args), 2)])
+
+        data_size = len(dataset)
+        ds = tf.data.Dataset.from_tensor_slices(np.arange(data_size))
+        if shuffle and self.data_per_sample == 2:  # 挙動が複雑なので2のみ許可
+            ds = tf.data.Dataset.zip(
+                tuple(
+                    ds.shuffle(buffer_size=data_size).map(
+                        lambda i: tf.numpy_function(
+                            get_data, inp=[i], Tout=self.get_data_Tout
+                        ),
+                        num_parallel_calls=tf.data.experimental.AUTOTUNE,
+                    )
+                    for _ in range(self.data_per_sample)
+                )
             )
-        assert self.data_per_sample == 1  # 挙動がややこしいので1のみ可とする
-        return SequentialIterator(self, dataset, self.batch_size, use_horovod)
-
-    def get_batch(self, dataset: Dataset, indices: typing.Sequence[int]):
-        """1件のミニバッチを取得する。
-
-        Args:
-            dataset: データセット
-            indices: Iteratorが作成したindexの配列。
-
-        Returns:
-            ミニバッチ。通常は入力データとラベルのtuple。
-
-        """
-        # data
-        if self.parallel:
-            futures = [
-                tk.threading.get_pool().submit(self.get_data, dataset, i)
-                for i in indices
-            ]
-            data = [f.result() for f in futures]
+            ds = ds.map(
+                lambda data1, data2: tf.numpy_function(
+                    get_sample, inp=(*data1, *data2), Tout=self.get_sample_Tout
+                )
+            )
         else:
-            data = [self.get_data(dataset, i) for i in indices]
-        # samples
-        samples = self.collate_data(data)
-        # batch
-        return self.collate_samples(samples)
+            assert not shuffle or self.data_per_sample == 1  # 挙動が複雑なので1のみ許可
+            ds = ds.shuffle(buffer_size=data_size) if shuffle else ds
+            ds = ds.map(
+                lambda i: tf.numpy_function(get_data, inp=[i], Tout=self.get_data_Tout),
+                num_parallel_calls=tf.data.experimental.AUTOTUNE,
+            )
+            ds = ds.map(
+                lambda *args: tf.numpy_function(
+                    get_sample, inp=(*args,), Tout=self.get_sample_Tout
+                )
+            )
+        ds = ds.repeat() if shuffle else ds  # シャッフル時はバッチサイズを固定するため先にrepeat
+        ds = ds.batch(self.batch_size)
+        ds = ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
-    def collate_data(self, data: list) -> list:
-        """self.data_per_sample個ずつ集約してget_sampleする処理。"""
-        return [
-            self.get_sample(data[i : i + self.data_per_sample])
-            for i in range(0, len(data), self.data_per_sample)
-        ]
+        if use_horovod:
+            samples_per_epoch = -(-data_size // (self.batch_size * tk.hvd.size()))
+        else:
+            samples_per_epoch = -(-data_size // self.batch_size)
+        return Iterator(ds, data_size, self.batch_size, samples_per_epoch)
 
     def get_sample(self, data: list) -> tuple:
         """1件のサンプルを取得する。"""
@@ -281,138 +293,19 @@ class DataLoader:
         return part
 
 
-class Iterator(tf.keras.utils.Sequence, metaclass=abc.ABCMeta):
-    """データをモデルに渡すクラス。
+@dataclasses.dataclass()
+class Iterator:
+    """データをモデルに渡すためのクラス。
 
     Args:
-        data_loader: データをモデルに渡す処理をするクラス
-        dataset: データセット
+        ds: tf.data.Dataset
+        data_size: データ数
         batch_size: バッチサイズ
-        use_horovod: 1エポックあたりのミニバッチ数(__len__の戻り値)の算出にHorovodを考慮するか否か。
-
-    Attributes:
-        seconds_per_step: 1ステップ当たりの実処理時間の指数移動平均値
+        steps_per_epoch: 1エポックあたりのミニバッチ数
 
     """
 
-    def __init__(
-        self,
-        data_loader: DataLoader,
-        dataset: Dataset,
-        batch_size: int,
-        use_horovod: bool,
-    ):
-        self.data_loader = data_loader
-        self.dataset = dataset
-        self.batch_size = batch_size
-        self.use_horovod = use_horovod
-        self.epoch: int = 1
-        self.seconds_per_step: float = 0.0
-
-    def on_epoch_end(self) -> None:
-        """1エポック完了時の処理。"""
-        self.epoch += 1
-
-    def __len__(self) -> int:
-        """1エポックあたりのミニバッチ数を返す。"""
-        bs = self.batch_size * tk.hvd.size() if self.use_horovod else self.batch_size
-        return -(-len(self.dataset) // bs)
-
-    def __getitem__(self, index: int) -> tk.models.ModelIOType:
-        """ミニバッチを1つ返す。"""
-        start_time = time.perf_counter()
-
-        indices = self.sample_batch_indices(index)
-        batch = self.data_loader.get_batch(self.dataset, indices)
-
-        elapsed_time = time.perf_counter() - start_time
-        self.seconds_per_step = self.seconds_per_step * 0.99 + elapsed_time * 0.01
-        return batch
-
-    @abc.abstractmethod
-    def sample_batch_indices(self, index: int) -> typing.Sequence[int]:
-        """1ミニバッチ分のindexの配列を返す。"""
-
-    def __iter__(self):
-        """データを返す。"""
-        for i in range(len(self)):
-            yield self[i]
-
-    def run(self):
-        """データを返す。"""
-        while True:
-            for i in range(len(self)):
-                yield self[i]
-            self.on_epoch_end()
-
-
-class SequentialIterator(Iterator):
-    """順番にサンプリングするIterator。"""
-
-    def sample_batch_indices(self, index: int) -> typing.Sequence[int]:
-        """1ミニバッチ分のindexの配列を返す。"""
-        start = self.batch_size * index
-        end = start + self.batch_size
-        return list(range(start, min(end, len(self.dataset))))
-
-
-class RandomIterator(Iterator):
-    """シャッフルするIterator。"""
-
-    def __init__(
-        self,
-        data_loader: DataLoader,
-        dataset: Dataset,
-        batch_size: int,
-        data_per_sample: int,
-        use_horovod: bool,
-    ):
-        super().__init__(
-            data_loader=data_loader,
-            dataset=dataset,
-            batch_size=batch_size,
-            use_horovod=use_horovod,
-        )
-        self.data_per_sample = data_per_sample
-        self.gens = [
-            RandomIterator._generate_shuffled_indices(len(dataset))
-            for _ in range(self.data_per_sample)
-        ]
-        self.indices = [
-            [next(gen) for _ in range(len(self) * self.batch_size)] for gen in self.gens
-        ]
-
-    def on_epoch_end(self) -> None:
-        """1エポック完了時の処理。"""
-        super().on_epoch_end()
-        self.indices = [
-            [next(gen) for _ in range(len(self) * self.batch_size)] for gen in self.gens
-        ]
-
-    def sample_batch_indices(self, index: int) -> typing.Sequence[int]:
-        """1ミニバッチ分のindexの配列を返す。"""
-        offset = self.batch_size * index
-        indices_list = [
-            indices[offset : offset + self.batch_size] for indices in self.indices
-        ]
-        return sum(indices_list, [])
-
-    @staticmethod
-    def _generate_shuffled_indices(data_count):
-        """シャッフルしたインデックスのgenerator"""
-        indices = np.arange(data_count)
-        while True:
-            random.shuffle(indices)
-            yield from indices
-
-
-class WeightedRandomIterator(Iterator):
-    """重み付き乱数によるSampler。"""
-
-    def sample_batch_indices(self, index: int) -> typing.Sequence[int]:
-        """1ミニバッチ分のindexの配列を返す。"""
-        del index
-        assert self.dataset.weights is not None
-        return random.choices(
-            range(len(self.dataset)), weights=self.dataset.weights, k=self.batch_size
-        )
+    ds: tf.data.Dataset
+    data_size: int
+    batch_size: int
+    steps_per_epoch: int

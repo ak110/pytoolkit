@@ -868,7 +868,7 @@ def cut_mix(sample1: tuple, sample2: tuple, beta: float = 1.0) -> tuple:
 @numba.njit(fastmath=True, nogil=True)
 def preprocess_tf(rgb):
     """RGB値の-1 ～ +1への変換"""
-    return rgb.astype(np.float32) / 127.5 - 1.0
+    return rgb.astype(np.float32) / np.float32(127.5) - 1
 
 
 # @numba.njit(fastmath=True, nogil=True)
