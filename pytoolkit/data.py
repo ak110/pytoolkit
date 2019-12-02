@@ -194,7 +194,7 @@ class DataLoader:
             dataset: データセット
             shuffle: シャッフルするのか否か
             use_horovod: 1エポックあたりのミニバッチ数(__len__の戻り値)の算出にHorovodを考慮するか否か。
-            num_replicas_in_sync: tf.distribute使用時の並列数。(バッチサイズに掛け算する)
+            num_replicas_in_sync: tf.distribute使用時の並列数(バッチサイズに掛け算する)
 
         Returns:
             Iterator

@@ -1,6 +1,7 @@
 """Keras"""
 from __future__ import annotations
 
+import contextlib
 import pathlib
 import typing
 
@@ -34,6 +35,7 @@ class KerasModel(Model):
         fit_params: tk.models.fit()のパラメータ
         use_horovod: 推論時にMPIによる分散処理をするか否か。(学習時は常にTrue)
         parallel_cv: lgb.cvなどのように全foldまとめて処理するならTrue
+        distribute_strategy: tf.distributeするなら指定する。
 
     model_name_formatに"{fold}"が含まれない名前を指定した場合、
     cvではなくtrainを使うモードということにする。
@@ -61,6 +63,7 @@ class KerasModel(Model):
         fit_params: dict = None,
         use_horovod: bool = False,
         parallel_cv: bool = False,
+        distribute_strategy: tf.distribute.Strategy = None,
         on_batch_fn: tk.models.OnBatchFnType = None,
         preprocessors: tk.pipeline.EstimatorListType = None,
         postprocessors: tk.pipeline.EstimatorListType = None,
@@ -82,6 +85,7 @@ class KerasModel(Model):
         self.fit_params = fit_params
         self.use_horovod = use_horovod
         self.parallel_cv = parallel_cv
+        self.distribute_strategy = distribute_strategy
         self.on_batch_fn = on_batch_fn
         self.models: typing.List[tf.keras.models.Model] = [None] * nfold
         if self.parallel_cv:
@@ -100,7 +104,7 @@ class KerasModel(Model):
     def _load_model(self, fold):
         model_path = self.models_dir / self.model_name_format.format(fold=fold + 1)
         if self.models[fold] is None:
-            self.models[fold] = self.create_network_fn()
+            self.models[fold] = self.create_network()
         tk.models.load_weights(self.models[fold], model_path)
 
     def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
@@ -111,7 +115,7 @@ class KerasModel(Model):
             return self._serial_cv(dataset, folds)
 
     def _parallel_cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType):
-        self.models = [self.create_network_fn() for _ in folds]
+        self.models = [self.create_network() for _ in folds]
 
         inputs = []
         targets = []
@@ -242,6 +246,7 @@ class KerasModel(Model):
                 dataset,
                 self.val_data_loader,
                 use_horovod=self.use_horovod,
+                num_replicas_in_sync=self.num_replicas_in_sync,
                 on_batch_fn=self.on_batch_fn,
             )
             for model in self.models
@@ -255,7 +260,7 @@ class KerasModel(Model):
 
         """
         assert self.nfold >= 1
-        self.models[0] = self.create_network_fn()
+        self.models[0] = self.create_network()
         # summary表示
         tk.models.summary(self.models[0])
         # グラフを出力
@@ -312,7 +317,7 @@ class KerasModel(Model):
             trained = False
         else:
             if self.models[fold] is None:  # 既にあればそれを使う
-                self.models[fold] = self.create_network_fn()
+                self.models[fold] = self.create_network()
             trained = True
 
             if self.refine_data_loader is not None:
@@ -329,6 +334,7 @@ class KerasModel(Model):
                     val_data_loader=self.val_data_loader,
                     epochs=self.epochs,
                     callbacks=self.callbacks,
+                    num_replicas_in_sync=self.num_replicas_in_sync,
                     **(self.fit_params or {}),
                 )
 
@@ -340,7 +346,12 @@ class KerasModel(Model):
                 tk.models.freeze_layers(
                     self.models[fold], tf.keras.layers.BatchNormalization
                 )
-                tk.models.recompile(self.models[fold])
+                with (
+                    self.distribute_strategy.scope()
+                    if self.distribute_strategy is not None
+                    else contextlib.nullcontext()
+                ):
+                    tk.models.recompile(self.models[fold])
                 tf.keras.backend.set_value(
                     self.models[fold].optimizer.lr, start_lr * self.refine_lr_factor
                 )
@@ -351,6 +362,7 @@ class KerasModel(Model):
                     val_set=val_set,
                     val_data_loader=self.val_data_loader,
                     epochs=self.refine_epochs,
+                    num_replicas_in_sync=self.num_replicas_in_sync,
                 )
 
             tk.models.save(self.models[fold], model_path)
@@ -393,6 +405,7 @@ class KerasModel(Model):
             data_loader=self.val_data_loader,  # DataAugmentation無しで評価
             prefix=prefix,
             use_horovod=self.use_horovod,
+            num_replicas_in_sync=self.num_replicas_in_sync,
         )
         if tk.hvd.is_master():
             max_len = max(len(n) for n in evals)
@@ -419,4 +432,27 @@ class KerasModel(Model):
             dataset,
             self.val_data_loader,
             on_batch_fn=self.on_batch_fn,
+            num_replicas_in_sync=self.num_replicas_in_sync,
         )
+
+    def create_network(self) -> tf.keras.models.Model:
+        """モデルの作成。"""
+        if self.distribute_strategy is None:
+            return self.create_network_fn()
+        with self.distribute_strategy.scope():
+            model = self.create_network_fn()
+            # 学習率の調整
+            tk.log.get(__name__).info(
+                f"Number of devices: {self.distribute_strategy.num_replicas_in_sync}"
+            )
+            lr = tf.keras.backend.get_value(model.optimizer.learning_rate)
+            lr *= self.distribute_strategy.num_replicas_in_sync
+            tf.keras.backend.set_value(model.optimizer.learning_rate, lr)
+            return model
+
+    @property
+    def num_replicas_in_sync(self):
+        """tf.distribute使用時の並列数(バッチサイズに掛け算する)"""
+        if self.distribute_strategy is None:
+            return 1
+        return self.distribute_strategy.num_replicas_in_sync

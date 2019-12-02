@@ -158,7 +158,7 @@ def compile(
     optimizer: OptimizerType,
     loss: LossType,
     metrics: MetricsType = None,
-    experimental_run_tf_function: bool = False,
+    experimental_run_tf_function: bool = None,
 ):  # pylint: disable=redefined-builtin
     """compileするだけ。"""
     with tk.log.trace_scope("compile"):
@@ -167,8 +167,13 @@ def compile(
             optimizer = tk.hvd.get().DistributedOptimizer(
                 optimizer, compression=tk.hvd.get().Compression.fp16
             )
-        # Horovod: Specify `experimental_run_tf_function=False` to ensure TensorFlow
-        # uses hvd.DistributedOptimizer() to compute gradients.
+            # Horovod: Specify `experimental_run_tf_function=False` to ensure TensorFlow
+            # uses hvd.DistributedOptimizer() to compute gradients.
+            if experimental_run_tf_function is None:
+                experimental_run_tf_function = False
+        else:
+            if experimental_run_tf_function is None:
+                experimental_run_tf_function = True
         model.compile(
             optimizer=optimizer,
             loss=loss,
@@ -205,6 +210,7 @@ def fit(
     use_multiprocessing: bool = False,
     workers: int = 1,
     max_queue_size: int = 10,
+    num_replicas_in_sync: int = 1,
 ):
     """独自のtraining loopになる予定の関数。
 
@@ -223,6 +229,7 @@ def fit(
         use_multiprocessing: Trueならマルチプロセス
         workers: ワーカー数
         max_queue_size: キューの最大サイズ
+        num_replicas_in_sync: tf.distribute使用時の並列数(バッチサイズに掛け算する)
 
     """
     if validation_freq == 0:
@@ -238,9 +245,19 @@ def fit(
     if val_set is not None:
         assert val_data_loader is not None
 
-    train_iterator = train_data_loader.iter(train_set, shuffle=True, use_horovod=True)
+    train_iterator = train_data_loader.iter(
+        train_set,
+        shuffle=True,
+        use_horovod=True,
+        num_replicas_in_sync=num_replicas_in_sync,
+    )
     val_iterator = (
-        val_data_loader.iter(val_set, shuffle=True, use_horovod=True)
+        val_data_loader.iter(
+            val_set,
+            shuffle=True,
+            use_horovod=True,
+            num_replicas_in_sync=num_replicas_in_sync,
+        )
         if val_set is not None and val_data_loader is not None
         else None
     )
@@ -314,6 +331,7 @@ def predict(
     verbose: int = 1,
     use_horovod: bool = False,
     on_batch_fn: OnBatchFnType = None,
+    num_replicas_in_sync: int = 1,
 ) -> ModelIOType:
     """予測。
 
@@ -327,6 +345,7 @@ def predict(
         on_batch_fn: モデルとミニバッチ分の入力データを受け取り、予測結果を返す処理。(TTA用)
         flow: 結果をgeneratorで返すならTrue
         desc: flow時のtqdmのdesc
+        num_replicas_in_sync: tf.distribute使用時の並列数(バッチサイズに掛け算する)
 
     Returns:
         予測結果。
@@ -336,7 +355,7 @@ def predict(
         verbose = verbose if tk.hvd.is_master() else 0
         callbacks = make_callbacks(callbacks, training=False)
         dataset = tk.hvd.split(dataset) if use_horovod else dataset
-        iterator = data_loader.iter(dataset)
+        iterator = data_loader.iter(dataset, num_replicas_in_sync=num_replicas_in_sync)
         if on_batch_fn is not None:
             values = _predict_flow(
                 model=model,
@@ -366,6 +385,7 @@ def predict_flow(
     verbose: int = 1,
     on_batch_fn: OnBatchFnType = None,
     desc: str = "predict",
+    num_replicas_in_sync: int = 1,
 ) -> typing.Iterator[ModelIOType]:
     """予測。
 
@@ -378,6 +398,7 @@ def predict_flow(
         on_batch_fn: モデルとミニバッチ分の入力データを受け取り、予測結果を返す処理。(TTA用)
         flow: 結果をgeneratorで返すならTrue
         desc: flow時のtqdmのdesc
+        num_replicas_in_sync: tf.distribute使用時の並列数(バッチサイズに掛け算する)
 
     Returns:
         予測結果。サンプルごとのgenerator。
@@ -385,7 +406,7 @@ def predict_flow(
     """
     with tk.log.trace_scope("predict"):
         callbacks = make_callbacks(callbacks, training=False)
-        iterator = data_loader.iter(dataset)
+        iterator = data_loader.iter(dataset, num_replicas_in_sync=num_replicas_in_sync)
         return _predict_flow(
             model=model,
             iterator=iterator,
@@ -434,6 +455,7 @@ def evaluate(
     verbose: int = 1,
     prefix: str = "",
     use_horovod: bool = False,
+    num_replicas_in_sync: int = 1,
 ) -> typing.Dict[str, float]:
     """評価。
 
@@ -442,9 +464,10 @@ def evaluate(
         dataset: データ。
         data_loader: データの読み込み
         callbacks: コールバック
-        verbose: 1ならプログレスバー表示。
-        prefix: メトリクス名の接頭文字列。
-        use_horovod: MPIによる分散処理をするか否か。
+        verbose: 1ならプログレスバー表示
+        prefix: メトリクス名の接頭文字列
+        use_horovod: MPIによる分散処理をするか否か
+        num_replicas_in_sync: tf.distribute使用時の並列数(バッチサイズに掛け算する)
 
     Returns:
         メトリクス名と値のdict
@@ -454,7 +477,7 @@ def evaluate(
         verbose = verbose if tk.hvd.is_master() else 0
         callbacks = make_callbacks(callbacks, training=False)
         dataset = tk.hvd.split(dataset) if use_horovod else dataset
-        iterator = data_loader.iter(dataset)
+        iterator = data_loader.iter(dataset, num_replicas_in_sync=num_replicas_in_sync)
         values = model.evaluate(
             iterator.ds,
             steps=iterator.steps_per_epoch,

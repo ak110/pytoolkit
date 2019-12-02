@@ -39,9 +39,7 @@ def _main():
     else:
         y = np.zeros((batch_size,))
     dataset = tk.data.Dataset(X, y)
-    data_loader = MyDataLoader(
-        data_augmentation=True, mask=args.mask, parallel=not args.profile
-    )
+    data_loader = MyDataLoader(data_augmentation=True, mask=args.mask)
     data_iterator = data_loader.iter(dataset, shuffle=True)
 
     if args.profile:
@@ -79,8 +77,8 @@ def _run(data_iterator, iterations):
 class MyDataLoader(tk.data.DataLoader):
     """DataLoader"""
 
-    def __init__(self, data_augmentation, mask, parallel):
-        super().__init__(batch_size=batch_size, parallel=parallel)
+    def __init__(self, data_augmentation, mask):
+        super().__init__(batch_size=batch_size)
         self.data_augmentation = data_augmentation
         self.mask = mask
         if data_augmentation:
