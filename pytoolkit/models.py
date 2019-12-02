@@ -348,7 +348,12 @@ def predict(
             )
             values = np.array(list(values))
         else:
-            values = model.predict(iterator, verbose=verbose, callbacks=callbacks)
+            values = model.predict(
+                iterator.ds,
+                steps=iterator.steps_per_epoch,
+                verbose=verbose,
+                callbacks=callbacks,
+            )
         values = tk.hvd.allgather(values) if use_horovod else values
         return values
 
@@ -450,7 +455,12 @@ def evaluate(
         callbacks = make_callbacks(callbacks, training=False)
         dataset = tk.hvd.split(dataset) if use_horovod else dataset
         iterator = data_loader.iter(dataset)
-        values = model.evaluate(iterator, verbose=verbose, callbacks=callbacks)
+        values = model.evaluate(
+            iterator.ds,
+            steps=iterator.steps_per_epoch,
+            verbose=verbose,
+            callbacks=callbacks,
+        )
         values = tk.hvd.allreduce(values) if use_horovod else values
         if len(model.metrics_names) == 1:
             evals = {prefix + model.metrics_names[0]: values}

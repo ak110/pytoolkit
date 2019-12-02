@@ -82,10 +82,8 @@ class GradCamVisualizer:
 
     def get_mask(self, model_inputs):
         """可視化してマスクを返す。マスクの値は`[0, 1)`。"""
-        if not isinstance(model_inputs, list):
-            model_inputs = [model_inputs]
         mask = GradCamVisualizer._get_mask(
-            self.grad_model, model_inputs, self.output_index
+            self.grad_model, tf.constant(model_inputs), tf.constant(self.output_index)
         ).numpy()
         assert mask.ndim == 3  # (N, H, W)
         return mask
@@ -97,6 +95,8 @@ class GradCamVisualizer:
             map_output, predictions = grad_model(model_inputs, training=False)
             model_output = predictions[:, class_index]
         grads = tape.gradient(model_output, map_output)
-        mask = K.sum(map_output * grads, axis=-1)
-        mask = tf.nn.relu(mask) / (K.max(mask) + K.epsilon())
+        mask = tf.keras.backend.sum(map_output * grads, axis=-1)
+        mask = tf.nn.relu(mask) / (
+            tf.keras.backend.max(mask) + tf.keras.backend.epsilon()
+        )
         return mask

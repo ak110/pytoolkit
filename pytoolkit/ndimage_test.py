@@ -139,4 +139,4 @@ def test_cut_mix(data_dir, check_dir):
 def test_preprocess_tf():
     rgb = np.array([0, 127, 128, 255], dtype=np.uint8)
     X = tk.ndimage.preprocess_tf(rgb)
-    assert X == pytest.approx([-1, -0.0039215686, +0.0039215686, +1])
+    assert X == pytest.approx([-1, -0.003921, +0.003921, +1], 1e-3)

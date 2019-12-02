@@ -174,23 +174,19 @@ class DataLoader:
     Args:
         batch_size: バッチサイズ
         data_per_sample: sampleあたりのデータ数。mixupとかするなら2にする。
-        parallel: サンプル単位でスレッド並列するならTrue
-
-    Attributes:
-        get_data_Tout: self.get_dataの出力の型 (必要に応じて派生先で書き換える)
-        get_sample_Tout: self.get_sampleの出力の型 (必要に応じて派生先で書き換える)
 
     """
 
-    def __init__(self, batch_size: int = 16, data_per_sample=1, parallel: bool = True):
+    def __init__(self, batch_size: int = 16, data_per_sample=1):
         self.batch_size = batch_size
         self.data_per_sample = data_per_sample
-        self.parallel = parallel
-        self.get_data_Tout = (tf.uint8, tf.float32)
-        self.get_sample_Tout = (tf.float32, tf.float32)
 
     def iter(
-        self, dataset: Dataset, shuffle: bool = False, use_horovod: bool = False
+        self,
+        dataset: Dataset,
+        shuffle: bool = False,
+        use_horovod: bool = False,
+        num_replicas_in_sync: int = 1,
     ) -> Iterator:
         """Iteratorを作成する。
 
@@ -198,11 +194,13 @@ class DataLoader:
             dataset: データセット
             shuffle: シャッフルするのか否か
             use_horovod: 1エポックあたりのミニバッチ数(__len__の戻り値)の算出にHorovodを考慮するか否か。
+            num_replicas_in_sync: tf.distribute使用時の並列数。(バッチサイズに掛け算する)
 
         Returns:
             Iterator
 
         """
+        assert len(dataset) > 1
 
         def get_data(i):
             return self.get_data(dataset, i)
@@ -210,39 +208,54 @@ class DataLoader:
         def get_sample(*args):
             return self.get_sample([args[i : i + 2] for i in range(0, len(args), 2)])
 
+        # 試しに1件呼び出してdtypeやshapeを推定 (ダサいが…)
+        exsample_data = get_data(0)
+        exsample_sample = get_sample(*exsample_data * self.data_per_sample)
+
+        def process1(i):
+            X, y = tf.numpy_function(
+                get_data, inp=[i], Tout=DataLoader._get_tf_types_from_np(exsample_data)
+            )
+            X, y = DataLoader._set_tf_rank_from_np(exsample_data, (X, y))
+            return X, y
+
+        def process2_1(X, y):
+            X, y = tf.numpy_function(
+                get_sample,
+                inp=(X, y),
+                Tout=DataLoader._get_tf_types_from_np(exsample_sample),
+            )
+            X, y = DataLoader._set_tf_rank_from_np(exsample_sample, (X, y))
+            return X, y
+
+        def process2_2(data1, data2):
+            X, y = tf.numpy_function(
+                get_sample,
+                inp=(*data1, *data2),
+                Tout=DataLoader._get_tf_types_from_np(exsample_sample),
+            )
+            X, y = DataLoader._set_tf_rank_from_np(exsample_sample, (X, y))
+            return X, y
+
         data_size = len(dataset)
         ds = tf.data.Dataset.from_tensor_slices(np.arange(data_size))
         if shuffle and self.data_per_sample == 2:  # 挙動が複雑なので2のみ許可
             ds = tf.data.Dataset.zip(
                 tuple(
                     ds.shuffle(buffer_size=data_size).map(
-                        lambda i: tf.numpy_function(
-                            get_data, inp=[i], Tout=self.get_data_Tout
-                        ),
-                        num_parallel_calls=tf.data.experimental.AUTOTUNE,
+                        process1, num_parallel_calls=tf.data.experimental.AUTOTUNE,
                     )
                     for _ in range(self.data_per_sample)
                 )
             )
-            ds = ds.map(
-                lambda data1, data2: tf.numpy_function(
-                    get_sample, inp=(*data1, *data2), Tout=self.get_sample_Tout
-                )
-            )
+            ds = ds.map(process2_2)
         else:
             assert not shuffle or self.data_per_sample == 1  # 挙動が複雑なので1のみ許可
             ds = ds.shuffle(buffer_size=data_size) if shuffle else ds
-            ds = ds.map(
-                lambda i: tf.numpy_function(get_data, inp=[i], Tout=self.get_data_Tout),
-                num_parallel_calls=tf.data.experimental.AUTOTUNE,
-            )
-            ds = ds.map(
-                lambda *args: tf.numpy_function(
-                    get_sample, inp=(*args,), Tout=self.get_sample_Tout
-                )
-            )
+            ds = ds.map(process1, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+            ds = ds.map(process2_1)
         ds = ds.repeat() if shuffle else ds  # シャッフル時はバッチサイズを固定するため先にrepeat
-        ds = ds.batch(self.batch_size)
+        ds = ds.batch(self.batch_size * num_replicas_in_sync)
         ds = ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
         if use_horovod:
@@ -291,6 +304,37 @@ class DataLoader:
         else:
             part = np.array(part)
         return part
+
+    @classmethod
+    def _get_tf_types_from_np(cls, exsample_data):
+        if isinstance(exsample_data, tuple):
+            return tuple(cls._get_tf_types_from_np(v) for v in exsample_data)
+        elif isinstance(exsample_data, list):
+            return [cls._get_tf_types_from_np(v) for v in exsample_data]
+        elif isinstance(exsample_data, dict):
+            return {k: cls._get_tf_types_from_np(v) for k, v in exsample_data.items()}
+        else:
+            return tf.dtypes.as_dtype(exsample_data.dtype)
+
+    @classmethod
+    def _set_tf_rank_from_np(cls, exsample_data, tensor):
+        if isinstance(exsample_data, tuple):
+            assert len(exsample_data) == len(tensor)
+            return tuple(
+                cls._set_tf_rank_from_np(v, t) for v, t in zip(exsample_data, tensor)
+            )
+        elif isinstance(exsample_data, list):
+            assert len(exsample_data) == len(tensor)
+            return [
+                cls._set_tf_rank_from_np(v, t) for v, t in zip(exsample_data, tensor)
+            ]
+        elif isinstance(exsample_data, dict):
+            return {
+                k: cls._set_tf_rank_from_np(v, tensor[k])
+                for k, v in exsample_data.items()
+            }
+        else:
+            return tf.ensure_shape(tensor, [None] * exsample_data.ndim)
 
 
 @dataclasses.dataclass()
