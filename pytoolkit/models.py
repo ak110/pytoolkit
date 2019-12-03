@@ -271,11 +271,9 @@ def fit(
     with tk.log.trace_scope("fit"):
         model.fit(
             train_iterator.ds,
-            steps_per_epoch=train_iterator.steps_per_epoch,
+            steps_per_epoch=train_iterator.steps,
             validation_data=val_iterator.ds if val_iterator is not None else None,
-            validation_steps=val_iterator.steps_per_epoch
-            if val_iterator is not None
-            else None,
+            validation_steps=val_iterator.steps if val_iterator is not None else None,
             class_weight=class_weight,
             epochs=epochs,
             callbacks=callbacks,
@@ -368,10 +366,7 @@ def predict(
             values = np.array(list(values))
         else:
             values = model.predict(
-                iterator.ds,
-                steps=iterator.steps_per_epoch,
-                verbose=verbose,
-                callbacks=callbacks,
+                iterator.ds, steps=iterator.steps, verbose=verbose, callbacks=callbacks,
             )
         values = tk.hvd.allgather(values) if use_horovod else values
         return values
@@ -430,7 +425,7 @@ def _predict_flow(
         cb.on_predict_begin()
     batch = 0
     for X, _ in tk.utils.tqdm(
-        iterator.ds, desc=desc, total=iterator.steps_per_epoch, disable=verbose < 1
+        iterator.ds, desc=desc, total=iterator.steps, disable=verbose < 1
     ):
         for cb in callbacks:
             cb.on_predict_batch_begin(batch)
@@ -479,10 +474,7 @@ def evaluate(
         dataset = tk.hvd.split(dataset) if use_horovod else dataset
         iterator = data_loader.iter(dataset, num_replicas_in_sync=num_replicas_in_sync)
         values = model.evaluate(
-            iterator.ds,
-            steps=iterator.steps_per_epoch,
-            verbose=verbose,
-            callbacks=callbacks,
+            iterator.ds, steps=iterator.steps, verbose=verbose, callbacks=callbacks,
         )
         values = tk.hvd.allreduce(values) if use_horovod else values
         if len(model.metrics_names) == 1:

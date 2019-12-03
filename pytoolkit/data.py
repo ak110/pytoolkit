@@ -201,6 +201,19 @@ class DataLoader:
 
         """
         assert len(dataset) > 1
+        ds = self.get_ds(dataset, shuffle, num_replicas_in_sync)
+        bs = (
+            self.batch_size
+            * (tk.hvd.size() if use_horovod else 1)
+            * num_replicas_in_sync
+        )
+        steps = -(-len(dataset) // bs)
+        return Iterator(ds=ds, data_size=len(dataset), steps=steps)
+
+    def get_ds(
+        self, dataset: Dataset, shuffle: bool, num_replicas_in_sync: int
+    ) -> tf.data.Dataset:
+        """tf.data.Datasetを作る。"""
 
         def get_data(i):
             return self.get_data(dataset, i)
@@ -237,12 +250,11 @@ class DataLoader:
             X, y = DataLoader._set_tf_rank_from_np(exsample_sample, (X, y))
             return X, y
 
-        data_size = len(dataset)
-        ds = tf.data.Dataset.from_tensor_slices(np.arange(data_size))
+        ds = tf.data.Dataset.from_tensor_slices(np.arange(len(dataset)))
         if shuffle and self.data_per_sample == 2:  # 挙動が複雑なので2のみ許可
             ds = tf.data.Dataset.zip(
                 tuple(
-                    ds.shuffle(buffer_size=data_size).map(
+                    ds.shuffle(buffer_size=len(dataset)).map(
                         process1, num_parallel_calls=tf.data.experimental.AUTOTUNE,
                     )
                     for _ in range(self.data_per_sample)
@@ -251,18 +263,13 @@ class DataLoader:
             ds = ds.map(process2_2)
         else:
             assert not shuffle or self.data_per_sample == 1  # 挙動が複雑なので1のみ許可
-            ds = ds.shuffle(buffer_size=data_size) if shuffle else ds
+            ds = ds.shuffle(buffer_size=len(dataset)) if shuffle else ds
             ds = ds.map(process1, num_parallel_calls=tf.data.experimental.AUTOTUNE)
             ds = ds.map(process2_1)
         ds = ds.repeat() if shuffle else ds  # シャッフル時はバッチサイズを固定するため先にrepeat
         ds = ds.batch(self.batch_size * num_replicas_in_sync)
         ds = ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-
-        if use_horovod:
-            samples_per_epoch = -(-data_size // (self.batch_size * tk.hvd.size()))
-        else:
-            samples_per_epoch = -(-data_size // self.batch_size)
-        return Iterator(ds, data_size, self.batch_size, samples_per_epoch)
+        return ds
 
     def get_sample(self, data: list) -> tuple:
         """1件のサンプルを取得する。"""
@@ -344,12 +351,10 @@ class Iterator:
     Args:
         ds: tf.data.Dataset
         data_size: データ数
-        batch_size: バッチサイズ
-        steps_per_epoch: 1エポックあたりのミニバッチ数
+        steps: 1エポックあたりのミニバッチ数
 
     """
 
     ds: tf.data.Dataset
     data_size: int
-    batch_size: int
-    steps_per_epoch: int
+    steps: int
