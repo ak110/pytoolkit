@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import contextlib
 import dataclasses
 import pathlib
 import typing
@@ -131,11 +130,13 @@ class App:
                     f()
             try:
                 with tk.log.trace_scope(command.entrypoint.__qualname__):
-                    with (
-                        command.distribute_strategy.scope()
-                        if command.distribute_strategy is not None
-                        else contextlib.nullcontext()
-                    ):
+                    if command.distribute_strategy is not None:
+                        with command.distribute_strategy.scope():
+                            tk.log.get(__name__).info(
+                                f"Number of devices: {self.num_replicas_in_sync}"
+                            )
+                            command.entrypoint(**args)
+                    else:
                         command.entrypoint(**args)
             except BaseException as e:
                 # KeyboardInterrupt以外で、かつ

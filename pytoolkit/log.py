@@ -76,7 +76,7 @@ def file_handler(
     level=logging.DEBUG,
     fmt="[%(levelname)-5s] %(message)s <%(name)s:%(filename)s:%(lineno)d>",
 ):
-    """RotatingFileHandler/FileHandlerを作成して返す。levelは文字列で'INFO'とかも指定可。(Python>=3.2)"""
+    """RotatingFileHandler/FileHandlerを作成して返す。levelは文字列で'INFO'とかも指定可。"""
     output_path = pathlib.Path(output_path)
     output_path.resolve().parent.mkdir(parents=True, exist_ok=True)
     if rotate:
@@ -101,18 +101,19 @@ def close(logger):
         logger.removeHandler(handler)
 
 
-def trace(process_name=None):
+def trace(process_name=None, level=logging.INFO):
     """関数の開始・終了をログるdecorator。
 
     Args:
         process_name: ログに出力する処理の名前。(Noneなら関数名)
+        level: ログレベル。文字列で'DEBUG'とかも指定可。
 
     """
 
     def decorator(func):
         @functools.wraps(func)
         def traced_func(*args, **kwargs):
-            with trace_scope(process_name or func.__qualname__):
+            with trace_scope(process_name or func.__qualname__, level):
                 return func(*args, **kwargs)
 
         return traced_func
@@ -121,18 +122,19 @@ def trace(process_name=None):
 
 
 @contextlib.contextmanager
-def trace_scope(process_name):
+def trace_scope(process_name, level=logging.INFO):
     """withで使うと、処理前後でログを出力する。
 
     Args:
         process_name: ログに出力する処理の名前。
+        level: ログレベル。文字列で'DEBUG'とかも指定可。
 
     """
     logger = get(__name__)
-    logger.debug(f"{process_name} 開始")
+    logger.log(level, f"{process_name} 開始")
     start_time = time.time()
     try:
         yield
     finally:
         elapsed_time = time.time() - start_time
-        logger.debug(f"{process_name} 終了 ({elapsed_time:.3f}[s])")
+        logger.log(level, f"{process_name} 終了 ({elapsed_time:.3f}[s])")
