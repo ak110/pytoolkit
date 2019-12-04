@@ -144,10 +144,10 @@ class RandomTransform(A.DualTransform):
         )
 
     def apply_to_bbox(self, bbox, m, **params):
-        raise tk.ndimage.transform_points(bbox, m)
+        return tk.ndimage.transform_points(bbox, m)
 
     def apply_to_keypoint(self, keypoint, m, **params):
-        raise tk.ndimage.transform_points(keypoint, m)
+        return tk.ndimage.transform_points(keypoint, m)
 
     def apply_to_mask(self, img, interp=None, **params):
         del interp

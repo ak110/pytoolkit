@@ -1,7 +1,6 @@
 """Keras"""
 from __future__ import annotations
 
-import contextlib
 import pathlib
 import typing
 
@@ -34,8 +33,8 @@ class KerasModel(Model):
         callbacks: tk.models.fit()のパラメータ
         fit_params: tk.models.fit()のパラメータ
         use_horovod: 推論時にMPIによる分散処理をするか否か。(学習時は常にTrue)
+        num_replicas_in_sync: tf.distributeするなら指定する。
         parallel_cv: lgb.cvなどのように全foldまとめて処理するならTrue
-        distribute_strategy: tf.distributeするなら指定する。
 
     model_name_formatに"{fold}"が含まれない名前を指定した場合、
     cvではなくtrainを使うモードということにする。
@@ -62,8 +61,8 @@ class KerasModel(Model):
         skip_folds: typing.Sequence[int] = (),
         fit_params: dict = None,
         use_horovod: bool = False,
+        num_replicas_in_sync: int = 1,
         parallel_cv: bool = False,
-        distribute_strategy: tf.distribute.Strategy = None,
         on_batch_fn: tk.models.OnBatchFnType = None,
         preprocessors: tk.pipeline.EstimatorListType = None,
         postprocessors: tk.pipeline.EstimatorListType = None,
@@ -84,8 +83,8 @@ class KerasModel(Model):
         self.callbacks = callbacks
         self.fit_params = fit_params
         self.use_horovod = use_horovod
+        self.num_replicas_in_sync = num_replicas_in_sync
         self.parallel_cv = parallel_cv
-        self.distribute_strategy = distribute_strategy
         self.on_batch_fn = on_batch_fn
         self.models: typing.List[tf.keras.models.Model] = [None] * nfold
         if self.parallel_cv:
@@ -346,12 +345,7 @@ class KerasModel(Model):
                 tk.models.freeze_layers(
                     self.models[fold], tf.keras.layers.BatchNormalization
                 )
-                with (
-                    self.distribute_strategy.scope()
-                    if self.distribute_strategy is not None
-                    else contextlib.nullcontext()
-                ):
-                    tk.models.recompile(self.models[fold])
+                tk.models.recompile(self.models[fold])
                 tf.keras.backend.set_value(
                     self.models[fold].optimizer.lr, start_lr * self.refine_lr_factor
                 )
@@ -437,22 +431,4 @@ class KerasModel(Model):
 
     def create_network(self) -> tf.keras.models.Model:
         """モデルの作成。"""
-        if self.distribute_strategy is None:
-            return self.create_network_fn()
-        with self.distribute_strategy.scope():
-            model = self.create_network_fn()
-            # 学習率の調整
-            tk.log.get(__name__).info(
-                f"Number of devices: {self.distribute_strategy.num_replicas_in_sync}"
-            )
-            lr = tf.keras.backend.get_value(model.optimizer.learning_rate)
-            lr *= self.distribute_strategy.num_replicas_in_sync
-            tf.keras.backend.set_value(model.optimizer.learning_rate, lr)
-            return model
-
-    @property
-    def num_replicas_in_sync(self):
-        """tf.distribute使用時の並列数(バッチサイズに掛け算する)"""
-        if self.distribute_strategy is None:
-            return 1
-        return self.distribute_strategy.num_replicas_in_sync
+        return self.create_network_fn()

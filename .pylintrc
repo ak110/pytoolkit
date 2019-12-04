@@ -62,7 +62,6 @@ ignored-modules=__init__
     ,tensorflow
     ,xgboost
 ignored-classes=numpy.ndarray
-    ,ConfigProto
     ,Empty
     ,h5py.File
     ,pathlib.PurePath
