@@ -99,7 +99,7 @@ def _listup_files(dirpath, recurse, use_tqdm, check_image):
         if check_image:
             try:
                 tk.ndimage.load(p)
-            except BaseException:
+            except Exception:
                 errors.append(f"Load error: {p}")
                 return False
         return True

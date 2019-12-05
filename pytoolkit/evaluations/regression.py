@@ -21,7 +21,7 @@ def print_regression_metrics(
         print_fn(f"MAE:      {evals['mae']:.3f} (base: {evals['mae_base']:.3f})")
         print_fn(f"RMSE/MAE: {evals['rmse/mae']:.3f}")
         return evals
-    except BaseException:
+    except Exception:
         tk.log.get(__name__).warning("Error: print_regression_metrics", exc_info=True)
         return {}
 

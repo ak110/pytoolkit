@@ -80,7 +80,7 @@ def clear() -> None:
                 continue
             while len(f._stateful_fn._function_cache._garbage_collectors[0]._cache) > 0:
                 f._stateful_fn._function_cache._garbage_collectors[0]._cache.popitem()
-    except BaseException:
+    except Exception:
         tk.log.get(__name__).warning(f"tf.functionキャッシュクリア失敗", exc_info=True)
 
 

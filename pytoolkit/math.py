@@ -20,7 +20,7 @@ def set_ndarray_format() -> None:
             result += f" values={s}"
             result += f">"
             return result
-        except BaseException:
+        except Exception:
             return np.array_repr(x)  # 念のため
 
     np.set_string_function(format_ndarray, repr=False)

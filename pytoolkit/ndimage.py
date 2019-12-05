@@ -84,7 +84,7 @@ def load_with_cache(
 
                 _load_cache = diskcache.Cache(temp_dir)
                 atexit.register(_clear_cache, _load_cache)
-            except BaseException:
+            except Exception:
                 pathlib.Path(temp_dir).rmdir()
                 _diskcache_load_failed = True
                 tk.log.get(__name__).warning("diskcache load failed.", exc_info=True)
@@ -134,7 +134,7 @@ def load(
                     if pil_img.mode != target_mode:
                         pil_img = pil_img.convert(target_mode)
                     img = np.asarray(pil_img, dtype=np.uint8)
-            except BaseException as e:
+            except Exception as e:
                 raise ValueError(f"Image load failed: {path_or_array}") from e
 
     if img is None:

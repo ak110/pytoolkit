@@ -25,7 +25,7 @@ def test_saveload_gif(data_dir, tmpdir):
 
 
 def test_load_text_failed(data_dir):
-    with pytest.raises(BaseException):
+    with pytest.raises(Exception):
         tk.ndimage.load(data_dir / "text.txt")
 
 

@@ -102,7 +102,7 @@ def better_exceptions():
         import better_exceptions as be
 
         be.hook()
-    except BaseException:
+    except Exception:
         tk.log.get(__name__).warning("better_exceptions error", exc_info=True)
 
 
@@ -126,7 +126,7 @@ def format_exception(exc, value, tb, color=False, safe=True) -> str:
         )
         return formatter.format_exception(exc, value, tb)
 
-    except BaseException:
+    except Exception:
         if not safe:
             raise
         return "".join(traceback.format_exception(exc, value, tb))

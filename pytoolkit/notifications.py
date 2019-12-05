@@ -52,7 +52,7 @@ def post(text: str):
                 import dotenv
 
                 dotenv.load_dotenv()
-            except BaseException:
+            except Exception:
                 tk.log.get(__name__).warning("dotenv読み込み失敗", exc_info=True)
 
             import requests
@@ -77,5 +77,5 @@ def post(text: str):
                 )
                 r.raise_for_status()
 
-        except BaseException:
+        except Exception:
             tk.log.get(__name__).warning("Slackへの投稿失敗", exc_info=True)

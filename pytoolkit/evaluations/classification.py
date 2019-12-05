@@ -34,7 +34,7 @@ def print_classification_metrics(
             print_fn(f"Rec-{average:5s}:  {evals['rec']:.3f}")
             print_fn(f"Logloss:    {evals['logloss']:.3f}")
         return evals
-    except BaseException:
+    except Exception:
         tk.log.get(__name__).warning(
             "Error: print_classification_metrics", exc_info=True
         )

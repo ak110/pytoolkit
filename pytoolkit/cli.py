@@ -138,10 +138,9 @@ class App:
                             command.entrypoint(**args)
                     else:
                         command.entrypoint(**args)
-            except BaseException as e:
-                # KeyboardInterrupt以外で、かつ
+            except Exception:
                 # ログファイルを出力する(ような重要な)コマンドの場合のみ通知を送信
-                if e is not KeyboardInterrupt and command.logfile:
+                if command.logfile:
                     tk.notifications.post(tk.utils.format_exc())
                 raise
             finally:

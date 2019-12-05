@@ -39,16 +39,6 @@ def test_ConvertColor(color):
     assert actual == pytest.approx(expected, 1e-3)
 
 
-def test_Pad2D():
-    pred = _predict_layer(tk.layers.Pad2D(1), np.zeros((1, 8, 8, 3)))
-    assert pred.shape == (1, 10, 10, 3)
-
-
-def test_PadChannel2D():
-    pred = _predict_layer(tk.layers.PadChannel2D(filters=4), np.zeros((1, 8, 8, 3)))
-    assert pred.shape == (1, 8, 8, 3 + 4)
-
-
 def test_coord_channel_2d():
     X = np.zeros((1, 4, 4, 1))
     y = np.array(
