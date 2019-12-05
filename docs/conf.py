@@ -18,6 +18,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+if True:
+    import pytoolkit as tk
 
 # -- Project information -----------------------------------------------------
 
@@ -47,7 +49,8 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
-    "sphinx.ext.viewcode",
+    # "sphinx.ext.viewcode",
+    "sphinx.ext.linkcode",
     "sphinx_autodoc_typehints",
 ]
 
@@ -194,6 +197,26 @@ autodoc_default_options = {
     "special-members": "__len__,__getitem__,__iter__",
     "show-inheritance": None,
 }
+
+
+# sphinx.ext.linkcode
+def linkcode_resolve(domain, info):
+    import inspect
+
+    if domain != "py" or not info["module"]:
+        return None
+    try:
+        obj = sys.modules[info["module"]]
+        for part in info["fullname"].split("."):
+            obj = getattr(obj, part)
+        fn = inspect.getsourcefile(obj)
+        fn = os.path.relpath(fn, start=os.path.dirname(tk.__file__))
+        source, lineno = inspect.getsourcelines(obj)
+        filename = f"pytoolkit/{fn}#L{lineno}-L{lineno + len(source) - 1}"
+    except Exception:
+        filename = info["module"].replace(".", "/") + ".py"
+    return f"https://github.com/ak110/pytoolkit/blob/master/{filename}"
+
 
 # sphinx-autodoc-typehints
 set_type_checking_flag = True
