@@ -651,14 +651,10 @@ class FilterResponseNormalization(tf.keras.layers.Layer):
         epsilon=1e-6,
         center=True,
         scale=True,
-        activate=True,
-        tau_initializer="zeros",
         beta_initializer="zeros",
         gamma_initializer="ones",
-        tau_regularizer=None,
         beta_regularizer=None,
         gamma_regularizer=None,
-        tau_constraint=None,
         beta_constraint=None,
         gamma_constraint=None,
         **kwargs,
@@ -668,17 +664,12 @@ class FilterResponseNormalization(tf.keras.layers.Layer):
         self.epsilon = epsilon
         self.center = center
         self.scale = scale
-        self.activate = activate
-        self.tau_initializer = tf.keras.initializers.get(tau_initializer)
         self.beta_initializer = tf.keras.initializers.get(beta_initializer)
         self.gamma_initializer = tf.keras.initializers.get(gamma_initializer)
-        self.tau_regularizer = tf.keras.regularizers.get(tau_regularizer)
         self.beta_regularizer = tf.keras.regularizers.get(beta_regularizer)
         self.gamma_regularizer = tf.keras.regularizers.get(gamma_regularizer)
-        self.tau_constraint = tf.keras.constraints.get(tau_constraint)
         self.beta_constraint = tf.keras.constraints.get(beta_constraint)
         self.gamma_constraint = tf.keras.constraints.get(gamma_constraint)
-        self.tau = None
         self.beta = None
         self.gamma = None
 
@@ -700,27 +691,18 @@ class FilterResponseNormalization(tf.keras.layers.Layer):
                 regularizer=self.beta_regularizer,
                 constraint=self.beta_constraint,
             )
-        if self.activate:
-            self.tau = self.add_weight(
-                shape=affine_shape,
-                name="tau",
-                initializer=self.tau_initializer,
-                regularizer=self.tau_regularizer,
-                constraint=self.tau_constraint,
-            )
         super().build(input_shape)
 
     def call(self, inputs, **kwargs):
         del kwargs
         x = inputs
-        nu2 = tf.reduce_mean(tf.square(x), axis=[1, 2], keepdims=True)
-        x *= tf.math.rsqrt(nu2 + tf.abs(self.epsilon))
+        axes = list(range(1, x.ndim - 1))
+        nu2 = tf.math.reduce_mean(tf.math.square(x), axis=axes, keepdims=True)
+        x *= tf.math.rsqrt(nu2 + tf.math.abs(self.epsilon))
         if self.scale:
             x *= self.gamma
         if self.center:
             x += self.beta
-        if self.activate:
-            x = tf.maximum(x, self.tau)
         return x
 
     def get_config(self):
@@ -728,18 +710,14 @@ class FilterResponseNormalization(tf.keras.layers.Layer):
             "epsilon": self.epsilon,
             "center": self.center,
             "scale": self.scale,
-            "activate": self.activate,
-            "tau_initializer": tf.keras.initializers.serialize(self.tau_initializer),
             "beta_initializer": tf.keras.initializers.serialize(self.beta_initializer),
             "gamma_initializer": tf.keras.initializers.serialize(
                 self.gamma_initializer
             ),
-            "tau_regularizer": tf.keras.regularizers.serialize(self.tau_regularizer),
             "beta_regularizer": tf.keras.regularizers.serialize(self.beta_regularizer),
             "gamma_regularizer": tf.keras.regularizers.serialize(
                 self.gamma_regularizer
             ),
-            "tau_constraint": tf.keras.constraints.serialize(self.tau_constraint),
             "beta_constraint": tf.keras.constraints.serialize(self.beta_constraint),
             "gamma_constraint": tf.keras.constraints.serialize(self.gamma_constraint),
         }
@@ -1415,3 +1393,23 @@ class MultiHeadAttention2D(tf.keras.layers.Layer):
         }
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
+
+
+@tk_utils.register_keras_custom_object
+class TrainOnly(tf.keras.layers.Wrapper):
+    """訓練時のみ適用するlayer wrapper"""
+
+    def call(self, inputs, training=None, **kwargs):
+        return K.in_train_phase(
+            lambda: self.layer.call(inputs, **kwargs), inputs, training
+        )
+
+
+@tk_utils.register_keras_custom_object
+class TestOnly(tf.keras.layers.Wrapper):
+    """推論時のみ適用するlayer wrapper"""
+
+    def call(self, inputs, training=None, **kwargs):
+        return K.in_train_phase(
+            inputs, lambda: self.layer.call(inputs, **kwargs), training
+        )
