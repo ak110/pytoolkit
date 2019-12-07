@@ -696,7 +696,7 @@ class FilterResponseNormalization(tf.keras.layers.Layer):
     def call(self, inputs, **kwargs):
         del kwargs
         x = inputs
-        axes = list(range(1, x.ndim - 1))
+        axes = list(range(1, K.ndim(x) - 1))
         nu2 = tf.math.reduce_mean(tf.math.square(x), axis=axes, keepdims=True)
         x *= tf.math.rsqrt(nu2 + tf.math.abs(self.epsilon))
         if self.scale:
@@ -763,6 +763,101 @@ class TLU(tf.keras.layers.Layer):
             "tau_initializer": tf.keras.initializers.serialize(self.tau_initializer),
             "tau_regularizer": tf.keras.regularizers.serialize(self.tau_regularizer),
             "tau_constraint": tf.keras.constraints.serialize(self.tau_constraint),
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
+@tk_utils.register_keras_custom_object
+class RandomRMSNormalization(tf.keras.layers.Layer):
+    """ランダム要素のあるrmsを使ったnormalization。<https://twitter.com/ak11/status/1202838201716490240>"""
+
+    def __init__(
+        self,
+        channel_size=32,
+        center=True,
+        scale=True,
+        beta_initializer="zeros",
+        gamma_initializer="ones",
+        beta_regularizer=None,
+        gamma_regularizer=None,
+        beta_constraint=None,
+        gamma_constraint=None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.supports_masking = True
+        self.channel_size = channel_size
+        self.center = center
+        self.scale = scale
+        self.beta_initializer = tf.keras.initializers.get(beta_initializer)
+        self.gamma_initializer = tf.keras.initializers.get(gamma_initializer)
+        self.beta_regularizer = tf.keras.regularizers.get(beta_regularizer)
+        self.gamma_regularizer = tf.keras.regularizers.get(gamma_regularizer)
+        self.beta_constraint = tf.keras.constraints.get(beta_constraint)
+        self.gamma_constraint = tf.keras.constraints.get(gamma_constraint)
+        self.beta = None
+        self.gamma = None
+
+    def build(self, input_shape):
+        affine_shape = (input_shape[-1],)
+        if self.scale:
+            self.gamma = self.add_weight(
+                shape=affine_shape,
+                name="gamma",
+                initializer=self.gamma_initializer,
+                regularizer=self.gamma_regularizer,
+                constraint=self.gamma_constraint,
+            )
+        if self.center:
+            self.beta = self.add_weight(
+                shape=affine_shape,
+                name="beta",
+                initializer=self.beta_initializer,
+                regularizer=self.beta_regularizer,
+                constraint=self.beta_constraint,
+            )
+        super().build(input_shape)
+
+    def call(self, inputs, training=None, **kwargs):
+        del kwargs
+        x = inputs
+        axes = list(range(1, K.ndim(x)))
+
+        if x.shape[-1] <= self.channel_size:
+            x_target = x
+        else:
+
+            def pick_random():
+                r = tf.random.uniform(shape=(x.shape[-1],))
+                _, indices = tf.nn.top_k(r, self.channel_size)
+                return tf.gather(x, indices, axis=-1)
+
+            x_target = K.in_train_phase(pick_random, x, training)
+
+        nu2 = tf.math.reduce_mean(tf.math.square(x_target), axis=axes, keepdims=True)
+        x *= tf.math.rsqrt(nu2 + 1e-6)
+        if self.scale:
+            x *= self.gamma
+        if self.center:
+            x += self.beta
+        return x
+
+    def get_config(self):
+        config = {
+            "channel_size": self.channel_size,
+            "center": self.center,
+            "scale": self.scale,
+            "beta_initializer": tf.keras.initializers.serialize(self.beta_initializer),
+            "gamma_initializer": tf.keras.initializers.serialize(
+                self.gamma_initializer
+            ),
+            "beta_regularizer": tf.keras.regularizers.serialize(self.beta_regularizer),
+            "gamma_regularizer": tf.keras.regularizers.serialize(
+                self.gamma_regularizer
+            ),
+            "beta_constraint": tf.keras.constraints.serialize(self.beta_constraint),
+            "gamma_constraint": tf.keras.constraints.serialize(self.gamma_constraint),
         }
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
