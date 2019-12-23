@@ -325,13 +325,13 @@ class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
         # y = (x - mean) / (sqrt(var) + epsilon) * gamma + beta
         #   = x * gamma / (sqrt(var) + epsilon) + (beta - mean * gamma / (sqrt(var) + epsilon))
         #   = x * a + (beta - mean * a)
-        a = self.gamma / (K.sqrt(var) + 1e-3)
+        a = self.gamma * tf.math.rsqrt(var + 1e-7)
         b = self.beta - mean * a
         return inputs * K.cast(a, K.dtype(inputs)) + K.cast(b, K.dtype(inputs))
 
     def _bn_test(self, inputs):
         """予測時のBN。"""
-        a = self.gamma / (K.sqrt(self.moving_variance) + 1e-3)
+        a = self.gamma / tf.math.rsqrt(self.moving_variance + 1e-7)
         b = self.beta - self.moving_mean * a
         return inputs * K.cast(a, K.dtype(inputs)) + K.cast(b, K.dtype(inputs))
 
@@ -416,15 +416,15 @@ class GroupNormalization(tf.keras.layers.Layer):
             N, H, W, C = shape[0], shape[1], shape[2], shape[3]
             g = K.minimum(self.groups, C)
             x = K.reshape(x, [N, H, W, g, C // g])
-            mean, var = tf.compat.v2.nn.moments(x=x, axes=[1, 2, 4], keepdims=True)
-            x = (x - mean) / K.sqrt(var + self.epsilon)
+            mean, var = tf.nn.moments(x=x, axes=[1, 2, 4], keepdims=True)
+            x = (x - mean) * tf.math.rsqrt(var + self.epsilon)
             x = K.reshape(x, [N, H, W, C])
         elif ndim == 5:  # 3D
             N, T, H, W, C = shape[0], shape[1], shape[2], shape[3], shape[4]
             g = K.minimum(self.groups, C)
             x = K.reshape(x, [N, T, H, W, g, C // g])
-            mean, var = tf.compat.v2.nn.moments(x=x, axes=[1, 2, 3, 5], keepdims=True)
-            x = (x - mean) / K.sqrt(var + self.epsilon)
+            mean, var = tf.nn.moments(x=x, axes=[1, 2, 3, 5], keepdims=True)
+            x = (x - mean) * tf.math.rsqrt(var + self.epsilon)
             x = K.reshape(x, [N, T, H, W, C])
         else:
             assert ndim in (4, 5)
@@ -927,7 +927,7 @@ class DropActivation(tf.keras.layers.Layer):
         def _train():
             shape = K.shape(inputs)
             r = K.random_uniform(shape=(shape[0],) + (1,) * (K.ndim(inputs) - 1))
-            return tf.compat.v2.where(r <= self.keep_rate, K.relu(inputs), inputs)
+            return tf.where(r <= self.keep_rate, K.relu(inputs), inputs)
 
         def _test():
             return K.relu(inputs, alpha=1 - self.keep_rate)
@@ -1212,12 +1212,12 @@ class ImputeNaN(tf.keras.layers.Layer):
     def call(self, inputs, **kwargs):
         del kwargs
         mask = tf.math.is_nan(inputs)
-        output = tf.compat.v2.where(mask, K.ones_like(inputs), inputs)  # nanを1に置き換え
+        output = tf.where(mask, K.ones_like(inputs), inputs)  # nanを1に置き換え
         output = K.dot(output, self.kernel1)
         output = K.relu(output)
         output = K.dot(output, self.kernel2)
         output = K.bias_add(output, self.bias, data_format="channels_last")
-        output = tf.compat.v2.where(mask, output, inputs)  # nan以外はinputsを出力
+        output = tf.where(mask, output, inputs)  # nan以外はinputsを出力
         return output
 
     def get_config(self):
@@ -1364,7 +1364,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
                 row_index = K.cumsum(mask_ones, axis=1)
                 col_index = K.cumsum(mask_ones, axis=2)
                 causal_mask = K.greater_equal(row_index, col_index)
-                w = tf.compat.v2.where(causal_mask, w, K.tile([[[-np.inf]]], w_shape))
+                w = tf.where(causal_mask, w, K.tile([[[-np.inf]]], w_shape))
             w = K.softmax(w)
             w = K.dropout(w, level=self.drop_rate)  # Attention Dropout
             a = K.batch_dot(w, K.tanh(v), axes=(2, 1))

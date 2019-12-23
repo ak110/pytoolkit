@@ -8,7 +8,7 @@ K = tf.keras.backend
 
 
 class GradCamVisualizer:
-    """Grad-CAM(のようなもの)による可視化。
+    """Grad-CAMによる可視化。
 
     Args:
         model: 対象のモデル。画像分類で最後がpooling_class+Dense+softmaxで分類している前提。

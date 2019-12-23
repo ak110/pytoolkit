@@ -216,10 +216,16 @@ class DataLoader:
         """tf.data.Datasetを作る。"""
 
         def get_data(i):
-            return self.get_data(dataset, i)
+            X, y = self.get_data(dataset, i)
+            if y is None:
+                y = 0  # tf.dataが死ぬのでダミーで0にしちゃう
+            return X, y
 
         def get_sample(*args):
-            return self.get_sample([args[i : i + 2] for i in range(0, len(args), 2)])
+            X, y = self.get_sample([args[i : i + 2] for i in range(0, len(args), 2)])
+            if y is None:
+                y = 0  # tf.dataが死ぬのでダミーで0にしちゃう
+            return X, y
 
         # 試しに1件呼び出してdtypeやshapeを推定 (ダサいが…)
         exsample_data = get_data(0)

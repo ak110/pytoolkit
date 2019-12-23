@@ -150,14 +150,14 @@ class SAdam(tf.keras.optimizers.Optimizer):
                     ((rho_t - 4) * (rho_t - 2) * rho_inf)
                     / ((rho_inf - 4) * (rho_inf - 2) * rho_t)
                 )
-                return var - scale * lr_t * r_t * m_t / (K.sqrt(vhat_t) + 1e-5)
+                return var - scale * lr_t * r_t * m_t * tf.math.rsqrt(vhat_t + 1e-7)
 
             def update_unadapted():
                 return var - scale * lr_t * m_t
 
             var_t = K.switch(rho_t > 4, update_adapted, update_unadapted)
         else:
-            var_t = var - scale * lr_t * m_t / (K.sqrt(vhat_t) + 1e-5)
+            var_t = var - scale * lr_t * m_t * tf.math.rsqrt(vhat_t + 1e-7)
 
         var_t = K.update(var, var_t)
         return tf.group(var_t, m_t, v_t)

@@ -97,12 +97,8 @@ class KerasModel(Model):
         self.num_replicas_in_sync = num_replicas_in_sync
         self.parallel_cv = parallel_cv
         self.on_batch_fn = on_batch_fn
-        self.training_models: typing.List[typing.Optional[tf.keras.models.Model]] = [
-            None
-        ] * nfold
-        self.prediction_models: typing.List[typing.Optional[tf.keras.models.Model]] = [
-            None
-        ] * nfold
+        self.training_models: typing.List[tf.keras.models.Model] = [None] * nfold
+        self.prediction_models: typing.List[tf.keras.models.Model] = [None] * nfold
         if self.parallel_cv:
             assert self.refine_data_loader is None, "NotImplemented"
         if "{fold}" not in self.model_name_format:
