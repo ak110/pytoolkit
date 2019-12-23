@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import pathlib
+import sys
 import typing
 
 import tensorflow as tf
@@ -138,11 +139,13 @@ class App:
                             command.entrypoint(**args)
                     else:
                         command.entrypoint(**args)
-            except Exception:
+            except Exception as e:
                 # ログファイルを出力する(ような重要な)コマンドの場合のみ通知を送信
                 if command.logfile:
-                    tk.notifications.post(tk.utils.format_exc())
-                raise
+                    tk.notifications.post(f"{type(e).__name__}: {e}")
+                # ログ出力して強制終了 (これ以上raiseしても少しトレース増えるだけなので)
+                tk.log.get(__name__).critical("Application error.", exc_info=True)
+                sys.exit(1)
             finally:
                 # 後処理
                 for f in self.terms:
@@ -190,7 +193,6 @@ class Command:
 
 def _ipy():
     """自動追加されるコマンド。ipython。"""
-    import sys
     import IPython
 
     m = sys.modules["__main__"]

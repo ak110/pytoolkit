@@ -1,6 +1,7 @@
 """Keras"""
 from __future__ import annotations
 
+import gc
 import pathlib
 import typing
 
@@ -18,7 +19,7 @@ class KerasModel(Model):
     _saveではなく学習時にsaveしてしまっているので注意。
 
     Args:
-        create_network_fn: モデルの作成関数
+        create_network_fn: モデルの作成関数。2個のモデルを返す関数の場合、1個目が訓練用、2個目が推論用。
         nfold: cvの分割数
         train_data_loader: 訓練データの読み込み
         val_data_loader: 検証データの読み込み
@@ -36,20 +37,30 @@ class KerasModel(Model):
         num_replicas_in_sync: tf.distributeするなら指定する。
         parallel_cv: lgb.cvなどのように全foldまとめて処理するならTrue
 
+    Fields:
+        training_models: 訓練用モデル
+        prediction_models: 推論用モデル
+
     model_name_formatに"{fold}"が含まれない名前を指定した場合、
     cvではなくtrainを使うモードということにする。
 
-    事前にself.modelsにモデルがある状態でcvやfitを呼んだ場合は追加学習ということにする。
+    事前にself.training_modelsにモデルがある状態でcvやfitを呼んだ場合は追加学習ということにする。
 
     """
 
     def __init__(
         self,
-        create_network_fn: typing.Callable[[], tf.keras.models.Model],
+        create_network_fn: typing.Callable[
+            [],
+            typing.Union[
+                tf.keras.models.Model,
+                typing.Tuple[tf.keras.models.Model, tf.keras.models.Model],
+            ],
+        ],
         nfold: int,
         train_data_loader: tk.data.DataLoader,
         val_data_loader: tk.data.DataLoader,
-        refine_data_loader: tk.data.DataLoader = None,
+        refine_data_loader: typing.Optional[tk.data.DataLoader] = None,
         *,
         epochs: int,
         refine_epochs: int = 50,
@@ -86,7 +97,12 @@ class KerasModel(Model):
         self.num_replicas_in_sync = num_replicas_in_sync
         self.parallel_cv = parallel_cv
         self.on_batch_fn = on_batch_fn
-        self.models: typing.List[tf.keras.models.Model] = [None] * nfold
+        self.training_models: typing.List[typing.Optional[tf.keras.models.Model]] = [
+            None
+        ] * nfold
+        self.prediction_models: typing.List[typing.Optional[tf.keras.models.Model]] = [
+            None
+        ] * nfold
         if self.parallel_cv:
             assert self.refine_data_loader is None, "NotImplemented"
         if "{fold}" not in self.model_name_format:
@@ -101,10 +117,9 @@ class KerasModel(Model):
             self._load_model(fold)
 
     def _load_model(self, fold):
+        self.create_network(fold)
         model_path = self.models_dir / self.model_name_format.format(fold=fold + 1)
-        if self.models[fold] is None:
-            self.models[fold] = self.create_network()
-        tk.models.load_weights(self.models[fold], model_path)
+        tk.models.load_weights(self.prediction_models[fold], model_path)
 
     def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
         assert len(folds) == self.nfold
@@ -114,14 +129,19 @@ class KerasModel(Model):
             return self._serial_cv(dataset, folds)
 
     def _parallel_cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType):
-        self.models = [self.create_network() for _ in folds]
+        for fold in range(len(folds)):
+            self.create_network(fold)
+        assert self.training_models[0] is not None
 
         inputs = []
         targets = []
         outputs = []
         losses = []
-        metrics: dict = {n: [] for n in self.models[0].metrics_names if n != "loss"}
-        for i, model in enumerate(self.models):
+        metrics: dict = {
+            n: [] for n in self.training_models[0].metrics_names if n != "loss"
+        }
+        for i, model in enumerate(self.training_models):
+            assert model is not None
             input_shape = model.input_shape
             output_shape = model.output_shape
             if isinstance(input_shape, tuple):
@@ -163,7 +183,7 @@ class KerasModel(Model):
             metrics[k] = metric_func
 
         model = tf.keras.models.Model(inputs=inputs + targets, outputs=outputs)
-        model.compile(self.models[0].optimizer, loss, list(metrics.values()))
+        model.compile(self.training_models[0].optimizer, loss, list(metrics.values()))
         tk.models.summary(model)
 
         def generator(datasets, data_loader):
@@ -238,18 +258,22 @@ class KerasModel(Model):
         }
 
     def _predict(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:
-        assert self.models is not None
-        return [
-            tk.models.predict(
-                model,
-                dataset,
-                self.val_data_loader,
-                use_horovod=self.use_horovod,
-                num_replicas_in_sync=self.num_replicas_in_sync,
-                on_batch_fn=self.on_batch_fn,
+        result = []
+        for fold, model in enumerate(self.prediction_models):
+            result.append(
+                tk.models.predict(
+                    model,
+                    dataset,
+                    self.val_data_loader,
+                    use_horovod=self.use_horovod,
+                    num_replicas_in_sync=self.num_replicas_in_sync,
+                    on_batch_fn=self.on_batch_fn,
+                )
             )
-            for model in self.models
-        ]
+            # メモリを食いがちなので再構築してみる
+            del model
+            self._rebuild_model(fold)
+        return result
 
     def check(self) -> KerasModel:
         """モデルの動作確認。(KerasModel独自メソッド)
@@ -259,11 +283,12 @@ class KerasModel(Model):
 
         """
         assert self.nfold >= 1
-        self.models[0] = self.create_network()
+        self.create_network(fold=0)
+        assert self.training_models[0] is not None
         # summary表示
-        tk.models.summary(self.models[0])
+        tk.models.summary(self.training_models[0])
         # グラフを出力
-        tk.models.plot(self.models[0], self.models_dir / "model.svg")
+        tk.models.plot(self.training_models[0], self.models_dir / "model.svg")
         return self
 
     @typing.overload
@@ -315,18 +340,18 @@ class KerasModel(Model):
             self._load_model(fold)
             trained = False
         else:
-            if self.models[fold] is None:  # 既にあればそれを使う
-                self.models[fold] = self.create_network()
+            self.create_network(fold)
             trained = True
+            model: tf.keras.models.Model = self.training_models[fold]
 
             if self.refine_data_loader is not None:
-                start_lr = tf.keras.backend.get_value(self.models[fold].optimizer.lr)
+                start_lr = tf.keras.backend.get_value(model.optimizer.learning_rate)
 
             # fit
             tk.hvd.barrier()
             if self.epochs > 0:
                 tk.models.fit(
-                    self.models[fold],
+                    model,
                     train_set=train_set,
                     train_data_loader=self.train_data_loader,
                     val_set=val_set,
@@ -342,15 +367,13 @@ class KerasModel(Model):
                 tk.log.get(__name__).info(
                     f"Fold {fold + 1}: Refining {self.refine_epochs} epochs..."
                 )
-                tk.models.freeze_layers(
-                    self.models[fold], tf.keras.layers.BatchNormalization
-                )
-                tk.models.recompile(self.models[fold])
+                tk.models.freeze_layers(model, tf.keras.layers.BatchNormalization)
+                tk.models.recompile(model)
                 tf.keras.backend.set_value(
-                    self.models[fold].optimizer.lr, start_lr * self.refine_lr_factor
+                    model.optimizer.learning_rate, start_lr * self.refine_lr_factor,
                 )
                 tk.models.fit(
-                    self.models[fold],
+                    model,
                     train_set=train_set,
                     train_data_loader=self.refine_data_loader,
                     val_set=val_set,
@@ -359,7 +382,8 @@ class KerasModel(Model):
                     num_replicas_in_sync=self.num_replicas_in_sync,
                 )
 
-            tk.models.save(self.models[fold], model_path)
+            tk.models.save(model, model_path)
+            del model
 
         # 訓練データと検証データの評価
         tk.hvd.barrier()
@@ -368,11 +392,9 @@ class KerasModel(Model):
             return None
         evals = self.evaluate(val_set, prefix="val_", fold=fold)
 
-        # メモリを食いがちなので学習完了後は再構築する
+        # メモリを食いがちなので再構築してみる
         if trained:
-            self.models[fold] = None
-            tk.hvd.clear()
-            self._load_model(fold)
+            self._rebuild_model(fold)
 
         return evals
 
@@ -390,11 +412,10 @@ class KerasModel(Model):
             metricsの文字列と値のdict
 
         """
-        assert self.models is not None
         assert self.preprocessors is None  # とりあえず未対応
         assert self.postprocessors is None  # とりあえず未対応
         evals = tk.models.evaluate(
-            self.models[fold],
+            self.training_models[fold],
             dataset,
             data_loader=self.val_data_loader,  # DataAugmentation無しで評価
             prefix=prefix,
@@ -418,17 +439,30 @@ class KerasModel(Model):
             fold: 何番目のモデルを使うか
 
         """
-        assert self.models is not None
         assert self.preprocessors is None  # とりあえず未対応
         assert self.postprocessors is None  # とりあえず未対応
         return tk.models.predict_flow(
-            self.models[fold],
+            self.prediction_models[fold],
             dataset,
             self.val_data_loader,
             on_batch_fn=self.on_batch_fn,
             num_replicas_in_sync=self.num_replicas_in_sync,
         )
 
-    def create_network(self) -> tf.keras.models.Model:
-        """モデルの作成。"""
-        return self.create_network_fn()
+    def create_network(self, fold: int) -> None:
+        """指定foldのモデルの作成。"""
+        if self.training_models[fold] is not None:  # 既にあればそれを使う
+            assert self.prediction_models[fold] is not None
+        else:
+            network = self.create_network_fn()
+            if not isinstance(network, tuple):
+                network = network, network
+            self.training_models[fold] = network[0]
+            self.prediction_models[fold] = network[1]
+
+    def _rebuild_model(self, fold: int) -> None:
+        """メモリ節約のための処理。"""
+        self.training_models[fold] = None
+        self.prediction_models[fold] = None
+        gc.collect()
+        self._load_model(fold)

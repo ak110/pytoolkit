@@ -528,15 +528,17 @@ def predict_on_batch_augmented(
         ),
         mode=padding_mode,
     )
-    result = []
+    X_batch2: list = []
     for y in np.linspace(0, padding_size[0] * 2, crop_size[0], dtype=np.int32):
         for x in np.linspace(0, padding_size[1] * 2, crop_size[1], dtype=np.int32):
             X = X_batch[:, x : x + shape[1], y : y + shape[2], :]
-            result.append(model.predict_on_batch(X))
+            X_batch2.append(X)
             if flip[0]:
-                result.append(model.predict_on_batch(X[:, ::-1, :, :]))
+                X_batch2.append(X[:, ::-1, :, :])
             if flip[1]:
-                result.append(model.predict_on_batch(X[:, :, ::-1, :]))
+                X_batch2.append(X[:, :, ::-1, :])
             if flip[0] and flip[1]:
-                result.append(model.predict_on_batch(X[:, ::-1, ::-1, :]))
+                X_batch2.append(X[:, ::-1, ::-1, :])
+    result = model.predict(np.concatenate(X_batch2, axis=0), verbose=0)
+    result = result.reshape((len(X_batch2), len(X_batch)) + result.shape[1:])
     return result

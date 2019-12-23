@@ -93,6 +93,13 @@ def tqdm_write(s, file=None, end="\n", nolock=False):
     t.write(s, file=file, end=end, nolock=nolock)
 
 
+def tqdm_external_write_mode(file=None, nolock=False):
+    """tqdm中に何か出力したいとき用のやつ。"""
+    from tqdm import tqdm as t
+
+    return t.external_write_mode(file=file, nolock=nolock)
+
+
 def better_exceptions():
     """better_exceptionsを有効にする。"""
     try:
