@@ -37,7 +37,7 @@ class KerasModel(Model):
         num_replicas_in_sync: tf.distributeするなら指定する。
         parallel_cv: lgb.cvなどのように全foldまとめて処理するならTrue
 
-    Fields:
+    Attributes:
         training_models: 訓練用モデル
         prediction_models: 推論用モデル
 
@@ -78,9 +78,8 @@ class KerasModel(Model):
         preprocessors: tk.pipeline.EstimatorListType = None,
         postprocessors: tk.pipeline.EstimatorListType = None,
     ):
-        super().__init__(preprocessors, postprocessors)
+        super().__init__(nfold, preprocessors, postprocessors)
         self.create_network_fn = create_network_fn
-        self.nfold = nfold
         self.train_data_loader = train_data_loader
         self.val_data_loader = val_data_loader
         self.refine_data_loader = refine_data_loader
@@ -253,23 +252,18 @@ class KerasModel(Model):
             for k in score_list[0]
         }
 
-    def _predict(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:
-        result = []
-        for fold, model in enumerate(self.prediction_models):
-            result.append(
-                tk.models.predict(
-                    model,
-                    dataset,
-                    self.val_data_loader,
-                    use_horovod=self.use_horovod,
-                    num_replicas_in_sync=self.num_replicas_in_sync,
-                    on_batch_fn=self.on_batch_fn,
-                )
-            )
-            # メモリを食いがちなので再構築してみる
-            del model
-            self._rebuild_model(fold)
-        return result
+    def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
+        pred = tk.models.predict(
+            self.prediction_models[fold],
+            dataset,
+            self.val_data_loader,
+            use_horovod=self.use_horovod,
+            num_replicas_in_sync=self.num_replicas_in_sync,
+            on_batch_fn=self.on_batch_fn,
+        )
+        # メモリを食いがちなので再構築してみる
+        self._rebuild_model(fold)
+        return pred
 
     def check(self) -> KerasModel:
         """モデルの動作確認。(KerasModel独自メソッド)

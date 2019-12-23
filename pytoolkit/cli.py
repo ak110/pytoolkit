@@ -20,7 +20,7 @@ class App:
     Args:
         output_dir: ログ出力先ディレクトリ
 
-    Fields:
+    Attributes:
         output_dir: ログ出力先ディレクトリ
         current_command: 現在実行中のコマンド名
 

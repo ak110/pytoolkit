@@ -17,6 +17,7 @@ class SKLearnModel(Model):
 
     Args:
         estimator: モデル
+        nfold: cvの分割数
         weights_arg_name: tk.data.Dataset.weightsを使う場合の引数名
                           (pipelineなどで変わるので。例: "transformedtargetregressor__sample_weight")
 
@@ -25,11 +26,12 @@ class SKLearnModel(Model):
     def __init__(
         self,
         estimator: sklearn.base.BaseEstimator,
+        nfold: int,
         weights_arg_name: str = "sample_weight",
         preprocessors: tk.pipeline.EstimatorListType = None,
         postprocessors: tk.pipeline.EstimatorListType = None,
     ):
-        super().__init__(preprocessors, postprocessors)
+        super().__init__(nfold, preprocessors, postprocessors)
         self.estimator = estimator
         self.weights_arg_name = weights_arg_name
         self.estimators_: typing.Optional[
@@ -67,9 +69,7 @@ class SKLearnModel(Model):
 
         return {"score": np.average(scores, weights=score_weights)}
 
-    def _predict(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:
+    def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
         # TODO: predict_proba対応
         assert self.estimators_ is not None
-        return np.array(
-            [estimator.predict(dataset.data) for estimator in self.estimators_]
-        )
+        return self.estimators_[fold].predict(dataset.data)

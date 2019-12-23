@@ -41,9 +41,8 @@ class XGBModel(Model):
     ):
         import xgboost
 
-        super().__init__(preprocessors, postprocessors)
+        super().__init__(nfold, preprocessors, postprocessors)
         self.params = params
-        self.nfold = nfold
         self.early_stopping_rounds = early_stopping_rounds
         self.num_boost_round = num_boost_round
         self.verbose_eval = verbose_eval
@@ -104,7 +103,7 @@ class XGBModel(Model):
 
         return scores
 
-    def _predict(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:
+    def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
         import xgboost
 
         assert self.gbms_ is not None
@@ -114,9 +113,8 @@ class XGBModel(Model):
         data = xgboost.DMatrix(
             data=dataset.data, feature_names=dataset.data.columns.values
         )
-        return np.array(
-            [gbm.predict(data, ntree_limit=gbm.best_ntree_limit) for gbm in self.gbms_]
-        )
+        gbm = self.gbms_[fold]
+        return gbm.predict(data, ntree_limit=gbm.best_ntree_limit)
 
     def feature_importance(self, importance_type: str = "total_gain"):
         """Feature ImportanceをDataFrameで返す。"""

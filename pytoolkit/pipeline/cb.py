@@ -32,9 +32,8 @@ class CBModel(Model):
     ):
         import catboost
 
-        super().__init__(preprocessors, postprocessors)
+        super().__init__(nfold, preprocessors, postprocessors)
         self.params = params
-        self.nfold = nfold
         self.cv_params = cv_params
         self.gbms_: typing.Optional[typing.List[catboost.CatBoost]] = None
         self.train_pool_: catboost.Pool = None
@@ -100,9 +99,9 @@ class CBModel(Model):
 
         return scores
 
-    def _predict(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:
+    def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
         assert self.gbms_ is not None
-        return np.array([gbm.predict(dataset.data) for gbm in self.gbms_])
+        return self.gbms_[fold].predict(dataset.data)
 
     def feature_importance(self):
         """Feature ImportanceをDataFrameで返す。"""

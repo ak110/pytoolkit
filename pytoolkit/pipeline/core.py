@@ -17,6 +17,7 @@ class Model:
     """パイプラインのモデルのインターフェース。
 
     Args:
+        nfold: CVの分割数
         preprocessors: 前処理 (sklearnのTransformerの配列)
         postprocessors: 後処理 (sklearnのTransformerの配列)
 
@@ -24,9 +25,11 @@ class Model:
 
     def __init__(
         self,
+        nfold: int,
         preprocessors: EstimatorListType = None,
         postprocessors: EstimatorListType = None,
     ):
+        self.nfold = nfold
         self.preprocessors = (
             sklearn.pipeline.make_pipeline(*preprocessors)
             if preprocessors is not None
@@ -113,34 +116,42 @@ class Model:
             folds: CVのindex
 
         Returns:
-            予測結果
+            推論結果
 
         """
-        pred_list = self.predict(dataset)
+        pred_list = [
+            self.predict(dataset.slice(val_indices), fold)
+            for fold, (_, val_indices) in enumerate(folds)
+        ]
         assert len(pred_list) == len(folds)
 
         oofp_shape = (len(dataset),) + pred_list[0].shape[1:]
         oofp = np.empty(oofp_shape, dtype=pred_list[0].dtype)
         for pred, (_, val_indices) in zip(pred_list, folds):
-            oofp[val_indices] = pred[val_indices]
+            oofp[val_indices] = pred
 
         return oofp
 
-    def predict(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:
-        """予測結果をリストで返す。
+    def predict_all(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:
+        """全fold分の推論結果をリストで返す。"""
+        return [self.predict(dataset, fold) for fold in range(self.nfold)]
+
+    def predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
+        """推論結果を返す。
 
         Args:
-            dataset (tk.data.Dataset): 入力データ
+            dataset: 入力データ
+            fold: 使用するモデル
 
         Returns:
-            len(self.folds)個の予測結果
+            推論結果
 
         """
         dataset = dataset.copy()
         if self.preprocessors is not None:
             dataset.data = self.preprocessors.transform(dataset.data)
 
-        pred_list = self._predict(dataset)
+        pred_list = self._predict(dataset, fold)
 
         if self.postprocessors is not None:
             for i in range(len(pred_list)):
@@ -187,14 +198,15 @@ class Model:
         """
         raise NotImplementedError()
 
-    def _predict(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:
-        """予測結果をリストで返す。
+    def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
+        """推論結果を返す。
 
         Args:
-            dataset (tk.data.Dataset): 入力データ
+            dataset: 入力データ
+            fold: 使用するモデル
 
         Returns:
-            len(self.folds)個の予測結果
+            推論結果
 
         """
         raise NotImplementedError()

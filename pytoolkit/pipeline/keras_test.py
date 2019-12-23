@@ -44,7 +44,7 @@ def test_keras_xor(tmpdir):
     model.check()
     model.train(train_set, train_set)
 
-    proba = model.predict(tk.data.Dataset(X, y))[0]
+    proba = model.predict(tk.data.Dataset(X, y), fold=0)
     tk.evaluations.print_classification_metrics(y, proba)
 
     y_pred = np.squeeze((proba > 0.5).astype(np.int32), axis=-1)

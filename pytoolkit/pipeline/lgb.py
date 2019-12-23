@@ -36,16 +36,15 @@ class LGBModel(Model):
         early_stopping_rounds: int = 200,
         num_boost_round: int = 9999,
         verbose_eval: int = 100,
-        callbacks: list = None,
+        callbacks: typing.Sequence[typing.Callable] = None,
         cv_params: dict = None,
         seeds: np.ndarray = None,
         init_score: np.ndarray = None,
         preprocessors: tk.pipeline.EstimatorListType = None,
         postprocessors: tk.pipeline.EstimatorListType = None,
     ):
-        super().__init__(preprocessors, postprocessors)
+        super().__init__(nfold, preprocessors, postprocessors)
         self.params = params
-        self.nfold = nfold
         self.early_stopping_rounds = early_stopping_rounds
         self.num_boost_round = num_boost_round
         self.verbose_eval = verbose_eval
@@ -122,7 +121,7 @@ class LGBModel(Model):
                     early_stopping_rounds=self.early_stopping_rounds,
                     num_boost_round=self.num_boost_round,
                     verbose_eval=self.verbose_eval,
-                    callbacks=(self.callbacks or []) + [model_extractor],
+                    callbacks=list(self.callbacks or []) + [model_extractor],
                     seed=seed,
                     **(self.cv_params or {}),
                 )
@@ -145,24 +144,18 @@ class LGBModel(Model):
             scores[name] = np.mean(score_list)
         return scores
 
-    def _predict(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:
-        pred = np.array(
+    def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
+        pred = np.mean(
             [
-                np.mean(
-                    [
-                        gbm.predict(
-                            dataset.data[gbm.feature_name()],
-                            num_iteration=gbm.best_iteration,
-                        )
-                        for gbm in gbms_fold
-                    ],
-                    axis=0,
+                gbm.predict(
+                    dataset.data[gbm.feature_name()], num_iteration=gbm.best_iteration,
                 )
-                for gbms_fold in self.gbms_
-            ]
+                for gbm in self.gbms_[fold]
+            ],
+            axis=0,
         )
         if dataset.init_score is not None:
-            pred += np.expand_dims(dataset.init_score, axis=0)
+            pred += dataset.init_score
         return pred
 
     def feature_importance(self, importance_type: str = "gain"):
