@@ -218,32 +218,28 @@ class DataLoader:
         def get_data(i):
             X, y = self.get_data(dataset, i)
             if y is None:
-                y = 0  # tf.dataが死ぬのでダミーで0にしちゃう
+                y = np.int32(0)  # ダミーで0にしちゃう(手抜き)
             return X, y
 
         def get_sample(*args):
             X, y = self.get_sample([args[i : i + 2] for i in range(0, len(args), 2)])
             if y is None:
-                y = 0  # tf.dataが死ぬのでダミーで0にしちゃう
+                y = np.int32(0)  # ダミーで0にしちゃう(手抜き)
             return X, y
 
         # 試しに1件呼び出してdtypeやshapeを推定 (ダサいが…)
         exsample_data = get_data(0)
         exsample_sample = get_sample(*exsample_data * self.data_per_sample)
+        data_tf_type = DataLoader._get_tf_types_from_np(exsample_data)
+        sample_tf_type = DataLoader._get_tf_types_from_np(exsample_sample)
 
         def process1(i):
-            X, y = tf.numpy_function(
-                get_data, inp=[i], Tout=DataLoader._get_tf_types_from_np(exsample_data)
-            )
+            X, y = tf.numpy_function(get_data, inp=[i], Tout=data_tf_type)
             X, y = DataLoader._set_tf_rank_from_np(exsample_data, (X, y))
             return X, y
 
         def process2_1(X, y):
-            X, y = tf.numpy_function(
-                get_sample,
-                inp=(X, y),
-                Tout=DataLoader._get_tf_types_from_np(exsample_sample),
-            )
+            X, y = tf.numpy_function(get_sample, inp=(X, y), Tout=sample_tf_type)
             X, y = DataLoader._set_tf_rank_from_np(exsample_sample, (X, y))
             return X, y
 
