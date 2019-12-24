@@ -13,6 +13,7 @@ import typing
 import numpy as np
 
 import pytoolkit as tk
+from .. import data as tk_data
 
 
 def load_coco_od(coco_dir, use_crowded=False):
@@ -41,41 +42,44 @@ def load_coco_od(coco_dir, use_crowded=False):
         return_crowded=True,
     )
 
-    class COCOODDataset(tk.data.Dataset):
-        def __init__(self, ds):
-            self.ds = ds
-            super().__init__(data=np.arange(len(self.ds)))
+    return _COCOODDataset(ds_train), _COCOODDataset(ds_val)
 
-        def get_data(self, index: int) -> typing.Tuple[typing.Any, typing.Any]:
-            img, bboxes, classes, areas, crowdeds = self.ds[index]
 
-            # (ymin,xmin,ymax,xmax) -> (xmin,ymin,xmax,ymax)
-            bboxes = bboxes[:, [1, 0, 3, 2]].astype(np.float32)
-            bboxes[:, [0, 2]] /= img.shape[1]
-            bboxes[:, [1, 3]] /= img.shape[0]
+class _COCOODDataset(tk_data.Dataset):
+    """chainercvのDatasetからtk.data.Datasetへの変換"""
 
-            X = np.transpose(img, (1, 2, 0)).astype(np.uint8)
-            y = tk.od.ObjectsAnnotation(
-                path=self._get_path(index),
-                width=img.shape[1],
-                height=img.shape[0],
-                classes=classes,
-                bboxes=bboxes,
-                areas=areas,
-                crowdeds=crowdeds,
-            )
+    def __init__(self, ds):
+        self.ds = ds
+        super().__init__(data=np.arange(len(self.ds)))
 
-            assert img.shape[-1] == 3  # RGB
-            return X, y
+    def get_data(self, index: int) -> typing.Tuple[typing.Any, typing.Any]:
+        img, bboxes, classes, areas, crowdeds = self.ds[index]
+        X = np.transpose(img, (1, 2, 0)).astype(np.uint8)  # CHW -> HWC
+        assert X.shape[-1] == 3, f"shape error: {X.shape}"  # RGB
 
-        def _get_path(self, index: int) -> pathlib.Path:
-            # https://github.com/chainer/chainercv/blob/fddc813/chainercv/datasets/coco/coco_instances_base_dataset.py#L66
-            return (
-                pathlib.Path(self.ds.img_root)
-                / self.ds.id_to_prop[self.ds.ids[index]]["file_name"]
-            )
+        # (ymin,xmin,ymax,xmax) -> (xmin,ymin,xmax,ymax)
+        bboxes = bboxes[:, [1, 0, 3, 2]].astype(np.float32)
+        bboxes[:, [0, 2]] /= X.shape[1]
+        bboxes[:, [1, 3]] /= X.shape[0]
 
-    return COCOODDataset(ds_train), COCOODDataset(ds_val)
+        y = tk.od.ObjectsAnnotation(
+            path=self._get_path(index),
+            width=X.shape[1],
+            height=X.shape[0],
+            classes=classes,
+            bboxes=bboxes,
+            areas=areas,
+            crowdeds=crowdeds,
+        )
+
+        return X, y
+
+    def _get_path(self, index: int) -> pathlib.Path:
+        # https://github.com/chainer/chainercv/blob/fddc813/chainercv/datasets/coco/coco_instances_base_dataset.py#L66
+        return (
+            pathlib.Path(self.ds.img_root)
+            / self.ds.id_to_prop[self.ds.ids[index]]["file_name"]
+        )
 
 
 def load_od(coco_dir, year=2017):

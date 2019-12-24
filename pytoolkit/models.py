@@ -156,7 +156,7 @@ def plot(
 def compile(
     model: tf.keras.models.Model,
     optimizer: OptimizerType,
-    loss: LossType,
+    loss: LossType = None,
     metrics: MetricsType = None,
     experimental_run_tf_function: bool = None,
 ):  # pylint: disable=redefined-builtin

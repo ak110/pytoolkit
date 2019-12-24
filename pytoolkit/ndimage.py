@@ -703,9 +703,10 @@ def transform_points(points: np.ndarray, m: np.ndarray) -> np.ndarray:
         変換後の座標の配列。
 
     """
+    points = np.asarray(points)
     return cv2.perspectiveTransform(
-        np.reshape(points, (-1, 1, 2)).astype(np.float32), m
-    ).reshape(-1, 2)
+        points.reshape((-1, 1, 2)).astype(np.float32), m
+    ).reshape(points.shape)
 
 
 def erase_random(

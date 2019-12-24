@@ -51,16 +51,20 @@ class ObjectsAnnotation:
         self.crowdeds = (
             np.asarray(crowdeds, dtype=np.bool) if crowdeds is not None else None
         )
-        assert self.width >= 1
-        assert self.height >= 1
-        assert (self.bboxes >= 0).all()
-        assert (self.bboxes <= 1).all()
-        assert (self.bboxes[:, :2] < self.bboxes[:, 2:]).all()
-        assert self.classes.shape == (self.num_objects,)
-        assert self.bboxes.shape == (self.num_objects, 4)
-        assert self.difficults.shape == (self.num_objects,)
-        assert self.areas is None or self.areas.shape == (self.num_objects,)
-        assert self.crowdeds is None or self.crowdeds.shape == (self.num_objects,)
+        assert self.width >= 1, str(self.width)
+        assert self.height >= 1, str(self.height)
+        assert (self.bboxes >= 0).all(), str(self.bboxes)
+        assert (self.bboxes <= 1).all(), str(self.bboxes)
+        assert (self.bboxes[:, :2] < self.bboxes[:, 2:]).all(), str(self.bboxes)
+        assert self.classes.shape == (self.num_objects,), str(self.classes)
+        assert self.bboxes.shape == (self.num_objects, 4), str(self.bboxes)
+        assert self.difficults.shape == (self.num_objects,), str(self.difficults)
+        assert self.areas is None or self.areas.shape == (self.num_objects,), str(
+            self.areas
+        )
+        assert self.crowdeds is None or self.crowdeds.shape == (self.num_objects,), str(
+            self.crowdeds
+        )
 
     @property
     def num_objects(self):

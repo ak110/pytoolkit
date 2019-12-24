@@ -15,7 +15,6 @@ def memorize(cache_dir, compress=0, verbose=True):
     force_rerun=Trueを付けて呼び出すと強制的に再実行してキャッシュを上書き。
 
     """
-    cache_dir = pathlib.Path(cache_dir)
 
     def decorator(func):
         @functools.wraps(func)
@@ -48,6 +47,7 @@ def memorize(cache_dir, compress=0, verbose=True):
 
 def get_cache_path(cache_dir, func, args, kwargs, verbose):
     """キャッシュのパスを作って返す。"""
+    cache_dir = pathlib.Path(cache_dir)
     bound_args = inspect.signature(func).bind(*args, **kwargs).arguments
     args_list = sorted(dict(bound_args).items())
     args_str = ",".join([f"{repr(k)}:{repr(v)}" for k, v in args_list])

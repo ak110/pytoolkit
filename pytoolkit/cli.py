@@ -59,7 +59,7 @@ class App:
         logfile: bool = True,
         then: str = None,
         use_horovod: bool = False,
-        distribute_strategy: tf.distribute.Strategy = None,
+        distribute_strategy_fn: typing.Callable[[], tf.distribute.Strategy] = None,
         args: typing.Dict[str, typing.Dict[str, typing.Any]] = None,
     ):
         """コマンドの追加用デコレーター。
@@ -68,7 +68,7 @@ class App:
             logfile: ログファイルを出力するのか否か
             then: 当該コマンドが終わった後に続けて実行するコマンドの名前
             use_horovod: horovodを使うならTrue
-            distribute_strategy: tf.distributeを使うならStrategy
+            distribute_strategy_fn: tf.distributeを使う場合のStrategyの作成関数
             args: add_argumentの引数。(例: args={"--x": {"type": int}})
 
         """
@@ -82,7 +82,7 @@ class App:
                 logfile=logfile,
                 then=then,
                 use_horovod=use_horovod,
-                distribute_strategy=distribute_strategy,
+                distribute_strategy_fn=distribute_strategy_fn,
                 args=args,
             )
             return entrypoint
@@ -131,7 +131,8 @@ class App:
                     f()
             try:
                 with tk.log.trace_scope(command.entrypoint.__qualname__):
-                    if command.distribute_strategy is not None:
+                    if command.distribute_strategy_fn is not None:
+                        command.distribute_strategy = command.distribute_strategy_fn()
                         with command.distribute_strategy.scope():
                             tk.log.get(__name__).info(
                                 f"Number of devices: {self.num_replicas_in_sync}"
@@ -178,7 +179,8 @@ class Command:
         logfile: ログファイルを出力するのか否か
         then: 当該コマンドが終わった後に続けて実行するコマンドの名前
         use_horovod: horovodを使うならTrue
-        distribute_strategy: tf.distributeを使うならStrategy
+        distribute_strategy_fn: tf.distributeを使う場合のStrategyの作成関数
+        distribute_strategy: 作成したStrategy
         args: add_argumentの引数。(例: args={"--x": {"type": int}})
 
     """
@@ -187,6 +189,9 @@ class Command:
     logfile: bool = True
     then: typing.Optional[str] = None
     use_horovod: bool = False
+    distribute_strategy_fn: typing.Optional[
+        typing.Callable[[], tf.distribute.Strategy]
+    ] = None
     distribute_strategy: typing.Optional[tf.distribute.Strategy] = None
     args: typing.Optional[typing.Dict[str, typing.Dict[str, typing.Any]]] = None
 

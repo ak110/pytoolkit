@@ -12,6 +12,14 @@ pytoolkit.evaluations.classification module
    :undoc-members:
    :show-inheritance:
 
+pytoolkit.evaluations.od module
+-------------------------------
+
+.. automodule:: pytoolkit.evaluations.od
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 pytoolkit.evaluations.regression module
 ---------------------------------------
 

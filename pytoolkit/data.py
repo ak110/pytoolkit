@@ -214,43 +214,77 @@ class DataLoader:
         self, dataset: Dataset, shuffle: bool, num_replicas_in_sync: int
     ) -> tf.data.Dataset:
         """tf.data.Datasetを作る。"""
+        # pylint: disable=protected-access
+
+        # 試しに1件呼び出してdtypeやshapeを推定 (ダサいが…)
+        exsample_data = self.get_data(dataset, 0)
+        exsample_sample = self.get_sample(
+            [exsample_data for _ in range(self.data_per_sample)]
+        )
+        data_tf_type = self.__class__._flatten(
+            self.__class__._get_tf_types(exsample_data)
+        )
+        sample_tf_type = self.__class__._flatten(
+            self.__class__._get_tf_types(exsample_sample)
+        )
 
         def get_data(i):
             X, y = self.get_data(dataset, i)
+            # tf.numpy_functionがNone未対応なので0にしちゃう
             if y is None:
-                y = np.int32(0)  # ダミーで0にしちゃう(手抜き)
-            return X, y
+                y = np.int32(0)
+            # tf.numpy_functionがdict未対応なのでlistに展開してしまう
+            # (並び順はexsample_dataに合わせる(一応))
+            if isinstance(exsample_data[0], dict):
+                X = [X[k] for k in exsample_data[0]]
+            if isinstance(exsample_data[1], dict):
+                y = [y[k] for k in exsample_data[1]]
+            data = self.__class__._flatten([X, y])
+            return data
 
         def get_sample(*args):
-            X, y = self.get_sample([args[i : i + 2] for i in range(0, len(args), 2)])
-            if y is None:
-                y = np.int32(0)  # ダミーで0にしちゃう(手抜き)
-            return X, y
+            # flattenされたものをexsample_dataに従い戻す
+            data_size = len(data_tf_type)
+            assert len(args) % data_size == 0
+            data_list = [
+                self.__class__._unflatten(exsample_data, args[i : i + data_size])
+                for i in range(0, len(args), data_size)
+            ]
+            print(args)
+            print(data_list)
 
-        # 試しに1件呼び出してdtypeやshapeを推定 (ダサいが…)
-        exsample_data = get_data(0)
-        exsample_sample = get_sample(*exsample_data * self.data_per_sample)
-        data_tf_type = DataLoader._get_tf_types_from_np(exsample_data)
-        sample_tf_type = DataLoader._get_tf_types_from_np(exsample_sample)
+            X, y = self.get_sample(data_list)
+
+            # tf.numpy_functionがNone未対応なので0にしちゃう
+            if y is None:
+                y = np.int32(0)
+            # tf.numpy_functionがdict未対応なのでlistに展開してしまう
+            # (並び順はexsample_dataに合わせる(一応))
+            if isinstance(exsample_sample[0], dict):
+                X = [X[k] for k in exsample_sample[0]]
+            if isinstance(exsample_sample[1], dict):
+                y = [y[k] for k in exsample_sample[1]]
+            sample = self.__class__._flatten([X, y])
+
+            print(exsample_sample)
+            print(sample)
+            return sample
 
         def process1(i):
-            X, y = tf.numpy_function(get_data, inp=[i], Tout=data_tf_type)
-            X, y = DataLoader._set_tf_rank_from_np(exsample_data, (X, y))
-            return X, y
+            data = tf.numpy_function(get_data, inp=[i], Tout=data_tf_type)
+            return data
 
-        def process2_1(X, y):
-            X, y = tf.numpy_function(get_sample, inp=(X, y), Tout=sample_tf_type)
-            X, y = DataLoader._set_tf_rank_from_np(exsample_sample, (X, y))
-            return X, y
+        def process2_1(*data):
+            sample = tf.numpy_function(get_sample, inp=data, Tout=sample_tf_type)
+            sample = self.__class__._unflatten_tensor(exsample_sample, sample)
+            return sample
 
         def process2_2(data1, data2):
-            X, y = tf.numpy_function(
-                get_sample,
-                inp=(*data1, *data2),
-                Tout=DataLoader._get_tf_types_from_np(exsample_sample),
+            sample = tf.numpy_function(
+                get_sample, inp=(*data1, *data2), Tout=sample_tf_type
             )
-            X, y = DataLoader._set_tf_rank_from_np(exsample_sample, (X, y))
-            return X, y
+            sample = self.__class__._unflatten_tensor(exsample_sample, sample)
+            return sample
 
         ds = tf.data.Dataset.from_tensor_slices(np.arange(len(dataset)))
         if shuffle and self.data_per_sample == 2:  # 挙動が複雑なので2のみ許可
@@ -315,32 +349,82 @@ class DataLoader:
         return part
 
     @classmethod
-    def _get_tf_types_from_np(cls, exsample_data):
-        if isinstance(exsample_data, tuple):
-            return tuple(cls._get_tf_types_from_np(v) for v in exsample_data)
+    def _flatten(cls, a):
+        """1次元配列化。"""
+        if isinstance(a, (list, tuple)):
+            return sum([cls._flatten(t) for t in a], [])
+        assert not isinstance(a, dict)
+        return [a]
+
+    @classmethod
+    def _get_tf_types(cls, exsample_data):
+        """exsample_dataからtf.dtypesを返す。"""
+        if exsample_data is None:
+            return tf.int32  # dummy
+        elif isinstance(exsample_data, tuple):
+            return tuple(cls._get_tf_types(v) for v in exsample_data)
         elif isinstance(exsample_data, list):
-            return [cls._get_tf_types_from_np(v) for v in exsample_data]
+            return [cls._get_tf_types(v) for v in exsample_data]
         elif isinstance(exsample_data, dict):
-            return {k: cls._get_tf_types_from_np(v) for k, v in exsample_data.items()}
+            # tf.numpy_functionがdict未対応なので、値の型だけリストで返す
+            return [cls._get_tf_types(v) for v in exsample_data.values()]
         else:
             return tf.dtypes.as_dtype(exsample_data.dtype)
 
     @classmethod
-    def _set_tf_rank_from_np(cls, exsample_data, tensor):
-        if isinstance(exsample_data, tuple):
-            assert len(exsample_data) == len(tensor)
+    def _unflatten(cls, exsample_data, data):
+        """flattenされたdataをexsample_dataに従い戻す。"""
+        if exsample_data is None:
+            return data  # dummy
+        elif isinstance(exsample_data, (tuple, list)):
+            lengths = [
+                len(v) if isinstance(v, (tuple, list, dict)) else 1
+                for v in exsample_data
+            ]
+            assert sum(lengths) == len(data)
+            offsets = np.cumsum(lengths) - lengths[0]
             return tuple(
-                cls._set_tf_rank_from_np(v, t) for v, t in zip(exsample_data, tensor)
+                cls._unflatten(v, data[o : o + l])
+                for v, o, l in zip(exsample_data, offsets, lengths)
             )
+        elif isinstance(exsample_data, dict):
+            assert len(exsample_data) == len(data)
+            return {
+                k: cls._unflatten(v, d)
+                for (k, v), d in zip(exsample_data.items(), data)
+            }
+        else:
+            return data
+
+    @classmethod
+    def _unflatten_tensor(cls, exsample_data, tensor):
+        """numpyのサンプルデータに従いtf.ensure_shapeする。"""
+        if exsample_data is None:
+            return tf.ensure_shape(tensor, ())  # dummy
+        elif isinstance(exsample_data, tuple):
+            if len(exsample_data) == len(tensor):
+                return tuple(
+                    cls._unflatten_tensor(v, t) for v, t in zip(exsample_data, tensor)
+                )
+            else:
+                # tf.numpy_functionがdict未対応なので展開しているのでここで戻す
+                assert len(exsample_data) == 2
+                return (
+                    cls._unflatten_tensor(
+                        exsample_data[0], tensor[: len(exsample_data[0])]
+                    ),
+                    cls._unflatten_tensor(
+                        exsample_data[1], tensor[len(exsample_data[0]) :]
+                    ),
+                )
         elif isinstance(exsample_data, list):
             assert len(exsample_data) == len(tensor)
-            return [
-                cls._set_tf_rank_from_np(v, t) for v, t in zip(exsample_data, tensor)
-            ]
+            return [cls._unflatten_tensor(v, t) for v, t in zip(exsample_data, tensor)]
         elif isinstance(exsample_data, dict):
+            # tf.numpy_functionがdict未対応なのでtensorはlistになっている
             return {
-                k: cls._set_tf_rank_from_np(v, tensor[k])
-                for k, v in exsample_data.items()
+                k: cls._unflatten_tensor(v, t)
+                for (k, v), t in zip(exsample_data.items(), tensor)
             }
         else:
             return tf.ensure_shape(tensor, [None] * exsample_data.ndim)
