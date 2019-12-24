@@ -7,7 +7,7 @@ import pytoolkit as tk
 @pytest.mark.parametrize("mode", ["hdf5", "saved_model", "onnx", "tflite"])
 def test_save(tmpdir, mode):
     if mode == "onnx":
-        pytest.skip("tf.keras2onnxのtf2対応待ち")
+        pytest.skip("keras2onnxのtf2対応待ち")
 
     path = str(tmpdir / "model")
     inputs = x = tf.keras.layers.Input((32, 32, 3))

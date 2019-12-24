@@ -17,6 +17,7 @@ import cv2
 import numba
 import numpy as np
 import PIL.Image
+import PIL.ImageOps
 
 import pytoolkit as tk
 
@@ -122,7 +123,7 @@ def load(
             if isinstance(img, np.lib.npyio.NpzFile):
                 if len(img.files) != 1:
                     raise ValueError(
-                        f'Image load failed: "{path_or_array}"" has multiple keys. ({img.files})'
+                        f'Image load failed: "{path_or_array}" has multiple keys. ({img.files})'
                     )
                 img = img[img.files[0]]
             assert img.dtype == np.uint8, f"{suffix} dtype error: {img.dtype}"
@@ -130,6 +131,10 @@ def load(
             # PILで読み込む
             try:
                 with PIL.Image.open(path_or_array) as pil_img:
+                    try:
+                        pil_img = PIL.ImageOps.exif_transpose(pil_img)
+                    except Exception as e:
+                        warnings.warn(f"{type(e).__name__}: {e}")
                     target_mode = "L" if grayscale else "RGB"
                     if pil_img.mode != target_mode:
                         pil_img = pil_img.convert(target_mode)
