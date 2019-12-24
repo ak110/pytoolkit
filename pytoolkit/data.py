@@ -219,6 +219,12 @@ class DataLoader:
         exsample_sample = self.get_sample(
             [exsample_data for _ in range(self.data_per_sample)]
         )
+        assert (
+            len(exsample_data) == 2
+        ), f"get_data returns {len(exsample_data)} values, but expects to see 2 values. exsample_data={exsample_data}"
+        assert (
+            len(exsample_sample) == 2
+        ), f"get_sample returns {len(exsample_sample)} values, but expects to see 2 values. exsample_data={exsample_sample}"
         data_tf_type = _get_tf_types(exsample_data)
         sample_tf_type = _get_tf_types(exsample_sample)
 
@@ -244,7 +250,7 @@ class DataLoader:
                 _unflatten(exsample_data, args[i : i + data_size])
                 for i in range(0, len(args), data_size)
             ]
-            assert len(data_list) == self.data_per_sample
+            assert len(data_list) == self.data_per_sample, repr(data_list)
 
             X, y = self.get_sample(data_list)
 
@@ -277,10 +283,10 @@ class DataLoader:
             return sample
 
         ds = tf.data.Dataset.from_tensor_slices(np.arange(len(dataset)))
-        if shuffle and self.data_per_sample == 2:  # 挙動が複雑なので2のみ許可
+        if self.data_per_sample == 2:  # 挙動が複雑なので2のみ許可
             ds = tf.data.Dataset.zip(
                 tuple(
-                    ds.shuffle(buffer_size=len(dataset)).map(
+                    (ds.shuffle(buffer_size=len(dataset)) if shuffle else ds).map(
                         process1, num_parallel_calls=tf.data.experimental.AUTOTUNE,
                     )
                     for _ in range(self.data_per_sample)
@@ -288,7 +294,7 @@ class DataLoader:
             )
             ds = ds.map(process2_2)
         else:
-            assert not shuffle or self.data_per_sample == 1  # 挙動が複雑なので1のみ許可
+            assert self.data_per_sample == 1  # 挙動が複雑なので1のみ許可
             ds = ds.shuffle(buffer_size=len(dataset)) if shuffle else ds
             ds = ds.map(process1, num_parallel_calls=tf.data.experimental.AUTOTUNE)
             ds = ds.map(process2_1)
@@ -315,28 +321,6 @@ class DataLoader:
 
         """
         return dataset.get_data(index)
-
-    def collate_samples(self, batch: list) -> tuple:
-        """バッチサイズ分のデータを集約する処理。
-
-        Args:
-            batch: get_sample()の結果をバッチサイズ分集めたもの
-
-        Returns:
-            モデルに渡されるデータ。通常は入力データとラベルのtuple。
-
-        """
-        return tuple(self.collate_part(part) for part in zip(*batch))
-
-    def collate_part(self, part):
-        """サンプルごとのデータをバッチ分まとめる処理。"""
-        if isinstance(part[0], list):
-            part = [np.array([x[i] for x in part]) for i in range(len(part[0]))]
-        elif isinstance(part[0], dict):
-            part = {k: np.array([x[k] for x in part]) for k in part[0]}
-        else:
-            part = np.array(part)
-        return part
 
 
 def _flatten(a):
@@ -370,18 +354,20 @@ def _unflatten(exsample_data, data):
         lengths = [
             len(v) if isinstance(v, (tuple, list, dict)) else 1 for v in exsample_data
         ]
-        assert sum(lengths) == len(data)
-        offsets = np.cumsum(lengths) - lengths[0]
+        assert sum(lengths) == len(data), f"exsample_data={exsample_data} data={data}"
+        offsets = np.concatenate([[0], np.cumsum(lengths)[:-1]])
         return tuple(
             _unflatten(v, data[o : o + l])
             for v, o, l in zip(exsample_data, offsets, lengths)
         )
     elif isinstance(exsample_data, dict):
-        assert len(exsample_data) == len(data)
+        assert len(exsample_data) == len(
+            data
+        ), f"exsample_data={exsample_data} data={data}"
         return {k: _unflatten(v, d) for (k, v), d in zip(exsample_data.items(), data)}
     else:
         if isinstance(data, (tuple, list)):
-            assert len(data) == 1
+            assert len(data) == 1, f"exsample_data={exsample_data} data={data}"
             data = data[0]
         return np.asarray(data, dtype=exsample_data.dtype)
 
@@ -395,24 +381,35 @@ def _unflatten_tensor(exsample_data, tensor):
             return tuple(_unflatten_tensor(v, t) for v, t in zip(exsample_data, tensor))
         else:
             # tf.numpy_functionがdict未対応なので展開しているのでここで戻す
-            assert len(exsample_data) == 2
+            assert (
+                len(exsample_data) == 2
+            ), f"exsample_data={exsample_data} tensor={tensor}"
             if isinstance(exsample_data[0], (tuple, list, dict)):
-                X = _unflatten_tensor(exsample_data[0], tensor[: len(exsample_data[0])])
                 len1 = len(exsample_data[0])
+                X = _unflatten_tensor(exsample_data[0], tensor[:len1])
             else:
-                X = _unflatten_tensor(exsample_data[0], tensor[0])
                 len1 = 1
+                X = _unflatten_tensor(exsample_data[0], tensor[0])
             if isinstance(exsample_data[1], (tuple, list, dict)):
+                len2 = len(exsample_data[1])
                 y = _unflatten_tensor(exsample_data[1], tensor[len1:])
             else:
+                len2 = 1
                 y = _unflatten_tensor(exsample_data[1], tensor[len1])
+            assert len1 + len2 == len(
+                tensor
+            ), f"exsample_data={exsample_data} tensor={tensor}"
             return X, y
     elif isinstance(exsample_data, list):
-        assert len(exsample_data) == len(tensor)
+        assert len(exsample_data) == len(
+            tensor
+        ), f"exsample_data={exsample_data} tensor={tensor}"
         return [_unflatten_tensor(v, t) for v, t in zip(exsample_data, tensor)]
     elif isinstance(exsample_data, dict):
         # tf.numpy_functionがdict未対応なのでtensorはlistになっている
-        assert len(exsample_data) == len(tensor)
+        assert len(exsample_data) == len(
+            tensor
+        ), f"exsample_data={exsample_data} tensor={tensor}"
         return {
             k: _unflatten_tensor(v, t)
             for (k, v), t in zip(exsample_data.items(), tensor)

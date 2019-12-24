@@ -4,6 +4,7 @@ albumentations
 better_exceptions
 black
 category_encoders
+chainercv
 diskcache
 flake8
 flake8-bugbear
