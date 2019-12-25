@@ -227,10 +227,10 @@ class Resize(A.DualTransform):
         return tk.ndimage.resize(image, width=self.width, height=self.height)
 
     def apply_to_bbox(self, bbox, **params):
-        raise bbox
+        return bbox
 
     def apply_to_keypoint(self, keypoint, **params):
-        raise keypoint
+        return keypoint
 
     def get_transform_init_args_names(self):
         return ("width", "height")
