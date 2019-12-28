@@ -1,5 +1,6 @@
 # pylint: disable=redefined-outer-name
 import albumentations as A
+import numpy as np
 import pytest
 
 import pytoolkit as tk
@@ -16,6 +17,9 @@ def save_dir(check_dir):
 @pytest.mark.parametrize("filename", ["cifar.png", "Lenna.png"])
 def test_data_augmentation(data_dir, save_dir, filename):
     """画像の変換のテスト。目視したいので結果を`../___check/image/`に保存しちゃう。"""
+    base_size = 32 if filename == "cifar.png" else 256
+    bboxes = [(0.41, 0.39, 0.70, 0.75)]
+    keypoints = [(0.52 * base_size, 0.52 * base_size)]
     aug = A.Compose(
         [
             A.OneOf(
@@ -26,18 +30,28 @@ def test_data_augmentation(data_dir, save_dir, filename):
                 ],
                 p=0.25,
             ),
-            tk.image.RandomRotate(),
-            tk.image.RandomTransform(256, 256),
+            # tk.image.RandomRotate(),  # TODO
+            tk.image.RandomTransform(256, 256, base_scale=2.0),
             tk.image.RandomColorAugmentors(noisy=True),
             tk.image.SpeckleNoise(),
-        ]
+        ],
+        bbox_params=A.BboxParams(format="albumentations", label_fields=["classes"]),
+        keypoint_params=A.KeypointParams(format="xy"),
     )
     img_path = data_dir / filename
-    img = tk.ndimage.load(img_path)
+    original_img = tk.ndimage.load(img_path)
     for i in range(32):
-        tk.ndimage.save(
-            save_dir / f"{img_path.stem}.DA.{i}.png", aug(image=img)["image"]
+        augmented = aug(
+            image=original_img, bboxes=bboxes, classes=[0], keypoints=keypoints
         )
+        img = augmented["image"]
+        img = tk.od.plot_objects(img, None, None, augmented["bboxes"])
+        for x, y in augmented["keypoints"]:
+            x = np.clip(int(x), 1, img.shape[1] - 2)
+            y = np.clip(int(y), 1, img.shape[1] - 2)
+            img[range(y - 1, y + 2), x, :] = [[[255, 255, 0]]]
+            img[y, range(x - 1, x + 2), :] = [[[255, 255, 0]]]
+        tk.ndimage.save(save_dir / f"{img_path.stem}.DA.{i}.png", img)
 
 
 def test_ToGrayScale(data_dir, save_dir):

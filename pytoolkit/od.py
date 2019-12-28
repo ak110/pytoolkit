@@ -1,5 +1,6 @@
 """機械学習(主にsklearn)関連。"""
 import pathlib
+import typing
 
 import cv2
 import numpy as np
@@ -421,13 +422,13 @@ def is_in_box(boxes_a, boxes_b):
 
 
 def plot_objects(
-    base_image,
-    classes,
-    confs,
-    bboxes,
-    class_names,
-    conf_threshold=0,
-    max_long_side=None,
+    base_image: np.ndarray,
+    classes: typing.Optional[np.ndarray],
+    confs: typing.Optional[np.ndarray],
+    bboxes: np.ndarray,
+    class_names: typing.Sequence[str] = None,
+    conf_threshold: float = 0.0,
+    max_long_side: int = None,
 ):
     """画像＋オブジェクト([class_id + confidence + xmin/ymin/xmax/ymax]×n)を画像化する。
 
@@ -441,13 +442,13 @@ def plot_objects(
         conf_threshold: この値以上のオブジェクトのみ描画する
 
     """
-    if confs is None:
-        confs = [None] * len(classes)
-    assert len(classes) == len(confs)
-    assert len(classes) == len(bboxes)
-    if class_names is not None and any(classes):
-        assert 0 <= np.min(classes) < len(class_names)
-        assert 0 <= np.max(classes) < len(class_names)
+    confs_ = [None] * len(bboxes) if confs is None else confs
+    classes_ = [None] * len(bboxes) if classes is None else classes
+    assert len(confs_) == len(bboxes)
+    assert len(classes_) == len(bboxes)
+    if class_names is not None and classes is not None:
+        assert 0 <= np.min(classes_) < len(class_names)
+        assert 0 <= np.max(classes_) < len(class_names)
 
     img = tk.ndimage.load(base_image, grayscale=False)
     if max_long_side is not None and max(*img.shape[:2]) > max_long_side:
@@ -462,32 +463,35 @@ def plot_objects(
         * 255
     )
 
-    for classid, conf, bbox in zip(classes, confs, bboxes):
+    for clazz, conf, bbox in zip(classes_, confs_, bboxes):
         if conf is not None and conf < conf_threshold:
             continue  # skip
+        assert bbox[0] <= bbox[2], f"bbox error: bbox={bbox} class={clazz} conf={conf}"
+        assert bbox[1] <= bbox[3], f"bbox error: bbox={bbox} class={clazz} conf={conf}"
         xmin = max(int(round(bbox[0] * img.shape[1])), 0)
         ymin = max(int(round(bbox[1] * img.shape[0])), 0)
         xmax = min(int(round(bbox[2] * img.shape[1])), img.shape[1])
         ymax = min(int(round(bbox[3] * img.shape[0])), img.shape[0])
-        label = (
-            class_names[classid] if class_names is not None else f"class{classid:02d}"
-        )
-        color = colors[classid % len(colors)][-2::-1]  # RGBA → BGR
-        text = label if conf is None else f"{conf:0.2f}, {label}"
-
+        if clazz is None:
+            color = colors[0]
+        else:
+            color = colors[clazz % len(colors)][-2::-1]  # RGBA → BGR
+            label = (
+                class_names[clazz] if class_names is not None else f"class{clazz:02d}"
+            )
+            text = label if conf is None else f"{conf:0.2f}, {label}"
+            tw = 6 * len(text)
+            cv2.rectangle(img, (xmin - 1, ymin), (xmin + tw + 15, ymin + 15), color, -1)
+            cv2.putText(
+                img,
+                text,
+                (xmin + 5, ymin + 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.35,
+                (0, 0, 0),
+                1,
+            )
         cv2.rectangle(img, (xmin, ymin), (xmax, ymax), color, thickness=2)
-
-        tw = 6 * len(text)
-        cv2.rectangle(img, (xmin - 1, ymin), (xmin + tw + 15, ymin + 15), color, -1)
-        cv2.putText(
-            img,
-            text,
-            (xmin + 5, ymin + 10),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.35,
-            (0, 0, 0),
-            1,
-        )
 
     return img
 

@@ -78,6 +78,7 @@ class RandomTransform(A.DualTransform):
         translate_v=0.0625,
         border_mode="edge",
         always_apply=False,
+        clip_bboxes=True,
         p=1,
     ):
         """Refined Data Augmentation <https://arxiv.org/abs/1909.09148> 用の控えめバージョンを作成する。"""
@@ -92,6 +93,7 @@ class RandomTransform(A.DualTransform):
             scale_prob=0,
             aspect_prob=0,
             rotate_prob=0,
+            clip_bboxes=clip_bboxes,
             always_apply=always_apply,
             p=p,
         )
@@ -113,6 +115,7 @@ class RandomTransform(A.DualTransform):
         rotate_range=(-15, +15),
         interp="lanczos",
         border_mode="edge",
+        clip_bboxes=True,
         always_apply=False,
         p=1,
     ):
@@ -132,6 +135,7 @@ class RandomTransform(A.DualTransform):
         self.rotate_range = rotate_range
         self.interp = interp
         self.border_mode = border_mode
+        self.clip_bboxes = clip_bboxes
 
     def apply(self, image, m, interp=None, **params):
         return tk.ndimage.perspective_transform(
@@ -143,11 +147,23 @@ class RandomTransform(A.DualTransform):
             border_mode=self.border_mode,
         )
 
-    def apply_to_bbox(self, bbox, m, **params):
-        return tk.ndimage.transform_points(bbox, m)
+    def apply_to_bbox(self, bbox, m, image_size, **params):
+        bbox = np.asarray(bbox)
+        assert bbox.shape == (4,)
+        bbox *= np.array([image_size[1], image_size[0]] * 2)
+        bbox = tk.ndimage.transform_points(bbox, m)
+        if bbox[2] < bbox[0]:
+            bbox = bbox[[2, 1, 0, 3]]
+        if bbox[3] < bbox[1]:
+            bbox = bbox[[0, 3, 2, 1]]
+        bbox /= np.array([self.width, self.height] * 2)
+        assert bbox.shape == (4,)
+        if self.clip_bboxes:
+            bbox = np.clip(bbox, 0, 1)
+        return tuple(bbox)
 
     def apply_to_keypoint(self, keypoint, m, **params):
-        return tk.ndimage.transform_points(keypoint, m)
+        return tuple(tk.ndimage.transform_points(keypoint[:2], m)) + tuple(keypoint[2:])
 
     def apply_to_mask(self, img, interp=None, **params):
         del interp
@@ -189,7 +205,7 @@ class RandomTransform(A.DualTransform):
             translate_h=random.uniform(-self.translate_h, self.translate_h),
             translate_v=random.uniform(-self.translate_v, self.translate_v),
         )
-        return {"m": m}
+        return {"m": m, "image_size": image.shape[:2]}
 
     @property
     def targets_as_params(self):
