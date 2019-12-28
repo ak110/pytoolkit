@@ -11,6 +11,8 @@ import logging.handlers
 import pathlib
 import time
 
+import tensorflow as tf
+
 import pytoolkit as tk
 
 
@@ -26,6 +28,7 @@ def init(
     file_fmt="%(asctime)s [%(levelname)-5s] %(message)s <%(name)s> %(filename)s:%(lineno)d",
     matplotlib_level=logging.WARNING,
     pil_level=logging.INFO,
+    close_tf_logger=True,
 ):
     """ルートロガーの初期化。"""
     logger = get(None)
@@ -44,10 +47,14 @@ def init(
                 fmt=file_fmt,
             )
         )
+    # ログが出すぎる他のライブラリなどのための調整
     if matplotlib_level is not None:
         get("matplotlib").setLevel(matplotlib_level)
     if pil_level is not None:
         get("PIL").setLevel(pil_level)
+    if close_tf_logger:
+        assert tf.get_logger().propagate
+        tk.log.close(tf.get_logger())
 
 
 def get(name):
