@@ -125,11 +125,20 @@ class Model:
         ]
         assert len(pred_list) == len(folds)
 
+        if isinstance(pred_list[0], list):  # multiple output
+            oofp = [
+                self._get_oofp(dataset, folds, [p[i] for p in pred_list])
+                for i in range(len(pred_list[0]))
+            ]
+        else:
+            oofp = self._get_oofp(dataset, folds, pred_list)
+        return oofp
+
+    def _get_oofp(self, dataset, folds, pred_list):
         oofp_shape = (len(dataset),) + pred_list[0].shape[1:]
         oofp = np.empty(oofp_shape, dtype=pred_list[0].dtype)
         for pred, (_, val_indices) in zip(pred_list, folds):
             oofp[val_indices] = pred
-
         return oofp
 
     def predict_all(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:

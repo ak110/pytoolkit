@@ -355,7 +355,7 @@ def predict(
         dataset = tk.hvd.split(dataset) if use_horovod else dataset
         iterator = data_loader.iter(dataset, num_replicas_in_sync=num_replicas_in_sync)
         if on_batch_fn is not None:
-            values = _predict_flow(
+            gen = _predict_flow(
                 model=model,
                 iterator=iterator,
                 callbacks=callbacks,
@@ -363,7 +363,13 @@ def predict(
                 on_batch_fn=on_batch_fn,
                 desc="predict",
             )
-            values = np.array(list(values))
+            results = list(gen)
+            if isinstance(results[0], list):  # multiple output
+                values = [
+                    np.array([r[i] for r in results]) for i in range(len(results[0]))
+                ]
+            else:
+                values = np.array(results)
         else:
             values = model.predict(
                 iterator.ds, steps=iterator.steps, verbose=verbose, callbacks=callbacks,
@@ -429,10 +435,17 @@ def _predict_flow(
     ):
         for cb in callbacks:
             cb.on_predict_batch_begin(batch)
-        pred_batch = on_batch_fn(model, X)
+        pred_batch = on_batch_fn(model, X.numpy())
         for cb in callbacks:
             cb.on_predict_batch_end(batch)
-        yield from pred_batch
+
+        if isinstance(pred_batch, list):  # multiple output
+            assert len(pred_batch) >= 2
+            for b in zip(*pred_batch):
+                yield list(b)
+        else:
+            yield from pred_batch
+
         batch += 1
     for cb in callbacks:
         cb.on_predict_end()
@@ -540,5 +553,10 @@ def predict_on_batch_augmented(
             if flip[0] and flip[1]:
                 X_batch2.append(X[:, ::-1, ::-1, :])
     result = model.predict(np.concatenate(X_batch2, axis=0), verbose=0)
-    result = result.reshape((len(X_batch2), len(X_batch)) + result.shape[1:])
+    if isinstance(result, list):  # multiple output
+        result = [
+            r.reshape((len(X_batch2), len(X_batch)) + r.shape[1:]) for r in result
+        ]
+    else:
+        result = result.reshape((len(X_batch2), len(X_batch)) + result.shape[1:])
     return result
