@@ -62,6 +62,7 @@ class KerasModel(Model):
         val_data_loader: tk.data.DataLoader,
         refine_data_loader: typing.Optional[tk.data.DataLoader] = None,
         *,
+        compile_fn: typing.Callable[[tf.keras.models.Model], None] = None,
         epochs: int,
         refine_epochs: int = 50,
         refine_lr_factor: float = 0.01,
@@ -88,6 +89,7 @@ class KerasModel(Model):
         self.skip_if_exists = skip_if_exists
         self.skip_folds = skip_folds
         self.epochs = epochs
+        self.compile_fn = compile_fn
         self.refine_epochs = refine_epochs
         self.refine_lr_factor = refine_lr_factor
         self.callbacks = callbacks
@@ -335,6 +337,8 @@ class KerasModel(Model):
             self.create_network(fold)
             trained = True
             model: tf.keras.models.Model = self.training_models[fold]
+            if self.compile_fn is not None:
+                self.compile_fn(model)
 
             if self.refine_data_loader is not None:
                 start_lr = tf.keras.backend.get_value(model.optimizer.learning_rate)
@@ -360,7 +364,10 @@ class KerasModel(Model):
                     f"Fold {fold + 1}: Refining {self.refine_epochs} epochs..."
                 )
                 tk.models.freeze_layers(model, tf.keras.layers.BatchNormalization)
-                tk.models.recompile(model)
+                if self.compile_fn is None:
+                    tk.models.recompile(model)
+                else:
+                    self.compile_fn(model)
                 tf.keras.backend.set_value(
                     model.optimizer.learning_rate, start_lr * self.refine_lr_factor,
                 )
@@ -406,6 +413,12 @@ class KerasModel(Model):
         """
         assert self.preprocessors is None  # とりあえず未対応
         assert self.postprocessors is None  # とりあえず未対応
+
+        # 未コンパイルならmetricsが無いかもしれないのでcompile
+        if self.training_models[fold].optimizer is None:
+            assert self.compile_fn is not None
+            self.compile_fn(self.training_models[fold])
+
         evals = tk.models.evaluate(
             self.training_models[fold],
             dataset,
