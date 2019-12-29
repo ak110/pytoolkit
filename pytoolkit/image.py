@@ -291,7 +291,7 @@ class RandomColorAugmentors(RandomCompose):
         super().__init__(argumentors, p=p)
 
     def get_transform_init_args_names(self):
-        return ("noisy",)
+        return ("noisy", "grayscale")
 
 
 class GaussNoise(A.ImageOnlyTransform):

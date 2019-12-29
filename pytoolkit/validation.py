@@ -34,13 +34,21 @@ def split(
                 isinstance(dataset.labels, np.ndarray)
                 and len(dataset.labels.shape) == 1
             )
+
+        if stratify:
+            X = dataset.data
+            y: typing.Any = dataset.labels
+        else:
+            X = list(range(len(dataset)))
+            y = None
+
         cv = (
             sklearn.model_selection.StratifiedKFold
             if stratify
             else sklearn.model_selection.KFold
         )
         cv = cv(nfold, shuffle=True, random_state=split_seed)
-        folds = list(cv.split(dataset.data, dataset.labels))
+        folds = list(cv.split(X, y))
 
     return folds
 

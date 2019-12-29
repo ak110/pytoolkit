@@ -32,10 +32,14 @@ class Dataset:
         init_score: LightGBMなど用。boostingのベーススコア。
         metadata: メタデータ。色々独自に入れておいてOK。sliceとかではそのままコピーされたりするので注意。
 
+    get_dataをオーバーライドすることで逐次読み込みなども可能とする。
+
     """
 
     data: typing.Union[typing.Sequence[typing.Any], pd.DataFrame, dict]
-    labels: np.ndarray = None
+    labels: typing.Union[
+        np.ndarray, typing.Sequence[np.ndarray], typing.Dict[str, np.ndarray]
+    ] = None
     groups: np.ndarray = None
     weights: np.ndarray = None
     ids: np.ndarray = None
@@ -47,11 +51,22 @@ class Dataset:
         return len(self.data)
 
     def get_data(self, index: int) -> typing.Tuple[typing.Any, typing.Any]:
-        """dataとlabelを返すだけの糖衣構文。"""
+        """dataとlabelを返す。"""
         if self.labels is None:
             return self.data[index], None
-        self.labels = typing.cast(np.ndarray, self.labels)
-        return self.data[index], self.labels[index]
+        return self._get(self.data, index), self._get(self.labels, index)
+
+    def _get(self, data, index: int):
+        """指定indexのデータ/ラベルを返す。"""
+        if isinstance(data, dict):
+            # multiple input/output
+            return {k: v[index] for k, v in data.items()}
+        elif isinstance(data, list):
+            # multiple input/output
+            return [v[index] for v in data]
+        else:
+            assert len(data) == len(self)
+            return data[index]
 
     def slice(self, rindex: typing.Sequence[int]) -> Dataset:
         """スライスを作成して返す。

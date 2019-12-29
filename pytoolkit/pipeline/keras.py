@@ -308,11 +308,13 @@ class KerasModel(Model):
             メトリクス名と値のdict
 
         """
-        assert fold in range(self.nfold)
         # pylint: disable=function-redefined
+        assert fold in range(self.nfold)
         tk.hvd.barrier()
         tk.log.get(__name__).info(
-            f"train: {len(train_set)} samples, val: {len(val_set) if val_set is not None else 0} samples, batch_size: {self.train_data_loader.batch_size}x{tk.hvd.size()}"
+            f"train: {len(train_set)} samples, "
+            f"val: {len(val_set) if val_set is not None else 0} samples, "
+            f"batch_size: {self.train_data_loader.batch_size}x{tk.hvd.size() * self.num_replicas_in_sync}"
         )
 
         model_path = self.models_dir / self.model_name_format.format(fold=fold + 1)

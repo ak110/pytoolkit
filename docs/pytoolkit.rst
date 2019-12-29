@@ -9,6 +9,7 @@ Subpackages
    pytoolkit.applications
    pytoolkit.datasets
    pytoolkit.evaluations
+   pytoolkit.layers
    pytoolkit.pipeline
 
 Submodules
@@ -98,14 +99,6 @@ pytoolkit.image module
 ----------------------
 
 .. automodule:: pytoolkit.image
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-pytoolkit.layers module
------------------------
-
-.. automodule:: pytoolkit.layers
    :members:
    :undoc-members:
    :show-inheritance:
