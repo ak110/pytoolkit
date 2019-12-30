@@ -28,7 +28,7 @@ def post_evals(evals: dict):
     """
     # 整形
     text = ""
-    max_len = max(len(k) for k in evals)
+    max_len = max(len(k) for k in evals) if len(evals) > 0 else 0
     for k, v in evals.items():
         if isinstance(v, numbers.Number):
             text += f"{k}:{' ' * (max_len - len(k))} {v:.3f}\n"

@@ -386,10 +386,14 @@ class KerasModel(Model):
 
         # 訓練データと検証データの評価
         tk.hvd.barrier()
-        self.evaluate(train_set, prefix="", fold=fold)
-        if val_set is None:
-            return None
-        evals = self.evaluate(val_set, prefix="val_", fold=fold)
+        try:
+            self.evaluate(train_set, prefix="", fold=fold)
+            if val_set is None:
+                return None
+            evals = self.evaluate(val_set, prefix="val_", fold=fold)
+        except Exception:
+            tk.log.get(__name__).warning("evaluate error", exc_info=True)
+            evals = {}
 
         # メモリを食いがちなので再構築してみる
         if trained:
