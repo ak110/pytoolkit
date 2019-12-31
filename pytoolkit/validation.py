@@ -15,6 +15,9 @@ def split(
     dataset: tk.data.Dataset, nfold: int, split_seed: int = 1, stratify: bool = None
 ) -> FoldsType:
     """nfold CV。"""
+    tk.log.get(__name__).info(
+        f"split: len(dataset)={len(dataset)} nfold={nfold} split_seed={split_seed} stratify={stratify}"
+    )
     if dataset.groups is not None:
         g = np.unique(dataset.groups)
         cv = sklearn.model_selection.KFold(

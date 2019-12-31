@@ -109,13 +109,13 @@ class KerasModel(Model):
         assert models_dir == self.models_dir
 
     def _load(self, models_dir: pathlib.Path):
-        assert models_dir == self.models_dir
         for fold in range(self.nfold):
-            self._load_model(fold)
+            self._load_model(fold, models_dir)
 
-    def _load_model(self, fold):
+    def _load_model(self, fold, models_dir=None):
         self.create_network(fold)
-        model_path = self.models_dir / self.model_name_format.format(fold=fold + 1)
+        models_dir = models_dir or self.models_dir
+        model_path = models_dir / self.model_name_format.format(fold=fold + 1)
         tk.models.load_weights(self.prediction_models[fold], model_path)
 
     def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:

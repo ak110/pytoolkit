@@ -8,6 +8,7 @@ import sklearn.base
 import sklearn.metrics
 import sklearn.model_selection
 import sklearn.utils
+import tensorflow as tf
 
 import pytoolkit as tk
 
@@ -259,3 +260,23 @@ def mape(y_true, y_pred):
     y_true, y_pred = np.ravel(y_true), np.ravel(y_pred)
     assert len(y_true) == len(y_pred)
     return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+
+
+def calibrate_proba(proba: typing.Union[np.ndarray, tf.Tensor], beta: np.ndarray):
+    """不均衡データなどの分類の確信度の補正。
+
+    Args:
+        proba: 補正する確信度。shape=(samples, classes)
+        beta: 補正する係数。shape=(classes,)
+
+    Returns:
+        補正結果。shape=(samples, classes)
+
+    References:
+        - <https://quinonero.net/Publications/predicting-clicks-facebook.pdf>
+
+    """
+    # return proba / (proba + (1 - proba) / beta)
+    # return (beta * proba) / (beta * proba - proba + 1)
+    bp = proba * beta / np.sum(beta)
+    return bp / (bp + 1 - proba)

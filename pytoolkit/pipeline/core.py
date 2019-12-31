@@ -20,6 +20,7 @@ class Model:
         nfold: CVの分割数
         preprocessors: 前処理 (sklearnのTransformerの配列)
         postprocessors: 後処理 (sklearnのTransformerの配列)
+        autosave: cv時にsaveもするならTrue。
 
     """
 
@@ -28,6 +29,7 @@ class Model:
         nfold: int,
         preprocessors: EstimatorListType = None,
         postprocessors: EstimatorListType = None,
+        autosave: bool = True,
     ):
         self.nfold = nfold
         self.preprocessors = (
@@ -40,12 +42,13 @@ class Model:
             if postprocessors is not None
             else None
         )
+        self.autosave = autosave
 
     def cv(
         self,
         dataset: tk.data.Dataset,
         folds: tk.validation.FoldsType,
-        models_dir: pathlib.Path,
+        models_dir: pathlib.Path = None,
     ) -> dict:
         """CVして保存。
 
@@ -58,10 +61,6 @@ class Model:
             metrics名と値
 
         """
-        if models_dir is not None:
-            models_dir = pathlib.Path(models_dir)
-            models_dir.mkdir(parents=True, exist_ok=True)
-
         dataset = dataset.copy()
         if self.preprocessors is not None:
             dataset.data = self.preprocessors.fit_transform(
@@ -74,16 +73,31 @@ class Model:
                 ),
                 axis=-1,
             )
-        scores = self._cv(dataset, folds)
 
+        scores = self._cv(dataset, folds)
         if models_dir is not None:
-            if self.preprocessors is not None:
-                tk.utils.dump(self.preprocessors, models_dir / "preprocessors.pkl")
-            if self.postprocessors is not None:
-                tk.utils.dump(self.postprocessors, models_dir / "postprocessors.pkl")
-            self._save(models_dir)
+            self.save(models_dir)
 
         return scores
+
+    def save(self, models_dir: tk.typing.PathLike) -> Model:
+        """保存。
+
+        Args:
+            models_dir: 保存先ディレクトリ
+
+        Returns:
+            self
+
+        """
+        models_dir = pathlib.Path(models_dir)
+        models_dir.mkdir(parents=True, exist_ok=True)
+        if self.preprocessors is not None:
+            tk.utils.dump(self.preprocessors, models_dir / "preprocessors.pkl")
+        if self.postprocessors is not None:
+            tk.utils.dump(self.postprocessors, models_dir / "postprocessors.pkl")
+        self._save(models_dir)
+        return self
 
     def load(self, models_dir: tk.typing.PathLike) -> Model:
         """読み込み。
@@ -160,21 +174,20 @@ class Model:
         if self.preprocessors is not None:
             dataset.data = self.preprocessors.transform(dataset.data)
 
-        pred_list = self._predict(dataset, fold)
+        pred = self._predict(dataset, fold)
 
         if self.postprocessors is not None:
-            for i in range(len(pred_list)):
-                if pred_list[i].ndim <= 1:
-                    pred_list[i] = np.squeeze(
-                        self.postprocessors.inverse_transform(
-                            np.expand_dims(pred_list[i], axis=-1)
-                        ),
-                        axis=-1,
-                    )
-                else:
-                    pred_list[i] = self.postprocessors.inverse_transform(pred_list[i])
+            if isinstance(pred, np.ndarray) and pred.ndim <= 1:
+                pred = np.squeeze(
+                    self.postprocessors.inverse_transform(
+                        np.expand_dims(pred, axis=-1)
+                    ),
+                    axis=-1,
+                )
+            else:
+                pred = self.postprocessors.inverse_transform(pred)
 
-        return pred_list
+        return pred
 
     def _save(self, models_dir: pathlib.Path):
         """保存。
