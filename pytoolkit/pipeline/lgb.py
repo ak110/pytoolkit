@@ -88,15 +88,18 @@ class LGBModel(Model):
     def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
         import lightgbm as lgb
 
-        assert isinstance(dataset.data, pd.DataFrame)
+        if isinstance(dataset.data, pd.DataFrame):
+            num_features = len(dataset.data.columns)
+        else:
+            assert isinstance(dataset.data, np.ndarray)
+            assert dataset.data.ndim == 2
+            num_features = dataset.data.shape[1]
 
         # 独自拡張: sklearn風の指定
         if self.params.get("feature_fraction") == "sqrt":
-            n = len(dataset.data.columns)
-            self.params["feature_fraction"] = np.sqrt(n) / n
+            self.params["feature_fraction"] = np.sqrt(num_features) / num_features
         elif self.params.get("feature_fraction") == "log2":
-            n = len(dataset.data.columns)
-            self.params["feature_fraction"] = np.log2(n) / n
+            self.params["feature_fraction"] = np.log2(num_features) / num_features
 
         train_set = lgb.Dataset(
             dataset.data,
@@ -145,12 +148,17 @@ class LGBModel(Model):
         return scores
 
     def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
+        assert self.gbms_ is not None
+
+        def _get_data(gbm):
+            if isinstance(dataset.data, pd.DataFrame):
+                return dataset.data[gbm.feature_name()]
+            return dataset.data
+
         pred = np.mean(
             [
-                gbm.predict(
-                    dataset.data[gbm.feature_name()], num_iteration=gbm.best_iteration,
-                )
-                for gbm in self.gbms_[fold]
+                gbm.predict(_get_data(gbm), num_iteration=gbm.best_iteration,)
+                for gbm in self.gbms_[fold, :]
             ],
             axis=0,
         )
@@ -160,6 +168,7 @@ class LGBModel(Model):
 
     def feature_importance(self, importance_type: str = "gain"):
         """Feature ImportanceをDataFrameで返す。"""
+        assert self.gbms_ is not None
         columns = self.gbms_[0][0].feature_name()
         for gbms_fold in self.gbms_:
             for gbm in gbms_fold:
