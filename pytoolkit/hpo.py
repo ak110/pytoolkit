@@ -95,3 +95,10 @@ def optimize(
             logger.info(f"best params = {params_fn(fixed_trial)}")
 
     return study
+
+
+def raise_pruned() -> typing.NoReturn:
+    """`raise optuna.exceptions.TrialPruned()` する。(params_fn/score_fnから呼び出す用)"""
+    import optuna  # pylint: disable=redefined-outer-name
+
+    raise optuna.exceptions.TrialPruned()

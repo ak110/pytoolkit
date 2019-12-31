@@ -20,6 +20,7 @@ class SKLearnModel(Model):
         nfold: cvの分割数
         weights_arg_name: tk.data.Dataset.weightsを使う場合の引数名
                           (pipelineなどで変わるので。例: "transformedtargetregressor__sample_weight")
+        predict_method: "predict" or "predict_proba"
 
     """
 
@@ -28,12 +29,14 @@ class SKLearnModel(Model):
         estimator: sklearn.base.BaseEstimator,
         nfold: int,
         weights_arg_name: str = "sample_weight",
+        predict_method: str = "predict",
         preprocessors: tk.pipeline.EstimatorListType = None,
         postprocessors: tk.pipeline.EstimatorListType = None,
     ):
         super().__init__(nfold, preprocessors, postprocessors)
         self.estimator = estimator
         self.weights_arg_name = weights_arg_name
+        self.predict_method = predict_method
         self.estimators_: typing.Optional[
             typing.List[sklearn.base.BaseEstimator]
         ] = None
@@ -70,6 +73,10 @@ class SKLearnModel(Model):
         return {"score": np.average(scores, weights=score_weights)}
 
     def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
-        # TODO: predict_proba対応
         assert self.estimators_ is not None
-        return self.estimators_[fold].predict(dataset.data)
+        if self.predict_method == "predict":
+            return self.estimators_[fold].predict(dataset.data)
+        elif self.predict_method == "predict_proba":
+            return self.estimators_[fold].predict_proba(dataset.data)
+        else:
+            raise ValueError(f"predict_method={self.predict_method}")
