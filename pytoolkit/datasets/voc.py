@@ -245,7 +245,7 @@ def evaluate(y_true, y_pred):
     }
 
 
-def load_voc_od(voc_dir, use_crowded=False):
+def load_voc_od(voc_dir):
     """VOCの物体検出のデータを読み込む。
 
     References:

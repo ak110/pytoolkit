@@ -5,7 +5,7 @@ import pytoolkit as tk
 
 
 @pytest.mark.parametrize("output_count", [1, 2])
-def test_predict(output_count):
+def test_predict(output_count, tmpdir):
     # pylint: disable=abstract-method
     dataset = tk.data.Dataset(data=np.random.randint(0, 256, size=(3, 2, 1)))
     folds = [
@@ -21,7 +21,7 @@ def test_predict(output_count):
             else:
                 return [dataset.data, np.array([fold] * len(dataset))]
 
-    model = TestModel(nfold=len(folds))
+    model = TestModel(nfold=len(folds), models_dir=str(tmpdir))
 
     # predict_all
     result = model.predict_all(dataset)
