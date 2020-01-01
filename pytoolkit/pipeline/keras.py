@@ -21,10 +21,10 @@ class KerasModel(Model):
     Args:
         create_network_fn: モデルの作成関数。2個のモデルを返す関数の場合、1個目が訓練用、2個目が推論用。
         nfold: cvの分割数
+        models_dir: 保存先ディレクトリ
         train_data_loader: 訓練データの読み込み
         val_data_loader: 検証データの読み込み
         refine_data_loader: Refined Data Augmentation <https://arxiv.org/abs/1909.09148> 用
-        models_dir: 保存先ディレクトリ
         model_name_format: モデルのファイル名のフォーマット。{fold}のところに数字が入る。
         skip_if_exists: cv()でモデルが存在するときスキップするならTrue。
         skip_folds: cv()で（skip_if_existsとは関係なく）スキップするfold。[0, nfold)
@@ -58,6 +58,7 @@ class KerasModel(Model):
             ],
         ],
         nfold: int,
+        models_dir: tk.typing.PathLike,
         train_data_loader: tk.data.DataLoader,
         val_data_loader: tk.data.DataLoader,
         refine_data_loader: typing.Optional[tk.data.DataLoader] = None,
@@ -67,7 +68,6 @@ class KerasModel(Model):
         refine_epochs: int = 50,
         refine_lr_factor: float = 0.003,
         callbacks: typing.List[tf.keras.callbacks.Callback] = None,
-        models_dir: tk.typing.PathLike,
         model_name_format: str = "model.fold{fold}.h5",
         skip_if_exists: bool = True,
         skip_folds: typing.Sequence[int] = (),
@@ -79,7 +79,9 @@ class KerasModel(Model):
         preprocessors: tk.pipeline.EstimatorListType = None,
         postprocessors: tk.pipeline.EstimatorListType = None,
     ):
-        super().__init__(nfold, preprocessors, postprocessors)
+        super().__init__(
+            nfold, models_dir, preprocessors, postprocessors, save_on_cv=False
+        )
         self.create_network_fn = create_network_fn
         self.train_data_loader = train_data_loader
         self.val_data_loader = val_data_loader
@@ -106,11 +108,17 @@ class KerasModel(Model):
             assert nfold == 1
 
     def _save(self, models_dir: pathlib.Path):
-        assert models_dir == self.models_dir
+        for fold in range(self.nfold):
+            self._save_model(fold, models_dir)
 
     def _load(self, models_dir: pathlib.Path):
         for fold in range(self.nfold):
             self._load_model(fold, models_dir)
+
+    def _save_model(self, fold, models_dir=None):
+        models_dir = models_dir or self.models_dir
+        model_path = models_dir / self.model_name_format.format(fold=fold + 1)
+        tk.models.save(self.prediction_models[fold], model_path)
 
     def _load_model(self, fold, models_dir=None):
         self.create_network(fold)
@@ -335,19 +343,21 @@ class KerasModel(Model):
             trained = False
         else:
             self.create_network(fold)
+            assert self.training_models[fold] is not None
             trained = True
-            model: tf.keras.models.Model = self.training_models[fold]
             if self.compile_fn is not None:
-                self.compile_fn(model)
+                self.compile_fn(self.training_models[fold])
 
             if self.refine_data_loader is not None:
-                start_lr = tf.keras.backend.get_value(model.optimizer.learning_rate)
+                start_lr = tf.keras.backend.get_value(
+                    self.training_models[fold].optimizer.learning_rate
+                )
 
             # fit
             tk.hvd.barrier()
             if self.epochs > 0:
                 tk.models.fit(
-                    model,
+                    self.training_models[fold],
                     train_set=train_set,
                     train_data_loader=self.train_data_loader,
                     val_set=val_set,
@@ -363,16 +373,19 @@ class KerasModel(Model):
                 tk.log.get(__name__).info(
                     f"Fold {fold + 1}: Refining {self.refine_epochs} epochs..."
                 )
-                tk.models.freeze_layers(model, tf.keras.layers.BatchNormalization)
+                tk.models.freeze_layers(
+                    self.training_models[fold], tf.keras.layers.BatchNormalization
+                )
                 if self.compile_fn is None:
-                    tk.models.recompile(model)
+                    tk.models.recompile(self.training_models[fold])
                 else:
-                    self.compile_fn(model)
+                    self.compile_fn(self.training_models[fold])
                 tf.keras.backend.set_value(
-                    model.optimizer.learning_rate, start_lr * self.refine_lr_factor,
+                    self.training_models[fold].optimizer.learning_rate,
+                    start_lr * self.refine_lr_factor,
                 )
                 tk.models.fit(
-                    model,
+                    self.training_models[fold],
                     train_set=train_set,
                     train_data_loader=self.refine_data_loader,
                     val_set=val_set,
@@ -381,8 +394,8 @@ class KerasModel(Model):
                     num_replicas_in_sync=self.num_replicas_in_sync,
                 )
 
-            tk.models.save(model, model_path)
-            del model
+            # 保存 TODO: preprocessorsなどが。。
+            self._save_model(fold)
 
         # 訓練データと検証データの評価
         tk.hvd.barrier()

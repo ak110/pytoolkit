@@ -18,20 +18,23 @@ class Model:
 
     Args:
         nfold: CVの分割数
+        models_dir: 保存先ディレクトリ
         preprocessors: 前処理 (sklearnのTransformerの配列)
         postprocessors: 後処理 (sklearnのTransformerの配列)
-        autosave: cv時にsaveもするならTrue。
+        save_on_cv: cv時にsaveもするならTrue。
 
     """
 
     def __init__(
         self,
         nfold: int,
+        models_dir: tk.typing.PathLike,
         preprocessors: EstimatorListType = None,
         postprocessors: EstimatorListType = None,
-        autosave: bool = True,
+        save_on_cv: bool = True,
     ):
         self.nfold = nfold
+        self.models_dir = pathlib.Path(models_dir)
         self.preprocessors = (
             sklearn.pipeline.make_pipeline(*preprocessors)
             if preprocessors is not None
@@ -42,20 +45,14 @@ class Model:
             if postprocessors is not None
             else None
         )
-        self.autosave = autosave
+        self.save_on_cv = save_on_cv
 
-    def cv(
-        self,
-        dataset: tk.data.Dataset,
-        folds: tk.validation.FoldsType,
-        models_dir: pathlib.Path = None,
-    ) -> dict:
+    def cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
         """CVして保存。
 
         Args:
             dataset: 入力データ
             folds: CVのindex
-            models_dir: 保存先ディレクトリ (Noneなら保存しない)
 
         Returns:
             metrics名と値
@@ -75,22 +72,22 @@ class Model:
             )
 
         scores = self._cv(dataset, folds)
-        if models_dir is not None:
-            self.save(models_dir)
+        if self.save_on_cv:
+            self.save()
 
         return scores
 
-    def save(self, models_dir: tk.typing.PathLike) -> Model:
+    def save(self, models_dir: tk.typing.PathLike = None) -> Model:
         """保存。
 
         Args:
-            models_dir: 保存先ディレクトリ
+            models_dir: 保存先ディレクトリ (Noneならself.models_dir)
 
         Returns:
             self
 
         """
-        models_dir = pathlib.Path(models_dir)
+        models_dir = pathlib.Path(models_dir or self.models_dir)
         models_dir.mkdir(parents=True, exist_ok=True)
         if self.preprocessors is not None:
             tk.utils.dump(self.preprocessors, models_dir / "preprocessors.pkl")
@@ -99,17 +96,17 @@ class Model:
         self._save(models_dir)
         return self
 
-    def load(self, models_dir: tk.typing.PathLike) -> Model:
+    def load(self, models_dir: tk.typing.PathLike = None) -> Model:
         """読み込み。
 
         Args:
-            models_dir: 保存先ディレクトリ
+            models_dir: 保存先ディレクトリ (Noneならself.models_dir)
 
         Returns:
             self
 
         """
-        models_dir = pathlib.Path(models_dir)
+        models_dir = pathlib.Path(models_dir or self.models_dir)
         models_dir.mkdir(parents=True, exist_ok=True)
         self.preprocessors = tk.utils.load(
             models_dir / "preprocessors.pkl", skip_not_exist=True

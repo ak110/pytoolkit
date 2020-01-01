@@ -19,6 +19,7 @@ class XGBModel(Model):
     Args:
         params: XGBoostのパラメータ
         nfold: cvの分割数
+        models_dir: 保存先ディレクトリ
         early_stopping_rounds: xgboost.cvのパラメータ
         num_boost_round: xgboost.cvのパラメータ
         verbose_eval: xgboost.cvのパラメータ
@@ -31,6 +32,7 @@ class XGBModel(Model):
         self,
         params: dict,
         nfold: int,
+        models_dir: tk.typing.PathLike,
         early_stopping_rounds: int = 200,
         num_boost_round: int = 9999,
         verbose_eval: int = 100,
@@ -41,7 +43,7 @@ class XGBModel(Model):
     ):
         import xgboost
 
-        super().__init__(nfold, preprocessors, postprocessors)
+        super().__init__(nfold, models_dir, preprocessors, postprocessors)
         self.params = params
         self.early_stopping_rounds = early_stopping_rounds
         self.num_boost_round = num_boost_round

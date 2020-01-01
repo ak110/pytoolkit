@@ -18,6 +18,7 @@ class CBModel(Model):
     Args:
         params: CatBoostのパラメータ
         nfold: cvの分割数
+        models_dir: 保存先ディレクトリ
         cv_params: catboost.train用パラメータ (`**kwargs`)
 
     """
@@ -26,13 +27,14 @@ class CBModel(Model):
         self,
         params: dict,
         nfold: int,
+        models_dir: tk.typing.PathLike,
         cv_params: dict = None,
         preprocessors=None,
         postprocessors=None,
     ):
         import catboost
 
-        super().__init__(nfold, preprocessors, postprocessors)
+        super().__init__(nfold, models_dir, preprocessors, postprocessors)
         self.params = params
         self.cv_params = cv_params
         self.gbms_: typing.Optional[typing.List[catboost.CatBoost]] = None

@@ -18,6 +18,7 @@ class SKLearnModel(Model):
     Args:
         estimator: モデル
         nfold: cvの分割数
+        models_dir: 保存先ディレクトリ
         weights_arg_name: tk.data.Dataset.weightsを使う場合の引数名
                           (pipelineなどで変わるので。例: "transformedtargetregressor__sample_weight")
         predict_method: "predict" or "predict_proba"
@@ -28,12 +29,13 @@ class SKLearnModel(Model):
         self,
         estimator: sklearn.base.BaseEstimator,
         nfold: int,
+        models_dir: tk.typing.PathLike,
         weights_arg_name: str = "sample_weight",
         predict_method: str = "predict",
         preprocessors: tk.pipeline.EstimatorListType = None,
         postprocessors: tk.pipeline.EstimatorListType = None,
     ):
-        super().__init__(nfold, preprocessors, postprocessors)
+        super().__init__(nfold, models_dir, preprocessors, postprocessors)
         self.estimator = estimator
         self.weights_arg_name = weights_arg_name
         self.predict_method = predict_method
