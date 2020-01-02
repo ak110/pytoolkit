@@ -54,7 +54,7 @@ def categorical_iou(y_true, y_pred, target_classes=None, strict=True):
     p_classes = K.argmax(y_pred, axis=-1)
     active_list = []
     iou_list = []
-    for c in target_classes or range(K.int_shape(y_true)[-1]):
+    for c in target_classes or range(y_true.shape[-1]):
         with tf.name_scope(f"class_{c}"):
             y_c = K.equal(y_classes, c)
             p_c = K.equal(p_classes, c)

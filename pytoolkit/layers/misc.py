@@ -136,7 +136,7 @@ class ChannelPair2D(tf.keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         del kwargs
-        ch = K.int_shape(inputs)[-1]
+        ch = inputs.shape[-1]
         return K.concatenate(
             [inputs[..., i : i + 1] * inputs[..., i + 1 :] for i in range(ch - 1)],
             axis=-1,

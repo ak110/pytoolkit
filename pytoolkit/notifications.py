@@ -8,42 +8,30 @@
 - LINE_TOKEN: LINE Notifyのtoken <https://notify-bot.line.me/ja/>
 
 """
+from __future__ import annotations
+
 import json
-import numbers
 import os
 import shlex
 import sys
 
-import numpy as np
-
 import pytoolkit as tk
 
 
-def post_evals(evals: dict):
-    """学習結果を通知。
+def post_evals(evals: tk.evaluations.EvalsType):
+    """評価結果を通知。
 
     Args:
-        evals: 評価結果などの入ったdict。
+        evals: 評価結果。
 
     """
-    # 整形
-    text = ""
-    max_len = max(len(k) for k in evals) if len(evals) > 0 else 0
-    for k, v in evals.items():
-        if isinstance(v, numbers.Number):
-            text += f"{k}:{' ' * (max_len - len(k))} {v:.3f}\n"
-        elif isinstance(v, np.ndarray):
-            s = np.array_str(v, precision=3, suppress_small=True)
-            text += f"{k}:{' ' * (max_len - len(k))} {s}\n"
-        else:
-            text += f"{k}:{' ' * (max_len - len(k))} {v}\n"
-    # 通知
-    post(text)
+    post(tk.evaluations.to_str(evals))
 
 
 def post(text: str):
     """通知。"""
     pre_text = f"{' '.join([shlex.quote(a) for a in sys.argv])}\n"
+    text = text.strip()
     tk.log.get(__name__).debug(f"Notification:\n{text}")
 
     if tk.hvd.is_master():
@@ -59,7 +47,7 @@ def post(text: str):
 
             slack_url = os.environ.get("SLACK_URL", "")
             if len(slack_url) > 0:
-                data = {"text": f"{pre_text}```\n{text}```\n<!channel>"}
+                data = {"text": f"{pre_text}```\n{text}\n```\n<!channel>"}
                 r = requests.post(
                     slack_url,
                     data=json.dumps(data),

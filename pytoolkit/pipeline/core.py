@@ -47,7 +47,9 @@ class Model:
         )
         self.save_on_cv = save_on_cv
 
-    def cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
+    def cv(
+        self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType
+    ) -> tk.evaluations.EvalsType:
         """CVして保存。
 
         Args:
@@ -204,7 +206,9 @@ class Model:
         """
         raise NotImplementedError()
 
-    def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
+    def _cv(
+        self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType
+    ) -> tk.evaluations.EvalsType:
         """CV。
 
         Args:

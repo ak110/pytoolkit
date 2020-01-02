@@ -67,7 +67,9 @@ class XGBModel(Model):
         assert self.gbms_ is not None
         assert len(self.gbms_) == self.nfold
 
-    def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
+    def _cv(
+        self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType
+    ) -> tk.evaluations.EvalsType:
         import xgboost
 
         assert isinstance(dataset.data, pd.DataFrame)

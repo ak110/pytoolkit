@@ -99,8 +99,8 @@ class ParallelGridPooling2D(tf.keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         del kwargs
-        shape = K.shape(inputs)
-        int_shape = K.int_shape(inputs)
+        shape = tf.shape(inputs)
+        int_shape = inputs.shape.as_list()
         rh, rw = self.pool_size
         b, h, w, c = shape[0], shape[1], shape[2], int_shape[3]
         outputs = K.reshape(inputs, (b, h // rh, rh, w // rw, rw, c))
@@ -136,8 +136,7 @@ class ParallelGridGather(tf.keras.layers.Layer):
         outputs = K.reshape(inputs, gather_shape)
         outputs = K.mean(outputs, axis=0)
         # tf.keras用workaround
-        if hasattr(outputs, "set_shape"):
-            outputs.set_shape(K.int_shape(inputs))
+        outputs.set_shape(inputs.shape.as_list())
         return outputs
 
     def get_config(self):
@@ -198,7 +197,7 @@ class BlurPooling2D(tf.keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         del kwargs
-        in_filters = K.int_shape(inputs)[-1]
+        in_filters = inputs.shape.as_list()[-1]
 
         pascals_tr = np.zeros((self.taps, self.taps))
         pascals_tr[0, 0] = 1
@@ -209,7 +208,7 @@ class BlurPooling2D(tf.keras.layers.Layer):
         filter2d = filter1d[np.newaxis, :] * filter1d[:, np.newaxis]
         filter2d = filter2d * (self.taps ** 2 / filter2d.sum())
         kernel = np.tile(filter2d[:, :, np.newaxis, np.newaxis], (1, 1, in_filters, 1))
-        kernel = K.constant(kernel)
+        kernel = tf.constant(kernel, dtype=tf.float32)
 
         return tf.nn.depthwise_conv2d(
             inputs, kernel, strides=(1,) + self.strides + (1,), padding="SAME"
@@ -236,9 +235,9 @@ class GeM2D(tf.keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         del kwargs
-        x = K.pow(K.maximum(inputs, self.epsilon), self.p)
-        x = K.mean(x, axis=[1, 2])  # GAP
-        x = K.pow(x, 1 / self.p)
+        x = tf.math.maximum(inputs, self.epsilon) ** self.p
+        x = tf.math.reduce_mean(x, axis=(1, 2))  # GAP
+        x = x ** (1 / self.p)
         return x
 
     def get_config(self):

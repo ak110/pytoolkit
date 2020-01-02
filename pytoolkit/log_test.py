@@ -46,6 +46,6 @@ def test_trace():
     tk.log.close(logger)
 
     lines = stderr.getvalue().split("\n")
-    assert lines[0] == "trace_scope 開始"
+    assert lines[0] == "trace_scope start"
     assert lines[1] == "あいうえお"
-    assert lines[2].startswith("trace_scope 終了 (")
+    assert lines[2].startswith("trace_scope done in ")

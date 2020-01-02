@@ -87,7 +87,9 @@ class LGBModel(Model):
             ]
         )
 
-    def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
+    def _cv(
+        self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType
+    ) -> tk.evaluations.EvalsType:
         import lightgbm as lgb
 
         if isinstance(dataset.data, pd.DataFrame):

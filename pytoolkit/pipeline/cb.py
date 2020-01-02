@@ -66,7 +66,9 @@ class CBModel(Model):
             for fold in range(self.nfold)
         ]
 
-    def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
+    def _cv(
+        self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType
+    ) -> tk.evaluations.EvalsType:
         import catboost
 
         assert isinstance(dataset.data, pd.DataFrame)
@@ -92,7 +94,7 @@ class CBModel(Model):
                 score_list.append(gbm.get_best_score()["validation"])
 
         cv_weights = [len(val_indices) for _, val_indices in folds]
-        scores = {}
+        scores: tk.evaluations.EvalsType = {}
         for k in score_list[0]:
             score = [s[k] for s in score_list]
             score = np.float32(np.average(score, weights=cv_weights))

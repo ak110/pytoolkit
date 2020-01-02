@@ -143,17 +143,17 @@ class GroupNormalization(tf.keras.layers.Layer):
         if ndim == 4:  # 2D
             N, H, W, C = shape[0], shape[1], shape[2], shape[3]
             g = K.minimum(self.groups, C)
-            x = K.reshape(x, [N, H, W, g, C // g])
+            x = tf.reshape(x, [N, H, W, g, C // g])
             mean, var = tf.nn.moments(x=x, axes=[1, 2, 4], keepdims=True)
             x = (x - mean) * tf.math.rsqrt(var + self.epsilon)
-            x = K.reshape(x, [N, H, W, C])
+            x = tf.reshape(x, [N, H, W, C])
         elif ndim == 5:  # 3D
             N, T, H, W, C = shape[0], shape[1], shape[2], shape[3], shape[4]
             g = K.minimum(self.groups, C)
-            x = K.reshape(x, [N, T, H, W, g, C // g])
+            x = tf.reshape(x, [N, T, H, W, g, C // g])
             mean, var = tf.nn.moments(x=x, axes=[1, 2, 3, 5], keepdims=True)
             x = (x - mean) * tf.math.rsqrt(var + self.epsilon)
-            x = K.reshape(x, [N, T, H, W, C])
+            x = tf.reshape(x, [N, T, H, W, C])
         else:
             assert ndim in (4, 5)
         if self.scale:
@@ -161,7 +161,7 @@ class GroupNormalization(tf.keras.layers.Layer):
         if self.center:
             x = x + self.beta
         # tf.keras用
-        x.set_shape(K.int_shape(inputs))
+        x.set_shape(inputs.shape.as_list())
         return x
 
     def get_config(self):
@@ -242,7 +242,7 @@ class InstanceNormalization(tf.keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         del kwargs
-        input_shape = K.int_shape(inputs)
+        input_shape = inputs.shape.as_list()
 
         reduction_axes = list(range(1, len(input_shape) - 1))
         mean = K.mean(inputs, reduction_axes, keepdims=True)
@@ -252,9 +252,9 @@ class InstanceNormalization(tf.keras.layers.Layer):
         broadcast_shape = [1] * len(input_shape)
         broadcast_shape[-1] = input_shape[-1]
         if self.scale:
-            outputs = outputs * K.reshape(self.gamma, broadcast_shape)
+            outputs = outputs * tf.reshape(self.gamma, broadcast_shape)
         if self.center:
-            outputs = outputs + K.reshape(self.beta, broadcast_shape)
+            outputs = outputs + tf.reshape(self.beta, broadcast_shape)
 
         return outputs
 

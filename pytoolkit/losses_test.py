@@ -4,15 +4,13 @@ import tensorflow as tf
 
 import pytoolkit as tk
 
-K = tf.keras.backend
-
 
 def test_binary_crossentropy():
     # 通常の動作確認
     _binary_loss_test(tk.losses.binary_crossentropy, symmetric=True)
     # alpha
-    y_true = K.constant([[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]])
-    y_pred = K.constant([[0.0, 0.3, 0.7, 1.0], [0.0, 0.3, 0.7, 1.0]])
+    y_true = tf.constant([[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]])
+    y_pred = tf.constant([[0.0, 0.3, 0.7, 1.0], [0.0, 0.3, 0.7, 1.0]])
     loss_na = tk.losses.binary_crossentropy(y_true, y_pred).numpy()
     loss_a3 = tk.losses.binary_crossentropy(y_true, y_pred, alpha=0.3).numpy()
     loss_a5 = tk.losses.binary_crossentropy(y_true, y_pred, alpha=0.5).numpy()
@@ -32,8 +30,8 @@ def test_lovasz_hinge():
 
 
 def test_lovasz_binary_crossentropy():
-    y_true = K.constant([[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]])
-    y_pred = K.constant([[0.0, 0.3, 0.7, 1.0], [0.0, 0.3, 0.7, 1.0]])
+    y_true = tf.constant([[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]])
+    y_pred = tf.constant([[0.0, 0.3, 0.7, 1.0], [0.0, 0.3, 0.7, 1.0]])
     loss1 = tk.losses.lovasz_binary_crossentropy(y_true, y_true).numpy()
     loss2 = tk.losses.lovasz_binary_crossentropy(y_true, y_pred).numpy()
     assert loss1 == pytest.approx(
@@ -43,8 +41,8 @@ def test_lovasz_binary_crossentropy():
         loss2 > np.array([0.0100503, 0.0100503])
     ).all(), "loss(y_true, y_pred) > zeros"
     # alpha
-    y_true = K.constant([[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]])
-    y_pred = K.constant([[0.0, 0.3, 0.7, 1.0], [0.0, 0.3, 0.7, 1.0]])
+    y_true = tf.constant([[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]])
+    y_pred = tf.constant([[0.0, 0.3, 0.7, 1.0], [0.0, 0.3, 0.7, 1.0]])
     loss_na = tk.losses.lovasz_binary_crossentropy(y_true, y_pred).numpy()
     loss_a3 = tk.losses.lovasz_binary_crossentropy(y_true, y_pred, alpha=0.3).numpy()
     loss_a5 = tk.losses.lovasz_binary_crossentropy(y_true, y_pred, alpha=0.5).numpy()
@@ -59,8 +57,8 @@ def test_lovasz_softmax():
 
 
 def _binary_loss_test(loss, symmetric):
-    y_true = K.constant([[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]])
-    y_pred = K.constant([[0.0, 0.3, 0.7, 1.0], [0.0, 0.3, 0.7, 1.0]])
+    y_true = tf.constant([[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]])
+    y_pred = tf.constant([[0.0, 0.3, 0.7, 1.0], [0.0, 0.3, 0.7, 1.0]])
     loss1 = loss(y_true, y_true).numpy()
     loss2 = loss(y_true, y_pred).numpy()
     assert loss1 == pytest.approx([0, 0], abs=1e-6), "loss(y_true, y_true) == zeros"

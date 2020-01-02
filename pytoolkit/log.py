@@ -138,10 +138,13 @@ def trace_scope(process_name, level=logging.INFO):
 
     """
     logger = get(__name__)
-    logger.log(level, f"{process_name} 開始")
+    logger.log(level, f"{process_name} start")
     start_time = time.time()
     try:
         yield
-    finally:
         elapsed_time = time.time() - start_time
-        logger.log(level, f"{process_name} 終了 ({elapsed_time:.3f}[s])")
+        logger.log(level, f"{process_name} done in {elapsed_time:.1f} s")
+    except:  # noqa
+        elapsed_time = time.time() - start_time
+        logger.log(level, f"{process_name} error in {elapsed_time:.1f} s")
+        raise

@@ -4,8 +4,6 @@ import tensorflow as tf
 
 import pytoolkit as tk
 
-K = tf.keras.backend
-
 
 @pytest.mark.parametrize("color", ["rgb", "lab", "hsv", "yuv", "ycbcr", "hed", "yiq"])
 def test_ConvertColor(color):
@@ -31,7 +29,7 @@ def test_ConvertColor(color):
     }[color](rgb)
 
     layer = tk.layers.ConvertColor(f"rgb_to_{color}")
-    actual = layer(K.constant(np.expand_dims(rgb, 0))).numpy()[0]
+    actual = layer(tf.constant(np.expand_dims(rgb.astype(np.float32), 0))).numpy()[0]
 
     actual, expected = np.round(actual, 3), np.round(expected, 3)  # 丸めちゃう
     assert actual.dtype == np.float32

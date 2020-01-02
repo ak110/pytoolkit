@@ -49,3 +49,11 @@ def test_BlurPooling2D():
     )
     pred = _predict_layer(tk.layers.BlurPooling2D(taps=5), X)
     assert pred == pytest.approx(y, abs=1e-5)
+
+
+def test_GeM2D():
+    X = np.zeros((1, 8, 8, 3))
+    X[0, 2, 2, 0] = 1.234 * (64 ** (1 / 3))
+    y = np.array([[1.234, 0, 0]])
+    pred = _predict_layer(tk.layers.GeM2D(), X)
+    assert pred == pytest.approx(y, abs=1e-5)

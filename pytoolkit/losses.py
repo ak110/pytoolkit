@@ -113,7 +113,7 @@ def categorical_crossentropy(
         else:
             cw = np.reshape(class_weights, (1, 1, -1))
     else:
-        num_classes = K.int_shape(y_pred)[-1]
+        num_classes = y_pred.shape[-1]
         cw = np.array([(1 - alpha) * 2] * 1 + [alpha * 2] * (num_classes - 1))
         cw = np.reshape(cw, (1, 1, -1))
 
@@ -143,8 +143,8 @@ def categorical_focal_loss(y_true, y_pred, gamma=2.0, alpha=None, reduce_mode="s
     if alpha is None:
         cw = 1
     else:
-        nb_classes = K.int_shape(y_pred)[-1]
-        cw = np.array([(1 - alpha) * 2] * 1 + [alpha * 2] * (nb_classes - 1))
+        num_classes = y_pred.shape[-1]
+        cw = np.array([(1 - alpha) * 2] * 1 + [alpha * 2] * (num_classes - 1))
         cw = np.reshape(cw, (1, 1, -1))
 
     y_pred = K.maximum(y_pred, K.epsilon())
@@ -247,7 +247,7 @@ def lovasz_softmax(y_true, y_pred, per_sample=True):
 
         return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=tf.float32)
 
-    num_classes = K.int_shape(y_pred)[-1]
+    num_classes = y_pred.shape[-1]
     y_pred = K.reshape(y_pred, (-1, num_classes))
     y_true = K.reshape(y_true, (-1, num_classes))
     losses = []

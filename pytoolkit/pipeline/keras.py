@@ -126,7 +126,9 @@ class KerasModel(Model):
         model_path = models_dir / self.model_name_format.format(fold=fold + 1)
         tk.models.load_weights(self.prediction_models[fold], model_path)
 
-    def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
+    def _cv(
+        self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType
+    ) -> tk.evaluations.EvalsType:
         assert len(folds) == self.nfold
         if self.parallel_cv:
             return self._parallel_cv(dataset, folds)

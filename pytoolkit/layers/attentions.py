@@ -111,7 +111,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
             q = K.bias_add(K.dot(seq, self.Wq[h]), self.bq[h])
             k = K.bias_add(K.dot(ctx, self.Wk[h]), self.bk[h])
             v = K.bias_add(K.dot(ctx, self.Wv[h]), self.bv[h])
-            k = k / np.sqrt(K.int_shape(k)[-1])
+            k = k / np.sqrt(k.shape[-1])
             w = K.batch_dot(q, k, axes=(2, 2))  # (None, seq.shape[1], ctx.shape[1])
             if self.causal:
                 w_shape = K.shape(w)
@@ -218,10 +218,10 @@ class MultiHeadAttention2D(tf.keras.layers.Layer):
             q = K.bias_add(K.dot(seq, self.Wq[h]), self.bq[h])
             k = K.bias_add(K.dot(seq, self.Wk[h]), self.bk[h])
             v = K.bias_add(K.dot(seq, self.Wv[h]), self.bv[h])
-            q = K.reshape(q, (batch_size, -1, K.int_shape(k)[-1]))
-            k = K.reshape(k, (batch_size, -1, K.int_shape(k)[-1]))
-            v = K.reshape(v, (batch_size, -1, K.int_shape(k)[-1]))
-            k = k / np.sqrt(K.int_shape(k)[-1])
+            q = K.reshape(q, (batch_size, -1, k.shape[-1]))
+            k = K.reshape(k, (batch_size, -1, k.shape[-1]))
+            v = K.reshape(v, (batch_size, -1, k.shape[-1]))
+            k = k / np.sqrt(k.shape[-1])
             w = K.batch_dot(q, k, axes=(2, 2))  # (None, seq.shape[1], ctx.shape[1])
             w = K.softmax(w)
             w = K.dropout(w, level=self.drop_rate)  # Attention Dropout

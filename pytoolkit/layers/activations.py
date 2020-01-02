@@ -63,12 +63,12 @@ class DropActivation(tf.keras.layers.Layer):
 
     def call(self, inputs, training=None):  # pylint: disable=arguments-differ
         def _train():
-            shape = K.shape(inputs)
-            r = K.random_uniform(shape=(shape[0],) + (1,) * (K.ndim(inputs) - 1))
-            return tf.where(r <= self.keep_rate, K.relu(inputs), inputs)
+            shape = tf.shape(inputs)
+            r = tf.random.uniform(shape=(shape[0],) + (1,) * (len(inputs.shape) - 1))
+            return tf.where(r <= self.keep_rate, tf.nn.relu(inputs), inputs)
 
         def _test():
-            return K.relu(inputs, alpha=1 - self.keep_rate)
+            return tf.nn.leaky_relu(inputs, alpha=1 - self.keep_rate)
 
         return K.in_train_phase(_train, _test, training=training)
 

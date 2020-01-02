@@ -49,7 +49,9 @@ class SKLearnModel(Model):
     def _load(self, models_dir: pathlib.Path):
         self.estimators_ = tk.utils.load(models_dir / "estimators.pkl")
 
-    def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> dict:
+    def _cv(
+        self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType
+    ) -> tk.evaluations.EvalsType:
         scores = []
         score_weights = []
         self.estimators_ = []
