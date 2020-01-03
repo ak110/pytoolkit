@@ -47,9 +47,7 @@ class Model:
         )
         self.save_on_cv = save_on_cv
 
-    def cv(
-        self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType
-    ) -> tk.evaluations.EvalsType:
+    def cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> Model:
         """CVして保存。
 
         Args:
@@ -57,7 +55,7 @@ class Model:
             folds: CVのindex
 
         Returns:
-            metrics名と値
+            self
 
         """
         dataset = dataset.copy()
@@ -73,11 +71,11 @@ class Model:
                 axis=-1,
             )
 
-        scores = self._cv(dataset, folds)
+        self._cv(dataset, folds)
         if self.save_on_cv:
             self.save()
 
-        return scores
+        return self
 
     def save(self, models_dir: tk.typing.PathLike = None) -> Model:
         """保存。
@@ -206,17 +204,12 @@ class Model:
         """
         raise NotImplementedError()
 
-    def _cv(
-        self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType
-    ) -> tk.evaluations.EvalsType:
+    def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> None:
         """CV。
 
         Args:
             dataset: 入力データ
             folds: CVのindex
-
-        Returns:
-            metrics名と値
 
         """
         raise NotImplementedError()

@@ -1,4 +1,6 @@
 """回帰の評価。"""
+from __future__ import annotations
+
 import typing
 
 import numpy as np
@@ -11,7 +13,7 @@ def print_regression_metrics(
     y_true: np.ndarray,
     y_pred: np.ndarray,
     print_fn: typing.Callable[[str], None] = None,
-) -> typing.Dict[str, typing.Any]:
+) -> tk.evaluations.EvalsType:
     """回帰の指標色々を表示する。"""
     try:
         evals = evaluate_regression(y_true, y_pred)
@@ -28,7 +30,7 @@ def print_regression_metrics(
 
 def evaluate_regression(
     y_true: np.ndarray, y_pred: np.ndarray
-) -> typing.Dict[str, typing.Any]:
+) -> tk.evaluations.EvalsType:
     """回帰の指標色々を算出してdictで返す。"""
     y_mean = np.tile(np.mean(y_pred), len(y_true))
     r2 = sklearn.metrics.r2_score(y_true, y_pred)

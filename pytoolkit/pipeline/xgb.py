@@ -67,9 +67,7 @@ class XGBModel(Model):
         assert self.gbms_ is not None
         assert len(self.gbms_) == self.nfold
 
-    def _cv(
-        self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType
-    ) -> tk.evaluations.EvalsType:
+    def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> None:
         import xgboost
 
         assert isinstance(dataset.data, pd.DataFrame)
@@ -102,10 +100,8 @@ class XGBModel(Model):
             if k.endswith("-mean"):
                 name, score = k[:-5], v.values[-1]
                 scores[name] = score
-                tk.log.get(__name__).info(f"{name}: {score}")
+                tk.log.get(__name__).info(f"cv {name}: {score:,.3f}")
             self.best_ntree_limit_ = len(v)
-
-        return scores
 
     def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
         import xgboost

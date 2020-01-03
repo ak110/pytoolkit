@@ -12,6 +12,7 @@ git+https://github.com/cocodataset/cocoapi.git#egg=pycocotools&subdirectory=Pyth
 keras2onnx
 matplotlib
 mypy
+nbformat
 numba
 numpy
 onnxmltools

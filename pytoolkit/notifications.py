@@ -25,14 +25,15 @@ def post_evals(evals: tk.evaluations.EvalsType):
         evals: 評価結果。
 
     """
-    post(tk.evaluations.to_str(evals))
+    post(tk.evaluations.to_str(evals, multiline=True))
 
 
 def post(text: str):
     """通知。"""
     pre_text = f"{' '.join([shlex.quote(a) for a in sys.argv])}\n"
     text = text.strip()
-    tk.log.get(__name__).debug(f"Notification:\n{text}")
+    for line in text.split("\n"):
+        tk.log.get(__name__).info(line)
 
     if tk.hvd.is_master():
         try:

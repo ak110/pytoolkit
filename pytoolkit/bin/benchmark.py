@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ImageDataGeneratorのチェック用コード。"""
+"""ImageDataGeneratorの速度チェック用コード。"""
 import argparse
 import cProfile
 import pathlib
@@ -8,22 +8,28 @@ import sys
 import albumentations as A
 import numpy as np
 
-if True:
-    sys.path.append(str(pathlib.Path(__file__).parent.parent))
+try:
+    import pytoolkit as tk
+except ImportError:
+    sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
     import pytoolkit as tk
 
 batch_size = 16
 image_size = (512, 512)
 
+logger = tk.log.get(__name__)
 
-def _main():
+
+def main():
+    tk.utils.better_exceptions()
+    tk.log.init(None)
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--load", action="store_true")
     parser.add_argument("--mask", action="store_true")
     parser.add_argument("--profile", action="store_true")
     args = parser.parse_args()
 
-    tk.utils.better_exceptions()
     base_dir = pathlib.Path(__file__).resolve().parent.parent
     data_dir = base_dir / "pytoolkit" / "_test_data"
     save_dir = base_dir / "___check" / "bench"
@@ -58,7 +64,7 @@ def _main():
         # 適当にループして速度を見る
         _run(data_iterator, iterations=16)
 
-    print(f"{data_iterator.seconds_per_step * 1000:.0f}ms/step")
+    logger.info(f"{data_iterator.seconds_per_step * 1000:.0f}ms/step")
 
 
 def _run(data_iterator, iterations):
@@ -107,4 +113,4 @@ class MyDataLoader(tk.data.DataLoader):
 
 
 if __name__ == "__main__":
-    _main()
+    main()

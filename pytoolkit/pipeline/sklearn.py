@@ -49,9 +49,7 @@ class SKLearnModel(Model):
     def _load(self, models_dir: pathlib.Path):
         self.estimators_ = tk.utils.load(models_dir / "estimators.pkl")
 
-    def _cv(
-        self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType
-    ) -> tk.evaluations.EvalsType:
+    def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> None:
         scores = []
         score_weights = []
         self.estimators_ = []
@@ -74,7 +72,9 @@ class SKLearnModel(Model):
             scores.append(estimator.score(val_set.data, val_set.labels, **kwargs))
             score_weights.append(len(val_set))
 
-        return {"score": np.average(scores, weights=score_weights)}
+        tk.log.get(__name__).info(
+            f"cv score: {np.average(scores, weights=score_weights):,.3f}"
+        )
 
     def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
         assert self.estimators_ is not None

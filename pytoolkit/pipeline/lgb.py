@@ -87,9 +87,7 @@ class LGBModel(Model):
             ]
         )
 
-    def _cv(
-        self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType
-    ) -> tk.evaluations.EvalsType:
+    def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> None:
         import lightgbm as lgb
 
         if isinstance(dataset.data, pd.DataFrame):
@@ -149,7 +147,8 @@ class LGBModel(Model):
 
         for name, score_list in scores.items():
             scores[name] = np.mean(score_list)
-        return scores
+        for k, v in scores.items():
+            tk.log.get(__name__).info(f"cv(mean) {k}: {v:,.3f}")
 
     def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
         assert self.gbms_ is not None

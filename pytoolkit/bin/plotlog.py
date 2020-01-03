@@ -12,13 +12,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-if True:
-    sys.path.append(str(pathlib.Path(__file__).parent.parent))
+try:
+    import pytoolkit as tk
+except ImportError:
+    sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
     import pytoolkit as tk
 
+logger = tk.log.get(__name__)
 
-def _main():
+
+def main():
     tk.utils.better_exceptions()
+    tk.log.init(None)
+
     parser = argparse.ArgumentParser(
         description="tk.callbacks.EpochLogger()で出力したログからグラフを描画するスクリプト。"
     )
@@ -35,10 +41,10 @@ def _main():
         args.logfile.read_text(encoding="utf-8", errors="surrogateescape")
     )
     if args.item is None:
-        print(f"{args.logfile} items:")
+        logger.info(f"{args.logfile} items:")
         for col, _ in df_list:
-            print(" ", col)
-        print("")
+            logger.info(f" {col}")
+        logger.info("")
     else:
         for col, df in df_list:
             if col != args.item:
@@ -80,12 +86,12 @@ def _main():
 
             if args.stdout:
                 data_url = tk.web.data_url(graph_bytes, "image/png")
-                print(data_url)
+                logger.info(data_url)
             elif args.save:
                 save_path = pathlib.Path(f"{args.logfile.stem}.{args.item}.png")
                 save_path = save_path.resolve()
                 save_path.write_bytes(graph_bytes)
-                print(save_path)
+                logger.info(save_path)
             else:
                 data_url = tk.web.data_url(graph_bytes, "image/png")
                 b64data = base64.b64encode(data_url.encode("utf-8")).decode("utf-8")
@@ -137,4 +143,4 @@ def _parse_log(log_text: str):
 
 
 if __name__ == "__main__":
-    _main()
+    main()

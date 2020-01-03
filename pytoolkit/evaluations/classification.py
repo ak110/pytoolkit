@@ -1,4 +1,6 @@
 """分類の評価。"""
+from __future__ import annotations
+
 import typing
 
 import numpy as np
@@ -12,7 +14,7 @@ def print_classification_metrics(
     proba_pred: np.ndarray,
     average: str = "macro",
     print_fn: typing.Callable[[str], None] = None,
-) -> typing.Dict[str, typing.Any]:
+) -> tk.evaluations.EvalsType:
     """分類の指標色々を表示する。"""
     try:
         evals = evaluate_classification(y_true, proba_pred, average)
@@ -43,7 +45,7 @@ def print_classification_metrics(
 
 def evaluate_classification(
     y_true: np.ndarray, proba_pred: np.ndarray, average: str = "macro"
-) -> typing.Dict[str, typing.Any]:
+) -> tk.evaluations.EvalsType:
     """分類の評価。"""
     true_type = sklearn.utils.multiclass.type_of_target(y_true)
     pred_type = sklearn.utils.multiclass.type_of_target(proba_pred)

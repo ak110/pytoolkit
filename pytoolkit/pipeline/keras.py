@@ -126,14 +126,12 @@ class KerasModel(Model):
         model_path = models_dir / self.model_name_format.format(fold=fold + 1)
         tk.models.load_weights(self.prediction_models[fold], model_path)
 
-    def _cv(
-        self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType
-    ) -> tk.evaluations.EvalsType:
+    def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> None:
         assert len(folds) == self.nfold
         if self.parallel_cv:
-            return self._parallel_cv(dataset, folds)
+            self._parallel_cv(dataset, folds)
         else:
-            return self._serial_cv(dataset, folds)
+            self._serial_cv(dataset, folds)
 
     def _parallel_cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType):
         for fold in range(len(folds)):
@@ -242,9 +240,7 @@ class KerasModel(Model):
         )
         scores = dict(zip(model.metrics_names, evals))
         for k, v in scores.items():
-            tk.log.get(__name__).info(f"CV: val_{k}={v:,.3f}")
-
-        return scores
+            tk.log.get(__name__).info(f"cv {k}: {v:,.3f}")
 
     def _serial_cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType):
         score_list = []
@@ -259,10 +255,9 @@ class KerasModel(Model):
             score_list.append(scores)
             score_weights.append(len(val_indices))
 
-        return {
-            k: np.average([s[k] for s in score_list], weights=score_weights)
-            for k in score_list[0]
-        }
+        for k in score_list[0]:
+            v = np.average([s[k] for s in score_list], weights=score_weights)
+            tk.log.get(__name__).info(f"cv {k}: {v:,.3f}")
 
     def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
         pred = tk.models.predict(

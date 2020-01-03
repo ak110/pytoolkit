@@ -7,12 +7,16 @@ import sys
 
 import tensorflow as tf
 
-if True:
-    sys.path.append(str(pathlib.Path(__file__).parent.parent))
+try:
+    import pytoolkit as tk
+except ImportError:
+    sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
     import pytoolkit as tk
 
+logger = tk.log.get(__name__)
 
-def _main():
+
+def main():
     tk.utils.better_exceptions()
     tk.log.init(None)
     parser = argparse.ArgumentParser(
@@ -48,4 +52,4 @@ def _main():
 
 
 if __name__ == "__main__":
-    _main()
+    main()

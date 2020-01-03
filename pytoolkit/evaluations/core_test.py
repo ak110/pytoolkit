@@ -6,7 +6,11 @@ import pytoolkit as tk
 
 def test_to_str():
     evals = {"aaa": 1, "b": np.float32(2)}
+
     s = tk.evaluations.to_str(evals)
+    assert s == "aaa=1.000 b=2.000"
+
+    s = tk.evaluations.to_str(evals, multiline=True)
     assert s == "aaa: 1.000\nb:   2.000"
 
 

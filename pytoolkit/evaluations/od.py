@@ -11,7 +11,7 @@ def print_od_metrics(
     y_true: typing.Iterable[tk.od.ObjectsAnnotation],
     y_pred: typing.Iterable[tk.od.ObjectsPrediction],
     print_fn: typing.Callable[[str], None] = None,
-) -> typing.Dict[str, typing.Any]:
+) -> tk.evaluations.EvalsType:
     """物体検出の各種metricsを算出してprintする。
 
     Args:
@@ -38,7 +38,7 @@ def print_od_metrics(
 def evaluate_od(
     y_true: typing.Iterable[tk.od.ObjectsAnnotation],
     y_pred: typing.Iterable[tk.od.ObjectsPrediction],
-) -> typing.Dict[str, typing.Any]:
+) -> tk.evaluations.EvalsType:
     """物体検出の各種metricsを算出してdictで返す。
 
     Args:

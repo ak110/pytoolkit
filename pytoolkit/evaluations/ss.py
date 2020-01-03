@@ -1,4 +1,6 @@
 """セマンティックセグメンテーションの評価。"""
+from __future__ import annotations
+
 import typing
 import warnings
 
@@ -12,7 +14,7 @@ def print_ss_metrics(
     y_pred: typing.Iterable[np.ndarray],
     threshold: float = 0.5,
     print_fn: typing.Callable[[str], None] = None,
-) -> typing.Dict[str, typing.Any]:
+) -> tk.evaluations.EvalsType:
     """semantic segmentationの各種metricsを算出してprintする。
 
     Args:
@@ -42,7 +44,7 @@ def evaluate_ss(
     y_pred: typing.Iterable[np.ndarray],
     threshold: float = 0.5,
     multilabel: bool = False,
-) -> typing.Dict[str, typing.Any]:
+) -> tk.evaluations.EvalsType:
     """semantic segmentationの各種metricsを算出してdictで返す。
 
     y_true, y_predはgeneratorも可。(メモリ不足にならないように)

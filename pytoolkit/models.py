@@ -207,9 +207,6 @@ def fit(
     callbacks: list = None,
     verbose: int = 1,
     initial_epoch: int = 0,
-    use_multiprocessing: bool = False,
-    workers: int = 1,
-    max_queue_size: int = 10,
     num_replicas_in_sync: int = 1,
 ):
     """独自のtraining loopになる予定の関数。
@@ -226,12 +223,14 @@ def fit(
         callbacks: コールバック。EpochLoggerとErrorOnNaNとhorovod関連は自動追加。
         verbose: 1ならプログレスバー表示、2ならepoch毎の結果だけ表示。
         initial_epoch: 学習を開始するエポック数 - 1
-        use_multiprocessing: Trueならマルチプロセス
-        workers: ワーカー数
-        max_queue_size: キューの最大サイズ
         num_replicas_in_sync: tf.distribute使用時の並列数(バッチサイズに掛け算する)
 
     """
+    use_horovod = tk.hvd.initialized() and tk.hvd.rank() > 1
+    if use_horovod:
+        assert num_replicas_in_sync <= 1
+    horovod_val_scale = 3 if use_horovod else 1
+
     if validation_freq == 0:
         # validation_freq == 0ならvalidationしない(独自仕様)
         validation_freq = None
@@ -240,7 +239,11 @@ def fit(
     elif validation_freq == "auto":
         # "auto"なら適当に決める(独自仕様)
         validation_freq = make_validation_freq(
-            validation_freq, epochs, train_set, val_set
+            validation_freq,
+            epochs,
+            train_set,
+            val_set,
+            max_val_per_train=0.1 / horovod_val_scale,
         )
     if val_set is not None:
         assert val_data_loader is not None
@@ -248,14 +251,14 @@ def fit(
     train_iterator = train_data_loader.iter(
         train_set,
         shuffle=True,
-        use_horovod=True,
+        use_horovod=use_horovod,
         num_replicas_in_sync=num_replicas_in_sync,
     )
     val_iterator = (
         val_data_loader.iter(
             val_set,
-            shuffle=True,
-            use_horovod=True,
+            shuffle=use_horovod,
+            use_horovod=use_horovod,
             num_replicas_in_sync=num_replicas_in_sync,
         )
         if val_set is not None and val_data_loader is not None
@@ -273,15 +276,14 @@ def fit(
             train_iterator.ds,
             steps_per_epoch=train_iterator.steps,
             validation_data=val_iterator.ds if val_iterator is not None else None,
-            validation_steps=val_iterator.steps if val_iterator is not None else None,
+            validation_steps=val_iterator.steps * horovod_val_scale
+            if val_iterator is not None
+            else None,
             class_weight=class_weight,
             epochs=epochs,
             callbacks=callbacks,
             verbose=verbose if tk.hvd.is_master() else 0,
             initial_epoch=initial_epoch,
-            use_multiprocessing=use_multiprocessing,
-            workers=workers,
-            max_queue_size=max_queue_size,
             **fit_kwargs,
         )
 

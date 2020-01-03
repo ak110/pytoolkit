@@ -7,6 +7,7 @@ Subpackages
 .. toctree::
 
    pytoolkit.applications
+   pytoolkit.bin
    pytoolkit.datasets
    pytoolkit.evaluations
    pytoolkit.layers
