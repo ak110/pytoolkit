@@ -254,33 +254,50 @@ def load_voc_od(voc_dir):
     """
     from chainercv.datasets.voc.voc_bbox_dataset import VOCBboxDataset
 
+    voc_dir = pathlib.Path(voc_dir)
     ds_train07 = VOCBboxDataset(
-        data_dir=str(voc_dir), split="trainval", year="2007", use_difficult=False,
+        data_dir=str(voc_dir / "VOC2007"),
+        split="trainval",
+        year="2007",
+        use_difficult=False,
     )
-    # TODO
+    # # TODO
     # ds_train12 = VOCBboxDataset(
-    #     data_dir=str(voc_dir), split="trainval", year="2012", use_difficult=False,
+    #     data_dir=str(voc_dir / "VOC2012"),
+    #     split="trainval",
+    #     year="2012",
+    #     use_difficult=False,
     # )
     ds_val = VOCBboxDataset(
-        data_dir=str(voc_dir),
+        data_dir=str(voc_dir / "VOC2007"),
         split="test",
         year="2007",
         use_difficult=True,
         return_difficult=True,
     )
 
-    return _VOCODDataset(ds_train07), _VOCODDataset(ds_val)
+    train_ds = _VOCODDataset(
+        data=np.arange(len(ds_train07)),
+        metadata={"ds": ds_train07, "class_names": CLASS_NAMES},
+    )
+    val_ds = _VOCODDataset(
+        data=np.arange(len(ds_val)),
+        metadata={"ds": ds_val, "class_names": CLASS_NAMES},
+    )
+    return train_ds, val_ds
 
 
 class _VOCODDataset(tk_data.Dataset):
     """chainercvのDatasetからtk.data.Datasetへの変換"""
 
-    def __init__(self, ds):
-        self.ds = ds
-        super().__init__(data=np.arange(len(self.ds)))
-
     def get_data(self, index: int) -> typing.Tuple[typing.Any, typing.Any]:
-        img, bboxes, classes, areas, crowdeds = self.ds[index]
+        assert self.metadata is not None
+        ds = self.metadata["ds"]
+        if ds.use_difficult:
+            img, bboxes, classes, difficults = ds[index]
+        else:
+            img, bboxes, classes = ds[index]
+            difficults = None
         X = np.transpose(img, (1, 2, 0)).astype(np.uint8)  # CHW -> HWC
         assert X.shape[-1] == 3, f"shape error: {X.shape}"  # RGB
 
@@ -290,19 +307,16 @@ class _VOCODDataset(tk_data.Dataset):
         bboxes[:, [1, 3]] /= X.shape[0]
 
         y = tk.od.ObjectsAnnotation(
-            path=self._get_path(index),
+            path=self._get_path(ds, index),
             width=X.shape[1],
             height=X.shape[0],
             classes=classes,
             bboxes=bboxes,
-            areas=areas,
-            crowdeds=crowdeds,
+            difficults=difficults,
         )
 
         return X, y
 
-    def _get_path(self, index: int) -> pathlib.Path:
+    def _get_path(self, ds, index: int) -> pathlib.Path:
         # https://github.com/chainer/chainercv/blob/fddc813/chainercv/datasets/voc/voc_bbox_dataset.py#L84
-        return (
-            pathlib.Path(self.ds.data_dir) / "JPEGImages" / f"{self.ds.ids[index]}.jpg"
-        )
+        return pathlib.Path(ds.data_dir) / "JPEGImages" / f"{ds.ids[index]}.jpg"

@@ -159,6 +159,7 @@ def compile(
     loss: LossType = None,
     metrics: MetricsType = None,
     experimental_run_tf_function: bool = None,
+    **kwargs,
 ):  # pylint: disable=redefined-builtin
     """compileするだけ。"""
     with tk.log.trace_scope("compile"):
@@ -179,6 +180,7 @@ def compile(
             loss=loss,
             metrics=metrics,
             experimental_run_tf_function=experimental_run_tf_function,
+            **kwargs,
         )
 
 
@@ -229,7 +231,12 @@ def fit(
     use_horovod = tk.hvd.initialized() and tk.hvd.rank() > 1
     if use_horovod:
         assert num_replicas_in_sync <= 1
-    horovod_val_scale = 3 if use_horovod else 1
+    # Horovodはそれぞれのワーカーが勝手にvalidateするのでshuffleする必要がある。
+    # tf.distributeも(少なくともTF 2.0では)端数が出てしまうとバグるのでshuffleすることにする。
+    shuffled_validate = use_horovod or num_replicas_in_sync > 1
+    # shuffleするならデータ数分だけでは全体をカバーできないため3倍にオーバーサンプリングする。
+    # (horovodのexamplesの真似: <https://github.com/horovod/horovod/blob/9bdd70d/examples/keras_mnist_advanced.py#L112,L115>)
+    val_scale = 3 if shuffled_validate else 1
 
     if validation_freq == 0:
         # validation_freq == 0ならvalidationしない(独自仕様)
@@ -243,7 +250,7 @@ def fit(
             epochs,
             train_set,
             val_set,
-            max_val_per_train=0.1 / horovod_val_scale,
+            max_val_per_train=0.1 / val_scale,
         )
     if val_set is not None:
         assert val_data_loader is not None
@@ -257,7 +264,7 @@ def fit(
     val_iterator = (
         val_data_loader.iter(
             val_set,
-            shuffle=use_horovod,
+            shuffle=shuffled_validate,
             use_horovod=use_horovod,
             num_replicas_in_sync=num_replicas_in_sync,
         )
@@ -276,7 +283,7 @@ def fit(
             train_iterator.ds,
             steps_per_epoch=train_iterator.steps,
             validation_data=val_iterator.ds if val_iterator is not None else None,
-            validation_steps=val_iterator.steps * horovod_val_scale
+            validation_steps=val_iterator.steps * val_scale
             if val_iterator is not None
             else None,
             class_weight=class_weight,

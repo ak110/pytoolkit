@@ -42,18 +42,18 @@ def load_coco_od(coco_dir, use_crowded=False):
         return_crowded=True,
     )
 
-    return _COCOODDataset(ds_train), _COCOODDataset(ds_val)
+    train_ds = _COCOODDataset(data=np.arange(len(ds_train)), metadata={"ds": ds_train})
+    val_ds = _COCOODDataset(data=np.arange(len(ds_val)), metadata={"ds": ds_val})
+    return train_ds, val_ds
 
 
 class _COCOODDataset(tk_data.Dataset):
     """chainercvのDatasetからtk.data.Datasetへの変換"""
 
-    def __init__(self, ds):
-        self.ds = ds
-        super().__init__(data=np.arange(len(self.ds)))
-
     def get_data(self, index: int) -> typing.Tuple[typing.Any, typing.Any]:
-        img, bboxes, classes, areas, crowdeds = self.ds[index]
+        assert self.metadata is not None
+        ds = self.metadata["ds"]
+        img, bboxes, classes, areas, crowdeds = ds[index]
         X = np.transpose(img, (1, 2, 0)).astype(np.uint8)  # CHW -> HWC
         assert X.shape[-1] == 3, f"shape error: {X.shape}"  # RGB
 
@@ -63,7 +63,7 @@ class _COCOODDataset(tk_data.Dataset):
         bboxes[:, [1, 3]] /= X.shape[0]
 
         y = tk.od.ObjectsAnnotation(
-            path=self._get_path(index),
+            path=self._get_path(ds, index),
             width=X.shape[1],
             height=X.shape[0],
             classes=classes,
@@ -74,12 +74,9 @@ class _COCOODDataset(tk_data.Dataset):
 
         return X, y
 
-    def _get_path(self, index: int) -> pathlib.Path:
+    def _get_path(self, ds, index: int) -> pathlib.Path:
         # https://github.com/chainer/chainercv/blob/fddc813/chainercv/datasets/coco/coco_instances_base_dataset.py#L66
-        return (
-            pathlib.Path(self.ds.img_root)
-            / self.ds.id_to_prop[self.ds.ids[index]]["file_name"]
-        )
+        return pathlib.Path(ds.img_root) / ds.id_to_prop[ds.ids[index]]["file_name"]
 
 
 def load_od(coco_dir, year=2017):
