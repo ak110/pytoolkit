@@ -561,7 +561,9 @@ def predict_on_batch_augmented(
                 X_batch2.append(X[:, :, ::-1, :])
             if flip[0] and flip[1]:
                 X_batch2.append(X[:, ::-1, ::-1, :])
-    result = model.predict(np.concatenate(X_batch2, axis=0), verbose=0)
+    result = model.predict(
+        np.concatenate(X_batch2, axis=0), batch_size=shape[0], verbose=0
+    )
     if isinstance(result, list):  # multiple output
         result = [
             r.reshape((len(X_batch2), len(X_batch)) + r.shape[1:]) for r in result

@@ -190,12 +190,14 @@ class DataLoader:
     Args:
         batch_size: バッチサイズ
         data_per_sample: sampleあたりのデータ数。mixupとかするなら2にする。
+        parallel: self.get_dataの呼び出しを並列化するか否か。
 
     """
 
-    def __init__(self, batch_size: int = 16, data_per_sample=1):
+    def __init__(self, batch_size: int = 16, data_per_sample=1, parallel=True):
         self.batch_size = batch_size
         self.data_per_sample = data_per_sample
+        self.parallel = parallel
 
     def iter(
         self,
@@ -299,11 +301,12 @@ class DataLoader:
             return sample
 
         ds = tf.data.Dataset.from_tensor_slices(np.arange(len(dataset)))
+        num_parallel_calls = tf.data.experimental.AUTOTUNE if self.parallel else None
         if self.data_per_sample == 2:  # 挙動が複雑なので2のみ許可
             ds = tf.data.Dataset.zip(
                 tuple(
                     (ds.shuffle(buffer_size=len(dataset)) if shuffle else ds).map(
-                        process1, num_parallel_calls=tf.data.experimental.AUTOTUNE,
+                        process1, num_parallel_calls=num_parallel_calls,
                     )
                     for _ in range(self.data_per_sample)
                 )
@@ -312,7 +315,7 @@ class DataLoader:
         else:
             assert self.data_per_sample == 1  # 挙動が複雑なので1のみ許可
             ds = ds.shuffle(buffer_size=len(dataset)) if shuffle else ds
-            ds = ds.map(process1, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+            ds = ds.map(process1, num_parallel_calls=num_parallel_calls)
             ds = ds.map(process2_1)
         ds = ds.repeat() if shuffle else ds  # シャッフル時はバッチサイズを固定するため先にrepeat
         ds = ds.batch(self.batch_size * num_replicas_in_sync)
