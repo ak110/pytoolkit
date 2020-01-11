@@ -3,13 +3,10 @@
 uint8のRGBで0～255として扱うのを前提とする。
 あとグレースケールの場合もrows×cols×1の配列で扱う。
 """
-import atexit
 import functools
 import io
 import pathlib
 import random
-import shutil
-import tempfile
 import typing
 import warnings
 
@@ -18,18 +15,6 @@ import numba
 import numpy as np
 import PIL.Image
 import PIL.ImageOps
-
-import pytoolkit as tk
-
-_load_cache = None
-_diskcache_load_failed = False
-
-
-def _clear_cache(dc):
-    """キャッシュのクリア。"""
-    cache_dir = dc.directory
-    dc.close()
-    shutil.rmtree(cache_dir, ignore_errors=True)
 
 
 def _float_to_uint8(func):
@@ -42,71 +27,11 @@ def _float_to_uint8(func):
     return float_to_uint8_func
 
 
-def load_with_cache(
-    path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path],
-    grayscale=False,
-    use_cache=True,
-    max_size=None,
-) -> np.ndarray:
-    """画像の読み込み。
-
-    Args:
-        path_or_array: 画像ファイルへのパス or npy/npzファイルへのパス or ndarray
-        grascale: Trueならグレースケールで読み込み、FalseならRGB
-        use_cache: 読み込み結果をdiskcacheライブラリでキャッシュするならTrue
-        max_size: このサイズを超えるなら縮小する。int or tuple。tupleは(height, width)
-
-    Returns:
-        読み込み結果のndarray。
-
-    """
-    max_size = tk.utils.normalize_tuple(max_size, 2) if max_size is not None else None
-
-    def _load():
-        img = load(path_or_array, grayscale=grayscale)
-        if max_size is not None and (
-            img.shape[0] > max_size[0] or img.shape[1] > max_size[1]
-        ):
-            r0 = max_size[0] / img.shape[0]
-            r1 = max_size[1] / img.shape[1]
-            r = min(r0, r1)
-            img = resize(
-                img, int(round(img.shape[1] * r)), int(round(img.shape[0] * r))
-            )
-        return img
-
-    if use_cache and isinstance(path_or_array, (str, pathlib.Path)):
-        global _load_cache
-        global _diskcache_load_failed
-        if _load_cache is None and not _diskcache_load_failed:
-            temp_dir = tempfile.mkdtemp(suffix="pytoolkit")
-            try:
-                import diskcache
-
-                _load_cache = diskcache.Cache(temp_dir)
-                atexit.register(_clear_cache, _load_cache)
-            except Exception:
-                pathlib.Path(temp_dir).rmdir()
-                _diskcache_load_failed = True
-                tk.log.get(__name__).warning("diskcache load failed.", exc_info=True)
-        if _load_cache is not None:
-            key = f"{path_or_array}::{max_size}"
-            img = _load_cache.get(key)
-            if img is None:
-                img = _load()
-                _load_cache.set(key, img)
-            return img
-
-    return _load()
-
-
 def load(
     path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path],
     grayscale=False,
 ) -> np.ndarray:
     """画像の読み込みの実装。"""
-    assert path_or_array is not None
-
     if isinstance(path_or_array, np.ndarray):
         # ndarrayならそのまま画像扱い
         img = np.copy(path_or_array)  # 念のためコピー
@@ -135,6 +60,13 @@ def load(
                         pil_img = PIL.ImageOps.exif_transpose(pil_img)
                     except Exception as e:
                         warnings.warn(f"{type(e).__name__}: {e}")
+                    try:
+                        img = PIL.ImageOps.exif_transpose(img)
+                    except Exception:
+                        # Pillow 7.0.0で修正されるバグがある。
+                        # https://github.com/python-pillow/Pillow/issues/3973
+                        # これに限らず失敗時も害はそれほど無いと思われるので無視する。
+                        pass
                     target_mode = "L" if grayscale else "RGB"
                     if pil_img.mode != target_mode:
                         pil_img = pil_img.convert(target_mode)
@@ -150,6 +82,50 @@ def load(
         raise ValueError(f"Image load failed: shape={path_or_array}")
 
     return img
+
+
+def get_image_size(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path]) -> typing.Tuple[int, int]:
+    """画像サイズを取得する。(H, W)"""
+    if isinstance(path_or_array, np.ndarray):
+        # ndarrayならそのまま画像扱い
+        img = path_or_array
+        assert img.dtype == np.uint8, f"ndarray dtype error: {img.dtype}"
+        return img.shape[:2]
+    else:
+        suffix = (
+            pathlib.Path(path_or_array).suffix.lower()
+            if isinstance(path_or_array, (str, pathlib.Path))
+            else None
+        )
+        if suffix in (".npy", ".npz"):
+            # .npyなら読み込んでそのまま画像扱い
+            img = np.load(str(path_or_array))
+            if isinstance(img, np.lib.npyio.NpzFile):
+                if len(img.files) != 1:
+                    raise ValueError(
+                        f'Image load failed: "{path_or_array}" has multiple keys. ({img.files})'
+                    )
+                img = img[img.files[0]]
+            assert img.dtype == np.uint8, f"{suffix} dtype error: {img.dtype}"
+            return img.shape[:2]
+        else:
+            # PILで読み込む
+            try:
+                with PIL.Image.open(path_or_array) as pil_img:
+                    try:
+                        pil_img = PIL.ImageOps.exif_transpose(pil_img)
+                    except Exception as e:
+                        warnings.warn(f"{type(e).__name__}: {e}")
+                    try:
+                        pil_img = PIL.ImageOps.exif_transpose(pil_img)
+                    except Exception:
+                        # Pillow 7.0.0で修正されるバグがある。
+                        # https://github.com/python-pillow/Pillow/issues/3973
+                        # これに限らず失敗時も害はそれほど無いと思われるので無視する。
+                        pass
+                    return pil_img.height, pil_img.width
+            except Exception as e:
+                raise ValueError(f"Image load failed: {path_or_array}") from e
 
 
 def save(

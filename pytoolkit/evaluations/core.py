@@ -26,13 +26,16 @@ def _to_str_kv(k, v, max_len) -> str:
     else:
         assert max_len >= len(k)
         sep = ":" + " " * (max_len - len(k) + 1)
-    if isinstance(v, numbers.Number):
-        return f"{k}{sep}{v:,.3f}"
-    elif isinstance(v, np.ndarray):
-        v = np.array_str(v, precision=3, suppress_small=True)
-        return f"{k}{sep}{v}"
-    else:
-        return f"{k}{sep}{v}"
+    try:
+        if isinstance(v, numbers.Number):
+            return f"{k}{sep}{v:,.3f}"
+        elif isinstance(v, np.ndarray):
+            v = np.array_str(v, precision=3, suppress_small=True)
+            return f"{k}{sep}{v}"
+        else:
+            return f"{k}{sep}{v}"
+    except Exception:
+        return f"{k}{sep}{type(v)}"
 
 
 def mean(

@@ -65,7 +65,7 @@ class KerasModel(Model):
         *,
         compile_fn: typing.Callable[[tf.keras.models.Model], None] = None,
         epochs: int,
-        refine_epochs: int = 50,
+        refine_epochs: int = 0,
         refine_lr_factor: float = 0.003,
         callbacks: typing.List[tf.keras.callbacks.Callback] = None,
         model_name_format: str = "model.fold{fold}.h5",
