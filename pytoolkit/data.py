@@ -203,6 +203,7 @@ class DataLoader:
         self,
         dataset: Dataset,
         shuffle: bool = False,
+        without_label: bool = False,
         use_horovod: bool = False,
         num_replicas_in_sync: int = 1,
     ) -> Iterator:
@@ -211,6 +212,7 @@ class DataLoader:
         Args:
             dataset: データセット
             shuffle: シャッフルするのか否か
+            without_label: ラベルを使わない場合(predict)、Trueを指定する。
             use_horovod: 1エポックあたりのミニバッチ数(__len__の戻り値)の算出にHorovodを考慮するか否か。
             num_replicas_in_sync: tf.distribute使用時の並列数(バッチサイズに掛け算する)
 
@@ -219,7 +221,7 @@ class DataLoader:
 
         """
         assert len(dataset) > 1
-        ds = self.get_ds(dataset, shuffle, num_replicas_in_sync)
+        ds = self.get_ds(dataset, shuffle, without_label, num_replicas_in_sync)
         bs = (
             self.batch_size
             * (tk.hvd.size() if use_horovod else 1)
@@ -229,7 +231,11 @@ class DataLoader:
         return Iterator(ds=ds, data_size=len(dataset), steps=steps)
 
     def get_ds(
-        self, dataset: Dataset, shuffle: bool, num_replicas_in_sync: int
+        self,
+        dataset: Dataset,
+        shuffle: bool,
+        without_label: bool,
+        num_replicas_in_sync: int,
     ) -> tf.data.Dataset:
         """tf.data.Datasetを作る。"""
         # 試しに1件呼び出してdtypeやshapeを推定 (ダサいが…)
@@ -281,6 +287,7 @@ class DataLoader:
                 X = [X[k] for k in exsample_sample[0]]
             if isinstance(exsample_sample[1], dict):
                 y = [y[k] for k in exsample_sample[1]]
+
             sample = _flatten([X, y])
             return sample
 
@@ -291,6 +298,8 @@ class DataLoader:
         def process2_1(*data):
             sample = tf.numpy_function(get_sample, inp=data, Tout=sample_tf_type)
             sample = _unflatten_tensor(exsample_sample, sample)
+            if without_label:
+                return sample[0]
             return sample
 
         def process2_2(data1, data2):
@@ -298,6 +307,8 @@ class DataLoader:
                 get_sample, inp=(*data1, *data2), Tout=sample_tf_type
             )
             sample = _unflatten_tensor(exsample_sample, sample)
+            if without_label:
+                return sample[0]
             return sample
 
         ds = tf.data.Dataset.from_tensor_slices(np.arange(len(dataset)))

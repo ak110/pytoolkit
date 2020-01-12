@@ -1,12 +1,10 @@
 """カスタムレイヤー。"""
 import tensorflow as tf
 
-from .. import utils as tk_utils
-
 K = tf.keras.backend
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class CoordChannel1D(tf.keras.layers.Layer):
     """CoordConvなレイヤー。
 
@@ -32,7 +30,7 @@ class CoordChannel1D(tf.keras.layers.Layer):
         return K.concatenate([inputs] + [pad_channel], axis=-1)
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class CoordChannel2D(tf.keras.layers.Layer):
     """CoordConvなレイヤー。
 
@@ -78,7 +76,7 @@ class CoordChannel2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class WSConv2D(tf.keras.layers.Conv2D):
     """Weight StandardizationなConv2D <https://arxiv.org/abs/1903.10520>"""
 

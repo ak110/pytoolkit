@@ -7,7 +7,7 @@ from .. import utils as tk_utils
 K = tf.keras.backend
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class Resize2D(tf.keras.layers.Layer):
     """リサイズ。
 
@@ -70,7 +70,7 @@ class Resize2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class ParallelGridPooling2D(tf.keras.layers.Layer):
     """Parallel Grid Poolingレイヤー。
 
@@ -117,7 +117,7 @@ class ParallelGridPooling2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class ParallelGridGather(tf.keras.layers.Layer):
     """ParallelGridPoolingでparallelにしたのを戻すレイヤー。"""
 
@@ -145,7 +145,7 @@ class ParallelGridGather(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class SubpixelConv2D(tf.keras.layers.Layer):
     """Sub-Pixel Convolutional Layer。
 
@@ -175,7 +175,7 @@ class SubpixelConv2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class BlurPooling2D(tf.keras.layers.Layer):
     """Blur Pooling Layer <https://arxiv.org/abs/1904.11486>"""
 
@@ -220,7 +220,7 @@ class BlurPooling2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class GeM2D(tf.keras.layers.Layer):
     """Generalized Mean Pooling (GeM) <https://github.com/filipradenovic/cnnimageretrieval-pytorch>"""
 

@@ -1,12 +1,10 @@
 """カスタムレイヤー。"""
 import tensorflow as tf
 
-from .. import utils as tk_utils
-
 K = tf.keras.backend
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class TLU(tf.keras.layers.Layer):
     """Thresholded Linear Unit <https://arxiv.org/abs/1911.09737>"""
 
@@ -49,7 +47,7 @@ class TLU(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class DropActivation(tf.keras.layers.Layer):
     """Drop-Activation <https://arxiv.org/abs/1811.05850>"""
 

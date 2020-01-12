@@ -31,11 +31,12 @@ def test_to_str():
 
 
 def test_plot_objects(data_dir, check_dir):
-    xml_path = data_dir / "od" / "Annotations" / "無題.xml"
     img_path = data_dir / "od" / "JPEGImages" / "無題.png"
     class_name_to_id = {"～": 0, "〇": 1}
     class_id_to_name = {v: k for k, v in class_name_to_id.items()}
-    ann = tk.datasets.voc.load_annotation(data_dir / "od", xml_path, class_name_to_id)
+    ann = tk.od.ObjectsAnnotation(
+        img_path, 768, 614, [0], [[203 / 768, 255 / 614, 601 / 768, 355 / 614]]
+    )
 
     img = tk.od.plot_objects(img_path, ann.classes, None, ann.bboxes, None)
     tk.ndimage.save(check_dir / "plot_objects1.png", img)

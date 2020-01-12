@@ -84,7 +84,9 @@ def load(
     return img
 
 
-def get_image_size(path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path]) -> typing.Tuple[int, int]:
+def get_image_size(
+    path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path]
+) -> typing.Tuple[int, int]:
     """画像サイズを取得する。(H, W)"""
     if isinstance(path_or_array, np.ndarray):
         # ndarrayならそのまま画像扱い

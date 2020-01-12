@@ -3,12 +3,10 @@ import tensorflow as tf
 
 import pytoolkit as tk
 
-from .. import utils as tk_utils
-
 K = tf.keras.backend
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
     """Sync BN。"""
 
@@ -64,7 +62,7 @@ class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
         return inputs * K.cast(a, K.dtype(inputs)) + K.cast(b, K.dtype(inputs))
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class GroupNormalization(tf.keras.layers.Layer):
     """Group Normalization。
 
@@ -185,7 +183,7 @@ class GroupNormalization(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class InstanceNormalization(tf.keras.layers.Layer):
     """Instance Normalization"""
 
@@ -278,7 +276,7 @@ class InstanceNormalization(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class RMSNormalization(tf.keras.layers.Layer):
     """Root Mean Square Layer Normalization <https://arxiv.org/abs/1910.07467>"""
 
@@ -370,7 +368,7 @@ class RMSNormalization(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class FilterResponseNormalization(tf.keras.layers.Layer):
     """Filter Response Normalization Layer <https://arxiv.org/abs/1911.09737>"""
 
@@ -453,7 +451,7 @@ class FilterResponseNormalization(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class RandomRMSNormalization(tf.keras.layers.Layer):
     """ランダム要素のあるrmsを使ったnormalization。<https://twitter.com/ak11/status/1202838201716490240>"""
 

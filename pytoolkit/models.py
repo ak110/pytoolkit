@@ -362,7 +362,9 @@ def predict(
         verbose = verbose if tk.hvd.is_master() else 0
         callbacks = make_callbacks(callbacks, training=False)
         dataset = tk.hvd.split(dataset) if use_horovod else dataset
-        iterator = data_loader.iter(dataset, num_replicas_in_sync=num_replicas_in_sync)
+        iterator = data_loader.iter(
+            dataset, without_label=True, num_replicas_in_sync=num_replicas_in_sync
+        )
         if on_batch_fn is not None:
             gen = _predict_flow(
                 model=model,
@@ -439,7 +441,7 @@ def _predict_flow(
     for cb in callbacks:
         cb.on_predict_begin()
     batch = 0
-    for X, _ in tk.utils.tqdm(
+    for X in tk.utils.tqdm(
         iterator.ds, desc=desc, total=iterator.steps, disable=verbose < 1
     ):
         for cb in callbacks:

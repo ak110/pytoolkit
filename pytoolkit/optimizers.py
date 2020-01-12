@@ -3,12 +3,10 @@
 
 import tensorflow as tf
 
-from . import utils as tk_utils
-
 K = tf.keras.backend
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class SGDEx(tf.keras.optimizers.SGD):
     """重み別に学習率の係数を設定できるSGD。
 
@@ -84,7 +82,7 @@ class SGDEx(tf.keras.optimizers.SGD):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class SAdam(tf.keras.optimizers.Optimizer):
     """色々混ぜてみたOptimizer。"""
 

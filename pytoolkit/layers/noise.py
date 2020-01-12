@@ -2,12 +2,10 @@
 import numpy as np
 import tensorflow as tf
 
-from .. import utils as tk_utils
-
 K = tf.keras.backend
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class MixFeat(tf.keras.layers.Layer):
     """MixFeat <https://openreview.net/forum?id=HygT9oRqFX>"""
 

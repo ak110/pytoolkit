@@ -30,7 +30,7 @@ cookiecutter gh:ak110/cookiecutter-pytoolkit
 - numba
 - pandas
 - scikit-learn
-- tensorflow-gpu>=2.0.0
+- tensorflow>=2.1.0
 
 ## 使うときに動的にimportしている依存ライブラリ
 

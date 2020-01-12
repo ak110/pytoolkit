@@ -2,12 +2,10 @@
 import numpy as np
 import tensorflow as tf
 
-from .. import utils as tk_utils
-
 K = tf.keras.backend
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class ConvertColor(tf.keras.layers.Layer):
     """ColorNet <https://arxiv.org/abs/1902.00267> 用の色変換とついでにスケーリング。
 
@@ -110,7 +108,7 @@ class ConvertColor(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class RemoveMask(tf.keras.layers.Layer):
     """マスクを取り除く。"""
 
@@ -127,7 +125,7 @@ class RemoveMask(tf.keras.layers.Layer):
         return inputs
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class ChannelPair2D(tf.keras.layers.Layer):
     """チャンネル同士の2個の組み合わせの積。"""
 
@@ -143,7 +141,7 @@ class ChannelPair2D(tf.keras.layers.Layer):
         )
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class ScaleValue(tf.keras.layers.Layer):
     """値だけをスケーリングしてシフトするレイヤー。回帰の出力前とかに。"""
 
@@ -173,7 +171,7 @@ class ScaleValue(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class ScaleGradient(tf.keras.layers.Layer):
     """勾配だけをスケーリングするレイヤー。転移学習するときとかに。"""
 
@@ -202,7 +200,7 @@ class ScaleGradient(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class ImputeNaN(tf.keras.layers.Layer):
     """NaNを適当な値に変換する層。"""
 
@@ -252,7 +250,7 @@ class ImputeNaN(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class TrainOnly(tf.keras.layers.Wrapper):
     """訓練時のみ適用するlayer wrapper"""
 
@@ -262,7 +260,7 @@ class TrainOnly(tf.keras.layers.Wrapper):
         )
 
 
-@tk_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable()
 class TestOnly(tf.keras.layers.Wrapper):
     """推論時のみ適用するlayer wrapper"""
 
