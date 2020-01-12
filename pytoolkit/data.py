@@ -220,7 +220,7 @@ class DataLoader:
             Iterator
 
         """
-        assert len(dataset) > 1
+        assert len(dataset) >= 1
         ds = self.get_ds(dataset, shuffle, without_label, num_replicas_in_sync)
         bs = (
             self.batch_size

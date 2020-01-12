@@ -32,31 +32,46 @@ def main():
     for path in args.files:
         save_path = path.with_suffix(".ipynb")
         with path.open() as file:
-            nb = parse(file.readlines())
+            nb = parse(path, file.readlines())
             with save_path.open("w") as f:
                 nbformat.write(nb, f)
                 logger.info(f"Generated: {save_path}")
 
 
-def parse(code: list) -> nbformat.v4:
+def parse(path: pathlib.Path, code: list) -> nbformat.v4:
     nb = nbformat.v4.new_notebook()
     nb["cells"] = []
     cell_value = ""
+    cell_is_markdown = False
 
-    for line in code:
-        if line == "# flake8: noqa: E265\n":
-            logger.info(f"ignore line: [{line.strip()}]")
-            continue
+    def add_cell(i):
+        s = cell_value.strip()
+        if s != "":
+            if cell_is_markdown:
+                nb["cells"].append(nbformat.v4.new_markdown_cell(s))
+                logger.info(f"Markdown cell added. ({path}:{i + 1})")
+            else:
+                nb["cells"].append(nbformat.v4.new_code_cell(s))
+                logger.info(f"Code cell added. ({path}:{i + 1})")
 
-        if line.startswith("#%%"):
-            if cell_value:
-                nb["cells"].append(nbformat.v4.new_code_cell(cell_value))
+    for i, line in enumerate(code):
+        s = line.strip()
+        if s == "#%%":
+            add_cell(i)
             cell_value = ""
+            cell_is_markdown = False
+        elif s == "#%% [markdown]":
+            add_cell(i)
+            cell_value = ""
+            cell_is_markdown = True
+        elif s == "# flake8: noqa: E265":
+            logger.info(f"Ignored line: {s} ({path}:{i + 1})")
+        else:
+            if s.startswith("#%%"):
+                logger.warning(f"Unknown marker: {s} ({path}:{i + 1})")
+            cell_value += line
 
-        cell_value += line
-
-    if cell_value:
-        nb["cells"].append(nbformat.v4.new_code_cell(cell_value))
+    add_cell(len(code))
     return nb
 
 

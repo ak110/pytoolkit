@@ -64,6 +64,8 @@ class App:
     ):
         """コマンドの追加用デコレーター。
 
+        コマンド名は関数名。ただし_は-に置き換えたもの。
+
         Args:
             logfile: ログファイルを出力するのか否か
             then: 当該コマンドが終わった後に続けて実行するコマンドの名前
@@ -75,9 +77,10 @@ class App:
         assert not logfile or self.output_dir is not None
 
         def _decorator(entrypoint: typing.Callable):
-            if entrypoint.__name__ in self.commands:
-                raise ValueError(f"Duplicated command: {entrypoint.__name__}")
-            self.commands[entrypoint.__name__] = Command(
+            command_name = entrypoint.__name__.replace("_", "-")
+            if command_name in self.commands:
+                raise ValueError(f"Duplicated command: {command_name}")
+            self.commands[command_name] = Command(
                 entrypoint=entrypoint,
                 logfile=logfile,
                 then=then,
@@ -121,7 +124,7 @@ class App:
                 tk.hvd.init()
             # ログ初期化
             tk.log.init(
-                self.output_dir / f"{command.entrypoint.__name__}.log"
+                self.output_dir / f"{self.current_command}.log"
                 if command.logfile and self.output_dir is not None
                 else None
             )

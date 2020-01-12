@@ -192,7 +192,7 @@ def lovasz_hinge(
         errors_sorted = tf.nn.elu(errors_sorted) + 1
     else:
         raise ValueError(f"Invalid activation: {activation}")
-    loss = tf.tensordot(errors_sorted, tf.stop_gradient(weights), 1)
+    loss = tf.tensordot(errors_sorted, weights, 1)
     assert K.ndim(loss) == 0
     return loss
 
@@ -232,7 +232,7 @@ def lovasz_binary_crossentropy(
     errors = tf.math.log1p(K.exp(y_pred)) - y_true * y_pred  # bce
     errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
     weights = tk.backend.lovasz_weights(y_true, perm, alpha=alpha)
-    loss = tf.tensordot(errors_sorted, tf.stop_gradient(weights), 1)
+    loss = tf.tensordot(errors_sorted, weights, 1)
     assert K.ndim(loss) == 0
     return loss
 
@@ -255,7 +255,7 @@ def lovasz_softmax(y_true, y_pred, per_sample=True):
         errors = K.abs(y_true[:, c] - y_pred[:, c])
         errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
         weights = tk.backend.lovasz_weights(y_true[:, c], perm)
-        loss = tf.tensordot(errors_sorted, tf.stop_gradient(weights), 1)
+        loss = tf.tensordot(errors_sorted, weights, 1)
         losses.append(loss)
     return tf.reduce_mean(losses)
 
