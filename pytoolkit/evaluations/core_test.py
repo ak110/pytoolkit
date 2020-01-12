@@ -14,9 +14,9 @@ def test_to_str():
     assert s == "aaa: 1.000\nb:   2.000"
 
     s = tk.evaluations.to_str({"a": ErrorType()})
-    assert (
-        s == "a=<class 'pytoolkit.evaluations.core_test.ErrorType'>"
-        or s == "a=<class 'pytoolkit.pytoolkit.evaluations.core_test.ErrorType'>"
+    assert s in (
+        "a=<class 'pytoolkit.evaluations.core_test.ErrorType'>",
+        "a=<class 'pytoolkit.pytoolkit.evaluations.core_test.ErrorType'>",
     )
 
 
