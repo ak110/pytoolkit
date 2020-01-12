@@ -211,7 +211,7 @@ def fit(
     initial_epoch: int = 0,
     num_replicas_in_sync: int = 1,
 ):
-    """独自のtraining loopになる予定の関数。
+    """学習。
 
     Args:
         model: モデル
@@ -228,7 +228,7 @@ def fit(
         num_replicas_in_sync: tf.distribute使用時の並列数(バッチサイズに掛け算する)
 
     """
-    use_horovod = tk.hvd.initialized() and tk.hvd.rank() > 1
+    use_horovod = tk.hvd.size() > 1
     if use_horovod:
         assert num_replicas_in_sync <= 1
     # Horovodはそれぞれのワーカーが勝手にvalidateするのでshuffleする必要がある。
@@ -340,22 +340,22 @@ def predict(
     on_batch_fn: OnBatchFnType = None,
     num_replicas_in_sync: int = 1,
 ) -> ModelIOType:
-    """予測。
+    """推論。
 
     Args:
         model: モデル
-        dataset: 予測したい入力データ
+        dataset: 推論したい入力データ
         data_loader: データの読み込み
         callbacks: コールバック
         verbose: プログレスバーを表示するか否か
         use_horovod: MPIによる分散処理をするか否か
-        on_batch_fn: モデルとミニバッチ分の入力データを受け取り、予測結果を返す処理。(TTA用)
+        on_batch_fn: モデルとミニバッチ分の入力データを受け取り、推論結果を返す処理。(TTA用)
         flow: 結果をgeneratorで返すならTrue
         desc: flow時のtqdmのdesc
         num_replicas_in_sync: tf.distribute使用時の並列数(バッチサイズに掛け算する)
 
     Returns:
-        予測結果。
+        推論結果。
 
     """
     with tk.log.trace_scope("predict"):
@@ -399,21 +399,21 @@ def predict_flow(
     desc: str = "predict",
     num_replicas_in_sync: int = 1,
 ) -> typing.Iterator[ModelIOType]:
-    """予測。
+    """推論。
 
     Args:
         model: モデル
-        dataset: 予測したい入力データ
+        dataset: 推論したい入力データ
         data_loader: データの読み込み
         callbacks: コールバック
         verbose: プログレスバー(tqdm)を表示するか否か
-        on_batch_fn: モデルとミニバッチ分の入力データを受け取り、予測結果を返す処理。(TTA用)
+        on_batch_fn: モデルとミニバッチ分の入力データを受け取り、推論結果を返す処理。(TTA用)
         flow: 結果をgeneratorで返すならTrue
         desc: flow時のtqdmのdesc
         num_replicas_in_sync: tf.distribute使用時の並列数(バッチサイズに掛け算する)
 
     Returns:
-        予測結果。サンプルごとのgenerator。
+        推論結果。サンプルごとのgenerator。
 
     """
     with tk.log.trace_scope("predict"):
@@ -527,7 +527,7 @@ def predict_on_batch_augmented(
     padding_size: typing.Tuple[int, int] = (32, 32),
     padding_mode: str = "edge",
 ) -> typing.List[np.ndarray]:
-    """ミニバッチ1個分の予測処理＆TTA。
+    """ミニバッチ1個分の推論処理＆TTA。
 
     Args:
         model: モデル。
@@ -538,7 +538,7 @@ def predict_on_batch_augmented(
         padding_mode: パディングの種類。(np.padのmode)
 
     Returns:
-        予測結果のリスト。
+        推論結果のリスト。
 
     """
     shape = X_batch.shape
