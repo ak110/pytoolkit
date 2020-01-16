@@ -232,11 +232,9 @@ def fit(
     if use_horovod:
         assert num_replicas_in_sync <= 1
     # Horovodはそれぞれのワーカーが勝手にvalidateするのでshuffleする必要がある。
-    # tf.distributeも(少なくともTF 2.0では)端数が出てしまうとバグるのでshuffleすることにする。
-    shuffled_validate = use_horovod or num_replicas_in_sync > 1
-    # shuffleするならデータ数分だけでは全体をカバーできないため3倍にオーバーサンプリングする。
+    # shuffleするならデータ数分だけでは全体をカバーできないため3倍回す。
     # (horovodのexamplesの真似: <https://github.com/horovod/horovod/blob/9bdd70d/examples/keras_mnist_advanced.py#L112,L115>)
-    val_scale = 3 if shuffled_validate else 1
+    val_scale = 3 if use_horovod else 1
 
     if validation_freq == 0:
         # validation_freq == 0ならvalidationしない(独自仕様)
@@ -264,7 +262,7 @@ def fit(
     val_iterator = (
         val_data_loader.iter(
             val_set,
-            shuffle=shuffled_validate,
+            shuffle=use_horovod,
             use_horovod=use_horovod,
             num_replicas_in_sync=num_replicas_in_sync,
         )
