@@ -2,7 +2,7 @@
 import numpy as np
 import tensorflow as tf
 
-from .. import utils as tk_utils
+import pytoolkit as tk
 
 K = tf.keras.backend
 
@@ -182,7 +182,7 @@ class BlurPooling2D(tf.keras.layers.Layer):
     def __init__(self, taps=5, strides=2, **kwargs):
         super().__init__(**kwargs)
         self.taps = taps
-        self.strides = tk_utils.normalize_tuple(strides, 2)
+        self.strides = tk.utils.normalize_tuple(strides, 2)
 
     def compute_output_shape(self, input_shape):
         assert len(input_shape) == 4
@@ -242,5 +242,40 @@ class GeM2D(tf.keras.layers.Layer):
 
     def get_config(self):
         config = {"p": self.p, "epsilon": self.epsilon}
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
+@tf.keras.utils.register_keras_serializable()
+class GeMPooling2D(tf.keras.layers.Layer):
+    """Generalized Mean Pooling (GeM) <https://arxiv.org/abs/1711.02512>"""
+
+    def __init__(self, epsilon=1e-6, **kargs):
+        super().__init__(**kargs)
+        self.epsilon = epsilon
+        self.p = None
+
+    def build(self, input_shape):
+        self.p = self.add_weight(
+            shape=(),
+            initializer=tf.keras.initializers.constant(3),
+            constraint=tk.constraints.GreaterThanOrEqualTo(1),
+            name="p",
+        )
+        super().build(input_shape)
+
+    def compute_output_shape(self, input_shape):
+        assert len(input_shape) == 4
+        return (input_shape[0], input_shape[3])
+
+    def call(self, inputs, **kwargs):
+        del kwargs
+        x = tf.math.maximum(inputs, self.epsilon) ** self.p
+        x = tf.math.reduce_mean(x, axis=(1, 2))  # GAP
+        x = x ** (1 / self.p)
+        return x
+
+    def get_config(self):
+        config = {"epsilon": self.epsilon}
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))

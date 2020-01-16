@@ -15,9 +15,15 @@ def split(
     dataset: tk.data.Dataset, nfold: int, split_seed: int = 1, stratify: bool = None
 ) -> FoldsType:
     """nfold CV。"""
+    # nfold == 1は特別に5foldの最初の1個しか実行しないバージョンということにする
+    # (もうちょっと分かりやすいインターフェースにしたいが利便性と両立する案が無いのでとりあえず…)
+    if nfold == 1:
+        return split(dataset, nfold=5, split_seed=split_seed, stratify=stratify)[:1]
+
     tk.log.get(__name__).info(
         f"split: len(dataset)={len(dataset)} nfold={nfold} split_seed={split_seed} stratify={stratify}"
     )
+
     if dataset.groups is not None:
         g = np.unique(dataset.groups)
         cv = sklearn.model_selection.KFold(
