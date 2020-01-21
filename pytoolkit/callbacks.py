@@ -7,8 +7,6 @@ import tensorflow as tf
 
 import pytoolkit as tk
 
-K = tf.keras.backend
-
 
 class LearningRateStepDecay(tf.keras.callbacks.Callback):
     """よくある150epoch目と225epoch目に学習率を1/10するコールバック。"""
@@ -25,7 +23,9 @@ class LearningRateStepDecay(tf.keras.callbacks.Callback):
         del logs
         if not hasattr(self.model.optimizer, "learning_rate"):
             raise ValueError('Optimizer must have a "learning_rate" attribute.')
-        self.start_lr = float(K.get_value(self.model.optimizer.learning_rate))
+        self.start_lr = float(
+            tf.keras.backend.get_value(self.model.optimizer.learning_rate)
+        )
         epochs = self.epochs or self.params["epochs"]
         self.reduce_epochs = [
             min(max(int(epochs * r), 1), epochs) for r in self.reduce_epoch_rates
@@ -34,9 +34,9 @@ class LearningRateStepDecay(tf.keras.callbacks.Callback):
     def on_epoch_begin(self, epoch, logs=None):
         del logs
         if epoch + 1 in self.reduce_epochs:
-            lr1 = K.get_value(self.model.optimizer.learning_rate)
+            lr1 = tf.keras.backend.get_value(self.model.optimizer.learning_rate)
             lr2 = lr1 * self.factor
-            K.set_value(self.model.optimizer.learning_rate, lr2)
+            tf.keras.backend.set_value(self.model.optimizer.learning_rate, lr2)
             tk.log.get(__name__).info(
                 f"Epoch {epoch + 1}: Learning rate {lr1:.1e} -> {lr2:.1e}"
             )
@@ -44,7 +44,7 @@ class LearningRateStepDecay(tf.keras.callbacks.Callback):
     def on_train_end(self, logs=None):
         del logs
         # 終わったら戻しておく
-        K.set_value(self.model.optimizer.learning_rate, self.start_lr)
+        tf.keras.backend.set_value(self.model.optimizer.learning_rate, self.start_lr)
 
 
 class CosineAnnealing(tf.keras.callbacks.Callback):
@@ -70,7 +70,9 @@ class CosineAnnealing(tf.keras.callbacks.Callback):
         del logs
         if not hasattr(self.model.optimizer, "learning_rate"):
             raise ValueError('Optimizer must have a "learning_rate" attribute.')
-        self.start_lr = float(K.get_value(self.model.optimizer.learning_rate))
+        self.start_lr = float(
+            tf.keras.backend.get_value(self.model.optimizer.learning_rate)
+        )
 
     def on_epoch_begin(self, epoch, logs=None):
         del logs
@@ -81,7 +83,9 @@ class CosineAnnealing(tf.keras.callbacks.Callback):
         else:
             r = (epoch + 1) / (self.epochs or self.params["epochs"])
             learning_rate = lr_min + 0.5 * (lr_max - lr_min) * (1 + np.cos(np.pi * r))
-        K.set_value(self.model.optimizer.learning_rate, float(learning_rate))
+        tf.keras.backend.set_value(
+            self.model.optimizer.learning_rate, float(learning_rate)
+        )
         # warmup時、optimizerの状態をゼロ埋めする (SGDなど前提で種類無視して0にするので注意)
         # https://twitter.com/ak11/status/1194763993082023936
         if self.warmup_reset_state and 2 <= epoch + 1 <= self.warmup_epochs:
@@ -91,7 +95,7 @@ class CosineAnnealing(tf.keras.callbacks.Callback):
     def on_train_end(self, logs=None):
         del logs
         # 終わったら戻しておく
-        K.set_value(self.model.optimizer.learning_rate, self.start_lr)
+        tf.keras.backend.set_value(self.model.optimizer.learning_rate, self.start_lr)
 
 
 class EpochLogger(tf.keras.callbacks.Callback):
@@ -114,7 +118,15 @@ class EpochLogger(tf.keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
         assert self.train_start_time is not None
         assert self.epoch_start_time is not None
-        lr = K.get_value(self.model.optimizer.learning_rate)
+        if isinstance(
+            self.model.optimizer.learning_rate,
+            tf.keras.optimizers.schedules.LearningRateSchedule,
+        ):
+            lr = self.model.optimizer.learning_rate(
+                tf.constant(self.params["steps"] * (epoch + 1))
+            ).numpy()
+        else:
+            lr = tf.keras.backend.get_value(self.model.optimizer.learning_rate)
         now = time.time()
         elapsed_time = now - self.epoch_start_time
         time_per_epoch = (now - self.train_start_time) / (epoch + 1)
