@@ -657,9 +657,9 @@ class ToGrayScale(A.ImageOnlyTransform):
 class RandomBinarize(A.ImageOnlyTransform):
     """ランダム2値化(白黒化)。"""
 
-    def __init__(self, threshold=(128 - 32, 128 + 32), always_apply=False, p=0.5):
+    def __init__(self, threshold=(127 - 32, 127 + 32), always_apply=False, p=0.5):
         super().__init__(always_apply=always_apply, p=p)
-        assert 0 < threshold[0] < threshold[1] < 255
+        assert 0 < threshold[0] <= threshold[1] < 255
         self.threshold = threshold
 
     def apply(self, image, threshold, **params):
@@ -667,6 +667,21 @@ class RandomBinarize(A.ImageOnlyTransform):
 
     def get_params(self):
         return {"threshold": random.uniform(*self.threshold)}
+
+    def get_transform_init_args_names(self):
+        return ("threshold",)
+
+
+class Binarize(A.ImageOnlyTransform):
+    """2値化(白黒化)。"""
+
+    def __init__(self, threshold=127, always_apply=False, p=1):
+        super().__init__(always_apply=always_apply, p=p)
+        assert 0 < threshold < 255
+        self.threshold = threshold
+
+    def apply(self, image, **params):
+        return tk.ndimage.binarize(image, self.threshold)
 
     def get_transform_init_args_names(self):
         return ("threshold",)

@@ -845,7 +845,7 @@ def cut_mix(sample1: tuple, sample2: tuple, beta: float = 1.0) -> tuple:
     bby2 = np.clip(cy + cut_h // 2, 0, H)
     image = np.copy(image1)  # 念のためコピー
     image[bby1:bby2, bbx1:bbx2, :] = image2[bby1:bby2, bbx1:bbx2, :]
-    label = label1 * lam + label2 * (1 - lam)
+    label = mix_data(label1, label2, lam)
     return image, label
 
 
