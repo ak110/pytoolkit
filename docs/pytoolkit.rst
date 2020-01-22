@@ -7,7 +7,6 @@ Subpackages
 .. toctree::
 
    pytoolkit.applications
-   pytoolkit.bin
    pytoolkit.datasets
    pytoolkit.evaluations
    pytoolkit.layers
@@ -56,10 +55,10 @@ pytoolkit.cli module
    :undoc-members:
    :show-inheritance:
 
-pytoolkit.conftest module
--------------------------
+pytoolkit.constraints module
+----------------------------
 
-.. automodule:: pytoolkit.conftest
+.. automodule:: pytoolkit.constraints
    :members:
    :undoc-members:
    :show-inheritance:

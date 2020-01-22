@@ -34,6 +34,7 @@ def test_data_augmentation(data_dir, save_dir, filename):
             tk.image.RandomTransform(256, 256, base_scale=2.0),
             tk.image.RandomColorAugmentors(noisy=True),
             tk.image.SpeckleNoise(),
+            tk.image.GridMask(),
         ],
         bbox_params=A.BboxParams(format="albumentations", label_fields=["classes"]),
         keypoint_params=A.KeypointParams(format="xy"),

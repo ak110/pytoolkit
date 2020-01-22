@@ -629,6 +629,54 @@ class RandomErasing(A.ImageOnlyTransform):
         )
 
 
+class GridMask(A.ImageOnlyTransform):
+    """GridMask <https://arxiv.org/abs/2001.04086>
+
+    細部の実装は怪しいけどとりあえず。
+
+    """
+
+    def __init__(
+        self, r=0.5, d=(0.4, 1.0), always_apply=False, p=1.0,
+    ):
+        super().__init__(always_apply=always_apply, p=p)
+        self.r = r
+        self.d = d
+
+    def apply(self, image, **params):
+        h, w = image.shape[:2]
+        d = random.uniform(*self.d)
+        dw = int(w * d)
+        dh = int(h * d)
+        lw = int(dw * self.r)
+        lh = int(dh * self.r)
+
+        # 少し大きくマスクを作成 (手抜き)
+        hh, ww = int(h * 1.5), int(w * 1.5)
+        mask = np.zeros((hh, ww, 1), np.float32)
+        for ox in range(0, ww, dw):
+            mask[:, ox : ox + lw, :] = 1
+        for oy in range(0, hh, dh):
+            mask[oy : oy + lh, :, :] = 1
+
+        # 回転: 『The mask is also rotated before use.』…？
+        degrees = random.uniform(0, 360)
+        mask = tk.ndimage.rotate(
+            mask, degrees, expand=False, interp="nearest", border_mode="wrap"
+        )
+
+        # 使うサイズをrandom crop
+        cy = random.randint(0, hh - h - 1)
+        cx = random.randint(0, ww - w - 1)
+        mask = mask[cy : cy + h, cx : cx + w, :]
+
+        # マスクを適用
+        return (image * mask).astype(image.dtype)
+
+    def get_transform_init_args_names(self):
+        return ("r", "d")
+
+
 class Standardize(A.ImageOnlyTransform):
     """標準化。0～255に適当に収める。"""
 

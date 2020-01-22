@@ -225,12 +225,15 @@ def lovasz_binary_crossentropy(
     y_pred = K.reshape(y_pred, (-1,))
     if from_logits:
         lpsilon = tk.math.logit(epsilon)
-        y_pred = K.clip(y_pred, lpsilon, -lpsilon)
+        logits = K.clip(y_pred, lpsilon, -lpsilon)
+        y_pred = tf.math.sigmoid(y_pred)
     else:
         y_pred = K.clip(y_pred, epsilon, 1 - epsilon)
-        y_pred = tk.backend.logit(y_pred)
-    errors = tf.math.log1p(K.exp(y_pred)) - y_true * y_pred  # bce
-    errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
+        logits = tk.backend.logit(y_pred)
+    base_errors = tf.math.abs(y_true - y_pred)
+    errors = tf.math.log1p(K.exp(logits)) - y_true * logits  # bce
+    _, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
+    errors_sorted = tf.gather(base_errors, perm)
     weights = tk.backend.lovasz_weights(y_true, perm, alpha=alpha)
     loss = tf.tensordot(errors_sorted, weights, 1)
     assert K.ndim(loss) == 0

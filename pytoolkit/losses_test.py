@@ -35,11 +35,9 @@ def test_lovasz_binary_crossentropy():
     loss1 = tk.losses.lovasz_binary_crossentropy(y_true, y_true).numpy()
     loss2 = tk.losses.lovasz_binary_crossentropy(y_true, y_pred).numpy()
     assert loss1 == pytest.approx(
-        [0.0100503, 0.0100503], abs=1e-6
+        [0.01, 0.01], abs=1e-3
     ), "loss(y_true, y_true) == zeros"
-    assert (
-        loss2 > np.array([0.0100503, 0.0100503])
-    ).all(), "loss(y_true, y_pred) > zeros"
+    assert (loss2 > np.array([0.01, 0.01])).all(), "loss(y_true, y_pred) > zeros"
     # alpha
     y_true = tf.constant([[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]])
     y_pred = tf.constant([[0.0, 0.3, 0.7, 1.0], [0.0, 0.3, 0.7, 1.0]])
