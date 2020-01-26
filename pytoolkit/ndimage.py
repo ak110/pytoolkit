@@ -143,7 +143,9 @@ def save(
         jpeg_quality: 1～100で指定する。
 
     """
-    assert len(img.shape) == 3
+    if img.ndim == 2:
+        img = np.expand_dims(img, axis=-1)
+    assert img.ndim == 3
     if img.dtype != np.uint8:
         warnings.warn(f"Invalid dtype: {img.dtype} (shape={img.shape})")
 
