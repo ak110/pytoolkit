@@ -7,6 +7,7 @@ Horovodに対応した簡単なwrapperなど。
 """
 from __future__ import annotations
 
+import os
 import pathlib
 import typing
 
@@ -105,15 +106,15 @@ def save(
                     save_format={"hdf5": "h5", "saved_model": "tf"}[mode],
                 )
             elif mode == "onnx":
+                os.environ["TF_KERAS"] = "1"
+
                 import onnxmltools
                 import keras2onnx
 
                 onnx_model = keras2onnx.convert_keras(model, model.name)
-                path.parent.mkdir(parents=True, exist_ok=True)
                 onnxmltools.utils.save_model(onnx_model, str(path))
             elif mode == "tflite":
                 tflite_model = tf.lite.TFLiteConverter.from_keras_model(model).convert()
-                path.parent.mkdir(parents=True, exist_ok=True)
                 with path.open("wb") as f:
                     f.write(tflite_model)
             else:

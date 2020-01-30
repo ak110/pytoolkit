@@ -42,6 +42,7 @@ cookiecutter gh:ak110/cookiecutter-pytoolkit
 - h5py
 - horovod
 - ipython
+- keras2onnx>=1.6.5
 - lightgbm
 - matplotlib
 - mpi4py
@@ -49,6 +50,5 @@ cookiecutter gh:ak110/cookiecutter-pytoolkit
 - optuna
 - python-dotenv
 - requests
-- tf2onnx
 - tqdm
 - xgboost

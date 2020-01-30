@@ -8,7 +8,7 @@ chainercv
 diskcache
 flake8
 flake8-bugbear
-keras2onnx
+keras2onnx>=1.6.5
 matplotlib
 mypy
 nbformat
