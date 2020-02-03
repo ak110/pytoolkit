@@ -176,13 +176,13 @@ class KerasModel(Model):
 
         def loss(y_true, y_pred):
             del y_true, y_pred
-            return tf.reduce_mean(losses, axis=0)
+            return tf.math.reduce_mean(losses, axis=0)
 
         for k, v in metrics.items():
 
             def metric_func(y_true, y_pred, v=v):
                 del y_true, y_pred
-                return tf.reduce_mean(v, axis=0)
+                return tf.math.reduce_mean(v, axis=0)
 
             metric_func.__name__ = k
             metrics[k] = metric_func

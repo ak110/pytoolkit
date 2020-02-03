@@ -132,7 +132,9 @@ def categorical_crossentropy(
     return reduce(loss, reduce_mode)
 
 
-def categorical_focal_loss(y_true, y_pred, gamma=2.0, alpha=None, reduce_mode="sum"):
+def categorical_focal_loss(
+    y_true, y_pred, from_logits=False, gamma=2.0, alpha=None, reduce_mode="sum"
+):
     """多クラス分類用Focal Loss <https://arxiv.org/abs/1708.02002>。
 
     Args:
@@ -146,6 +148,9 @@ def categorical_focal_loss(y_true, y_pred, gamma=2.0, alpha=None, reduce_mode="s
         num_classes = y_pred.shape[-1]
         cw = np.array([(1 - alpha) * 2] * 1 + [alpha * 2] * (num_classes - 1))
         cw = np.reshape(cw, (1, 1, -1))
+
+    if from_logits:
+        y_pred = tf.nn.softmax(y_pred)
 
     y_pred = K.maximum(y_pred, K.epsilon())
     loss = -cw * K.pow(1 - y_pred, gamma) * y_true * K.log(y_pred)
@@ -170,12 +175,13 @@ def lovasz_hinge(
     """Lovasz hinge loss。<https://arxiv.org/abs/1512.07797>"""
     if not from_logits:
         y_pred = tk.backend.logit(y_pred)
+        from_logits = True
     if per_sample:
 
         def loss_per_sample(elems):
             yt, yp = elems
             return lovasz_hinge(
-                yt, yp, from_logits=True, per_sample=False, activation=activation
+                yt, yp, from_logits=from_logits, per_sample=False, activation=activation
             )
 
         return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=tf.float32)
@@ -240,27 +246,42 @@ def lovasz_binary_crossentropy(
     return loss
 
 
-def lovasz_softmax(y_true, y_pred, per_sample=True):
-    """Lovasz softmax loss。<https://arxiv.org/abs/1705.08790>"""
+def lovasz_categorical_crossentropy(
+    y_true, y_pred, from_logits=False, per_sample=True, epsilon=0.01, alpha=None
+):
+    """Lovasz Softmaxのsoftmaxじゃない版。"""
     if per_sample:
 
         def loss_per_sample(elems):
             yt, yp = elems
-            return lovasz_softmax(yt, yp, per_sample=False)
+            return lovasz_categorical_crossentropy(
+                yt,
+                yp,
+                from_logits=from_logits,
+                per_sample=False,
+                epsilon=epsilon,
+                alpha=alpha,
+            )
 
         return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=tf.float32)
 
     num_classes = y_pred.shape[-1]
     y_pred = K.reshape(y_pred, (-1, num_classes))
     y_true = K.reshape(y_true, (-1, num_classes))
+    if from_logits:
+        log_p = tk.backend.log_softmax(y_pred)
+    else:
+        y_pred = K.maximum(y_pred, K.epsilon())
+        log_p = K.log(y_pred)
+    errors = -y_true * log_p  # cce
     losses = []
     for c in range(num_classes):
-        errors = K.abs(y_true[:, c] - y_pred[:, c])
-        errors_sorted, perm = tf.nn.top_k(errors, k=K.shape(errors)[0])
-        weights = tk.backend.lovasz_weights(y_true[:, c], perm)
+        errors_sorted, perm = tf.nn.top_k(errors[:, c], k=K.shape(errors)[0])
+        weights = tk.backend.lovasz_weights(y_true[:, c], perm, alpha=alpha)
         loss = tf.tensordot(errors_sorted, weights, 1)
+        assert K.ndim(loss) == 0
         losses.append(loss)
-    return tf.reduce_mean(losses)
+    return loss
 
 
 def l1_smooth_loss(y_true, y_pred):

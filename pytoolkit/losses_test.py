@@ -50,13 +50,36 @@ def test_lovasz_binary_crossentropy():
     assert loss_a3[1] < loss_a7[1]
 
 
-def test_lovasz_softmax():
-    _binary_loss_test(tk.losses.lovasz_softmax, symmetric=True)
+def test_lovasz_categorical_crossentropy():
+    _categorical_loss_test(tk.losses.lovasz_categorical_crossentropy, symmetric=True)
 
 
 def _binary_loss_test(loss, symmetric):
     y_true = tf.constant([[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]])
     y_pred = tf.constant([[0.0, 0.3, 0.7, 1.0], [0.0, 0.3, 0.7, 1.0]])
+    loss1 = loss(y_true, y_true).numpy()
+    loss2 = loss(y_true, y_pred).numpy()
+    assert loss1 == pytest.approx([0, 0], abs=1e-6), "loss(y_true, y_true) == zeros"
+    assert (loss2 > np.array([0, 0])).all(), "loss(y_true, y_pred) > zeros"
+    assert (
+        loss2[0] == pytest.approx(loss2[1], abs=1e-5) or not symmetric
+    ), "symmetricity of loss(y_true, y_pred)"
+    return loss1, loss2
+
+
+def _categorical_loss_test(loss, symmetric):
+    y_true = tf.constant(
+        [
+            [[1.0, 0.0], [1.0, 0.0], [1.0, 0.0], [1.0, 0.0]],
+            [[0.0, 1.0], [0.0, 1.0], [0.0, 1.0], [0.0, 1.0]],
+        ]
+    )
+    y_pred = tf.constant(
+        [
+            [[1.0, 0.0], [0.7, 0.3], [0.3, 0.7], [0.0, 1.0]],
+            [[1.0, 0.0], [0.7, 0.3], [0.3, 0.7], [0.0, 1.0]],
+        ]
+    )
     loss1 = loss(y_true, y_true).numpy()
     loss2 = loss(y_true, y_pred).numpy()
     assert loss1 == pytest.approx([0, 0], abs=1e-6), "loss(y_true, y_true) == zeros"
