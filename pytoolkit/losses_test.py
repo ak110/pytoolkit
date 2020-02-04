@@ -50,8 +50,8 @@ def test_lovasz_binary_crossentropy():
     assert loss_a3[1] < loss_a7[1]
 
 
-def test_lovasz_categorical_crossentropy():
-    _categorical_loss_test(tk.losses.lovasz_categorical_crossentropy, symmetric=True)
+def test_categorical_focal_loss():
+    _categorical_loss_test(tk.losses.categorical_focal_loss, symmetric=True)
 
 
 def _binary_loss_test(loss, symmetric):

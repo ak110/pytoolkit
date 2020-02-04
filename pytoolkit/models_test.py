@@ -9,12 +9,13 @@ import pytoolkit as tk
 def test_save(tmpdir, mode):
     path = str(tmpdir / "model")
     inputs = x = tf.keras.layers.Input((32, 32, 3))
+    x = tf.keras.layers.Conv2D(16, 3, padding="same")(x)
     x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.Dropout(0.25)(x)
-    if mode != "onnx":
-        x = tk.layers.BlurPooling2D()(x)  # keras2onnxが未対応？
     x = tk.layers.Resize2D((8, 8))(x)
     if mode != "onnx":
+        x = tk.layers.GroupNormalization()(x)  # keras2onnxが未対応？
+        x = tk.layers.BlurPooling2D()(x)  # keras2onnxが未対応？
         x = tk.layers.GeMPooling2D()(x)  # keras2onnxが未対応？
     model = tf.keras.models.Model(inputs, x)
     tk.models.save(model, path, mode=mode)

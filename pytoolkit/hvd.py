@@ -38,52 +38,6 @@ def init() -> None:
             tk.log.get(__name__).warning("Horovod読み込み失敗", exc_info=True)
 
 
-def clear() -> None:
-    """TF2のバグのwork around。tf.functionのキャッシュをクリアする。
-
-    これをやらないと変な感じのエラーが出る。::
-
-        Traceback (most recent call last):
-        File "/usr/local/lib/python3.7/site-packages/tensorflow_core/python/eager/function.py"
-        , line 109, in _hash_fix
-            hash(elem)
-                └ <weakref at 0x7f58c81ef530; dead>
-        TypeError: weak object has gone away
-
-    これをやると変な警告は出るようになっちゃうけどとりあえず落ちなくなる。。::
-
-        [WARNING] 6 out of the last 8 calls to <function _make_broadcast_group_fn.<locals>
-        .broadcast_group at 0x7fc58c4aaf80> triggered tf.function retracing. Tracing is
-        expensive and the excessive number of tracings is likely due to passing python
-        objects instead of tensors. Also, tf.function has experimental_relax_shapes=True
-        option that relaxes argument shapes that can avoid unnecessary retracing.
-        Please refer to
-        https://www.tensorflow.org/beta/tutorials/eager/tf_function#python_or_tensor_args
-        and https://www.tensorflow.org/api_docs/python/tf/function for more details.
-
-    """
-    # pylint: disable=protected-access
-    try:
-        from horovod.tensorflow import (
-            _make_broadcast_group_fn,
-            _make_allreduce_grads_fn,
-        )
-
-        functions = [
-            _make_broadcast_group_fn(),
-            _make_allreduce_grads_fn(
-                "DistributedGradientTape", "", "", get().Compression.fp16, False
-            ),
-        ]
-        for f in functions:
-            if f._stateful_fn is None:
-                continue
-            while len(f._stateful_fn._function_cache._garbage_collectors[0]._cache) > 0:
-                f._stateful_fn._function_cache._garbage_collectors[0]._cache.popitem()
-    except Exception:
-        tk.log.get(__name__).warning(f"tf.functionキャッシュクリア失敗", exc_info=True)
-
-
 def initialized() -> bool:
     """初期化済みなのか否か(Horovodを使うのか否か)"""
     return _initialized

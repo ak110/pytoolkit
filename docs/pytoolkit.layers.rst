@@ -28,6 +28,14 @@ pytoolkit.layers.convolutional module
    :undoc-members:
    :show-inheritance:
 
+pytoolkit.layers.endpoint module
+--------------------------------
+
+.. automodule:: pytoolkit.layers.endpoint
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 pytoolkit.layers.misc module
 ----------------------------
 

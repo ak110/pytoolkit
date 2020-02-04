@@ -42,7 +42,7 @@ cookiecutter gh:ak110/cookiecutter-pytoolkit
 - h5py
 - horovod
 - ipython
-- keras2onnx>=1.6.5
+- keras2onnx
 - lightgbm
 - matplotlib
 - mpi4py

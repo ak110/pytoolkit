@@ -4,6 +4,7 @@
 from .activations import *
 from .attentions import *
 from .convolutional import *
+from .endpoint import *
 from .misc import *
 from .noise import *
 from .normalization import *
