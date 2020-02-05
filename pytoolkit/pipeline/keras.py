@@ -282,6 +282,8 @@ class KerasModel(Model):
         assert self.nfold >= 1
         self.create_network(fold=0)
         assert self.training_models[0] is not None
+        if self.compile_fn is not None:
+            self.compile_fn(self.training_models[0])
         # summary表示
         tk.models.summary(self.training_models[0])
         # グラフを出力

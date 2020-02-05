@@ -799,6 +799,44 @@ class WrappedTranslateY(A.ImageOnlyTransform):
         return ("scale",)
 
 
+class To3Channel(A.ImageOnlyTransform):
+    """入力がグレースケールの場合、R=G=Bにshapeを変える。"""
+
+    def __init__(self, always_apply=False, p=1.0):
+        super().__init__(always_apply=always_apply, p=p)
+
+    def apply(self, image, **params):
+        if image.ndim == 2:
+            image = np.expand_dims(image, axis=-1)
+        assert image.ndim == 3
+        if image.shape[-1] == 1:
+            image = np.tile(image, (1, 1, 3))
+        assert image.shape[-1] == 3
+        return image
+
+    def get_transform_init_args_names(self):
+        return ()
+
+
+class To1Channel(A.ImageOnlyTransform):
+    """(H, W, 1)のshapeで返す。入力がRGBの場合、(R + G + B)/3。"""
+
+    def __init__(self, always_apply=False, p=1.0):
+        super().__init__(always_apply=always_apply, p=p)
+
+    def apply(self, image, **params):
+        if image.ndim == 2:
+            image = np.expand_dims(image, axis=-1)
+        assert image.ndim == 3
+        if image.shape[-1] == 3:
+            image = np.mean(image, axis=-1, keepdims=True)
+        assert image.shape[-1] == 1
+        return image
+
+    def get_transform_init_args_names(self):
+        return ()
+
+
 def _random_loguniform(lower: float, upper: float) -> float:
     """3/4 ～ 4/3みたいな乱数を作って返す。"""
     assert 0 < lower < 1 < upper
