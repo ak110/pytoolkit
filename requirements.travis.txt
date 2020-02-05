@@ -28,4 +28,5 @@ scikit-learn
 scipy
 six>=1.13.0
 tensorflow-cpu>=2.1.0
+tf2onnx
 tqdm

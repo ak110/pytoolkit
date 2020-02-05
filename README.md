@@ -50,5 +50,6 @@ cookiecutter gh:ak110/cookiecutter-pytoolkit
 - optuna
 - python-dotenv
 - requests
+- tf2onnx
 - tqdm
 - xgboost
