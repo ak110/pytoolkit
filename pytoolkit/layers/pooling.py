@@ -208,7 +208,7 @@ class BlurPooling2D(tf.keras.layers.Layer):
         filter2d = filter1d[np.newaxis, :] * filter1d[:, np.newaxis]
         filter2d = filter2d * (self.taps ** 2 / filter2d.sum())
         kernel = np.tile(filter2d[:, :, np.newaxis, np.newaxis], (1, 1, in_filters, 1))
-        kernel = tf.constant(kernel, dtype=tf.float32)
+        kernel = tf.constant(kernel, dtype=inputs.dtype)
 
         return tf.nn.depthwise_conv2d(
             inputs, kernel, strides=(1,) + self.strides + (1,), padding="SAME"

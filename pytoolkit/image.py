@@ -638,11 +638,12 @@ class GridMask(A.ImageOnlyTransform):
     """
 
     def __init__(
-        self, r=0.6, d=(0.4, 1.0), always_apply=False, p=0.7,
+        self, r=0.6, d=(0.4, 1.0), random_color=False, always_apply=False, p=0.7,
     ):
         super().__init__(always_apply=always_apply, p=p)
         self.r = r
         self.d = d
+        self.random_color = random_color
 
     def apply(self, image, **params):
         h, w = image.shape[:2]
@@ -672,10 +673,18 @@ class GridMask(A.ImageOnlyTransform):
         mask = mask[cy : cy + h, cx : cx + w, :]
 
         # マスクを適用
-        return (image * mask).astype(image.dtype)
+        if self.random_color:
+            # ランダムな色でマスク (オリジナル)
+            depth = 1 if image.ndim == 2 else image.shape[-1]
+            color = np.array(
+                [random.randint(0, 255) for _ in range(depth)], dtype=np.uint8,
+            )
+            return (image * mask + color * (1 - mask)).astype(image.dtype)
+        else:
+            return (image * mask).astype(image.dtype)
 
     def get_transform_init_args_names(self):
-        return ("r", "d")
+        return ("r", "d", "random_color")
 
 
 class Standardize(A.ImageOnlyTransform):

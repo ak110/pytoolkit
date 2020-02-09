@@ -1,34 +1,36 @@
 """キャッシュ関連。"""
+from __future__ import annotations
+
 import functools
 import hashlib
 import inspect
 import pathlib
+import typing
 
 import joblib
 
 import pytoolkit as tk
 
 
-def memorize(cache_dir, compress=0, verbose=True):
+def memorize(cache_dir: tk.typing.PathLike = "./cache", compress: int = 0):
     """関数の戻り値をファイルにキャッシュするデコレーター。
 
-    force_rerun=Trueを付けて呼び出すと強制的に再実行してキャッシュを上書き。
+    Args:
+        cache_dir: 保存先ディレクトリ
+        compress: 0～9の圧縮レベル。一般的には3がおすすめ。
 
     """
 
     def decorator(func):
         @functools.wraps(func)
-        def memorized_func(*args, force_rerun=False, **kwargs):
-            cache_path = get_cache_path(cache_dir, func, args, kwargs, verbose)
+        def memorized_func(*args, **kwargs):
+            cache_path = get_cache_path(cache_dir, func, args, kwargs)
             # キャッシュがあれば読む
-            if not force_rerun:
-                if cache_path.is_file():
-                    if verbose:
-                        tk.log.get(__name__).info(f"Cache is found: {cache_path}")
-                    return joblib.load(cache_path)
-                else:
-                    if verbose:
-                        tk.log.get(__name__).info(f"Cache is not found: {cache_path}")
+            if cache_path.is_file():
+                tk.log.get(__name__).info(f"Cache is found: {cache_path}")
+                return joblib.load(cache_path)
+            else:
+                tk.log.get(__name__).info(f"Cache is not found: {cache_path}")
             # 無ければ実処理
             result = func(*args, **kwargs)
             if tk.hvd.is_master():
@@ -45,14 +47,18 @@ def memorize(cache_dir, compress=0, verbose=True):
     return decorator
 
 
-def get_cache_path(cache_dir, func, args, kwargs, verbose):
+def get_cache_path(
+    cache_dir: tk.typing.PathLike,
+    func: typing.Callable,
+    args: typing.Sequence,
+    kwargs: typing.Dict,
+):
     """キャッシュのパスを作って返す。"""
     cache_dir = pathlib.Path(cache_dir)
     bound_args = inspect.signature(func).bind(*args, **kwargs).arguments
     args_list = sorted(dict(bound_args).items())
     args_str = ",".join([f"{repr(k)}:{repr(v)}" for k, v in args_list])
     args_hash = hashlib.md5(args_str.encode("utf-8")).hexdigest()[:8]
-    if verbose:
-        tk.log.get(__name__).info(f"Cache {args_hash}: arguments={args_str}")
+    tk.log.get(__name__).info(f"Cache {args_hash}: arguments={args_str}")
     cache_path = cache_dir / f"{func.__name__}_{args_hash}.pkl"
     return cache_path

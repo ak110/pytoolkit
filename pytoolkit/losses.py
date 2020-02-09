@@ -65,7 +65,7 @@ def binary_focal_loss(
     else:
         y_logit = tk.backend.logit(y_pred)
 
-    y_pred_inv = tf.cast(1 - tk.backend.clip64(y_pred), tf.float32)
+    y_pred_inv = tf.cast(1 - tk.backend.clip64(y_pred), y_pred.dtype)
 
     # 前提知識:
     # -log(sigmoid(x)) = log(1 + exp(-x))
@@ -196,7 +196,7 @@ def lovasz_hinge(
                 yt, yp, from_logits=from_logits, per_sample=False, activation=activation
             )
 
-        return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=tf.float32)
+        return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=y_pred.dtype)
 
     y_true = tf.reshape(y_true, (-1,))
     y_pred = tf.reshape(y_pred, (-1,))
@@ -237,7 +237,7 @@ def lovasz_binary_crossentropy(
                 alpha=alpha,
             )
 
-        return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=tf.float32)
+        return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=y_pred.dtype)
 
     y_true = tf.reshape(y_true, (-1,))
     y_pred = tf.reshape(y_pred, (-1,))

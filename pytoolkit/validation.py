@@ -12,11 +12,21 @@ FoldsType = typing.Sequence[typing.Tuple[np.ndarray, np.ndarray]]
 
 
 def split(
-    dataset: tk.data.Dataset, nfold: int, split_seed: int = 1, stratify: bool = None
+    dataset: tk.data.Dataset,
+    nfold: int,
+    split_seed: int = 1,
+    stratify: typing.Union[bool, np.ndarray] = None,
 ) -> FoldsType:
-    """nfold CV。"""
-    # nfold == 1は特別に5foldの最初の1個しか実行しないバージョンということにする
-    # (もうちょっと分かりやすいインターフェースにしたいが利便性と両立する案が無いのでとりあえず…)
+    """nfold CV。
+
+    Args:
+        dataset: 分割する元のデータセット
+        nfold: 分割数。ただし1の場合は特別に5foldの最初の1個しか実行しないバージョンということにする。
+               (もうちょっと分かりやすいインターフェースにしたいが利便性と両立する案が無いのでとりあえず…)
+        split_seed: シード値
+        stratify: Trueの場合か、Noneでかつdataset.labelsがndarrayかつndim == 1ならStratifiedKFold。FalseならKFold。ndarrayの場合はそれを使ってStratifiedKFold。
+
+    """
     if nfold == 1:
         return split(dataset, nfold=5, split_seed=split_seed, stratify=stratify)[:1]
 
@@ -40,13 +50,16 @@ def split(
     else:
         if stratify is None:
             stratify = (
-                isinstance(dataset.labels, np.ndarray)
-                and len(dataset.labels.shape) == 1
+                isinstance(dataset.labels, np.ndarray) and dataset.labels.ndim == 1
             )
 
-        if stratify:
+        if isinstance(stratify, np.ndarray):
             X = dataset.data
-            y: typing.Any = dataset.labels
+            y: typing.Any = stratify
+            stratify = True
+        elif stratify:
+            X = dataset.data
+            y = dataset.labels
         else:
             X = list(range(len(dataset)))
             y = None

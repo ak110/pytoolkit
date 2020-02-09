@@ -335,7 +335,7 @@ def resize(
         }[interp]
     else:  # 縮小
         cv2_interp = cv2.INTER_NEAREST if interp == "nearest" else cv2.INTER_AREA
-    if rgb.shape[-1] in (1, 3):
+    if rgb.ndim == 2 or rgb.shape[-1] in (1, 3):
         rgb = cv2.resize(rgb, (width, height), interpolation=cv2_interp)
         if rgb.ndim == 2:
             rgb = np.expand_dims(rgb, axis=-1)
@@ -367,6 +367,8 @@ def blur(rgb: np.ndarray, sigma: float) -> np.ndarray:
 @_float_to_uint8
 def unsharp_mask(rgb: np.ndarray, sigma: float, alpha=2.0) -> np.ndarray:
     """シャープ化。sigmaは0～1程度、alphaは1～2程度がよい？"""
+    if rgb.ndim == 2:
+        rgb = np.expand_dims(rgb, axis=-1)
     blured = blur(rgb, sigma)
     rgb = rgb.astype(np.float)
     return rgb + (rgb - blured) * alpha
@@ -641,10 +643,13 @@ def perspective_transform(
         "bicubic": cv2.INTER_CUBIC,
         "lanczos": cv2.INTER_LANCZOS4,
     }[interp]
-    cv2_border = {
-        "edge": cv2.BORDER_REPLICATE,
-        "reflect": cv2.BORDER_REFLECT_101,
-        "wrap": cv2.BORDER_WRAP,
+    cv2_border, borderValue = {
+        "edge": (cv2.BORDER_REPLICATE, None),
+        "reflect": (cv2.BORDER_REFLECT_101, None),
+        "wrap": (cv2.BORDER_WRAP, None),
+        "zero": (cv2.BORDER_CONSTANT, 0),
+        "half": (cv2.BORDER_CONSTANT, 127),
+        "one": (cv2.BORDER_CONSTANT, 255),
     }[border_mode]
 
     if cv2_interp != cv2.INTER_NEAREST:
@@ -656,9 +661,15 @@ def perspective_transform(
         if dw <= sw or dh <= sh:
             cv2_interp = cv2.INTER_AREA
 
+    assert rgb.ndim in (2, 3)
     if rgb.ndim == 2 or rgb.shape[-1] in (1, 3):
         rgb = cv2.warpPerspective(
-            rgb, m, (width, height), flags=cv2_interp, borderMode=cv2_border
+            rgb,
+            m,
+            (width, height),
+            flags=cv2_interp,
+            borderMode=cv2_border,
+            borderValue=borderValue,
         )
         if rgb.ndim == 2:
             rgb = np.expand_dims(rgb, axis=-1)
@@ -670,10 +681,12 @@ def perspective_transform(
                 (width, height),
                 flags=cv2_interp,
                 borderMode=cv2_border,
+                borderValue=borderValue,
             )
             for ch in range(rgb.shape[-1])
         ]
         rgb = np.transpose(resized_list, (1, 2, 0))
+    assert rgb.ndim == 3
     return rgb
 
 

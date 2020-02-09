@@ -462,3 +462,34 @@ class Iterator:
     ds: tf.data.Dataset
     data_size: int
     steps: int
+
+
+def mixup(
+    ds: tf.data.Dataset,
+    premix_fn: typing.Callable,
+    num_parallel_calls: int = tf.data.experimental.AUTOTUNE,
+    data_count: int = None,
+):
+    """tf.dataでのmixup: <https://arxiv.org/abs/1710.09412>
+
+    Args:
+        ds: 元のデータセット
+        premix_fn: DataAugmentationなどの処理
+        num_parallel_calls: `premix_fn`の並列数。
+
+
+    """
+
+    @tf.function
+    def mixup_fn(data1, data2):
+        r = tf.random.uniform((), 0, 1)
+        return [d1 * r + d2 * (1 - r) for d1, d2 in zip(data1, data2)]
+
+    data_count = data_count or tf.data.experimental.cardinality(ds)
+    ds1 = ds.shuffle(buffer_size=data_count)
+    ds2 = ds.shuffle(buffer_size=data_count)
+    ds1 = ds1.map(premix_fn, num_parallel_calls=num_parallel_calls)
+    ds2 = ds2.map(premix_fn, num_parallel_calls=num_parallel_calls)
+    ds = tf.data.Dataset.zip((ds1, ds2))
+    ds = ds.map(mixup_fn)
+    return ds
