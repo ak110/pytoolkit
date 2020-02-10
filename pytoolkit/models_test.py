@@ -7,6 +7,12 @@ import pytoolkit as tk
 
 @pytest.mark.parametrize("mode", ["hdf5", "saved_model", "onnx", "tflite"])
 def test_save(tmpdir, mode):
+    if mode == "onnx":
+        import keras2onnx
+
+        if keras2onnx.__version__ < "1.6.5":
+            pytest.skip()
+
     path = str(tmpdir / "model")
     inputs = x = tf.keras.layers.Input((32, 32, 3))
     x = tf.keras.layers.Conv2D(16, 3, padding="same")(x)
