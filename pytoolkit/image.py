@@ -632,6 +632,7 @@ class RandomErasing(A.ImageOnlyTransform):
 class GridMask(A.ImageOnlyTransform):
     """GridMask <https://arxiv.org/abs/2001.04086> <https://github.com/akuxcw/GridMask>
 
+    - rは大きいほどマスクが小さくなる
     - d1, d2は入力サイズに対する比率で指定
     - pは(Albumentationsの流儀とは合わせず)(しかし可変にするのも面倒なので)Faster-RCNNでの実験で一番良かった0.7に
 

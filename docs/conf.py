@@ -44,14 +44,15 @@ release = ""
 # ones.
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.autodoc.typehints",
     "sphinx.ext.autosummary",
     "sphinx.ext.doctest",
     "sphinx.ext.intersphinx",
+    "sphinx.ext.linkcode",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
     # "sphinx.ext.viewcode",
-    "sphinx.ext.linkcode",
-    "sphinx_autodoc_typehints",
+    # "sphinx_autodoc_typehints",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -219,9 +220,12 @@ def linkcode_resolve(domain, info):
 
 
 # sphinx-autodoc-typehints
-set_type_checking_flag = True
-typehints_fully_qualified = False
-always_document_param_types = True
+# set_type_checking_flag = True
+# typehints_fully_qualified = False
+# always_document_param_types = True
+
+# sphinx.ext.autodoc.typehints
+autodoc_typehints = "description"
 
 # -- Options for todo extension ----------------------------------------------
 

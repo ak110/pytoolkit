@@ -463,6 +463,11 @@ class Iterator:
     data_size: int
     steps: int
 
+    def __post_init__(self):
+        tk.log.get(__name__).info(
+            f"Iterator: element_spec={self.ds.element_spec} data_size={self.data_size} steps={self.steps}"
+        )
+
 
 def mixup(
     ds: tf.data.Dataset,
@@ -475,8 +480,8 @@ def mixup(
     Args:
         ds: 元のデータセット
         premix_fn: DataAugmentationなどの処理
-        num_parallel_calls: `premix_fn`の並列数。
-
+        num_parallel_calls: premix_fnの並列数
+        data_count: シャッフル時のバッファサイズ
 
     """
 

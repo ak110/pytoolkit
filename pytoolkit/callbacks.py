@@ -182,4 +182,4 @@ class ErrorOnNaN(tf.keras.callbacks.Callback):
         loss = logs.get("loss")
         if loss is not None:
             if np.isnan(loss) or np.isinf(loss):
-                raise RuntimeError(f"Batch {batch}: Invalid loss")
+                raise RuntimeError(f"Batch {batch}: Invalid loss (logs={logs})")
