@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import gc
 import pathlib
+import tempfile
 import typing
 
 import numpy as np
@@ -272,8 +273,11 @@ class KerasModel(Model):
         self._rebuild_model(fold)
         return pred
 
-    def check(self) -> KerasModel:
+    def check(self, dataset: tk.data.Dataset = None) -> KerasModel:
         """モデルの動作確認。(KerasModel独自メソッド)
+
+        Args:
+            dataset: チェック用データセット
 
         Returns:
             self
@@ -288,6 +292,14 @@ class KerasModel(Model):
         tk.models.summary(self.training_models[0])
         # グラフを出力
         tk.models.plot(self.training_models[0], self.models_dir / "model.svg")
+        # save/loadの動作確認 (とりあえず落ちなければOKとする)
+        with tempfile.TemporaryDirectory() as tmpdir_path:
+            tmpdir = pathlib.Path(tmpdir_path)
+            self._save_model(fold=0, models_dir=tmpdir)
+            self._load_model(fold=0, models_dir=tmpdir)
+        # evaluate
+        if dataset is not None:
+            self.evaluate(dataset, prefix="check_", fold=0)
         return self
 
     @typing.overload

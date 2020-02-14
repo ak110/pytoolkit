@@ -939,3 +939,67 @@ def ensure_channel_dim(img: np.ndarray) -> np.ndarray:
     if img.ndim == 2:
         return np.expand_dims(img, axis=-1)
     return img
+
+
+def perlin_noise(
+    shape: typing.Tuple[int, int],
+    frequency: float = 3.0,
+    octaves: int = 5,
+    persistence: float = 0.5,
+    lacunarity: float = 2.0,
+    seed: int = 0,
+):
+    random_state = np.random.RandomState(seed=seed)
+    gradient = random_state.uniform(-1, +1, size=shape + (2,))
+
+    image = np.zeros(shape, dtype=np.float32)
+    amplify = 1.0
+    for _ in range(octaves):
+        image += _perlin_noise_base(shape, frequency, gradient) * amplify
+        frequency *= lacunarity
+        amplify *= persistence
+    image -= image.min()
+    image /= image.max()
+    return np.uint8(image * 255)
+
+
+def _perlin_noise_base(shape, frequency, gradient):
+    # linear space by frequency
+    x = np.tile(np.linspace(0, frequency, shape[1], endpoint=False), shape[0])
+    y = np.repeat(np.linspace(0, frequency, shape[0], endpoint=False), shape[1])
+
+    # gradient coordinates
+    x0 = x.astype(int)
+    y0 = y.astype(int)
+
+    # local coordinate
+    x -= x0
+    y -= y0
+
+    # gradient projections
+    g00 = gradient[x0, y0]
+    g10 = gradient[x0 + 1, y0]
+    g01 = gradient[x0, y0 + 1]
+    g11 = gradient[x0 + 1, y0 + 1]
+
+    # fade
+    t = (3 - 2 * x) * x * x
+
+    # linear interpolation
+    r = g00[:, 0] * x + g00[:, 1] * y
+    s = g10[:, 0] * (x - 1) + g10[:, 1] * y
+    g0 = r + t * (s - r)
+
+    # linear interpolation
+    r = g01[:, 0] * x + g01[:, 1] * (y - 1)
+    s = g11[:, 0] * (x - 1) + g11[:, 1] * (y - 1)
+    g1 = r + t * (s - r)
+
+    # fade
+    t = (3 - 2 * y) * y * y
+
+    # (bi)linear interpolation
+    g = g0 + t * (g1 - g0)
+
+    # reshape
+    return g.reshape(shape)

@@ -280,3 +280,19 @@ def calibrate_proba(proba: typing.Union[np.ndarray, tf.Tensor], beta: np.ndarray
     # return (beta * proba) / (beta * proba - proba + 1)
     bp = proba * beta / np.sum(beta)
     return bp / (bp + 1 - proba)
+
+
+def get_effective_class_weights(
+    samples_per_classes: typing.Sequence[int], beta: float = 0.9999
+):
+    """Class-Balanced Loss風のclass_weightsを作成して返す。<https://arxiv.org/abs/1901.05555>
+
+    Args:
+        samples_per_classes: クラスごとのサンプルサイズ (shape=(num_classes,))
+        beta: ハイパーパラメーター
+
+    """
+    effectives = 1.0 - beta ** np.asarray(samples_per_classes)
+    weights = (1 - beta) / effectives
+    weights = weights * (len(samples_per_classes) / weights.sum())
+    return weights

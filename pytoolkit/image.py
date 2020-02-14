@@ -312,6 +312,29 @@ class GaussNoise(A.ImageOnlyTransform):
         return ("scale",)
 
 
+class SaltAndPepperNoise(A.ImageOnlyTransform):
+    """Salt-and-pepper noise。"""
+
+    def __init__(self, salt=0.01, pepper=0.01, always_apply=False, p=0.5):
+        super().__init__(always_apply=always_apply, p=p)
+        self.salt = salt
+        self.pepper = pepper
+
+    def apply(self, image, **params):
+        rand = np.random.RandomState(random.randrange(2 ** 32))
+        map_ = rand.uniform(size=image.shape[:2])
+        image = image.copy()
+        image[map_ < self.salt] = 255
+        image[map_ > 1 - self.pepper] = 0
+        return image
+
+    def get_params(self):
+        return {}
+
+    def get_transform_init_args_names(self):
+        return ("scale",)
+
+
 class RandomBlur(A.ImageOnlyTransform):
     """ぼかし。"""
 
