@@ -761,9 +761,11 @@ def erase_random(
         if alpha:
             rgb[ey : ey + eh, ex : ex + ew, :] = (
                 rgb[ey : ey + eh, ex : ex + ew, :] * (1 - alpha) + rc * alpha
-            ).astype(np.uint8)
+            ).astype(rgb.dtype)
         else:
-            rgb[ey : ey + eh, ex : ex + ew, :] = rc[np.newaxis, np.newaxis, :]
+            rgb[ey : ey + eh, ex : ex + ew, :] = rc[np.newaxis, np.newaxis, :].astype(
+                rgb.dtype
+            )
         break
 
     return rgb
@@ -949,24 +951,41 @@ def perlin_noise(
     lacunarity: float = 2.0,
     seed: int = 0,
 ):
+    """パーリンノイズの生成。
+
+    Args:
+        shape: (H, W)
+        frequency: 短辺の周波数
+        octaves: 重ねる数
+
+    """
     random_state = np.random.RandomState(seed=seed)
-    gradient = random_state.uniform(-1, +1, size=shape + (2,))
+    if shape[0] < shape[1]:
+        freq_v = frequency
+        freq_h = frequency * shape[1] / shape[0]
+    else:
+        freq_h = frequency
+        freq_v = frequency * shape[0] / shape[1]
+    grad_size_h = int(freq_h * lacunarity ** octaves + 1)
+    grad_size_v = int(freq_v * lacunarity ** octaves + 1)
+    gradient = random_state.uniform(-1, +1, size=(grad_size_h, grad_size_v, 2))
 
     image = np.zeros(shape, dtype=np.float32)
     amplify = 1.0
     for _ in range(octaves):
-        image += _perlin_noise_base(shape, frequency, gradient) * amplify
-        frequency *= lacunarity
+        image += _perlin_noise_base(shape, freq_v, freq_h, gradient) * amplify
+        freq_v *= lacunarity
+        freq_h *= lacunarity
         amplify *= persistence
     image -= image.min()
     image /= image.max()
     return np.uint8(image * 255)
 
 
-def _perlin_noise_base(shape, frequency, gradient):
+def _perlin_noise_base(shape, freq_v, freq_h, gradient):
     # linear space by frequency
-    x = np.tile(np.linspace(0, frequency, shape[1], endpoint=False), shape[0])
-    y = np.repeat(np.linspace(0, frequency, shape[0], endpoint=False), shape[1])
+    x = np.tile(np.linspace(0, freq_h, shape[1], endpoint=False), shape[0])
+    y = np.repeat(np.linspace(0, freq_v, shape[0], endpoint=False), shape[1])
 
     # gradient coordinates
     x0 = x.astype(int)

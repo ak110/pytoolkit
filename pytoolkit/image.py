@@ -332,7 +332,45 @@ class SaltAndPepperNoise(A.ImageOnlyTransform):
         return {}
 
     def get_transform_init_args_names(self):
-        return ("scale",)
+        return ("salt", "pepper")
+
+
+class PerlinNoise(A.ImageOnlyTransform):
+    """Perlin noise。"""
+
+    def __init__(
+        self,
+        alpha=(0, 0.5),
+        frequency=(2.0, 4.0),
+        octaves=(3, 5),
+        always_apply=False,
+        p=0.5,
+    ):
+        super().__init__(always_apply=always_apply, p=p)
+        self.alpha = alpha
+        self.frequency = frequency
+        self.octaves = octaves
+
+    def apply(self, image, frequency, octaves, seed, alpha, **params):
+        noise = tk.ndimage.perlin_noise(
+            image.shape[:2], frequency=frequency, octaves=octaves, seed=seed
+        )
+        if image.ndim != 2:
+            assert image.ndim == 3
+            noise = np.expand_dims(noise, axis=-1)
+        image = (image * (1 - alpha) + noise * alpha).astype(image.dtype)
+        return image
+
+    def get_params(self):
+        return {
+            "frequency": random.uniform(*self.frequency),
+            "octaves": random.randint(*self.octaves),
+            "seed": random.randint(0, 2 ** 32 - 1),
+            "alpha": random.uniform(*self.alpha),
+        }
+
+    def get_transform_init_args_names(self):
+        return ("alpha", "frequency", "octaves")
 
 
 class RandomBlur(A.ImageOnlyTransform):

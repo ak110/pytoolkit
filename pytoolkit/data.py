@@ -488,7 +488,10 @@ def mixup(
     @tf.function
     def mixup_fn(data1, data2):
         r = tf.random.uniform((), 0, 1)
-        return [d1 * r + d2 * (1 - r) for d1, d2 in zip(data1, data2)]
+        return [
+            tf.cast(d1, tf.float32) * r + tf.cast(d2, tf.float32) * (1 - r)
+            for d1, d2 in zip(data1, data2)
+        ]
 
     data_count = data_count or tf.data.experimental.cardinality(ds)
     ds1 = ds.shuffle(buffer_size=data_count)

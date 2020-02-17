@@ -94,6 +94,16 @@ def test_WrappedTranslateY(data_dir, save_dir):
         )
 
 
+def test_PerlinNoise(data_dir, save_dir):
+    """PerlinNoise"""
+    aug = tk.image.PerlinNoise(p=1)
+    img = tk.ndimage.load(data_dir / "Lenna.png")
+    for i in range(10):
+        tk.ndimage.save(
+            save_dir / f"Lenna.PerlinNoise.{i}.png", aug(image=img)["image"],
+        )
+
+
 def test_gray_scale(data_dir):
     img = tk.ndimage.load(data_dir / "Lenna.png", grayscale=True)
     aug = A.Compose(
