@@ -726,7 +726,7 @@ class GridMask(A.ImageOnlyTransform):
         # 回転
         degrees = random.uniform(0, 360)
         mask = tk.ndimage.rotate(
-            mask, degrees, expand=False, interp="nearest", border_mode="wrap"
+            mask, degrees, expand=False, interp="bilinear", border_mode="wrap"
         )
 
         # 使うサイズをrandom crop

@@ -86,11 +86,6 @@ class CosineAnnealing(tf.keras.callbacks.Callback):
         tf.keras.backend.set_value(
             self.model.optimizer.learning_rate, float(learning_rate)
         )
-        # warmup時、optimizerの状態をゼロ埋めする (SGDなど前提で種類無視して0にするので注意)
-        # https://twitter.com/ak11/status/1194763993082023936
-        if self.warmup_reset_state and 2 <= epoch + 1 <= self.warmup_epochs:
-            state = self.model.optimizer.get_weights()
-            self.model.optimizer.set_weights([np.zeros_like(w) for w in state])
 
     def on_train_end(self, logs=None):
         del logs

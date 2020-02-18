@@ -191,6 +191,14 @@ pytoolkit.preprocessing module
    :undoc-members:
    :show-inheritance:
 
+pytoolkit.schedules module
+--------------------------
+
+.. automodule:: pytoolkit.schedules
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 pytoolkit.table module
 ----------------------
 

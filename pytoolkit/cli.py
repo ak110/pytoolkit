@@ -205,4 +205,4 @@ def _ipy():
 
     m = sys.modules["__main__"]
     user_ns = {k: getattr(m, k) for k in dir(m)}
-    IPython.start_ipython(argv=[], user_ns=user_ns)
+    IPython.start_ipython(argv=["--ext=autoreload"], user_ns=user_ns)

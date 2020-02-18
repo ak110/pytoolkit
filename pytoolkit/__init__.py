@@ -26,6 +26,7 @@ from . import (
     optimizers,
     pipeline,
     preprocessing,
+    schedules,
     table,
     threading,
     typing,
