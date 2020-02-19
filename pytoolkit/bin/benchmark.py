@@ -90,7 +90,7 @@ class MyDataLoader(tk.data.DataLoader):
         if data_augmentation:
             self.aug = A.Compose(
                 [
-                    tk.image.RandomTransform(image_size[1], image_size[0]),
+                    tk.image.RandomTransform(size=image_size[:2]),
                     tk.image.RandomColorAugmentors(noisy=True),
                     tk.image.RandomErasing(),
                 ]

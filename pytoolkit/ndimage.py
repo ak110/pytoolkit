@@ -947,6 +947,7 @@ def perlin_noise(
     shape: typing.Tuple[int, int],
     frequency: float = 3.0,
     octaves: int = 5,
+    ar: float = 1.0,
     persistence: float = 0.5,
     lacunarity: float = 2.0,
     seed: int = 0,
@@ -957,15 +958,17 @@ def perlin_noise(
         shape: (H, W)
         frequency: 短辺の周波数
         octaves: 重ねる数
+        ar: アスペクト比。>1なら横長、<1なら縦長のノイズを生成する
 
     """
     random_state = np.random.RandomState(seed=seed)
+    rar = np.sqrt(ar)
     if shape[0] < shape[1]:
-        freq_v = frequency
-        freq_h = frequency * shape[1] / shape[0]
+        freq_v = frequency / rar
+        freq_h = frequency * shape[1] / shape[0] * rar
     else:
-        freq_h = frequency
-        freq_v = frequency * shape[0] / shape[1]
+        freq_h = frequency * rar
+        freq_v = frequency * shape[0] / shape[1] / rar
     grad_size_h = int(freq_h * lacunarity ** octaves + 1)
     grad_size_v = int(freq_v * lacunarity ** octaves + 1)
     gradient = random_state.uniform(-1, +1, size=(grad_size_h, grad_size_v, 2))

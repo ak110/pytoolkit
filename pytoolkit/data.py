@@ -18,6 +18,13 @@ import tensorflow as tf
 
 import pytoolkit as tk
 
+# Dataset.dataの型
+DataType = typing.Union[typing.Sequence[typing.Any], pd.DataFrame, dict]
+# Dataset.labelsの型
+LabelsType = typing.Union[
+    np.ndarray, typing.List[np.ndarray], typing.Dict[str, np.ndarray]
+]
+
 
 @dataclasses.dataclass()
 class Dataset:
@@ -37,10 +44,8 @@ class Dataset:
 
     """
 
-    data: typing.Union[typing.Sequence[typing.Any], pd.DataFrame, dict]
-    labels: typing.Union[
-        np.ndarray, typing.Sequence[np.ndarray], typing.Dict[str, np.ndarray]
-    ] = None
+    data: DataType
+    labels: LabelsType = None
     groups: np.ndarray = None
     weights: np.ndarray = None
     ids: np.ndarray = None
@@ -68,6 +73,15 @@ class Dataset:
         else:
             assert len(data) == len(self)
             return data[index]
+
+    def iter(
+        self, folds: tk.validation.FoldsType
+    ) -> typing.Generator[typing.Tuple[Dataset, Dataset], None, None]:
+        """foldsに従って分割する。"""
+        for train_indices, val_indices in folds:
+            train_set = self.slice(train_indices)
+            val_set = self.slice(val_indices)
+            yield train_set, val_set
 
     def slice(self, rindex: typing.Sequence[int]) -> Dataset:
         """スライスを作成して返す。
@@ -463,15 +477,15 @@ class Iterator:
     data_size: int
     steps: int
 
-    def __post_init__(self):
-        tk.log.get(__name__).info(
-            f"Iterator: element_spec={self.ds.element_spec} data_size={self.data_size} steps={self.steps}"
-        )
+    def to_str(self) -> str:
+        """情報を文字列化して返す。"""
+        return f"element_spec={self.ds.element_spec} data_size={self.data_size} steps={self.steps}"
 
 
 def mixup(
     ds: tf.data.Dataset,
     premix_fn: typing.Callable,
+    postmix_fn: typing.Callable,
     num_parallel_calls: int = tf.data.experimental.AUTOTUNE,
     data_count: int = None,
 ):
@@ -480,6 +494,7 @@ def mixup(
     Args:
         ds: 元のデータセット
         premix_fn: DataAugmentationなどの処理
+        postmix_fn: mixup後の処理
         num_parallel_calls: premix_fnの並列数
         data_count: シャッフル時のバッファサイズ
 
@@ -488,16 +503,16 @@ def mixup(
     @tf.function
     def mixup_fn(data1, data2):
         r = tf.random.uniform((), 0, 1)
-        return [
-            tf.cast(d1, tf.float32) * r + tf.cast(d2, tf.float32) * (1 - r)
-            for d1, d2 in zip(data1, data2)
-        ]
+        return postmix_fn(
+            *[
+                tf.cast(d1, tf.float32) * r + tf.cast(d2, tf.float32) * (1 - r)
+                for d1, d2 in zip(premix_fn(data1), premix_fn(data2))
+            ]
+        )
 
     data_count = data_count or tf.data.experimental.cardinality(ds)
     ds1 = ds.shuffle(buffer_size=data_count)
     ds2 = ds.shuffle(buffer_size=data_count)
-    ds1 = ds1.map(premix_fn, num_parallel_calls=num_parallel_calls)
-    ds2 = ds2.map(premix_fn, num_parallel_calls=num_parallel_calls)
     ds = tf.data.Dataset.zip((ds1, ds2))
-    ds = ds.map(mixup_fn)
+    ds = ds.map(mixup_fn, num_parallel_calls=num_parallel_calls)
     return ds

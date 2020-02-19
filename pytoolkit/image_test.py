@@ -31,7 +31,7 @@ def test_data_augmentation(data_dir, save_dir, filename):
                 p=0.25,
             ),
             # tk.image.RandomRotate(),  # TODO
-            tk.image.RandomTransform(256, 256, base_scale=2.0),
+            tk.image.RandomTransform(size=(256, 256), base_scale=2.0),
             tk.image.RandomColorAugmentors(noisy=True),
             tk.image.SpeckleNoise(),
             tk.image.GridMask(),
@@ -117,7 +117,7 @@ def test_gray_scale(data_dir):
                 p=0.25,
             ),
             tk.image.RandomRotate(),
-            tk.image.RandomTransform(256, 256),
+            tk.image.RandomTransform(size=(256, 256)),
             tk.image.RandomColorAugmentors(noisy=True, grayscale=True),
             tk.image.SpeckleNoise(),
         ]

@@ -53,10 +53,7 @@ class SKLearnModel(Model):
         scores = []
         score_weights = []
         self.estimators_ = []
-        for train_indices, val_indices in tk.utils.tqdm(folds, desc="cv"):
-            train_set = dataset.slice(train_indices)
-            val_set = dataset.slice(val_indices)
-
+        for train_set, val_set in tk.utils.tqdm(dataset.iter(folds), desc="cv"):
             kwargs = {}
             if train_set.weights is not None:
                 kwargs[self.weights_arg_name] = train_set.weights

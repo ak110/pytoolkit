@@ -270,6 +270,9 @@ def fit(
         if val_set is not None and val_data_loader is not None
         else None
     )
+    tk.log.get(__name__).info(f"train_iterator: {train_iterator.to_str()}")
+    if val_iterator is not None:
+        tk.log.get(__name__).info(f"val_iterator:   {val_iterator.to_str()}")
 
     callbacks = make_callbacks(callbacks, training=True)
 
@@ -364,6 +367,7 @@ def predict(
         iterator = data_loader.iter(
             dataset, without_label=True, num_replicas_in_sync=num_replicas_in_sync
         )
+        tk.log.get(__name__).info(f"iterator: {iterator.to_str()}")
         if on_batch_fn is not None:
             gen = _predict_flow(
                 model=model,
@@ -418,6 +422,7 @@ def predict_flow(
     with tk.log.trace_scope("predict"):
         callbacks = make_callbacks(callbacks, training=False)
         iterator = data_loader.iter(dataset, num_replicas_in_sync=num_replicas_in_sync)
+        tk.log.get(__name__).info(f"iterator: {iterator.to_str()}")
         return _predict_flow(
             model=model,
             iterator=iterator,
@@ -496,6 +501,7 @@ def evaluate(
         callbacks = make_callbacks(callbacks, training=False)
         dataset = tk.hvd.split(dataset) if use_horovod else dataset
         iterator = data_loader.iter(dataset, num_replicas_in_sync=num_replicas_in_sync)
+        tk.log.get(__name__).info(f"iterator: {iterator.to_str()}")
         values = model.evaluate(
             iterator.ds, steps=iterator.steps, verbose=verbose, callbacks=callbacks,
         )

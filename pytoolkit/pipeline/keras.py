@@ -4,6 +4,7 @@ from __future__ import annotations
 import gc
 import pathlib
 import tempfile
+import time
 import typing
 
 import numpy as np
@@ -29,6 +30,8 @@ class KerasModel(Model):
         model_name_format: モデルのファイル名のフォーマット。{fold}のところに数字が入る。
         skip_if_exists: cv()でモデルが存在するときスキップするならTrue。
         skip_folds: cv()で（skip_if_existsとは関係なく）スキップするfold。[0, nfold)
+        compile_fn: モデルのコンパイル処理
+        score_fn: ラベルと推論結果を受け取り、指標をdictで返す関数。指定しなければモデルのevaluate()が使われる。
         epochs: tk.models.fit()のパラメータ
         refine_epochs: refineのエポック数
         refine_lr_factor: refineの学習率の係数。初期学習率×refine_lr_factorがrefine時の学習率になる。
@@ -65,6 +68,9 @@ class KerasModel(Model):
         refine_data_loader: typing.Optional[tk.data.DataLoader] = None,
         *,
         compile_fn: typing.Callable[[tf.keras.models.Model], None] = None,
+        score_fn: typing.Callable[
+            [tk.data.LabelsType, tk.models.ModelIOType], tk.evaluations.EvalsType
+        ] = None,
         epochs: int,
         refine_epochs: int = 0,
         refine_lr_factor: float = 0.003,
@@ -93,6 +99,7 @@ class KerasModel(Model):
         self.skip_folds = skip_folds
         self.epochs = epochs
         self.compile_fn = compile_fn
+        self.score_fn = score_fn
         self.refine_epochs = refine_epochs
         self.refine_lr_factor = refine_lr_factor
         self.callbacks = callbacks
@@ -219,11 +226,7 @@ class KerasModel(Model):
                         X_batch[f"model{i}_target{j}"] = ytj
                 yield X_batch, None
 
-        train_sets = []
-        val_sets = []
-        for train_indices, val_indices in folds:
-            train_sets.append(dataset.slice(train_indices))
-            val_sets.append(dataset.slice(val_indices))
+        train_sets, val_sets = zip(*list(dataset.iter(folds)))
 
         model.fit(
             generator(train_sets, self.train_data_loader),
@@ -244,21 +247,17 @@ class KerasModel(Model):
             tk.log.get(__name__).info(f"cv {k}: {v:,.3f}")
 
     def _serial_cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType):
-        score_list = []
-        score_weights = []
-        for fold, (train_indices, val_indices) in enumerate(folds):
+        evals_list = []
+        evals_weights = []
+        for fold, (train_set, val_set) in enumerate(dataset.iter(folds)):
             tk.log.get(__name__).info(
-                f"Fold {fold + 1}/{len(folds)}: train={len(train_indices)} val={len(val_indices)}"
+                f"Fold {fold + 1}/{len(folds)}: train={len(train_set)} val={len(val_set)}"
             )
-            train_set = dataset.slice(train_indices)
-            val_set = dataset.slice(val_indices)
-            scores = self.train(train_set, val_set, fold=fold)
-            score_list.append(scores)
-            score_weights.append(len(val_indices))
-
-        for k in score_list[0]:
-            v = np.average([s[k] for s in score_list], weights=score_weights)
-            tk.log.get(__name__).info(f"cv {k}: {v:,.3f}")
+            evals = self.train(train_set, val_set, fold=fold)
+            evals_list.append(evals)
+            evals_weights.append(len(val_set))
+        evals = tk.evaluations.mean(evals_list, weights=evals_weights)
+        tk.log.get(__name__).info(f"cv: {tk.evaluations.to_str(evals)}")
 
     def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
         pred = tk.models.predict(
@@ -269,8 +268,8 @@ class KerasModel(Model):
             num_replicas_in_sync=self.num_replicas_in_sync,
             on_batch_fn=self.on_batch_fn,
         )
-        # メモリを食いがちなので再構築してみる
-        self._rebuild_model(fold)
+        # # メモリを食いがちなので再構築してみる
+        # self._rebuild_model(fold)
         return pred
 
     def check(self, dataset: tk.data.Dataset = None) -> KerasModel:
@@ -300,6 +299,41 @@ class KerasModel(Model):
         # evaluate
         if dataset is not None:
             self.evaluate(dataset, prefix="check_", fold=0)
+            if self.score_fn is not None:
+                evals = self._model_evaluate(dataset, prefix="check_", fold=0)
+                tk.log.get(__name__).info(f"check: {tk.evaluations.to_str(evals)}")
+        return self
+
+    def bench(self, dataset: tk.data.Dataset) -> KerasModel:
+        """DataLoaderの速度確認。(KerasModel独自メソッド)
+
+        Args:
+            dataset: チェック用データセット
+
+        Returns:
+            self
+
+        """
+        for name, data_loader, shuffle in [
+            ("train", self.train_data_loader, True),
+            ("refine", self.refine_data_loader, True),
+            ("val", self.val_data_loader, False),
+        ]:
+            if data_loader is None:
+                continue
+            it = data_loader.iter(
+                dataset, shuffle=shuffle, num_replicas_in_sync=self.num_replicas_in_sync
+            )
+            time.sleep(3)  # prefetch待ち (一応レベル)
+            steps = 100
+            start_time = time.perf_counter()
+            for i, _ in enumerate(it.ds.repeat()):
+                if i >= steps - 1:
+                    break
+            elapsed = time.perf_counter() - start_time
+            tk.log.get(__name__).info(
+                f"{name}_data_loader:{' ' * (6 - len(name))} {elapsed * 1000 / steps:.0f}ms/step"
+            )
         return self
 
     @typing.overload
@@ -439,6 +473,15 @@ class KerasModel(Model):
             metricsの文字列と値のdict
 
         """
+        if self.score_fn is None:
+            evals = self._model_evaluate(dataset, prefix, fold)
+        else:
+            preds = self.predict(dataset, fold=fold)
+            evals = self.score_fn(dataset.labels, preds)
+        tk.log.get(__name__).info(f"fold{fold}: {tk.evaluations.to_str(evals)}")
+        return evals
+
+    def _model_evaluate(self, dataset, prefix, fold):
         assert self.preprocessors is None  # とりあえず未対応
         assert self.postprocessors is None  # とりあえず未対応
 
@@ -455,11 +498,6 @@ class KerasModel(Model):
             use_horovod=self.use_horovod,
             num_replicas_in_sync=self.num_replicas_in_sync,
         )
-        if tk.hvd.is_master():
-            max_len = max(len(n) for n in evals)
-            for n, v in evals.items():
-                tk.log.get(__name__).info(f'{n}:{" " * (max_len - len(n))} {v:.3f}')
-        tk.hvd.barrier()
         return evals
 
     def predict_flow(
