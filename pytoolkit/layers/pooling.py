@@ -235,9 +235,11 @@ class GeM2D(tf.keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         del kwargs
-        x = tf.math.maximum(inputs, self.epsilon) ** self.p
+        x = tf.cast(inputs, tf.float32)  # float16ではオーバーフローしやすいので一応
+        x = tf.math.maximum(x, self.epsilon) ** self.p
         x = tf.math.reduce_mean(x, axis=(1, 2))  # GAP
         x = x ** (1 / self.p)
+        x = tf.cast(x, inputs.dtype)
         return x
 
     def get_config(self):
@@ -248,18 +250,46 @@ class GeM2D(tf.keras.layers.Layer):
 
 @tf.keras.utils.register_keras_serializable()
 class GeMPooling2D(tf.keras.layers.Layer):
-    """Generalized Mean Pooling (GeM) <https://arxiv.org/abs/1711.02512>"""
+    """Generalized Mean Pooling (GeM)
 
-    def __init__(self, epsilon=1e-6, **kargs):
+    References:
+        - <https://arxiv.org/abs/1711.02512>
+
+    """
+
+    def __init__(
+        self,
+        epsilon=1e-6,
+        p_initializer=None,
+        p_regularizer=None,
+        p_constraint=None,
+        p_trainable=True,
+        **kargs
+    ):
         super().__init__(**kargs)
         self.epsilon = epsilon
+        self.p_initializer = tf.keras.initializers.get(
+            p_initializer
+            if p_initializer is not None
+            else tf.keras.initializers.constant(3)
+        )
+        self.p_regularizer = tf.keras.regularizers.get(p_regularizer)
+        self.p_constraint = tf.keras.constraints.get(
+            # オーバーフロー対策で適当に制約をつける
+            p_constraint
+            if p_constraint is not None
+            else tk.constraints.Clip(1, 8)
+        )
+        self.p_trainable = p_trainable
         self.p = None
 
     def build(self, input_shape):
         self.p = self.add_weight(
             shape=(),
-            initializer=tf.keras.initializers.constant(3),
-            constraint=tk.constraints.GreaterThanOrEqualTo(1),
+            initializer=self.p_initializer,
+            regularizer=self.p_regularizer,
+            constraint=self.p_constraint,
+            trainable=self.p_trainable,
             name="p",
         )
         super().build(input_shape)
@@ -270,12 +300,20 @@ class GeMPooling2D(tf.keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         del kwargs
-        x = tf.math.maximum(inputs, self.epsilon) ** self.p
+        x = tf.cast(inputs, tf.float32)  # float16ではオーバーフローしやすいので一応
+        x = tf.math.maximum(x, self.epsilon) ** self.p
         x = tf.math.reduce_mean(x, axis=(1, 2))  # GAP
         x = x ** (1 / self.p)
+        x = tf.cast(x, inputs.dtype)
         return x
 
     def get_config(self):
-        config = {"epsilon": self.epsilon}
+        config = {
+            "epsilon": self.epsilon,
+            "p_initializer": tf.keras.initializers.serialize(self.p_initializer),
+            "p_regularizer": tf.keras.regularizers.serialize(self.p_regularizer),
+            "p_constraint": tf.keras.constraints.serialize(self.p_constraint),
+            "p_trainable": self.p_trainable,
+        }
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
