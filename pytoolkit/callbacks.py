@@ -177,4 +177,32 @@ class ErrorOnNaN(tf.keras.callbacks.Callback):
         loss = logs.get("loss")
         if loss is not None:
             if np.isnan(loss) or np.isinf(loss):
-                raise RuntimeError(f"Batch {batch}: Invalid loss (logs={logs})")
+                raise RuntimeError(
+                    f"Batch {batch}: Invalid loss (logs={logs} {self._get_stat_str()})"
+                )
+
+    def _get_stat_str(self) -> str:
+        """モデルの中に怪しい値が無いか調べて文字列化して返す。"""
+        try:
+            max_value, max_value_layer = 0, ""
+            nan_layers = []
+            inf_layers = []
+            for layer in self.model.layers:
+                for w in layer.get_weights():
+                    m = np.max(np.abs(w))
+                    if max_value < m:
+                        max_value = m
+                        max_value_layer = layer.name
+                    if np.isnan(w).any():
+                        nan_layers.append(layer.name)
+                    if np.isinf(w).any():
+                        inf_layers.append(layer.name)
+            s = f"max_weights={max_value}(by {max_value_layer})"
+            if len(nan_layers) > 0:
+                s += f" nan_layers={nan_layers}"
+            if len(inf_layers) > 0:
+                s += f" inf_layers={inf_layers}"
+            return s
+        except Exception:
+            tk.log.get(__name__).warning("error", exc_info=True)
+            return ""
