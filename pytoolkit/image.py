@@ -796,19 +796,16 @@ class GridMask(A.ImageOnlyTransform):  # pylint: disable=abstract-method
     def apply(self, image, **params):
         # pylint: disable=arguments-differ
         h, w = image.shape[:2]
-        d = random.uniform(*self.d)
-        dw = int(w * d)
-        dh = int(h * d)
-        lw = int(dw * self.r)
-        lh = int(dh * self.r)
+        d = int(min(h, w) * random.uniform(*self.d))
+        l_ = int(d * self.r)
 
         # 少し大きくマスクを作成
         hh, ww = int(h * 1.5), int(w * 1.5)
         mask = np.zeros((hh, ww, 1), np.float32)
-        for ox in range(0, ww, dw):
-            mask[:, ox : ox + lw, :] = 1
-        for oy in range(0, hh, dh):
-            mask[oy : oy + lh, :, :] = 1
+        for ox in range(0, ww, d):
+            mask[:, ox : ox + l_, :] = 1
+        for oy in range(0, hh, d):
+            mask[oy : oy + l_, :, :] = 1
 
         # 回転
         degrees = random.uniform(0, 360)
@@ -822,11 +819,12 @@ class GridMask(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         mask = mask[cy : cy + h, cx : cx + w, :]
 
         # マスクを適用
+        image = tk.ndimage.ensure_channel_dim(image)
         if self.random_color:
             # ランダムな色でマスク (オリジナル)
-            depth = 1 if image.ndim == 2 else image.shape[-1]
             color = np.array(
-                [random.randint(0, 255) for _ in range(depth)], dtype=np.uint8,
+                [random.randint(0, 255) for _ in range(image.shape[-1])],
+                dtype=np.uint8,
             )
             return (image * mask + color * (1 - mask)).astype(image.dtype)
         else:

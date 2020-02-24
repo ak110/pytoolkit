@@ -143,9 +143,7 @@ def save(
         jpeg_quality: 1～100で指定する。
 
     """
-    if img.ndim == 2:
-        img = np.expand_dims(img, axis=-1)
-    assert img.ndim == 3
+    img = ensure_channel_dim(img)
     if img.dtype != np.uint8:
         warnings.warn(f"Invalid dtype: {img.dtype} (shape={img.shape})")
 
@@ -195,8 +193,7 @@ def rotate(
     m, w, h = compute_rotate(rgb.shape[1], rgb.shape[0], degrees=degrees, expand=expand)
     if rgb.shape[-1] in (1, 3):
         rgb = cv2.warpAffine(rgb, m, (w, h), flags=cv2_interp, borderMode=cv2_border)
-        if rgb.ndim == 2:
-            rgb = np.expand_dims(rgb, axis=-1)
+        rgb = ensure_channel_dim(rgb)
     else:
         rotated_list = [
             cv2.warpAffine(
@@ -337,8 +334,7 @@ def resize(
         cv2_interp = cv2.INTER_NEAREST if interp == "nearest" else cv2.INTER_AREA
     if rgb.ndim == 2 or rgb.shape[-1] in (1, 3):
         rgb = cv2.resize(rgb, (width, height), interpolation=cv2_interp)
-        if rgb.ndim == 2:
-            rgb = np.expand_dims(rgb, axis=-1)
+        rgb = ensure_channel_dim(rgb)
     else:
         resized_list = [
             cv2.resize(rgb[:, :, ch], (width, height), interpolation=cv2_interp)
@@ -359,16 +355,14 @@ def gaussian_noise(
 def blur(rgb: np.ndarray, sigma: float) -> np.ndarray:
     """ぼかし。sigmaは0～1程度がよい？"""
     rgb = cv2.GaussianBlur(rgb, (5, 5), sigma)
-    if rgb.ndim == 2:
-        rgb = np.expand_dims(rgb, axis=-1)
+    rgb = ensure_channel_dim(rgb)
     return rgb
 
 
 @_float_to_uint8
 def unsharp_mask(rgb: np.ndarray, sigma: float, alpha=2.0) -> np.ndarray:
     """シャープ化。sigmaは0～1程度、alphaは1～2程度がよい？"""
-    if rgb.ndim == 2:
-        rgb = np.expand_dims(rgb, axis=-1)
+    rgb = ensure_channel_dim(rgb)
     blured = blur(rgb, sigma)
     rgb = rgb.astype(np.float)
     return rgb + (rgb - blured) * alpha
@@ -377,8 +371,7 @@ def unsharp_mask(rgb: np.ndarray, sigma: float, alpha=2.0) -> np.ndarray:
 def median(rgb: np.ndarray, size: int) -> np.ndarray:
     """メディアンフィルタ。sizeは3程度がよい？"""
     rgb = cv2.medianBlur(rgb, size)
-    if rgb.ndim == 2:
-        rgb = np.expand_dims(rgb, axis=-1)
+    rgb = ensure_channel_dim(rgb)
     return rgb
 
 
@@ -671,8 +664,7 @@ def perspective_transform(
             borderMode=cv2_border,
             borderValue=borderValue,
         )
-        if rgb.ndim == 2:
-            rgb = np.expand_dims(rgb, axis=-1)
+        rgb = ensure_channel_dim(rgb)
     else:
         resized_list = [
             cv2.warpPerspective(
@@ -757,6 +749,7 @@ def erase_random(
                 continue
 
         rgb = np.copy(rgb)
+        rgb = ensure_channel_dim(rgb)
         rc = random_state.randint(0, 256, size=rgb.shape[-1])
         if alpha:
             rgb[ey : ey + eh, ex : ex + ew, :] = (
@@ -940,6 +933,7 @@ def ensure_channel_dim(img: np.ndarray) -> np.ndarray:
     """shapeが(H, W)なら(H, W, 1)にして返す。それ以外ならそのまま返す。"""
     if img.ndim == 2:
         return np.expand_dims(img, axis=-1)
+    assert img.ndim == 3
     return img
 
 
