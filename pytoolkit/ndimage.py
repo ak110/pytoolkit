@@ -928,7 +928,7 @@ def class_to_mask(classes: np.ndarray, class_colors: np.ndarray) -> np.ndarray:
     return np.asarray(class_colors)[classes]
 
 
-@numba.njit(fastmath=True, nogil=True)
+# @numba.njit(fastmath=True, nogil=True)
 def ensure_channel_dim(img: np.ndarray) -> np.ndarray:
     """shapeが(H, W)なら(H, W, 1)にして返す。それ以外ならそのまま返す。"""
     if img.ndim == 2:

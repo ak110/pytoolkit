@@ -156,7 +156,7 @@ def evaluate_ss(
         "miou": np.mean(class_iou),
         "iou_score": iou_score,
         "dice": dice,
-        "fg_iou": np.mean(sample_iou[fg_mask]),
-        "bg_acc": np.mean(pred_bg_mask[bg_mask]),
+        "fg_iou": np.mean(sample_iou[fg_mask]) if fg_mask.any() else np.nan,
+        "bg_acc": np.mean(pred_bg_mask[bg_mask]) if bg_mask.any() else np.nan,
         "acc": acc,
     }

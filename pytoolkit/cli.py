@@ -31,6 +31,7 @@ class App:
         self.inits: typing.List[typing.Callable[[], None]] = [
             tk.utils.better_exceptions,
             tk.math.set_ndarray_format,
+            tk.math.set_numpy_error,
         ]
         self.terms: typing.List[typing.Callable[[], None]] = []
         self.commands: typing.Dict[str, Command] = {}

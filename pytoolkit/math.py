@@ -27,6 +27,11 @@ def set_ndarray_format() -> None:
     np.set_string_function(format_ndarray, repr=True)
 
 
+def set_numpy_error() -> None:
+    """nanとかが出るときにraiseするように設定する。"""
+    np.seterr(all="raise")
+
+
 def sigmoid(x):
     """シグモイド関数。"""
     return 1 / (1 + np.exp(-x))

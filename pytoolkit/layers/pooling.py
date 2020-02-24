@@ -278,7 +278,7 @@ class GeMPooling2D(tf.keras.layers.Layer):
             # オーバーフロー対策で適当に制約をつける
             p_constraint
             if p_constraint is not None
-            else tk.constraints.Clip(1, 8)
+            else tk.constraints.Clip(1, 7)
         )
         self.p_trainable = p_trainable
         self.p = None

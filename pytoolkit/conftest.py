@@ -16,3 +16,10 @@ def check_dir():
 def data_dir():
     """テストデータのディレクトリ。"""
     return pathlib.Path(__file__).resolve().parent / "_test_data"
+
+
+if True:
+    import pytoolkit as tk
+
+    tk.math.set_ndarray_format()
+    tk.math.set_numpy_error()
