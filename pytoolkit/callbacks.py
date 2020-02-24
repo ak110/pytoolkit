@@ -172,8 +172,8 @@ class Checkpoint(tf.keras.callbacks.Callback):
 class ErrorOnNaN(tf.keras.callbacks.Callback):
     """NaNやinfで異常終了させる。"""
 
-    def __init__(self, save_dir=None):
-        self.save_dir = pathlib.Path(save_dir or ".")
+    def __init__(self, save_path=None):
+        self.save_path = pathlib.Path(save_path or "___broken___.h5")
 
     def on_batch_end(self, batch, logs=None):
         logs = logs or {}
@@ -202,7 +202,7 @@ class ErrorOnNaN(tf.keras.callbacks.Callback):
             # inf/nanが含まれていたら調査用に出力
             if broken:
                 try:
-                    self.model.save(self.save_dir / "broken_model.h5")
+                    self.model.save(str(self.save_path))
                 except Exception:
                     logger.warning("save error", exc_info=True)
 

@@ -14,9 +14,10 @@ def test_ErrorOnNaN(tmpdir):
     model = tf.keras.models.Model(inputs, x)
     model.weights[0].assign(np.array([0.5, 1.5, np.inf]))
 
-    cb = tk.callbacks.ErrorOnNaN(save_dir=str(tmpdir))
+    save_path = str(tmpdir / "___broken___.h5")
+    cb = tk.callbacks.ErrorOnNaN(save_path=save_path)
     cb.model = model
     with pytest.raises(RuntimeError):
         cb.on_batch_end(3, logs={"loss": np.nan})
 
-    assert pathlib.Path(str(tmpdir / "broken_model.h5")).exists()
+    assert pathlib.Path(save_path).exists()
