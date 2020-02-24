@@ -172,37 +172,39 @@ class Checkpoint(tf.keras.callbacks.Callback):
 class ErrorOnNaN(tf.keras.callbacks.Callback):
     """NaNやinfで異常終了させる。"""
 
+    def __init__(self, save_dir=None):
+        self.save_dir = pathlib.Path(save_dir or ".")
+
     def on_batch_end(self, batch, logs=None):
         logs = logs or {}
         loss = logs.get("loss")
-        if loss is not None:
-            if np.isnan(loss) or np.isinf(loss):
-                raise RuntimeError(
-                    f"Batch {batch}: Invalid loss (logs={logs} {self._get_stat_str()})"
-                )
+        if loss is not None and (np.isnan(loss) or np.isinf(loss)):
+            logger = tk.log.get(__name__)
+            # モデルの中に怪しい値が無いか調べる
+            max_value, max_value_weight = 0, ""
+            broken = False
+            try:
+                for layer in self.model.layers:
+                    for w, t in zip(layer.get_weights(), layer.weights):
+                        m = np.max(np.abs(w[~np.isinf(w)]), initial=0)
+                        if max_value < m:
+                            max_value = m
+                            max_value_weight = t.name
+                        if np.isnan(w).any():
+                            logger.info(f"nan in weights: {t.name}")
+                            broken = True
+                        elif np.isinf(w).any():
+                            logger.info(f"inf in weights: {t.name}")
+                            broken = True
+                logger.info(f"max_weights={max_value} (by {max_value_weight})")
+            except Exception:
+                logger.warning("check error", exc_info=True)
+            # inf/nanが含まれていたら調査用に出力
+            if broken:
+                try:
+                    self.model.save(self.save_dir / "broken_model.h5")
+                except Exception:
+                    logger.warning("save error", exc_info=True)
 
-    def _get_stat_str(self) -> str:
-        """モデルの中に怪しい値が無いか調べて文字列化して返す。"""
-        try:
-            max_value, max_value_layer = 0, ""
-            nan_layers = []
-            inf_layers = []
-            for layer in self.model.layers:
-                for w in layer.get_weights():
-                    m = np.max(np.abs(w))
-                    if max_value < m:
-                        max_value = m
-                        max_value_layer = layer.name
-                    if np.isnan(w).any():
-                        nan_layers.append(layer.name)
-                    if np.isinf(w).any():
-                        inf_layers.append(layer.name)
-            s = f"max_weights={max_value}(by {max_value_layer})"
-            if len(nan_layers) > 0:
-                s += f" nan_layers={nan_layers}"
-            if len(inf_layers) > 0:
-                s += f" inf_layers={inf_layers}"
-            return s
-        except Exception:
-            tk.log.get(__name__).warning("error", exc_info=True)
-            return ""
+            # エラーを飛ばす
+            raise RuntimeError(f"Batch {batch}: Invalid loss (logs={logs})")

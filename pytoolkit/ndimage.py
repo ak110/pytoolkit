@@ -933,7 +933,9 @@ def ensure_channel_dim(img: np.ndarray) -> np.ndarray:
     """shapeが(H, W)なら(H, W, 1)にして返す。それ以外ならそのまま返す。"""
     if img.ndim == 2:
         return np.expand_dims(img, axis=-1)
-    assert img.ndim == 3
+    assert img.ndim == 3, f"shape error: {img.shape}"
+    assert not np.isnan(img).any(), f"value error: {img}"
+    assert not np.isinf(img).any(), f"value error: {img}"
     return img
 
 
