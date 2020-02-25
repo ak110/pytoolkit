@@ -59,7 +59,13 @@ def load_weights(
         with tk.log.trace_scope(f"load_weights({path})"):
             if verbose:
                 old_weights = model.get_weights()
-            model.load_weights(str(path), by_name=by_name)
+            if path.is_dir():
+                # SavedModelはload_weights未対応？
+                # TODO: by_name対応？
+                loaded_model = load(path)
+                model.set_weights(loaded_model.get_weights())
+            else:
+                model.load_weights(str(path), by_name=by_name)
             if verbose:
                 new_weights = model.get_weights()
                 changed_params = np.sum(

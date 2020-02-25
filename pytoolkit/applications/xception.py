@@ -8,7 +8,7 @@ from .. import hvd, ndimage
 K = tf.keras.backend
 
 
-def xception(weights="imagenet", input_tensor=None, input_shape=None, for_small=False):
+def create(weights="imagenet", input_tensor=None, input_shape=None, for_small=False):
     """Xception。
 
     padding="same"にしたりinitializer, regularizerを指定したりしたもの。
@@ -159,3 +159,28 @@ def xception(weights="imagenet", input_tensor=None, input_shape=None, for_small=
 def preprocess_input(x):
     """前処理。"""
     return ndimage.preprocess_tf(x)
+
+
+def get_1_over_2(model):
+    """入力から縦横1/2のところのテンソルを返す。"""
+    return model.get_layer("block1_conv2_act").output
+
+
+def get_1_over_4(model):
+    """入力から縦横1/4のところのテンソルを返す。"""
+    return model.get_layer("block3_sepconv1_act").input
+
+
+def get_1_over_8(model):
+    """入力から縦横1/8のところのテンソルを返す。"""
+    return model.get_layer("block4_sepconv1_act").input
+
+
+def get_1_over_16(model):
+    """入力から縦横1/16のところのテンソルを返す。"""
+    return model.get_layer("block13_sepconv1_act").input
+
+
+def get_1_over_32(model):
+    """入力から縦横1/32のところのテンソルを返す。"""
+    return model.output

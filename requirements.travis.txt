@@ -5,9 +5,10 @@ better_exceptions
 black
 category_encoders
 chainercv
-diskcache
+efficientnet
 flake8
 flake8-bugbear
+image-classifiers
 keras2onnx
 matplotlib
 mypy
@@ -28,5 +29,6 @@ scikit-learn
 scipy
 six>=1.13.0
 tensorflow-cpu>=2.1.0
+tf2cv
 tf2onnx
 tqdm

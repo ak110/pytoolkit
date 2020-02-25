@@ -26,6 +26,10 @@ def test_save(tmpdir, mode):
     model = tf.keras.models.Model(inputs, x)
     tk.models.save(model, path, mode=mode)
 
+    if mode in ("hdf5", "saved_model"):
+        tk.models.load_weights(model, path)
+        tk.models.load(path)
+
 
 @pytest.mark.parametrize("output_count", [1, 2])
 def test_predict_flow(output_count):

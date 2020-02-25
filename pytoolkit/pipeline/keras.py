@@ -126,7 +126,13 @@ class KerasModel(Model):
     def _save_model(self, fold, models_dir=None):
         models_dir = models_dir or self.models_dir
         model_path = models_dir / self.model_name_format.format(fold=fold + 1)
-        tk.models.save(self.prediction_models[fold], model_path)
+        tk.models.save(
+            self.prediction_models[fold],
+            model_path,
+            mode="hdf5"
+            if model_path.suffix in (".h5", ".hdf5", ".keras")
+            else "saved_model",
+        )
 
     def _load_model(self, fold, models_dir=None):
         self.create_network(fold)

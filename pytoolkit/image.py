@@ -789,7 +789,7 @@ class GridMask(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         self, r=0.6, d=(0.4, 1.0), random_color=False, always_apply=False, p=0.7,
     ):
         super().__init__(always_apply=always_apply, p=p)
-        self.r = r
+        self.r = r if isinstance(r, tuple) else (r, r)
         self.d = d
         self.random_color = random_color
 
@@ -797,7 +797,8 @@ class GridMask(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         # pylint: disable=arguments-differ
         h, w = image.shape[:2]
         d = int(min(h, w) * random.uniform(*self.d))
-        l_ = int(d * self.r)
+        r = random.uniform(*self.r)
+        l_ = int(d * r)
 
         # 少し大きくマスクを作成
         hh, ww = int(h * 1.5), int(w * 1.5)

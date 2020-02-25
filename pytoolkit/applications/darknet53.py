@@ -5,7 +5,13 @@ import tensorflow as tf
 from .. import hvd
 
 
-def darknet53(input_shape=None, input_tensor=None, weights="imagenet", for_small=False):
+def create(
+    include_top=False,
+    input_shape=None,
+    input_tensor=None,
+    weights="imagenet",
+    for_small=False,
+):
     """Darknet53。
 
     feature map例:
@@ -22,6 +28,7 @@ def darknet53(input_shape=None, input_tensor=None, weights="imagenet", for_small
     else:
         assert input_tensor is None
         input_tensor = tf.keras.layers.Input(input_shape)
+    assert not include_top
     assert weights in (None, "imagenet")
 
     x = _darknet_body(input_tensor, for_small=for_small)
@@ -99,3 +106,33 @@ def _darknet_conv_bn_act(filters, kernel_size, name, strides=1, padding="same"):
 def preprocess_input(x):
     """前処理。"""
     return x / 255
+
+
+def get_1_over_1(model):
+    """入力から縦横1/1のところのテンソルを返す。"""
+    return model.get_layer("block1_conv1_act").output
+
+
+def get_1_over_2(model):
+    """入力から縦横1/2のところのテンソルを返す。"""
+    return model.get_layer("block2_add").output
+
+
+def get_1_over_4(model):
+    """入力から縦横1/4のところのテンソルを返す。"""
+    return model.get_layer("block4_add").output
+
+
+def get_1_over_8(model):
+    """入力から縦横1/8のところのテンソルを返す。"""
+    return model.get_layer("block12_add").output
+
+
+def get_1_over_16(model):
+    """入力から縦横1/16のところのテンソルを返す。"""
+    return model.get_layer("block20_add").output
+
+
+def get_1_over_32(model):
+    """入力から縦横1/32のところのテンソルを返す。"""
+    return model.output

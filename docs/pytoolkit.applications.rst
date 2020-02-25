@@ -12,6 +12,30 @@ pytoolkit.applications.darknet53 module
    :undoc-members:
    :show-inheritance:
 
+pytoolkit.applications.efficientnet module
+------------------------------------------
+
+.. automodule:: pytoolkit.applications.efficientnet
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pytoolkit.applications.resnet34 module
+--------------------------------------
+
+.. automodule:: pytoolkit.applications.resnet34
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pytoolkit.applications.seresnext50 module
+-----------------------------------------
+
+.. automodule:: pytoolkit.applications.seresnext50
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 pytoolkit.applications.xception module
 --------------------------------------
 

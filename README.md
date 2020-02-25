@@ -38,7 +38,6 @@ cookiecutter gh:ak110/cookiecutter-pytoolkit
 - catboost
 - category_encoders
 - chainercv
-- diskcache
 - h5py
 - horovod
 - ipython
