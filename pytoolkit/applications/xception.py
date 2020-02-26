@@ -8,7 +8,13 @@ from .. import hvd, ndimage
 K = tf.keras.backend
 
 
-def create(weights="imagenet", input_tensor=None, input_shape=None, for_small=False):
+def create(
+    include_top=False,
+    weights="imagenet",
+    input_tensor=None,
+    input_shape=None,
+    for_small=False,
+):
     """Xception。
 
     padding="same"にしたりinitializer, regularizerを指定したりしたもの。
@@ -22,6 +28,7 @@ def create(weights="imagenet", input_tensor=None, input_shape=None, for_small=Fa
 
     """
     assert K.image_data_format() == "channels_last"
+    assert not include_top
 
     if input_shape is None:
         assert input_tensor is not None

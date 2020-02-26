@@ -60,6 +60,7 @@ ignored-modules=__init__
     ,pydensecrf.densecrf
     ,pydensecrf.utils
     ,tensorflow
+    ,vmprof
     ,xgboost
 ignored-classes=numpy.ndarray
     ,Empty

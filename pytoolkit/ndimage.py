@@ -16,13 +16,6 @@ import PIL.Image
 import PIL.ImageOps
 
 
-@numba.njit(fastmath=True, nogil=True)
-def _to_uint8(x):
-    """floatからnp.uint8への変換。"""
-    # np.clipは未実装: https://github.com/numba/numba/pull/3468
-    return np.minimum(np.maximum(x, 0), 255).astype(np.uint8)
-
-
 def load(
     path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path],
     grayscale=False,
@@ -345,7 +338,7 @@ def gaussian_noise(
 ) -> np.ndarray:
     """ガウシアンノイズ。scaleは0～50くらい。小さいほうが色が壊れないかも。"""
     rgb = rgb + random_state.normal(0, scale, size=rgb.shape).astype(np.float32)
-    return _to_uint8(rgb)
+    return to_uint8(rgb)
 
 
 def blur(rgb: np.ndarray, sigma: float) -> np.ndarray:
@@ -361,7 +354,7 @@ def unsharp_mask(rgb: np.ndarray, sigma: float, alpha=2.0) -> np.ndarray:
     blured = blur(rgb, sigma)
     rgb = rgb.astype(np.float32)
     rgb = rgb + (rgb - blured) * alpha
-    return _to_uint8(rgb)
+    return to_uint8(rgb)
 
 
 def median(rgb: np.ndarray, size: int) -> np.ndarray:
@@ -374,7 +367,7 @@ def median(rgb: np.ndarray, size: int) -> np.ndarray:
 @numba.njit(fastmath=True, nogil=True)
 def brightness(rgb: np.ndarray, beta: float) -> np.ndarray:
     """明度の変更。betaの例：np.random.uniform(-32, +32)"""
-    return _to_uint8(rgb.astype(np.float32) + np.float32(beta))
+    return to_uint8(rgb.astype(np.float32) + np.float32(beta))
 
 
 @numba.njit(fastmath=True, nogil=True)
@@ -383,7 +376,7 @@ def contrast(rgb: np.ndarray, alpha: float) -> np.ndarray:
     # (rgb - 127.5) * alpha + 127.5
     # = rgb * alpha + 127.5 * (1 - alpha)
     alpha = np.float32(alpha)
-    return _to_uint8(rgb.astype(np.float32) * alpha + 127.5 * (1 - alpha))
+    return to_uint8(rgb.astype(np.float32) * alpha + 127.5 * (1 - alpha))
 
 
 @numba.njit(fastmath=True, nogil=True)
@@ -391,7 +384,7 @@ def saturation(rgb: np.ndarray, alpha: float) -> np.ndarray:
     """彩度の変更。alphaの例：np.random.uniform(0.5, 1.5)"""
     rgb = rgb.astype(np.float32)
     gs = (rgb * np.array([[[0.299, 0.587, 0.114]]], dtype=np.float32)).sum(axis=-1)
-    return _to_uint8(alpha * rgb + (1 - alpha) * np.expand_dims(gs, axis=-1))
+    return to_uint8(alpha * rgb + (1 - alpha) * np.expand_dims(gs, axis=-1))
 
 
 @numba.njit(fastmath=True, nogil=True)
@@ -402,13 +395,13 @@ def hue_lite(rgb: np.ndarray, alpha: np.ndarray, beta: np.ndarray) -> np.ndarray
     assert (alpha > 0).all()
     ma = 3 / (1 / (alpha + 1e-7)).sum()
     mb = np.mean(beta.astype(np.float32))
-    return _to_uint8(rgb.astype(np.float32) * (alpha / ma) + (beta - mb))
+    return to_uint8(rgb.astype(np.float32) * (alpha / ma) + (beta - mb))
 
 
 @numba.njit(fastmath=True, nogil=True)
 def to_grayscale(rgb: np.ndarray) -> np.ndarray:
     """グレースケール化。"""
-    return _to_uint8(
+    return to_uint8(
         (
             rgb.astype(np.float32)
             * np.array([[[0.299, 0.587, 0.114]]], dtype=np.float32)
@@ -422,7 +415,7 @@ def standardize(rgb: np.ndarray) -> np.ndarray:
     rgb = rgb.astype(np.float32)
     rgb = (rgb - np.mean(rgb)) / (np.std(rgb) + 1e-5)
     rgb = rgb * 64 + 127
-    return _to_uint8(rgb)
+    return to_uint8(rgb)
 
 
 @numba.njit(fastmath=True, nogil=True)
@@ -452,7 +445,7 @@ def equalize(rgb: np.ndarray) -> np.ndarray:
     gray = np.mean(rgb, axis=-1, keepdims=True)
     eq = np.expand_dims(cv2.equalizeHist(gray.astype(np.uint8)), axis=-1)
     rgb = rgb + (eq - gray)
-    return _to_uint8(rgb)
+    return to_uint8(rgb)
 
 
 # @numba.njit(fastmath=True, nogil=True)  # TypingError: numba doesn't support kwarg for mean
@@ -463,7 +456,7 @@ def auto_contrast(rgb: np.ndarray, scale=255) -> np.ndarray:
     b, w = gray.min(), gray.max()
     if b < w:
         rgb = (rgb - b) * (scale / (w - b))
-    return _to_uint8(rgb)
+    return to_uint8(rgb)
 
 
 # @numba.njit(fastmath=True, nogil=True)  # round
@@ -471,7 +464,7 @@ def posterize(rgb: np.ndarray, bits) -> np.ndarray:
     """ポスタリゼーション。"""
     assert bits in range(1, 8)
     t = np.float32(2 ** bits / 255)
-    return _to_uint8(np.round(rgb.astype(np.float32) * t) / t)
+    return to_uint8(np.round(rgb.astype(np.float32) * t) / t)
 
 
 def geometric_transform(
@@ -926,6 +919,13 @@ def ensure_channel_dim(img: np.ndarray) -> np.ndarray:
         return np.expand_dims(img, axis=-1)
     assert img.ndim == 3, str(img.shape)
     return img
+
+
+@numba.njit(fastmath=True, nogil=True)
+def to_uint8(x):
+    """floatからnp.uint8への変換。"""
+    # np.clipは未実装: https://github.com/numba/numba/pull/3468
+    return np.minimum(np.maximum(x, 0), 255).astype(np.uint8)
 
 
 def perlin_noise(
