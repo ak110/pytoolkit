@@ -1,8 +1,19 @@
 #!/usr/bin/env python3
-"""ImageDataGeneratorの速度チェック用コード。"""
+"""ImageDataGeneratorの速度チェック用コード。
+
+--profileを付けるとvmprofを使う。
+
+sudo apt install libunwind-dev
+pip install vmprof
+
+OMP_NUM_THREADS=1 pytoolkit/bin/benchmark.py --profile
+vmprofshow --prune_percent=5 benchmark.prof
+rm benchmark.prof
+
+"""
 import argparse
-import cProfile
 import pathlib
+import random
 import sys
 import time
 
@@ -25,6 +36,9 @@ def main():
     tk.utils.better_exceptions()
     tk.log.init(None)
 
+    random.seed(1)
+    np.random.seed(1)
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--load", action="store_true")
     parser.add_argument("--mask", action="store_true")
@@ -36,13 +50,16 @@ def main():
     save_dir = base_dir / "___check" / "bench"
     save_dir.mkdir(parents=True, exist_ok=True)
 
+    iterations = 128
     if args.load:
         X = np.array([data_dir / "9ab919332a1dceff9a252b43c0fb34a0_m.jpg"] * batch_size)
+        iterations //= 2
     else:
         X = tk.ndimage.load(data_dir / "9ab919332a1dceff9a252b43c0fb34a0_m.jpg")
         X = np.tile(np.expand_dims(X, axis=0), (batch_size, 1, 1, 1))
     if args.mask:
         y = X
+        iterations //= 2
     else:
         y = np.zeros((batch_size,))
     dataset = tk.data.Dataset(X, y)
@@ -50,20 +67,20 @@ def main():
     data_iterator = data_loader.iter(dataset, shuffle=True)
 
     if args.profile:
-        # 適当にループして速度を見る
-        cProfile.runctx(
-            "_run(data_iterator, iterations=4)",
-            globals=globals(),
-            locals={"_run": _run, "data_iterator": data_iterator},
-            sort="cumulative",
-        )  # 累積:cumulative 内部:time
+        import vmprof
+
+        with pathlib.Path("benchmark.prof").open("w+b") as fd:
+            vmprof.enable(fd.fileno())
+            _run(data_iterator, iterations=iterations)
+            vmprof.disable()
+        logger.info("example: vmprofshow --prune_percent=5 benchmark.prof")
     else:
         # 1バッチ分を保存
         X_batch, _ = next(iter(data_iterator.ds))
         for ix, x in enumerate(X_batch):
             tk.ndimage.save(save_dir / f"{ix}.png", np.clip(x, 0, 255).astype(np.uint8))
         # 適当にループして速度を見る
-        _run(data_iterator, iterations=16)
+        _run(data_iterator, iterations=iterations)
 
 
 def _run(data_iterator, iterations):

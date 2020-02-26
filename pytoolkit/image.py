@@ -349,14 +349,13 @@ class RandomColorAugmentors(RandomCompose):
                     RandomUnsharpMask(p=0.125),
                     A.IAASharpen(alpha=(0, 0.5), p=0.125),
                     GaussNoise(p=0.125),
-                    SpeckleNoise(p=0.125),
-                    A.ImageCompression(quality_lower=50, quality_upper=100, p=0.125),
                 ]
             )
         if not grayscale and noisy:
-            argumentors.extend(
-                [A.ISONoise(color_shift=(0, 0.05), intensity=(0, 0.5), p=0.125)]
-            )
+            # argumentors.extend(
+            #     [A.ISONoise(color_shift=(0, 0.05), intensity=(0, 0.5), p=0.125)]
+            # )
+            pass
         super().__init__(argumentors, p=p)
 
     def get_transform_init_args_names(self):

@@ -3,7 +3,6 @@
 uint8のRGBで0～255として扱うのを前提とする。
 あとグレースケールの場合もrows×cols×1の配列で扱う。
 """
-import functools
 import io
 import pathlib
 import random
@@ -17,14 +16,11 @@ import PIL.Image
 import PIL.ImageOps
 
 
-def _float_to_uint8(func):
+@numba.njit(fastmath=True, nogil=True)
+def _to_uint8(x):
     """floatからnp.uint8への変換。"""
-
-    @functools.wraps(func)
-    def float_to_uint8_func(*args, **kwargs):
-        return np.clip(func(*args, **kwargs), 0, 255).astype(np.uint8)
-
-    return float_to_uint8_func
+    # np.clipは未実装: https://github.com/numba/numba/pull/3468
+    return np.minimum(np.maximum(x, 0), 255).astype(np.uint8)
 
 
 def load(
@@ -344,12 +340,12 @@ def resize(
     return rgb
 
 
-@_float_to_uint8
 def gaussian_noise(
     rgb: np.ndarray, random_state: np.random.RandomState, scale: float
 ) -> np.ndarray:
     """ガウシアンノイズ。scaleは0～50くらい。小さいほうが色が壊れないかも。"""
-    return rgb + random_state.normal(0, scale, size=rgb.shape).astype(np.float32)
+    rgb = rgb + random_state.normal(0, scale, size=rgb.shape).astype(np.float32)
+    return _to_uint8(rgb)
 
 
 def blur(rgb: np.ndarray, sigma: float) -> np.ndarray:
@@ -359,13 +355,13 @@ def blur(rgb: np.ndarray, sigma: float) -> np.ndarray:
     return rgb
 
 
-@_float_to_uint8
 def unsharp_mask(rgb: np.ndarray, sigma: float, alpha=2.0) -> np.ndarray:
     """シャープ化。sigmaは0～1程度、alphaは1～2程度がよい？"""
     rgb = ensure_channel_dim(rgb)
     blured = blur(rgb, sigma)
-    rgb = rgb.astype(np.float)
-    return rgb + (rgb - blured) * alpha
+    rgb = rgb.astype(np.float32)
+    rgb = rgb + (rgb - blured) * alpha
+    return _to_uint8(rgb)
 
 
 def median(rgb: np.ndarray, size: int) -> np.ndarray:
@@ -375,33 +371,29 @@ def median(rgb: np.ndarray, size: int) -> np.ndarray:
     return rgb
 
 
-@_float_to_uint8
 @numba.njit(fastmath=True, nogil=True)
 def brightness(rgb: np.ndarray, beta: float) -> np.ndarray:
     """明度の変更。betaの例：np.random.uniform(-32, +32)"""
-    return rgb.astype(np.float32) + np.float32(beta)
+    return _to_uint8(rgb.astype(np.float32) + np.float32(beta))
 
 
-@_float_to_uint8
 @numba.njit(fastmath=True, nogil=True)
 def contrast(rgb: np.ndarray, alpha: float) -> np.ndarray:
     """コントラストの変更。alphaの例：np.random.uniform(0.75, 1.25)"""
     # (rgb - 127.5) * alpha + 127.5
     # = rgb * alpha + 127.5 * (1 - alpha)
     alpha = np.float32(alpha)
-    return rgb.astype(np.float32) * alpha + 127.5 * (1 - alpha)
+    return _to_uint8(rgb.astype(np.float32) * alpha + 127.5 * (1 - alpha))
 
 
-@_float_to_uint8
 @numba.njit(fastmath=True, nogil=True)
 def saturation(rgb: np.ndarray, alpha: float) -> np.ndarray:
     """彩度の変更。alphaの例：np.random.uniform(0.5, 1.5)"""
     rgb = rgb.astype(np.float32)
     gs = (rgb * np.array([[[0.299, 0.587, 0.114]]], dtype=np.float32)).sum(axis=-1)
-    return alpha * rgb + (1 - alpha) * np.expand_dims(gs, axis=-1)
+    return _to_uint8(alpha * rgb + (1 - alpha) * np.expand_dims(gs, axis=-1))
 
 
-@_float_to_uint8
 @numba.njit(fastmath=True, nogil=True)
 def hue_lite(rgb: np.ndarray, alpha: np.ndarray, beta: np.ndarray) -> np.ndarray:
     """色相の変更の適当バージョン。"""
@@ -410,26 +402,27 @@ def hue_lite(rgb: np.ndarray, alpha: np.ndarray, beta: np.ndarray) -> np.ndarray
     assert (alpha > 0).all()
     ma = 3 / (1 / (alpha + 1e-7)).sum()
     mb = np.mean(beta.astype(np.float32))
-    return rgb.astype(np.float32) * (alpha / ma) + (beta - mb)
+    return _to_uint8(rgb.astype(np.float32) * (alpha / ma) + (beta - mb))
 
 
-@_float_to_uint8
 @numba.njit(fastmath=True, nogil=True)
 def to_grayscale(rgb: np.ndarray) -> np.ndarray:
     """グレースケール化。"""
-    return (
-        rgb.astype(np.float32) * np.array([[[0.299, 0.587, 0.114]]], dtype=np.float32)
-    ).sum(axis=-1)
+    return _to_uint8(
+        (
+            rgb.astype(np.float32)
+            * np.array([[[0.299, 0.587, 0.114]]], dtype=np.float32)
+        ).sum(axis=-1)
+    )
 
 
-@_float_to_uint8
 @numba.njit(fastmath=True, nogil=True)
 def standardize(rgb: np.ndarray) -> np.ndarray:
     """標準化。0～255に適当に収める。"""
     rgb = rgb.astype(np.float32)
     rgb = (rgb - np.mean(rgb)) / (np.std(rgb) + 1e-5)
     rgb = rgb * 64 + 127
-    return rgb
+    return _to_uint8(rgb)
 
 
 @numba.njit(fastmath=True, nogil=True)
@@ -452,18 +445,17 @@ def rot90(rgb: np.ndarray, k) -> np.ndarray:
     return rgb
 
 
-@_float_to_uint8
 # @numba.njit(fastmath=True, nogil=True)
 def equalize(rgb: np.ndarray) -> np.ndarray:
     """ヒストグラム平坦化。"""
     rgb = rgb.astype(np.float32)
     gray = np.mean(rgb, axis=-1, keepdims=True)
     eq = np.expand_dims(cv2.equalizeHist(gray.astype(np.uint8)), axis=-1)
-    return rgb + (eq - gray)
+    rgb = rgb + (eq - gray)
+    return _to_uint8(rgb)
 
 
-@_float_to_uint8
-# @numba.njit(fastmath=True, nogil=True)
+# @numba.njit(fastmath=True, nogil=True)  # TypingError: numba doesn't support kwarg for mean
 def auto_contrast(rgb: np.ndarray, scale=255) -> np.ndarray:
     """オートコントラスト。"""
     rgb = rgb.astype(np.float32)
@@ -471,16 +463,15 @@ def auto_contrast(rgb: np.ndarray, scale=255) -> np.ndarray:
     b, w = gray.min(), gray.max()
     if b < w:
         rgb = (rgb - b) * (scale / (w - b))
-    return rgb
+    return _to_uint8(rgb)
 
 
-@_float_to_uint8
-# @numba.njit(fastmath=True, nogil=True)
+# @numba.njit(fastmath=True, nogil=True)  # round
 def posterize(rgb: np.ndarray, bits) -> np.ndarray:
     """ポスタリゼーション。"""
     assert bits in range(1, 8)
     t = np.float32(2 ** bits / 255)
-    return np.round(rgb.astype(np.float32) * t) / t
+    return _to_uint8(np.round(rgb.astype(np.float32) * t) / t)
 
 
 def geometric_transform(
@@ -928,14 +919,12 @@ def class_to_mask(classes: np.ndarray, class_colors: np.ndarray) -> np.ndarray:
     return np.asarray(class_colors)[classes]
 
 
-# @numba.njit(fastmath=True, nogil=True)
+@numba.njit(fastmath=True, nogil=True)
 def ensure_channel_dim(img: np.ndarray) -> np.ndarray:
     """shapeが(H, W)なら(H, W, 1)にして返す。それ以外ならそのまま返す。"""
     if img.ndim == 2:
         return np.expand_dims(img, axis=-1)
-    assert img.ndim == 3, f"shape error: {img.shape}"
-    assert not np.isnan(img).any(), f"value error: {img}"
-    assert not np.isinf(img).any(), f"value error: {img}"
+    assert img.ndim == 3, str(img.shape)
     return img
 
 
