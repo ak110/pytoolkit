@@ -4,6 +4,7 @@ import argparse
 import cProfile
 import pathlib
 import sys
+import time
 
 import albumentations as A
 import numpy as np
@@ -30,7 +31,7 @@ def main():
     parser.add_argument("--profile", action="store_true")
     args = parser.parse_args()
 
-    base_dir = pathlib.Path(__file__).resolve().parent.parent
+    base_dir = pathlib.Path(__file__).resolve().parent.parent.parent
     data_dir = base_dir / "pytoolkit" / "_test_data"
     save_dir = base_dir / "___check" / "bench"
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -58,26 +59,25 @@ def main():
         )  # 累積:cumulative 内部:time
     else:
         # 1バッチ分を保存
-        X_batch, _ = data_iterator[0]
+        X_batch, _ = next(iter(data_iterator.ds))
         for ix, x in enumerate(X_batch):
             tk.ndimage.save(save_dir / f"{ix}.png", np.clip(x, 0, 255).astype(np.uint8))
         # 適当にループして速度を見る
         _run(data_iterator, iterations=16)
 
-    logger.info(f"{data_iterator.seconds_per_step * 1000:.0f}ms/step")
-
 
 def _run(data_iterator, iterations):
     """ループして速度を見るための処理。"""
+    start_time = time.perf_counter()
     with tk.utils.tqdm(total=batch_size * iterations, unit="f") as pbar:
-        while True:
-            for X_batch, y_batch in data_iterator:
-                assert len(X_batch) == batch_size
-                assert len(y_batch) == batch_size
-                pbar.update(len(X_batch))
-            data_iterator.on_epoch_end()
+        for X_batch, y_batch in data_iterator.ds:
+            assert len(X_batch) == batch_size
+            assert len(y_batch) == batch_size
+            pbar.update(len(X_batch))
             if pbar.n >= pbar.total:
                 break
+    sps = (time.perf_counter() - start_time) / iterations
+    logger.info(f"{sps * 1000:.0f}ms/step")
 
 
 class MyDataLoader(tk.data.DataLoader):

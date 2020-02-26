@@ -62,7 +62,7 @@ def load_weights(
             if path.is_dir():
                 # SavedModelはload_weights未対応？
                 # TODO: by_name対応？
-                loaded_model = load(path)
+                loaded_model = tf.keras.models.load_model(str(path), compile=False)
                 model.set_weights(loaded_model.get_weights())
             else:
                 model.load_weights(str(path), by_name=by_name)
