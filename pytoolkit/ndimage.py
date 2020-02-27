@@ -748,7 +748,7 @@ def erase_random(
     return rgb
 
 
-def mixup(sample1: tuple, sample2: tuple, mode: str = "beta") -> tuple:
+def mixup(sample1: tuple, sample2: tuple, mode: str = "beta", alpha=0.2) -> tuple:
     """mixup。 <https://arxiv.org/abs/1710.09412>
 
     常に「sample1の重み >= sample2の重み」となるようにしている。
@@ -760,13 +760,14 @@ def mixup(sample1: tuple, sample2: tuple, mode: str = "beta") -> tuple:
             - 'beta': β分布を0.5以上にした分布
             - 'uniform': [0.5, 1]の一様分布
             - 'uniform_ex': [0.5, √2]の一様分布
+        alpha: mode == 'beta'の場合のα。<1で0 or 1寄り、1で一様、>1で0.5寄り。
 
     Returns:
         tuple: 混ぜられたデータ。
 
     """
     if mode == "beta":
-        r = np.float32(np.abs(random.betavariate(0.2, 0.2) - 0.5) + 0.5)
+        r = np.float32(np.abs(random.betavariate(alpha, alpha) - 0.5) + 0.5)
     elif mode == "uniform":
         r = np.float32(random.uniform(0.5, 1))
     elif mode == "uniform_ex":
