@@ -785,12 +785,19 @@ class GridMask(A.ImageOnlyTransform):  # pylint: disable=abstract-method
     """
 
     def __init__(
-        self, r=0.6, d=(0.4, 1.0), random_color=False, always_apply=False, p=0.7,
+        self,
+        r=0.6,
+        d=(0.4, 1.0),
+        random_color=False,
+        fill_value=0,
+        always_apply=False,
+        p=0.7,
     ):
         super().__init__(always_apply=always_apply, p=p)
         self.r = r if isinstance(r, tuple) else (r, r)
         self.d = d
         self.random_color = random_color
+        self.fill_value = fill_value
 
     def apply(self, image, **params):
         # pylint: disable=arguments-differ
@@ -809,9 +816,17 @@ class GridMask(A.ImageOnlyTransform):  # pylint: disable=abstract-method
 
         # 回転
         degrees = random.uniform(0, 360)
-        mask = tk.ndimage.rotate(
-            mask, degrees, expand=False, interp="bilinear", border_mode="wrap"
+        center = (mask.shape[1] // 2, mask.shape[0] // 2)
+        m = cv2.getRotationMatrix2D(center=center, angle=degrees, scale=1.0)
+        mask = cv2.warpAffine(
+            mask,
+            m,
+            (mask.shape[1], mask.shape[0]),
+            flags=cv2.INTER_LINEAR,
+            borderMode=cv2.BORDER_WRAP,
         )
+        assert mask.ndim == 2
+        mask = np.expand_dims(mask, axis=-1)
 
         # 使うサイズをrandom crop
         cy = random.randint(0, hh - h - 1)
@@ -819,13 +834,17 @@ class GridMask(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         mask = mask[cy : cy + h, cx : cx + w, :]
 
         # マスクを適用
-        image = tk.ndimage.ensure_channel_dim(image)
+        if image.ndim == 2:
+            image = np.expand_dims(image, axis=-1)
         if self.random_color:
             # ランダムな色でマスク (オリジナル)
             color = np.array(
                 [random.randint(0, 255) for _ in range(image.shape[-1])],
                 dtype=np.uint8,
             )
+            return (image * mask + color * (1 - mask)).astype(image.dtype)
+        elif self.fill_value != 0:
+            color = np.asarray(self.fill_value)
             return (image * mask + color * (1 - mask)).astype(image.dtype)
         else:
             return (image * mask).astype(image.dtype)

@@ -12,17 +12,32 @@ def save_dir(check_dir):
     return d
 
 
-@pytest.mark.parametrize("filename", ["cifar.png", "Lenna.png"])
-def test_autoaugment(data_dir, save_dir, filename):
+@pytest.mark.parametrize(
+    "policy,filename",
+    [
+        ("cifar10", "cifar.png"),
+        ("cifar10", "Lenna.png"),
+        ("svhn", "Lenna.png"),
+        ("imagenet", "Lenna.png"),
+    ],
+)
+def test_autoaugment(data_dir, save_dir, policy, filename):
     """画像の変換のテスト。目視したいので結果を`../___check/autoaugment/`に保存しちゃう。"""
-    aug = tk.autoaugment.CIFAR10Policy()
+    aug = {
+        "cifar10": tk.autoaugment.CIFAR10Policy,
+        "svhn": tk.autoaugment.SVHNPolicy,
+        "imagenet": tk.autoaugment.ImageNetPolicy,
+    }[policy]()
     img_path = data_dir / filename
-    img = tk.ndimage.load(img_path)
+    img = tk.ndimage.load(img_path, grayscale=True)
     for i in range(32):
-        tk.ndimage.save(save_dir / f"{img_path.stem}.{i}.png", aug(image=img)["image"])
+        augmented = aug(image=img)
+        tk.ndimage.save(
+            save_dir / f"{policy}.{img_path.stem}.{i}.png", augmented["image"]
+        )
 
 
-@pytest.mark.parametrize("mag", [0, 9])
+@pytest.mark.parametrize("grayscale, mag", [(False, 0), (False, 9), (True, 5)])
 @pytest.mark.parametrize(
     "klass",
     [
@@ -42,8 +57,11 @@ def test_autoaugment(data_dir, save_dir, filename):
         tk.autoaugment.Sharpness,
     ],
 )
-def test_transforms(data_dir, save_dir, klass, mag):
+def test_transforms(data_dir, save_dir, klass, grayscale, mag):
     """各変換の確認。"""
-    img = tk.ndimage.load(data_dir / "cifar.png")
+    img = tk.ndimage.load(data_dir / "cifar.png", grayscale=grayscale)
     img = klass(mag, p=1)(image=img)["image"]
-    tk.ndimage.save(save_dir / f"transform.{klass.__name__}.mag={mag}.png", img)
+    tk.ndimage.save(
+        save_dir / f"transform.{klass.__name__}.grayscale={grayscale}.mag={mag}.png",
+        img,
+    )

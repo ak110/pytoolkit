@@ -48,6 +48,9 @@ class CIFAR10Policy(A.OneOf):
             p=p,
         )
 
+    def get_transform_init_args_names(self):
+        return ()
+
 
 class SVHNPolicy(A.OneOf):
     """AutoAugment <https://arxiv.org/abs/1805.09501>のSVHN用。"""
@@ -84,6 +87,9 @@ class SVHNPolicy(A.OneOf):
             p=p,
         )
 
+    def get_transform_init_args_names(self):
+        return ()
+
 
 class ImageNetPolicy(A.OneOf):
     """AutoAugment <https://arxiv.org/abs/1805.09501>のImageNet用。"""
@@ -119,6 +125,9 @@ class ImageNetPolicy(A.OneOf):
             ],
             p=p,
         )
+
+    def get_transform_init_args_names(self):
+        return ()
 
 
 def subpolicy(a1, p1, mag1, a2, p2, mag2):
@@ -157,7 +166,7 @@ class Affine(A.ImageOnlyTransform):
         translate_y = float_parameter(
             self.translate_y_mag, image.shape[0] * 150 / 331, flip_sign=True
         )
-        image = PIL.Image.fromarray(image, mode="RGB")
+        image = to_pillow(image)
         data = (1, shear_x, translate_x, shear_y, 1, translate_y)
         return np.asarray(
             image.transform(
@@ -165,9 +174,17 @@ class Affine(A.ImageOnlyTransform):
                 PIL.Image.AFFINE,
                 data,
                 PIL.Image.BICUBIC,
-                fillcolor=(128, 128, 128),
+                fillcolor=(128,) if image.mode == "L" else (128, 128, 128),
             ),
             dtype=np.uint8,
+        )
+
+    def get_transform_init_args_names(self):
+        return (
+            "shear_x_mag",
+            "shear_y_mag",
+            "translate_x_mag",
+            "translate_y_mag",
         )
 
 
@@ -177,12 +194,18 @@ class ShearX(Affine):
     def __init__(self, mag, always_apply=False, p=0.5):
         super().__init__(shear_x_mag=mag, always_apply=always_apply, p=p)
 
+    def get_transform_init_args_names(self):
+        return ("mag",)
+
 
 class ShearY(Affine):
     """せん断。"""
 
     def __init__(self, mag, always_apply=False, p=0.5):
         super().__init__(shear_y_mag=mag, always_apply=always_apply, p=p)
+
+    def get_transform_init_args_names(self):
+        return ("mag",)
 
 
 class TranslateX(Affine):
@@ -191,12 +214,18 @@ class TranslateX(Affine):
     def __init__(self, mag, always_apply=False, p=0.5):
         super().__init__(translate_x_mag=mag, always_apply=always_apply, p=p)
 
+    def get_transform_init_args_names(self):
+        return ("mag",)
+
 
 class TranslateY(Affine):
     """移動。"""
 
     def __init__(self, mag, always_apply=False, p=0.5):
         super().__init__(translate_y_mag=mag, always_apply=always_apply, p=p)
+
+    def get_transform_init_args_names(self):
+        return ("mag",)
 
 
 class Rotate(A.ImageOnlyTransform):
@@ -212,11 +241,14 @@ class Rotate(A.ImageOnlyTransform):
 
     def apply(self, image, **params):
         degrees = int_parameter(self.mag, 30, flip_sign=True)
-        image = PIL.Image.fromarray(image, mode="RGB")
+        image = to_pillow(image)
         image = image.convert("RGBA").rotate(degrees)
         bg = PIL.Image.new("RGBA", image.size, (128, 128, 128, 255))
         image = PIL.Image.composite(image, bg, image).convert("RGB")
         return np.asarray(image, dtype=np.uint8)
+
+    def get_transform_init_args_names(self):
+        return ("mag",)
 
 
 class AutoContrast(A.ImageOnlyTransform):
@@ -227,8 +259,11 @@ class AutoContrast(A.ImageOnlyTransform):
         del mag
 
     def apply(self, image, **params):
-        image = PIL.Image.fromarray(image, mode="RGB")
+        image = to_pillow(image)
         return np.asarray(PIL.ImageOps.autocontrast(image), dtype=np.uint8)
+
+    def get_transform_init_args_names(self):
+        return ("mag",)
 
 
 class Invert(A.ImageOnlyTransform):
@@ -239,8 +274,11 @@ class Invert(A.ImageOnlyTransform):
         del mag
 
     def apply(self, image, **params):
-        image = PIL.Image.fromarray(image, mode="RGB")
+        image = to_pillow(image)
         return np.asarray(PIL.ImageOps.invert(image), dtype=np.uint8)
+
+    def get_transform_init_args_names(self):
+        return ("mag",)
 
 
 class Equalize(A.ImageOnlyTransform):
@@ -251,8 +289,11 @@ class Equalize(A.ImageOnlyTransform):
         del mag
 
     def apply(self, image, **params):
-        image = PIL.Image.fromarray(image, mode="RGB")
+        image = to_pillow(image)
         return np.asarray(PIL.ImageOps.equalize(image), dtype=np.uint8)
+
+    def get_transform_init_args_names(self):
+        return ("mag",)
 
 
 class Solarize(A.ImageOnlyTransform):
@@ -264,8 +305,11 @@ class Solarize(A.ImageOnlyTransform):
 
     def apply(self, image, **params):
         threshold = 256 - int_parameter(self.mag, 256)
-        image = PIL.Image.fromarray(image, mode="RGB")
+        image = to_pillow(image)
         return np.asarray(PIL.ImageOps.solarize(image, threshold), dtype=np.uint8)
+
+    def get_transform_init_args_names(self):
+        return ("mag",)
 
 
 class Posterize(A.ImageOnlyTransform):
@@ -278,8 +322,11 @@ class Posterize(A.ImageOnlyTransform):
     def apply(self, image, **params):
         # https://github.com/tensorflow/models/blob/master/research/autoaugment/augmentation_transforms.py#L267 🤔
         bit = 8 - int_parameter(self.mag, 4)
-        image = PIL.Image.fromarray(image, mode="RGB")
+        image = to_pillow(image)
         return np.asarray(PIL.ImageOps.posterize(image, bit), dtype=np.uint8)
+
+    def get_transform_init_args_names(self):
+        return ("mag",)
 
 
 class Contrast(A.ImageOnlyTransform):
@@ -291,10 +338,13 @@ class Contrast(A.ImageOnlyTransform):
 
     def apply(self, image, **params):
         factor = 1 + float_parameter(self.mag, 0.9, flip_sign=True)
-        image = PIL.Image.fromarray(image, mode="RGB")
+        image = to_pillow(image)
         return np.asarray(
             PIL.ImageEnhance.Contrast(image).enhance(factor), dtype=np.uint8
         )
+
+    def get_transform_init_args_names(self):
+        return ("mag",)
 
 
 class Color(A.ImageOnlyTransform):
@@ -306,8 +356,11 @@ class Color(A.ImageOnlyTransform):
 
     def apply(self, image, **params):
         factor = 1 + float_parameter(self.mag, 0.9, flip_sign=True)
-        image = PIL.Image.fromarray(image, mode="RGB")
+        image = to_pillow(image)
         return np.asarray(PIL.ImageEnhance.Color(image).enhance(factor), dtype=np.uint8)
+
+    def get_transform_init_args_names(self):
+        return ("mag",)
 
 
 class Brightness(A.ImageOnlyTransform):
@@ -319,10 +372,13 @@ class Brightness(A.ImageOnlyTransform):
 
     def apply(self, image, **params):
         factor = 1 + float_parameter(self.mag, 0.9, flip_sign=True)
-        image = PIL.Image.fromarray(image, mode="RGB")
+        image = to_pillow(image)
         return np.asarray(
             PIL.ImageEnhance.Brightness(image).enhance(factor), dtype=np.uint8
         )
+
+    def get_transform_init_args_names(self):
+        return ("mag",)
 
 
 class Sharpness(A.ImageOnlyTransform):
@@ -334,10 +390,20 @@ class Sharpness(A.ImageOnlyTransform):
 
     def apply(self, image, **params):
         factor = 1 + float_parameter(self.mag, 0.9, flip_sign=True)
-        image = PIL.Image.fromarray(image, mode="RGB")
+        image = to_pillow(image)
         return np.asarray(
             PIL.ImageEnhance.Sharpness(image).enhance(factor), dtype=np.uint8
         )
+
+    def get_transform_init_args_names(self):
+        return ("mag",)
+
+
+def to_pillow(image: np.ndarray) -> PIL.Image:
+    """ndarrayからPIL.Imageへの変換。"""
+    image = np.squeeze(image)
+    mode = "L" if image.ndim == 2 else "RGB"
+    return PIL.Image.fromarray(image, mode)
 
 
 def float_parameter(level: int, maxval: float, flip_sign: bool = False) -> float:
