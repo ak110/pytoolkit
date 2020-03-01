@@ -242,9 +242,10 @@ class Rotate(A.ImageOnlyTransform):
     def apply(self, image, **params):
         degrees = int_parameter(self.mag, 30, flip_sign=True)
         image = to_pillow(image)
+        in_mode = image.mode
         image = image.convert("RGBA").rotate(degrees)
         bg = PIL.Image.new("RGBA", image.size, (128, 128, 128, 255))
-        image = PIL.Image.composite(image, bg, image).convert("RGB")
+        image = PIL.Image.composite(image, bg, image).convert(in_mode)
         return np.asarray(image, dtype=np.uint8)
 
     def get_transform_init_args_names(self):

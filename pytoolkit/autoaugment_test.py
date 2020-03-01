@@ -61,6 +61,7 @@ def test_transforms(data_dir, save_dir, klass, grayscale, mag):
     """各変換の確認。"""
     img = tk.ndimage.load(data_dir / "cifar.png", grayscale=grayscale)
     img = klass(mag, p=1)(image=img)["image"]
+    assert (img.ndim == 2 or img.shape[-1] == 1) == grayscale
     tk.ndimage.save(
         save_dir / f"transform.{klass.__name__}.grayscale={grayscale}.mag={mag}.png",
         img,

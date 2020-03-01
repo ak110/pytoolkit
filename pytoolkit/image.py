@@ -801,6 +801,8 @@ class GridMask(A.ImageOnlyTransform):  # pylint: disable=abstract-method
 
     def apply(self, image, **params):
         # pylint: disable=arguments-differ
+        # ↓<https://github.com/PyCQA/pylint/issues/3139>
+        # pylint: disable=unsubscriptable-object
         h, w = image.shape[:2]
         d = int(min(h, w) * random.uniform(*self.d))
         r = random.uniform(*self.r)
