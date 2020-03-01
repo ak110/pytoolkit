@@ -1,5 +1,8 @@
 """カスタムレイヤー。"""
+
 import tensorflow as tf
+
+import pytoolkit as tk
 
 
 @tf.keras.utils.register_keras_serializable()
@@ -25,6 +28,8 @@ class AutomatedFocalLoss(tf.keras.layers.Layer):
             shape=logits_shape[1:] if self.mode == "binary" else logits_shape[1:-1],
             initializer=tf.keras.initializers.zeros(),
             trainable=False,
+            synchronization=tf.VariableSynchronization.ON_READ,
+            aggregation=tf.VariableAggregation.MEAN,
             name="phat_correct",
         )
         super().build(input_shape)
@@ -46,14 +51,19 @@ class AutomatedFocalLoss(tf.keras.layers.Layer):
             p = tf.nn.softmax(logits)
             p_correct = tf.math.reduce_sum(labels * p, axis=-1)
 
-        new = tf.math.reduce_mean(p_correct, axis=0)
-        phat_correct = self.phat_correct * 0.95 + new * 0.05
+        p_new = tf.math.reduce_mean(p_correct, axis=0)
+        phat_correct = self.phat_correct * 0.95 + p_new * 0.05
         tf.keras.backend.update(self.phat_correct, phat_correct)
 
-        gamma = -tf.math.log(phat_correct + 1e-7)
+        gamma = -tf.math.log(tf.math.maximum(phat_correct, 0.01))
 
         w = (1 - p_correct) ** gamma
-        loss = -w * tf.math.log(p_correct + 1e-7)
+        w = tf.stop_gradient(w)  # ？
+        if self.mode == "binary":
+            loss = w * (tf.math.log1p(tf.math.exp(logits)) - labels * logits)
+        else:
+            log_p = tk.backend.log_softmax(logits)
+            loss = -w * tf.math.reduce_sum(labels * log_p, axis=-1)
         return loss
 
     def get_config(self):
