@@ -81,37 +81,38 @@ def evaluate_od(
     pred_bboxes_list = np.array(
         [p.get_real_bboxes(y.width, y.height) for (p, y) in zip(y_pred, y_true)]
     )
-    evals = chainercv.evaluations.eval_detection_coco(
-        pred_bboxes_list,
-        pred_classes_list,
-        pred_confs_list,
-        gt_bboxes_list,
-        gt_classes_list,
-        gt_areas_list,
-        gt_crowdeds_list,
-    )
+    with np.errstate(all="warn"):
+        evals = chainercv.evaluations.eval_detection_coco(
+            pred_bboxes_list,
+            pred_classes_list,
+            pred_confs_list,
+            gt_bboxes_list,
+            gt_classes_list,
+            gt_areas_list,
+            gt_crowdeds_list,
+        )
 
-    voc_evals1 = chainercv.evaluations.eval_detection_voc(
-        pred_bboxes_list,
-        pred_classes_list,
-        pred_confs_list,
-        gt_bboxes_list,
-        gt_classes_list,
-        gt_difficults_list,
-        use_07_metric=False,
-    )
-    voc_evals2 = chainercv.evaluations.eval_detection_voc(
-        pred_bboxes_list,
-        pred_classes_list,
-        pred_confs_list,
-        gt_bboxes_list,
-        gt_classes_list,
-        gt_difficults_list,
-        use_07_metric=True,
-    )
-    evals["voc_ap"] = voc_evals1["ap"]
-    evals["voc_map"] = voc_evals1["map"]
-    evals["voc07_ap"] = voc_evals2["ap"]
-    evals["voc07_map"] = voc_evals2["map"]
+        voc_evals1 = chainercv.evaluations.eval_detection_voc(
+            pred_bboxes_list,
+            pred_classes_list,
+            pred_confs_list,
+            gt_bboxes_list,
+            gt_classes_list,
+            gt_difficults_list,
+            use_07_metric=False,
+        )
+        voc_evals2 = chainercv.evaluations.eval_detection_voc(
+            pred_bboxes_list,
+            pred_classes_list,
+            pred_confs_list,
+            gt_bboxes_list,
+            gt_classes_list,
+            gt_difficults_list,
+            use_07_metric=True,
+        )
+        evals["voc_ap"] = voc_evals1["ap"]
+        evals["voc_map"] = voc_evals1["map"]
+        evals["voc07_ap"] = voc_evals2["ap"]
+        evals["voc07_map"] = voc_evals2["map"]
 
-    return evals
+        return evals
