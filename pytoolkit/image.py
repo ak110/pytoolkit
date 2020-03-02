@@ -7,7 +7,9 @@ import warnings
 import albumentations as A
 import cv2
 import numpy as np
+import PIL.Image
 import scipy.ndimage
+import tensorflow as tf
 
 import pytoolkit as tk
 
@@ -300,16 +302,48 @@ class RandomTransform(A.DualTransform):
 
 
 class Resize(A.DualTransform):  # pylint: disable=abstract-method
-    """リサイズ。"""
+    """リサイズ。
 
-    def __init__(self, width, height, always_apply=False, p=1):
+    Args:
+        size: 出力サイズ。(H, W)
+        mode: cv2 or tf or pil
+
+    """
+
+    def __init__(
+        self, *, size=None, width=None, height=None, mode="cv2", always_apply=False, p=1
+    ):
         super().__init__(always_apply=False, p=1)
-        self.width = width
-        self.height = height
+        if size is None:
+            # deprecated
+            warnings.warn("width/height ware deprecated.")
+            size = (height, width)
+        assert mode in ("cv2", "tf", "pil")
+        self.size = size
+        self.mode = mode
 
     def apply(self, image, **params):
         # pylint: disable=arguments-differ
-        return tk.ndimage.resize(image, width=self.width, height=self.height)
+        if self.mode == "cv2":
+            image = tk.ndimage.resize(image, width=self.size[1], height=self.size[0])
+        elif self.mode == "tf":
+            image = tf.image.resize(
+                image, self.size, method=tf.image.ResizeMethod.LANCZOS5, antialias=True
+            )
+            image = tf.cast(tf.clip_by_value(image, 0, 255), tf.uint8).numpy()
+        elif self.mode == "pil":
+            if image.ndim == 3 and image.shape[2] == 1:
+                image = np.squeeze(image, axis=2)
+            image = np.asarray(
+                PIL.Image.fromarray(image).resize(
+                    self.size[::-1], resample=PIL.Image.LANCZOS
+                ),
+                dtype=np.uint8,
+            )
+            image = tk.ndimage.ensure_channel_dim(image)
+        else:
+            raise ValueError(f"mode={self.mode}")
+        return image
 
     def apply_to_bbox(self, bbox, **params):
         return bbox
@@ -318,7 +352,7 @@ class Resize(A.DualTransform):  # pylint: disable=abstract-method
         return keypoint
 
     def get_transform_init_args_names(self):
-        return ("width", "height")
+        return ("size",)
 
 
 class RandomColorAugmentors(RandomCompose):
