@@ -308,6 +308,9 @@ class Resize(A.DualTransform):  # pylint: disable=abstract-method
         size: 出力サイズ。(H, W)
         mode: cv2 or tf or pil
 
+    環境にもよるが、1024x768 -> 331x331でcv2:3ms、tf:30ms、pil:10msくらい。
+    (tf/pilは遅めなので要注意。ただしcv2は拡大と縮小の混在は画質が悪いので要注意。)
+
     """
 
     def __init__(

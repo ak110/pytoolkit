@@ -55,11 +55,7 @@ class KerasModel(Model):
     def __init__(
         self,
         create_network_fn: typing.Callable[
-            [],
-            typing.Union[
-                tf.keras.models.Model,
-                typing.Tuple[tf.keras.models.Model, tf.keras.models.Model],
-            ],
+            [], typing.Tuple[tf.keras.models.Model, tf.keras.models.Model]
         ],
         nfold: int,
         models_dir: tk.typing.PathLike,

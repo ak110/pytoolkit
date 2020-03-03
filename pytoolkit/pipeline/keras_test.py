@@ -13,7 +13,7 @@ def test_keras_xor(tmpdir):
     y = np.array([0, 1, 1, 0], dtype=np.int32)
     train_set = tk.data.Dataset(X.repeat(4096, axis=0), y.repeat(4096, axis=0))
 
-    def create_network() -> tf.keras.models.Model:
+    def create_network():
         inputs = x = tf.keras.layers.Input(shape=(2,))
         x = tf.keras.layers.Dense(16, use_bias=False)(x)
         x = tf.keras.layers.BatchNormalization()(x)
@@ -23,7 +23,7 @@ def test_keras_xor(tmpdir):
         tk.models.compile(
             model, "adam", "binary_crossentropy", [tk.metrics.binary_accuracy]
         )
-        return model
+        return model, model
 
     model = tk.pipeline.KerasModel(
         create_network_fn=create_network,
