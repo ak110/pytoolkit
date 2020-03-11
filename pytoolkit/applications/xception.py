@@ -14,6 +14,7 @@ def create(
     input_tensor=None,
     input_shape=None,
     for_small=False,
+    activation="relu",
 ):
     """Xception。
 
@@ -51,7 +52,7 @@ def create(
         kernel_initializer="he_uniform",
     )
     bn = functools.partial(tf.keras.layers.BatchNormalization)
-    act = functools.partial(tf.keras.layers.Activation, "relu")
+    act = functools.partial(tf.keras.layers.Activation, activation)
     mp = functools.partial(
         tf.keras.layers.MaxPooling2D, pool_size=3, strides=2, padding="same"
     )

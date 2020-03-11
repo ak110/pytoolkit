@@ -97,16 +97,31 @@ class LGBModel(Model):
             assert dataset.data.ndim == 2
             num_features = dataset.data.shape[1]
 
+        params = self.params.copy()
+        weight = dataset.weights if dataset.weights is not None else None
         # 独自拡張: sklearn風の指定
-        if self.params.get("feature_fraction") == "sqrt":
-            self.params["feature_fraction"] = np.sqrt(num_features) / num_features
-        elif self.params.get("feature_fraction") == "log2":
-            self.params["feature_fraction"] = np.log2(num_features) / num_features
+        if params.get("feature_fraction") == "sqrt":
+            params["feature_fraction"] = np.sqrt(num_features) / num_features
+        elif params.get("feature_fraction") == "log2":
+            params["feature_fraction"] = np.log2(num_features) / num_features
+        # 独自拡張: クラス別の重みの指定
+        if "class_weights" in params:
+            if params.get("class_weights") == "balanced":
+                assert "num_class" in params, str(params)
+                class_weights = params.get("num_class") / np.bincount(dataset.labels)
+            else:
+                class_weights = params.get("class_weights")
+            params.pop("class_weights")
+            sample_weights = class_weights[dataset.labels]
+            if weight is None:
+                weight = sample_weights
+            else:
+                weight *= sample_weights
 
         train_set = lgb.Dataset(
             dataset.data,
             dataset.labels,
-            weight=dataset.weights if dataset.weights is not None else None,
+            weight=weight,
             group=np.bincount(dataset.groups) if dataset.groups is not None else None,
             init_score=dataset.init_score if dataset.init_score is not None else None,
             free_raw_data=False,
@@ -120,7 +135,7 @@ class LGBModel(Model):
             with tk.log.trace_scope(f"seed averaging({seed_i + 1}/{len(seeds)})"):
                 model_extractor = ModelExtractionCallback()
                 eval_hist = lgb.cv(
-                    self.params,
+                    params,
                     train_set,
                     folds=folds,
                     early_stopping_rounds=self.early_stopping_rounds,

@@ -33,8 +33,8 @@ def test_data_loader_2():
         def get_sample(self, data: list) -> tuple:
             assert len(data) == 2
             data1, data2 = data
-            assert isinstance(data1, tuple)
-            assert isinstance(data2, tuple)
+            assert isinstance(data1, tuple) and len(data1) == 2  # X, y
+            assert isinstance(data2, tuple) and len(data2) == 2  # X, y
             return data1
 
     dataset = tk.data.Dataset(data=np.arange(3), labels=np.arange(4, 7))
@@ -46,14 +46,14 @@ def test_data_loader_2():
         assert X_batch.numpy().shape == (2,) and y_batch.numpy().shape == (2,)
 
 
-@pytest.mark.parametrize("data_per_sample", [1, 2])
+@pytest.mark.parametrize("data_per_sample", [1, 2, 3])
 def test_data_loader_dict_and_none(data_per_sample):
     """X=dict(), y=Noneのケース"""
 
     class MyDataLoader(tk.data.DataLoader):
         def get_sample(self, data: list) -> tuple:
             assert len(data) == data_per_sample
-            assert isinstance(data[0], tuple)
+            assert isinstance(data[0], tuple) and len(data[0]) == 2  # X, y
             return data[0]
 
     data = np.array(
@@ -66,6 +66,10 @@ def test_data_loader_dict_and_none(data_per_sample):
     g = iter(iterator.ds)
 
     X_batch, y_batch = next(g)
-    assert X_batch["a"].numpy() == pytest.approx(np.array([0, 1]))
-    assert X_batch["b"].numpy() == pytest.approx(np.array([[0, 0], [1, 1]]))
+    if data_per_sample in (1, 3):
+        assert X_batch["a"].numpy() == pytest.approx(np.array([0, 1]))
+        assert X_batch["b"].numpy() == pytest.approx(np.array([[0, 0], [1, 1]]))
+    else:
+        assert X_batch["a"].numpy() == pytest.approx(np.array([0, 0]))
+        assert X_batch["b"].numpy() == pytest.approx(np.array([[0, 0], [0, 0]]))
     assert y_batch.numpy() == pytest.approx(np.array([0, 0]))

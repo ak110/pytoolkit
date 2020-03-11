@@ -37,7 +37,8 @@ class Dataset:
         weights: サンプルごとの重み
         ids: ID (入力データにしないIDが別途必要な場合用)
         init_score: LightGBMなど用。boostingのベーススコア。
-        metadata: メタデータ。色々独自に入れておいてOK。sliceとかではそのままコピーされたりするので注意。
+        metadata: メタデータ。色々独自に入れておいてOK。
+                  sliceとかではそのままコピーされたりするので注意。
 
     get_dataをオーバーライドすることで逐次読み込みなども可能とする。
     (ただし、sliceとかで__init__が呼ばれるので注意。)
@@ -280,14 +281,17 @@ class DataLoader:
             data = _flatten([X, y])
             return data
 
-        def get_sample(*args):
+        def get_sample(*data):
             # flattenされたものをexsample_dataに従い戻す
-            data_size = len(data_tf_type)
-            assert len(args) % data_size == 0
-            data_list = [
-                _unflatten(exsample_data, args[i : i + data_size])
-                for i in range(0, len(args), data_size)
-            ]
+            if self.data_per_sample > 1:
+                for d in data:
+                    assert len(d) == self.data_per_sample, repr(data)
+                data_list = [
+                    _unflatten(exsample_data, [d[i] for d in data])
+                    for i in range(self.data_per_sample)
+                ]
+            else:
+                data_list = [_unflatten(exsample_data, data)]
             assert len(data_list) == self.data_per_sample, repr(data_list)
 
             X, y = self.get_sample(data_list)
@@ -309,40 +313,24 @@ class DataLoader:
             data = tf.numpy_function(get_data, inp=[i], Tout=data_tf_type)
             return data
 
-        def process2_1(*data):
+        def process2(*data):
             sample = tf.numpy_function(get_sample, inp=data, Tout=sample_tf_type)
             sample = _unflatten_tensor(exsample_sample, sample)
             if without_label:
                 return sample[0]
             return sample
 
-        def process2_2(data1, data2):
-            sample = tf.numpy_function(
-                get_sample, inp=(*data1, *data2), Tout=sample_tf_type
-            )
-            sample = _unflatten_tensor(exsample_sample, sample)
-            if without_label:
-                return sample[0]
-            return sample
-
         ds = tf.data.Dataset.from_tensor_slices(np.arange(len(dataset)))
-        num_parallel_calls = tf.data.experimental.AUTOTUNE if self.parallel else None
-        if self.data_per_sample == 2:  # 挙動が複雑なので2のみ許可
-            ds = tf.data.Dataset.zip(
-                tuple(
-                    (ds.shuffle(buffer_size=len(dataset)) if shuffle else ds).map(
-                        process1, num_parallel_calls=num_parallel_calls,
-                    )
-                    for _ in range(self.data_per_sample)
-                )
-            )
-            ds = ds.map(process2_2)
+        ds = ds.shuffle(buffer_size=len(dataset)) if shuffle else ds
+        ds = ds.map(
+            process1,
+            num_parallel_calls=tf.data.experimental.AUTOTUNE if self.parallel else None,
+        )
+        if self.data_per_sample > 1:
+            ds = ds.repeat().batch(self.data_per_sample)
         else:
-            assert self.data_per_sample == 1  # 挙動が複雑なので1のみ許可
-            ds = ds.shuffle(buffer_size=len(dataset)) if shuffle else ds
-            ds = ds.map(process1, num_parallel_calls=num_parallel_calls)
-            ds = ds.map(process2_1)
-        ds = ds.repeat() if shuffle else ds  # シャッフル時はバッチサイズを固定するため先にrepeat
+            ds = ds.repeat() if shuffle else ds  # バッチサイズを固定するため先にrepeat
+        ds = ds.map(process2)
         ds = ds.batch(self.batch_size * num_replicas_in_sync)
         ds = ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
         return ds
@@ -479,7 +467,11 @@ class Iterator:
 
     def to_str(self) -> str:
         """情報を文字列化して返す。"""
-        return f"element_spec={self.ds.element_spec} data_size={self.data_size} steps={self.steps}"
+        return (
+            f"element_spec={self.ds.element_spec}"
+            f" data_size={self.data_size}"
+            f" steps={self.steps}"
+        )
 
 
 def mixup(
