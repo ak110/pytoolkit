@@ -81,7 +81,9 @@ class CosineAnnealing(tf.keras.callbacks.Callback):
         if epoch + 1 < self.warmup_epochs:
             learning_rate = lr_max * (epoch + 1) / self.warmup_epochs
         else:
-            r = (epoch + 1) / (self.epochs or self.params["epochs"])
+            epoch = epoch + 1 - self.warmup_epochs
+            epochs = (self.epochs or self.params["epochs"]) - self.warmup_epochs
+            r = epoch / epochs  # [0, 1]
             learning_rate = lr_min + 0.5 * (lr_max - lr_min) * (1 + np.cos(np.pi * r))
         tf.keras.backend.set_value(
             self.model.optimizer.learning_rate, float(learning_rate)

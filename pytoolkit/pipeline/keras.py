@@ -30,6 +30,7 @@ class KerasModel(Model):
         model_name_format: モデルのファイル名のフォーマット。{fold}のところに数字が入る。
         skip_if_exists: cv()でモデルが存在するときスキップするならTrue。
         skip_folds: cv()で（skip_if_existsとは関係なく）スキップするfold。[0, nfold)
+        base_models_dir: 指定した場合、学習前に重みを読み込む。
         compile_fn: モデルのコンパイル処理
         score_fn: ラベルと推論結果を受け取り、指標をdictで返す関数。指定しなければモデルのevaluate()が使われる。
         epochs: tk.models.fit()のパラメータ
@@ -74,6 +75,7 @@ class KerasModel(Model):
         model_name_format: str = "model.fold{fold}.h5",
         skip_if_exists: bool = True,
         skip_folds: typing.Sequence[int] = (),
+        base_models_dir: tk.typing.PathLike = None,
         fit_params: dict = None,
         use_horovod: bool = False,
         num_replicas_in_sync: int = 1,
@@ -93,6 +95,9 @@ class KerasModel(Model):
         self.model_name_format = model_name_format
         self.skip_if_exists = skip_if_exists
         self.skip_folds = skip_folds
+        self.base_models_dir = (
+            pathlib.Path(base_models_dir) if base_models_dir is not None else None
+        )
         self.epochs = epochs
         self.compile_fn = compile_fn
         self.score_fn = score_fn
@@ -391,9 +396,16 @@ class KerasModel(Model):
         else:
             self.create_network(fold)
             assert self.training_models[fold] is not None
+            assert self.prediction_models[fold] is not None
             trained = True
             if self.compile_fn is not None:
                 self.compile_fn(self.training_models[fold])
+
+            if self.base_models_dir is not None:
+                tk.models.load_weights(
+                    self.prediction_models[fold],
+                    self.base_models_dir / self.model_name_format.format(fold=fold + 1),
+                )
 
             if self.refine_data_loader is not None:
                 start_lr = tf.keras.backend.get_value(
