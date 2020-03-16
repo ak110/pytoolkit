@@ -4,6 +4,14 @@ pytoolkit.pipeline package
 Submodules
 ----------
 
+pytoolkit.pipeline.blending module
+----------------------------------
+
+.. automodule:: pytoolkit.pipeline.blending
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 pytoolkit.pipeline.cb module
 ----------------------------
 

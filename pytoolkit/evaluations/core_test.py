@@ -10,6 +10,9 @@ def test_to_str():
     s = tk.evaluations.to_str(evals)
     assert s == "aaa=1.000 b=2.000"
 
+    s = tk.evaluations.to_str(evals, precision=4)
+    assert s == "aaa=1.0000 b=2.0000"
+
     s = tk.evaluations.to_str(evals, multiline=True)
     assert s == "aaa: 1.000\nb:   2.000"
 

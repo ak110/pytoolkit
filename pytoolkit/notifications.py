@@ -18,14 +18,14 @@ import sys
 import pytoolkit as tk
 
 
-def post_evals(evals: tk.evaluations.EvalsType):
+def post_evals(evals: tk.evaluations.EvalsType, precision=3):
     """評価結果を通知。
 
     Args:
         evals: 評価結果。
 
     """
-    post(tk.evaluations.to_str(evals, multiline=True))
+    post(tk.evaluations.to_str(evals, multiline=True, precision=precision))
 
 
 def post(text: str):

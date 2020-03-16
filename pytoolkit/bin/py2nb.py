@@ -64,6 +64,11 @@ def parse(path: pathlib.Path, code: list) -> nbformat.v4:
             add_cell(i)
             cell_value = ""
             cell_is_markdown = True
+        elif s.startswith("#%% "):
+            # 独自拡張: 「#%% !pip install ...」みたいにすると!pip installのセルになる感じ
+            add_cell(i)
+            cell_value = s[4:]
+            cell_is_markdown = False
         elif s == "# flake8: noqa: E265":
             logger.info(f"Ignored line: {s} ({path}:{i + 1})")
         else:

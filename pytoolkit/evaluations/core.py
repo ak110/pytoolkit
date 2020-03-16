@@ -12,15 +12,15 @@ import numpy as np
 EvalsType = typing.Dict[str, typing.Any]
 
 
-def to_str(evals: EvalsType, multiline=False) -> str:
+def to_str(evals: EvalsType, multiline=False, precision=3) -> str:
     """文字列化。"""
     max_len = max(len(k) for k in evals) if multiline and len(evals) > 0 else None
-    s = [_to_str_kv(k, v, max_len) for k, v in evals.items()]
+    s = [_to_str_kv(k, v, max_len, precision) for k, v in evals.items()]
     sep = "\n" if multiline else " "
     return sep.join(s)
 
 
-def _to_str_kv(k, v, max_len) -> str:
+def _to_str_kv(k, v, max_len, precision) -> str:
     if max_len is None:
         sep = "="
     else:
@@ -28,9 +28,9 @@ def _to_str_kv(k, v, max_len) -> str:
         sep = ":" + " " * (max_len - len(k) + 1)
     try:
         if isinstance(v, numbers.Number):
-            return f"{k}{sep}{v:,.3f}"
+            return f"{k}{sep}{v:,.{precision}f}"
         elif isinstance(v, np.ndarray):
-            v = np.array_str(v, precision=3, suppress_small=True)
+            v = np.array_str(v, precision=precision, suppress_small=True)
             return f"{k}{sep}{v}"
         else:
             return f"{k}{sep}{v}"
