@@ -75,6 +75,12 @@ def split(
     return folds
 
 
+def get_dummy_folds(train_set: tk.data.Dataset):
+    """全データで学習して全データで検証するときのfoldsを返す。"""
+    indices = list(range(len(train_set)))
+    return [(indices, indices)]
+
+
 def pseudo_labeling(
     train_set: tk.data.Dataset,
     folds1: FoldsType,

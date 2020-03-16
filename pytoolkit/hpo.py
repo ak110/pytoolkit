@@ -23,7 +23,7 @@ def optimize(
     timeout=None,
     n_jobs=1,
     catch=(Exception,),
-):
+) -> optuna.study.Study:
     """Optunaの簡易ラッパー。
 
     Args:
@@ -42,7 +42,7 @@ def optimize(
         catch: study.optimizeの引数
 
     Returns:
-        optuna.study.Study: study object
+        study object
 
     suggest_*メモ:
         - trial.suggest_categorical(name, choices)
@@ -90,9 +90,8 @@ def optimize(
     finally:
         if len(study.trials) > 0:
             # params_fnの戻り値を最終結果としてログ出力
-            fixed_trial = optuna.trial.FixedTrial(study.best_params)
             logger.info(f"best value = {study.best_value}")
-            logger.info(f"best params = {params_fn(fixed_trial)}")
+            logger.info(f"best params = {get_best_params(study, params_fn)}")
 
     return study
 
@@ -102,3 +101,16 @@ def raise_pruned() -> typing.NoReturn:
     import optuna  # pylint: disable=redefined-outer-name
 
     raise optuna.exceptions.TrialPruned()
+
+
+def get_best_params(
+    study: optuna.study.Study,
+    params_fn: typing.Callable[[optuna.Trial], typing.Any] = None,
+) -> typing.Dict[str, float]:
+    """見つけた中で最善のパラメータを返す。"""
+    import optuna  # pylint: disable=redefined-outer-name
+
+    if params_fn is None:
+        return study.best_params
+    else:
+        return params_fn(optuna.trial.FixedTrial(study.best_params))
