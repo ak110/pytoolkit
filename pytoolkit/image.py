@@ -980,6 +980,62 @@ class SpeckleNoise(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         return ("scale",)
 
 
+class RandomMorphology(A.ImageOnlyTransform):  # pylint: disable=abstract-method
+    """モルフォロジー変換
+
+    Args:
+        mode: 動作モード
+            - "erode"
+            - "dilate"
+            - "open"
+            - "close"
+        ksize: カーネルサイズの幅 (min, max)
+        element_shape: カーネルの形状
+            - cv2.MORPH_ELLIPSE: 楕円
+            - cv2.MORPH_RECT: 矩形
+
+    References:
+        - <https://www.kaggle.com/ren4yu/bengali-morphological-ops-as-image-augmentation>
+        - <https://www.kaggle.com/c/bengaliai-cv19/discussion/128198#734220>
+        - <http://labs.eecs.tottori-u.ac.jp/sd/Member/oyamada/OpenCV/html/py_tutorials/py_imgproc/py_morphological_ops/py_morphological_ops.html>
+
+    """
+
+    def __init__(
+        self,
+        mode,
+        ksize=(1, 5),
+        element_shape=cv2.MORPH_ELLIPSE,
+        always_apply=False,
+        p=0.5,
+    ):
+        super().__init__(always_apply, p)
+        assert mode in ("erode", "dilate", "open", "close")
+        self.mode = mode
+        self.ksize = ksize
+        self.element_shape = element_shape
+
+    def apply(self, image, **params):  # pylint: disable=arguments-differ
+        ksize = random.randint(*self.ksize), random.randint(*self.ksize)
+        kernel = cv2.getStructuringElement(self.element_shape, ksize)
+
+        if self.mode == "erode":
+            image = cv2.erode(image, kernel, iterations=1)
+        elif self.mode == "dilate":
+            image = cv2.dilate(image, kernel, iterations=1)
+        elif self.mode == "open":
+            image = cv2.morphologyEx(image, cv2.MORPH_OPEN, kernel)
+        elif self.mode == "close":
+            image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel)
+
+        if image.ndim == 2:
+            image = np.expand_dims(image, axis=-1)
+        return image
+
+    def get_transform_init_args_names(self):
+        return ("mode", "ksize", "element_shape")
+
+
 class WrappedTranslateX(A.ImageOnlyTransform):  # pylint: disable=abstract-method
     """水平に移動してはみ出た分を反対側にくっつける。"""
 

@@ -374,7 +374,6 @@ class FilterResponseNormalization(tf.keras.layers.Layer):
 
     def __init__(
         self,
-        epsilon=1e-6,
         center=True,
         scale=True,
         beta_initializer="zeros",
@@ -387,7 +386,6 @@ class FilterResponseNormalization(tf.keras.layers.Layer):
     ):
         super().__init__(**kwargs)
         self.supports_masking = True
-        self.epsilon = epsilon
         self.center = center
         self.scale = scale
         self.beta_initializer = tf.keras.initializers.get(beta_initializer)
@@ -396,11 +394,18 @@ class FilterResponseNormalization(tf.keras.layers.Layer):
         self.gamma_regularizer = tf.keras.regularizers.get(gamma_regularizer)
         self.beta_constraint = tf.keras.constraints.get(beta_constraint)
         self.gamma_constraint = tf.keras.constraints.get(gamma_constraint)
+        self.epsilon = None
         self.beta = None
         self.gamma = None
 
     def build(self, input_shape):
         affine_shape = (input_shape[-1],)
+        self.epsilon = self.add_weight(
+            shape=affine_shape,
+            name="epsilon",
+            initializer=tf.keras.initializers.zeros(),
+            constraint=tf.keras.constraints.non_neg(),
+        )
         if self.scale:
             self.gamma = self.add_weight(
                 shape=affine_shape,
@@ -424,7 +429,7 @@ class FilterResponseNormalization(tf.keras.layers.Layer):
         x = inputs
         axes = list(range(1, K.ndim(x) - 1))
         nu2 = tf.math.reduce_mean(tf.math.square(x), axis=axes, keepdims=True)
-        x *= tf.math.rsqrt(nu2 + tf.math.abs(self.epsilon))
+        x *= tf.math.rsqrt(nu2 + self.epsilon + 1e-5)
         if self.scale:
             x *= self.gamma
         if self.center:
@@ -433,7 +438,6 @@ class FilterResponseNormalization(tf.keras.layers.Layer):
 
     def get_config(self):
         config = {
-            "epsilon": self.epsilon,
             "center": self.center,
             "scale": self.scale,
             "beta_initializer": tf.keras.initializers.serialize(self.beta_initializer),
@@ -457,7 +461,6 @@ class RandomRMSNormalization(tf.keras.layers.Layer):
 
     def __init__(
         self,
-        channel_size=32,
         center=True,
         scale=True,
         beta_initializer="zeros",
@@ -470,7 +473,6 @@ class RandomRMSNormalization(tf.keras.layers.Layer):
     ):
         super().__init__(**kwargs)
         self.supports_masking = True
-        self.channel_size = channel_size
         self.center = center
         self.scale = scale
         self.beta_initializer = tf.keras.initializers.get(beta_initializer)
@@ -504,22 +506,14 @@ class RandomRMSNormalization(tf.keras.layers.Layer):
 
     def call(self, inputs, training=None, **kwargs):
         del kwargs
-        x = inputs
-        axes = list(range(1, K.ndim(x)))
+        axes = list(range(1, inputs.shape.rank - 1))
 
-        if x.shape[-1] <= self.channel_size:
-            x_target = x
-        else:
+        nu2 = tf.math.reduce_mean(tf.math.square(inputs), axis=axes, keepdims=True)
 
-            def pick_random():
-                r = tf.random.uniform(shape=(x.shape[-1],))
-                _, indices = tf.nn.top_k(r, self.channel_size)
-                return tf.gather(x, indices, axis=-1)
+        #  学習時はノイズを入れてみる
+        nu2 += K.in_train_phase(tf.random.normal((), stddev=0.02), 0.0, training)
 
-            x_target = K.in_train_phase(pick_random, x, training)
-
-        nu2 = tf.math.reduce_mean(tf.math.square(x_target), axis=axes, keepdims=True)
-        x *= tf.math.rsqrt(nu2 + 1e-6)
+        x = inputs * tf.math.rsqrt(nu2 + 1.0)  # >= 1にするため+1
         if self.scale:
             x *= self.gamma
         if self.center:
@@ -528,7 +522,6 @@ class RandomRMSNormalization(tf.keras.layers.Layer):
 
     def get_config(self):
         config = {
-            "channel_size": self.channel_size,
             "center": self.center,
             "scale": self.scale,
             "beta_initializer": tf.keras.initializers.serialize(self.beta_initializer),
