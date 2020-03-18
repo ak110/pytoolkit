@@ -389,10 +389,9 @@ class RandomColorAugmentors(RandomCompose):
                 ]
             )
         if not grayscale and noisy:
-            # argumentors.extend(
-            #     [A.ISONoise(color_shift=(0, 0.05), intensity=(0, 0.5), p=0.125)]
-            # )
-            pass
+            argumentors.extend(
+                [A.ISONoise(color_shift=(0, 0.05), intensity=(0, 0.5), p=0.125)]
+            )
         super().__init__(argumentors, p=p)
 
     def get_transform_init_args_names(self):

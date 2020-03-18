@@ -29,7 +29,7 @@ class KerasModel(Model):
         refine_data_loader: Refined Data Augmentation <https://arxiv.org/abs/1909.09148> 用
         model_name_format: モデルのファイル名のフォーマット。{fold}のところに数字が入る。
         skip_if_exists: cv()でモデルが存在するときスキップするならTrue。
-        skip_folds: cv()で（skip_if_existsとは関係なく）スキップするfold。[0, nfold)
+        skip_folds: cv()で（skip_if_existsとは関係なく）スキップするfoldのリスト。[0, nfold)
         base_models_dir: 指定した場合、学習前に重みを読み込む。
         compile_fn: モデルのコンパイル処理
         score_fn: ラベルと推論結果を受け取り、指標をdictで返す関数。指定しなければモデルのevaluate()が使われる。

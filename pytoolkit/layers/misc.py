@@ -268,3 +268,93 @@ class TestOnly(tf.keras.layers.Wrapper):
         return K.in_train_phase(
             inputs, lambda: self.layer.call(inputs, **kwargs), training
         )
+
+
+@tf.keras.utils.register_keras_serializable()
+class Scale(tf.keras.layers.Layer):
+    """学習可能なスケール値。"""
+
+    def __init__(
+        self,
+        shape=(),
+        scale_initializer="zeros",
+        scale_regularizer=None,
+        scale_constraint=None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.supports_masking = True
+        self.shape = shape
+        self.scale_initializer = tf.keras.initializers.get(scale_initializer)
+        self.scale_regularizer = tf.keras.regularizers.get(scale_regularizer)
+        self.scale_constraint = tf.keras.constraints.get(scale_constraint)
+        self.scale = None
+
+    def build(self, input_shape):
+        self.scale = self.add_weight(
+            shape=self.shape,
+            name="scale",
+            initializer=self.scale_initializer,
+            regularizer=self.scale_regularizer,
+            constraint=self.scale_constraint,
+        )
+        super().build(input_shape)
+
+    def call(self, inputs, **kwargs):
+        del kwargs
+        return inputs * self.scale
+
+    def get_config(self):
+        config = {
+            "scale_initializer": tf.keras.initializers.serialize(
+                self.scale_initializer
+            ),
+            "scale_regularizer": tf.keras.regularizers.serialize(
+                self.scale_regularizer
+            ),
+            "scale_constraint": tf.keras.constraints.serialize(self.scale_constraint),
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
+@tf.keras.utils.register_keras_serializable()
+class RandomScale(tf.keras.layers.Layer):
+    """ランダムにスケーリング
+
+    Args:
+        min_scale: 最小値
+        max_scale: 最大値
+        shape: スケールのshape
+
+    """
+
+    def __init__(
+        self,
+        min_scale: float = 0.5,
+        max_scale: float = 2.0,
+        shape: tuple = (),
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.min_scale = min_scale
+        self.max_scale = max_scale
+        self.shape = shape
+
+    def call(self, inputs, **kwargs):
+        del kwargs
+        scale = tf.math.exp(
+            tf.random.uniform(
+                self.shape, np.log(self.min_scale), np.log(self.max_scale)
+            )
+        )
+        return inputs * scale
+
+    def get_config(self):
+        config = {
+            "min_scale": self.min_scale,
+            "max_scale": self.max_scale,
+            "shape": self.shape,
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))

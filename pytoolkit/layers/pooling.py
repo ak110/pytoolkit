@@ -301,9 +301,10 @@ class GeMPooling2D(tf.keras.layers.Layer):
     def call(self, inputs, **kwargs):
         del kwargs
         x = tf.cast(inputs, tf.float32)  # float16ではオーバーフローしやすいので一応
-        x = tf.math.maximum(x, self.epsilon) ** self.p
+        p = tf.cast(self.p, tf.float32)
+        x = tf.math.maximum(x, self.epsilon) ** p
         x = tf.math.reduce_mean(x, axis=(1, 2))  # GAP
-        x = x ** (1 / self.p)
+        x = x ** (1 / p)
         x = tf.cast(x, inputs.dtype)
         return x
 
