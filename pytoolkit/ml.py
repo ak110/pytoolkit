@@ -234,7 +234,7 @@ def search_threshold(
         )
         return val_score, best_th
 
-    with tk.log.trace_scope("search_threshold"):
+    with tk.log.trace("search_threshold"):
         with joblib.Parallel(n_jobs=-1, backend="threading") as parallel:
             scores, ths = zip(*parallel([_search(fold) for fold in range(cv)]))
 

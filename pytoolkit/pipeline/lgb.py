@@ -132,7 +132,7 @@ class LGBModel(Model):
         scores: dict = {}
         self.gbms_ = np.empty((len(folds), len(seeds)), dtype=object)
         for seed_i, seed in enumerate(seeds):
-            with tk.log.trace_scope(f"seed averaging({seed_i + 1}/{len(seeds)})"):
+            with tk.log.trace(f"seed averaging({seed_i + 1}/{len(seeds)})"):
                 model_extractor = ModelExtractionCallback()
                 eval_hist = lgb.cv(
                     params,

@@ -20,6 +20,8 @@ class KerasModel(Model):
 
     _saveではなく学習時にsaveしてしまっているので注意。
 
+    tf.distributeを使う場合は__init__やcvの呼び出しをstrategyのscope内で呼び出す必要があるので注意。
+
     Args:
         create_network_fn: モデルの作成関数。2個のモデルを返す関数の場合、1個目が訓練用、2個目が推論用。
         nfold: cvの分割数
@@ -38,11 +40,10 @@ class KerasModel(Model):
         refine_lr_factor: refineの学習率の係数。初期学習率×refine_lr_factorがrefine時の学習率になる。
         callbacks: tk.models.fit()のパラメータ
         fit_params: tk.models.fit()のパラメータ
-        use_horovod: 推論時にMPIによる分散処理をするか否か。(学習時は常にTrue)
-        num_replicas_in_sync: tf.distributeするなら指定する。
         parallel_cv: lgb.cvなどのように全foldまとめて処理するならTrue
 
     Attributes:
+        num_replicas_in_sync: tf.distributeによる並列数
         training_models: 訓練用モデル
         prediction_models: 推論用モデル
 
@@ -77,8 +78,6 @@ class KerasModel(Model):
         skip_folds: typing.Sequence[int] = (),
         base_models_dir: tk.typing.PathLike = None,
         fit_params: dict = None,
-        use_horovod: bool = False,
-        num_replicas_in_sync: int = 1,
         parallel_cv: bool = False,
         on_batch_fn: tk.models.OnBatchFnType = None,
         preprocessors: tk.pipeline.EstimatorListType = None,
@@ -105,12 +104,14 @@ class KerasModel(Model):
         self.refine_lr_factor = refine_lr_factor
         self.callbacks = callbacks
         self.fit_params = fit_params
-        self.use_horovod = use_horovod
-        self.num_replicas_in_sync = num_replicas_in_sync
         self.parallel_cv = parallel_cv
         self.on_batch_fn = on_batch_fn
         self.training_models: typing.List[tf.keras.models.Model] = [None] * nfold
         self.prediction_models: typing.List[tf.keras.models.Model] = [None] * nfold
+
+        self.num_replicas_in_sync: int = tf.distribute.get_strategy().num_replicas_in_sync
+        assert self.num_replicas_in_sync >= 1
+
         if self.parallel_cv:
             assert self.refine_data_loader is None, "NotImplemented"
         if "{fold}" not in self.model_name_format:
@@ -208,7 +209,9 @@ class KerasModel(Model):
 
         def generator(datasets, data_loader):
             iterators = [
-                data_loader.iter(dataset, shuffle=True, use_horovod=True).run()
+                data_loader.iter(
+                    dataset, shuffle=True, use_horovod=tk.hvd.initialized()
+                ).run()
                 for dataset in datasets
             ]
             while True:
@@ -271,7 +274,7 @@ class KerasModel(Model):
             self.prediction_models[fold],
             dataset,
             self.val_data_loader,
-            use_horovod=self.use_horovod,
+            use_horovod=tk.hvd.initialized(),
             num_replicas_in_sync=self.num_replicas_in_sync,
             on_batch_fn=self.on_batch_fn,
         )
@@ -509,7 +512,7 @@ class KerasModel(Model):
             dataset,
             data_loader=self.val_data_loader,  # DataAugmentation無しで評価
             prefix=prefix,
-            use_horovod=self.use_horovod,
+            use_horovod=tk.hvd.initialized(),
             num_replicas_in_sync=self.num_replicas_in_sync,
         )
         return evals

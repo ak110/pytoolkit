@@ -4,7 +4,6 @@ fmtに色々出したいときはこの辺を参照：
 https://docs.python.jp/3/library/logging.html#logrecord-attributes
 
 """
-import contextlib
 import functools
 import logging
 import logging.handlers
@@ -108,43 +107,56 @@ def close(logger):
         logger.removeHandler(handler)
 
 
-def trace(process_name=None, level=logging.INFO):
-    """関数の開始・終了をログるdecorator。
+class trace:
+    """開始・終了をログdecorator＆context manager。
 
     Args:
-        process_name: ログに出力する処理の名前。(Noneなら関数名)
+        process_name: ログに出力する処理の名前。(Noneなら関数名。context managerとしての使用時は必須)
         level: ログレベル。文字列で'DEBUG'とかも指定可。
+
+    Examples:
+        decoratorの例::
+            @tk.log.trace()
+            def func()
+                pass
+
+        context managerの例::
+            with tk.log.trace("process"):
+                process()
 
     """
 
-    def decorator(func):
+    def __init__(self, process_name=None, level=logging.INFO):
+        self.process_name = process_name
+        self.level = level
+        self.start_time = None
+
+    def __call__(self, func):
         @functools.wraps(func)
-        def traced_func(*args, **kwargs):
-            with trace_scope(process_name or func.__qualname__, level):
-                return func(*args, **kwargs)
+        def traced_func(*args, **kwds):
+            with self.__class__(
+                process_name=self.process_name or func.__qualname__, level=self.level
+            ):
+                return func(*args, **kwds)
 
         return traced_func
 
-    return decorator
+    def __enter__(self):
+        assert self.process_name is not None
+        assert self.start_time is None
+        get(__name__).log(self.level, f"{self.process_name} start")
+        self.start_time = time.time()
+        return self
 
-
-@contextlib.contextmanager
-def trace_scope(process_name, level=logging.INFO):
-    """withで使うと、処理前後でログを出力する。
-
-    Args:
-        process_name: ログに出力する処理の名前。
-        level: ログレベル。文字列で'DEBUG'とかも指定可。
-
-    """
-    logger = get(__name__)
-    logger.log(level, f"{process_name} start")
-    start_time = time.time()
-    try:
-        yield
-        elapsed_time = time.time() - start_time
-        logger.log(level, f"{process_name} done in {elapsed_time:.1f} s")
-    except:  # noqa
-        elapsed_time = time.time() - start_time
-        logger.log(level, f"{process_name} error in {elapsed_time:.1f} s")
-        raise
+    def __exit__(self, *exc):
+        elapsed_time = time.time() - self.start_time
+        if exc[0] is None:
+            get(__name__).log(
+                self.level, f"{self.process_name} done in {elapsed_time:.1f} s"
+            )
+        else:
+            get(__name__).log(
+                self.level, f"{self.process_name} error in {elapsed_time:.1f} s"
+            )
+        self.start_time = None  # チェック用に戻しておく
+        return False

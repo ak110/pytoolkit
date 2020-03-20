@@ -157,7 +157,7 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
         return self
 
     def fit_transform(self, X, y):
-        with tk.log.trace_scope("FeaturesEncoder.fit_transform"):
+        with tk.log.trace("FeaturesEncoder.fit_transform"):
             # 対象とする列のリストアップ
             candidate_columns = set(X.columns.values)
             # ignore_colsを除外
@@ -230,7 +230,7 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
         assert self.iszero_cols_ is not None
         assert self.isnull_cols_ is not None
         del y
-        with tk.log.trace_scope("FeaturesEncoder.transform"):
+        with tk.log.trace("FeaturesEncoder.transform"):
             feats = pd.DataFrame(index=X.index)
 
             if len(self.binary_cols_):

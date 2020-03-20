@@ -39,7 +39,7 @@ def load(
     compile: bool = False,  # pylint: disable=redefined-outer-name
 ):
     """モデルの読み込み。"""
-    with tk.log.trace_scope(f"load({path})"):
+    with tk.log.trace(f"load({path})"):
         model = tf.keras.models.load_model(
             str(path), custom_objects=custom_objects, compile=compile
         )
@@ -56,7 +56,7 @@ def load_weights(
     """モデルの重みの読み込み。"""
     path = pathlib.Path(path)
     if path.exists():
-        with tk.log.trace_scope(f"load_weights({path})"):
+        with tk.log.trace(f"load_weights({path})"):
             if verbose:
                 old_weights = model.get_weights()
             if path.is_dir():
@@ -102,7 +102,7 @@ def save(
     assert mode in ("hdf5", "saved_model", "onnx", "tflite")
     path = pathlib.Path(path)
     if tk.hvd.is_master():
-        with tk.log.trace_scope(f"save({path})"):
+        with tk.log.trace(f"save({path})"):
             path.parent.mkdir(parents=True, exist_ok=True)
             if mode in ("hdf5", "saved_model"):
                 model.save(
@@ -145,7 +145,7 @@ def plot(
     """モデルのグラフのplot。"""
     path = pathlib.Path(to_file)
     if tk.hvd.is_master():
-        with tk.log.trace_scope(f"plot({path})"):
+        with tk.log.trace(f"plot({path})"):
             path.parent.mkdir(parents=True, exist_ok=True)
             try:
                 tf.keras.utils.plot_model(
@@ -169,7 +169,7 @@ def compile(
     **kwargs,
 ):  # pylint: disable=redefined-builtin
     """compileするだけ。"""
-    with tk.log.trace_scope("compile"):
+    with tk.log.trace("compile"):
         if tk.hvd.initialized():
             optimizer = tf.keras.optimizers.get(optimizer)
             optimizer = tk.hvd.get().DistributedOptimizer(
@@ -193,7 +193,7 @@ def compile(
 
 def recompile(model: tf.keras.models.Model):
     """optimizerなどを再利用してコンパイル。"""
-    with tk.log.trace_scope("recompile"):
+    with tk.log.trace("recompile"):
         # Horovod: Specify `experimental_run_tf_function=False` to ensure TensorFlow
         # uses hvd.DistributedOptimizer() to compute gradients.
         model.compile(
@@ -286,7 +286,7 @@ def fit(
     if validation_freq is not None:
         fit_kwargs["validation_freq"] = validation_freq
 
-    with tk.log.trace_scope("fit"):
+    with tk.log.trace("fit"):
         model.fit(
             train_iterator.ds,
             steps_per_epoch=train_iterator.steps,
@@ -366,7 +366,7 @@ def predict(
         推論結果。
 
     """
-    with tk.log.trace_scope("predict"):
+    with tk.log.trace("predict"):
         verbose = verbose if tk.hvd.is_master() else 0
         callbacks = make_callbacks(callbacks, training=False)
         dataset = tk.hvd.split(dataset) if use_horovod else dataset
@@ -425,7 +425,7 @@ def predict_flow(
         推論結果。サンプルごとのgenerator。
 
     """
-    with tk.log.trace_scope("predict"):
+    with tk.log.trace("predict"):
         callbacks = make_callbacks(callbacks, training=False)
         iterator = data_loader.iter(dataset, num_replicas_in_sync=num_replicas_in_sync)
         tk.log.get(__name__).info(f"iterator: {iterator.to_str()}")
@@ -502,7 +502,7 @@ def evaluate(
         メトリクス名と値のdict
 
     """
-    with tk.log.trace_scope("evaluate"):
+    with tk.log.trace("evaluate"):
         verbose = verbose if tk.hvd.is_master() else 0
         callbacks = make_callbacks(callbacks, training=False)
         dataset = tk.hvd.split(dataset) if use_horovod else dataset

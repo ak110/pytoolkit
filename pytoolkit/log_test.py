@@ -40,7 +40,7 @@ def test_trace():
     tk.log.close(logger)
     logger.addHandler(tk.log.stream_handler(stderr, level="DEBUG", fmt=None))
 
-    with tk.log.trace_scope("trace_scope"):
+    with tk.log.trace("trace_scope"):
         logger.debug("あいうえお")
 
     tk.log.close(logger)

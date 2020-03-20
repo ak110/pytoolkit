@@ -131,10 +131,10 @@ class App:
             )
             # 前処理
             for f in self.inits:
-                with tk.log.trace_scope(f.__qualname__):
+                with tk.log.trace(f.__qualname__):
                     f()
             try:
-                with tk.log.trace_scope(command.entrypoint.__qualname__):
+                with tk.log.trace(command.entrypoint.__qualname__):
                     if command.distribute_strategy_fn is not None:
                         command.distribute_strategy = command.distribute_strategy_fn()
                         with command.distribute_strategy.scope():
@@ -154,7 +154,7 @@ class App:
             finally:
                 # 後処理
                 for f in self.terms:
-                    with tk.log.trace_scope(f.__qualname__):
+                    with tk.log.trace(f.__qualname__):
                         f()
 
             # 次のコマンド

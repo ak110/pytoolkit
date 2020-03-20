@@ -39,7 +39,6 @@ def test_keras_xor(tmpdir):
         fit_params={"verbose": 2},
         models_dir=models_dir,
         model_name_format="model.h5",
-        use_horovod=True,
     )
     model.check()
     model.train(train_set, train_set)
