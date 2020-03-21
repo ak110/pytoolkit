@@ -81,7 +81,7 @@ class CBModel(Model):
 
         self.gbms_, score_list = [], []
         for fold, (train_indices, val_indices) in enumerate(folds):
-            with tk.log.trace(f"cv({fold + 1}/{len(folds)})"):
+            with tk.log.trace(f"fold{fold}"):
                 gbm = catboost.train(
                     params=self.params,
                     pool=self.train_pool_.slice(train_indices),

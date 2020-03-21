@@ -482,7 +482,6 @@ def evaluate(
     data_loader: tk.data.DataLoader,
     callbacks: list = None,
     verbose: int = 1,
-    prefix: str = "",
     use_horovod: bool = False,
     num_replicas_in_sync: int = 1,
 ) -> typing.Dict[str, float]:
@@ -494,7 +493,6 @@ def evaluate(
         data_loader: データの読み込み
         callbacks: コールバック
         verbose: 1ならプログレスバー表示
-        prefix: メトリクス名の接頭文字列
         use_horovod: MPIによる分散処理をするか否か
         num_replicas_in_sync: tf.distribute使用時の並列数(バッチサイズに掛け算する)
 
@@ -513,9 +511,9 @@ def evaluate(
         )
         values = tk.hvd.allreduce(values) if use_horovod else values
         if len(model.metrics_names) == 1:
-            evals = {prefix + model.metrics_names[0]: values}
+            evals = {model.metrics_names[0]: values}
         else:
-            evals = dict(zip([prefix + n for n in model.metrics_names], values))
+            evals = dict(zip(model.metrics_names, values))
         return evals
 
 

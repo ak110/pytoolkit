@@ -63,6 +63,7 @@ def evaluate_classification(
             prec, rec, f1, _ = sklearn.metrics.precision_recall_fscore_support(
                 y_true, y_pred
             )
+            mcc = sklearn.metrics.matthews_corrcoef(y_true, y_pred)
             auc = sklearn.metrics.roc_auc_score(y_true, proba_pred)
             ap = sklearn.metrics.average_precision_score(y_true, proba_pred)
             logloss = sklearn.metrics.log_loss(y_true, proba_pred)
@@ -74,6 +75,7 @@ def evaluate_classification(
                 "ap": ap,
                 "prec": prec,
                 "rec": rec,
+                "mcc": mcc,
                 "logloss": logloss,
             }
         else:  # multiclass
@@ -87,6 +89,7 @@ def evaluate_classification(
             prec, rec, f1, _ = sklearn.metrics.precision_recall_fscore_support(
                 y_true, y_pred, labels=labels, average=average
             )
+            mcc = sklearn.metrics.matthews_corrcoef(y_true, y_pred)
             auc = sklearn.metrics.roc_auc_score(ohe_true, proba_pred, average=average)
             ap = sklearn.metrics.average_precision_score(
                 ohe_true, proba_pred, average=average
@@ -100,5 +103,6 @@ def evaluate_classification(
                 "ap": ap,
                 "prec": prec,
                 "rec": rec,
+                "mcc": mcc,
                 "logloss": logloss,
             }

@@ -38,6 +38,11 @@ def _to_str_kv(k, v, max_len, precision) -> str:
         return f"{k}{sep}{type(v)}"
 
 
+def add_prefix(evals: EvalsType, prefix: str) -> EvalsType:
+    """metric名にprefixを付ける。"""
+    return {f"{prefix}{k}": v for k, v in evals.items()}
+
+
 def mean(
     evals_list: typing.Sequence[EvalsType], weights: typing.Sequence[float] = None
 ) -> EvalsType:

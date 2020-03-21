@@ -18,7 +18,7 @@ import tensorflow as tf
 
 
 def create_b0(
-    include_top=False, input_shape=None, input_tensor=None, weights="imagenet"
+    include_top=False, input_shape=None, input_tensor=None, weights="noisy-student"
 ):
     """ネットワークの作成。"""
     import efficientnet.tfkeras as efn
@@ -32,7 +32,7 @@ def create_b0(
 
 
 def create_b1(
-    include_top=False, input_shape=None, input_tensor=None, weights="imagenet"
+    include_top=False, input_shape=None, input_tensor=None, weights="noisy-student"
 ):
     """ネットワークの作成。"""
     import efficientnet.tfkeras as efn
@@ -46,7 +46,7 @@ def create_b1(
 
 
 def create_b2(
-    include_top=False, input_shape=None, input_tensor=None, weights="imagenet"
+    include_top=False, input_shape=None, input_tensor=None, weights="noisy-student"
 ):
     """ネットワークの作成。"""
     import efficientnet.tfkeras as efn
@@ -60,7 +60,7 @@ def create_b2(
 
 
 def create_b3(
-    include_top=False, input_shape=None, input_tensor=None, weights="imagenet"
+    include_top=False, input_shape=None, input_tensor=None, weights="noisy-student"
 ):
     """ネットワークの作成。"""
     import efficientnet.tfkeras as efn
@@ -74,7 +74,7 @@ def create_b3(
 
 
 def create_b4(
-    include_top=False, input_shape=None, input_tensor=None, weights="imagenet"
+    include_top=False, input_shape=None, input_tensor=None, weights="noisy-student"
 ):
     """ネットワークの作成。"""
     import efficientnet.tfkeras as efn
@@ -88,7 +88,7 @@ def create_b4(
 
 
 def create_b5(
-    include_top=False, input_shape=None, input_tensor=None, weights="imagenet"
+    include_top=False, input_shape=None, input_tensor=None, weights="noisy-student"
 ):
     """ネットワークの作成。"""
     import efficientnet.tfkeras as efn
@@ -102,7 +102,7 @@ def create_b5(
 
 
 def create_b6(
-    include_top=False, input_shape=None, input_tensor=None, weights="imagenet"
+    include_top=False, input_shape=None, input_tensor=None, weights="noisy-student"
 ):
     """ネットワークの作成。"""
     import efficientnet.tfkeras as efn
@@ -116,7 +116,7 @@ def create_b6(
 
 
 def create_b7(
-    include_top=False, input_shape=None, input_tensor=None, weights="imagenet"
+    include_top=False, input_shape=None, input_tensor=None, weights="noisy-student"
 ):
     """ネットワークの作成。"""
     import efficientnet.tfkeras as efn

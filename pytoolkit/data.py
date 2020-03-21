@@ -247,7 +247,7 @@ class DataLoader:
 
     def get_ds(
         self,
-        dataset: Dataset,
+        dataset: tk.data.Dataset,
         shuffle: bool,
         without_label: bool,
         num_replicas_in_sync: int,
@@ -475,36 +475,28 @@ class Iterator:
 
 
 def mixup(
-    ds: tf.data.Dataset,
-    premix_fn: typing.Callable,
-    postmix_fn: typing.Callable,
-    num_parallel_calls: int = tf.data.experimental.AUTOTUNE,
-    data_count: int = None,
+    ds: tf.data.Dataset, postmix_fn: typing.Callable, num_parallel_calls: int = None,
 ):
     """tf.dataでのmixup: <https://arxiv.org/abs/1710.09412>
 
     Args:
         ds: 元のデータセット
-        premix_fn: DataAugmentationなどの処理
         postmix_fn: mixup後の処理
         num_parallel_calls: premix_fnの並列数
-        data_count: シャッフル時のバッファサイズ
 
     """
 
     @tf.function
-    def mixup_fn(data1, data2):
+    def mixup_fn(*data):
         r = tf.random.uniform((), 0, 1)
         return postmix_fn(
             *[
-                tf.cast(d1, tf.float32) * r + tf.cast(d2, tf.float32) * (1 - r)
-                for d1, d2 in zip(premix_fn(data1), premix_fn(data2))
+                tf.cast(d[0], tf.float32) * r + tf.cast(d[1], tf.float32) * (1 - r)
+                for d in data
             ]
         )
 
-    data_count = data_count or tf.data.experimental.cardinality(ds)
-    ds1 = ds.shuffle(buffer_size=data_count)
-    ds2 = ds.shuffle(buffer_size=data_count)
-    ds = tf.data.Dataset.zip((ds1, ds2))
+    ds = ds.repeat()
+    ds = ds.batch(2)
     ds = ds.map(mixup_fn, num_parallel_calls=num_parallel_calls)
     return ds

@@ -373,13 +373,13 @@ class RandomColorAugmentors(RandomCompose):
             RandomContrast(p=0.25),
             RandomHue(p=0.25),
             RandomSaturation(p=0.25),
-            RandomEqualize(p=0.0625),
-            RandomAutoContrast(p=0.0625),
             RandomAlpha(p=0.25),
         ]
         if noisy:
             argumentors.extend(
                 [
+                    RandomEqualize(p=0.0625),
+                    RandomAutoContrast(p=0.0625),
                     RandomPosterize(p=0.0625),
                     A.Solarize(threshold=(50, 255 - 50), p=0.0625),
                     RandomBlur(p=0.125),

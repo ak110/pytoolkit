@@ -127,7 +127,7 @@ class KerasModel(Model):
 
     def _save_model(self, fold, models_dir=None):
         models_dir = models_dir or self.models_dir
-        model_path = models_dir / self.model_name_format.format(fold=fold + 1)
+        model_path = models_dir / self.model_name_format.format(fold=fold)
         tk.models.save(
             self.prediction_models[fold],
             model_path,
@@ -139,7 +139,7 @@ class KerasModel(Model):
     def _load_model(self, fold, models_dir=None):
         self.create_network(fold)
         models_dir = models_dir or self.models_dir
-        model_path = models_dir / self.model_name_format.format(fold=fold + 1)
+        model_path = models_dir / self.model_name_format.format(fold=fold)
         tk.models.load_weights(self.prediction_models[fold], model_path)
 
     def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> None:
@@ -261,7 +261,7 @@ class KerasModel(Model):
         evals_weights = []
         for fold, (train_set, val_set) in enumerate(dataset.iter(folds)):
             tk.log.get(__name__).info(
-                f"Fold {fold + 1}/{len(folds)}: train={len(train_set)} val={len(val_set)}"
+                f"fold{fold}: train={len(train_set)} val={len(val_set)}"
             )
             evals = self.train(train_set, val_set, fold=fold)
             evals_list.append(evals)
@@ -310,7 +310,8 @@ class KerasModel(Model):
         if dataset is not None:
             self.evaluate(dataset, prefix="check_", fold=0)
             if self.score_fn is not None:
-                evals = self._model_evaluate(dataset, prefix="check_", fold=0)
+                evals = self._model_evaluate(dataset, fold=0)
+                evals = tk.evaluations.add_prefix(evals, "check_")
                 tk.log.get(__name__).info(f"check: {tk.evaluations.to_str(evals)}")
         return self
 
@@ -382,17 +383,17 @@ class KerasModel(Model):
             f"batch_size: {self.train_data_loader.batch_size}x{tk.hvd.size() * self.num_replicas_in_sync}"
         )
 
-        model_path = self.models_dir / self.model_name_format.format(fold=fold + 1)
+        model_path = self.models_dir / self.model_name_format.format(fold=fold)
 
         if self.skip_if_exists and model_path.exists():
             tk.log.get(__name__).info(
-                f"Fold {fold + 1}: Loading '{model_path}'... (skip_if_exists)"
+                f"fold{fold}: Loading '{model_path}'... (skip_if_exists)"
             )
             self._load_model(fold)
             trained = False
         elif fold in self.skip_folds and model_path.exists():
             tk.log.get(__name__).info(
-                f"Fold {fold + 1}: Loading '{model_path}'... (skip_folds)"
+                f"fold{fold}: Loading '{model_path}'... (skip_folds)"
             )
             self._load_model(fold)
             trained = False
@@ -407,7 +408,7 @@ class KerasModel(Model):
             if self.base_models_dir is not None:
                 tk.models.load_weights(
                     self.prediction_models[fold],
-                    self.base_models_dir / self.model_name_format.format(fold=fold + 1),
+                    self.base_models_dir / self.model_name_format.format(fold=fold),
                 )
 
             if self.refine_data_loader is not None:
@@ -433,7 +434,7 @@ class KerasModel(Model):
             # refine
             if self.refine_data_loader is not None and self.refine_epochs > 0:
                 tk.log.get(__name__).info(
-                    f"Fold {fold + 1}: Refining {self.refine_epochs} epochs..."
+                    f"fold{fold}: Refining {self.refine_epochs} epochs..."
                 )
                 tk.models.freeze_layers(
                     self.training_models[fold], tf.keras.layers.BatchNormalization
@@ -477,9 +478,9 @@ class KerasModel(Model):
         return evals
 
     def evaluate(
-        self, dataset: tk.data.Dataset, prefix: str = "", fold: int = 0
+        self, dataset: tk.data.Dataset, prefix: str = None, fold: int = 0
     ) -> typing.Dict[str, float]:
-        """評価して結果をINFOログ出力する。(KerasModel独自メソッド)
+        """評価する。(KerasModel独自メソッド)
 
         Args:
             dataset: データ
@@ -491,14 +492,15 @@ class KerasModel(Model):
 
         """
         if self.score_fn is None:
-            evals = self._model_evaluate(dataset, prefix, fold)
+            evals = self._model_evaluate(dataset, fold)
         else:
             preds = self.predict(dataset, fold=fold)
             evals = self.score_fn(dataset.labels, preds)
-        tk.log.get(__name__).info(f"fold{fold}: {tk.evaluations.to_str(evals)}")
+        if prefix is not None:
+            evals = tk.evaluations.add_prefix(evals, prefix)
         return evals
 
-    def _model_evaluate(self, dataset, prefix, fold):
+    def _model_evaluate(self, dataset, fold):
         assert self.preprocessors is None  # とりあえず未対応
         assert self.postprocessors is None  # とりあえず未対応
 
@@ -511,7 +513,6 @@ class KerasModel(Model):
             self.training_models[fold],
             dataset,
             data_loader=self.val_data_loader,  # DataAugmentation無しで評価
-            prefix=prefix,
             use_horovod=tk.hvd.initialized(),
             num_replicas_in_sync=self.num_replicas_in_sync,
         )
