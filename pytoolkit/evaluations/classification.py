@@ -68,7 +68,6 @@ def evaluate_classification(
             ap = sklearn.metrics.average_precision_score(y_true, proba_pred)
             logloss = sklearn.metrics.log_loss(y_true, proba_pred)
             return {
-                "type": "binary",
                 "acc": acc,
                 "f1": f1,
                 "auc": auc,
@@ -96,7 +95,6 @@ def evaluate_classification(
             )
             logloss = sklearn.metrics.log_loss(ohe_true, proba_pred)
             return {
-                "type": "multiclass",
                 "acc": acc,
                 "f1": f1,
                 "auc": auc,

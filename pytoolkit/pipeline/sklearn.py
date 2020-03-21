@@ -22,6 +22,7 @@ class SKLearnModel(Model):
         weights_arg_name: tk.data.Dataset.weightsを使う場合の引数名
                           (pipelineなどで変わるので。例: "transformedtargetregressor__sample_weight")
         predict_method: "predict" or "predict_proba"
+        score_fn: ラベルと推論結果を受け取り、指標をdictで返す関数。指定しなければモデルのscore()が使われる。
 
     """
 
@@ -32,6 +33,9 @@ class SKLearnModel(Model):
         models_dir: tk.typing.PathLike,
         weights_arg_name: str = "sample_weight",
         predict_method: str = "predict",
+        score_fn: typing.Callable[
+            [tk.data.LabelsType, tk.models.ModelIOType], tk.evaluations.EvalsType
+        ] = None,
         preprocessors: tk.pipeline.EstimatorListType = None,
         postprocessors: tk.pipeline.EstimatorListType = None,
     ):
@@ -39,6 +43,7 @@ class SKLearnModel(Model):
         self.estimator = estimator
         self.weights_arg_name = weights_arg_name
         self.predict_method = predict_method
+        self.score_fn = score_fn
         self.estimators_: typing.Optional[
             typing.List[sklearn.base.BaseEstimator]
         ] = None
@@ -50,11 +55,11 @@ class SKLearnModel(Model):
         self.estimators_ = tk.utils.load(models_dir / "estimators.pkl")
 
     def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> None:
-        scores = []
+        evals_list = []
         score_weights = []
         self.estimators_ = []
-        for train_set, val_set in tk.utils.tqdm(
-            dataset.iter(folds), total=len(folds), desc="cv"
+        for fold, (train_set, val_set) in tk.utils.tqdm(
+            enumerate(dataset.iter(folds)), total=len(folds), desc="cv"
         ):
             kwargs = {}
             if train_set.weights is not None:
@@ -68,12 +73,18 @@ class SKLearnModel(Model):
             if val_set.weights is not None:
                 kwargs[self.weights_arg_name] = val_set.weights
 
-            scores.append(estimator.score(val_set.data, val_set.labels, **kwargs))
+            if self.score_fn is None:
+                evals = {
+                    "score": estimator.score(val_set.data, val_set.labels, **kwargs)
+                }
+            else:
+                pred_val = self._predict(val_set, fold)
+                evals = self.score_fn(val_set.labels, pred_val)
+            evals_list.append(evals)
             score_weights.append(len(val_set))
 
-        tk.log.get(__name__).info(
-            f"cv score: {np.average(scores, weights=score_weights):,.3f}"
-        )
+        evals = tk.evaluations.mean(evals_list, weights=score_weights)
+        tk.log.get(__name__).info(f"cv: {tk.evaluations.to_str(evals)}")
 
     def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
         assert self.estimators_ is not None

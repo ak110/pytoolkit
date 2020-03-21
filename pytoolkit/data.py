@@ -478,7 +478,9 @@ class Iterator:
 
 
 def mixup(
-    ds: tf.data.Dataset, postmix_fn: typing.Callable, num_parallel_calls: int = None,
+    ds: tf.data.Dataset,
+    postmix_fn: typing.Callable = None,
+    num_parallel_calls: int = None,
 ):
     """tf.dataでのmixup: <https://arxiv.org/abs/1710.09412>
 
@@ -492,12 +494,11 @@ def mixup(
     @tf.function
     def mixup_fn(*data):
         r = tf.random.uniform((), 0, 1)
-        return postmix_fn(
-            *[
-                tf.cast(d[0], tf.float32) * r + tf.cast(d[1], tf.float32) * (1 - r)
-                for d in data
-            ]
-        )
+        data = [
+            tf.cast(d[0], tf.float32) * r + tf.cast(d[1], tf.float32) * (1 - r)
+            for d in data
+        ]
+        return data if postmix_fn is None else postmix_fn(*data)
 
     ds = ds.repeat()
     ds = ds.batch(2)

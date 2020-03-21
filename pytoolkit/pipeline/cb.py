@@ -101,7 +101,11 @@ class CBModel(Model):
 
     def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
         assert self.gbms_ is not None
-        return self.gbms_[fold].predict(dataset.data)
+        if self.params.get("loss_function") in ("MultiClass",):  # TODO
+            prediction_type = "Probability"
+        else:
+            prediction_type = "RawFormulaVal"
+        return self.gbms_[fold].predict(dataset.data, prediction_type=prediction_type)
 
     def feature_importance(self):
         """Feature ImportanceをDataFrameで返す。"""
