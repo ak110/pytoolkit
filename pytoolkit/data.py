@@ -71,6 +71,9 @@ class Dataset:
         elif isinstance(data, list):
             # multiple input/output
             return [v[index] for v in data]
+        elif isinstance(data, pd.DataFrame):
+            assert len(data) == len(self)
+            return data.values[index]
         else:
             assert len(data) == len(self)
             return data[index]
