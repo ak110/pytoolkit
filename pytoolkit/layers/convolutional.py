@@ -80,23 +80,30 @@ class CoordChannel2D(tf.keras.layers.Layer):
 class WSConv2D(tf.keras.layers.Conv2D):
     """Weight StandardizationなConv2D <https://arxiv.org/abs/1903.10520>"""
 
-    def call(self, inputs, **kwargs):
-        del kwargs
+    def call(self, inputs):
+        # pylint: disable=access-member-before-definition,attribute-defined-outside-init
+        base_kernel = self.kernel
+        kernel_mean = tf.math.reduce_mean(base_kernel, axis=[0, 1, 2], keepdims=True)
+        kernel_std = tf.math.reduce_std(base_kernel, axis=[0, 1, 2], keepdims=True)
+        self.kernel = (base_kernel - kernel_mean) / (kernel_std + 1e-5)
+        try:
+            return super().call(inputs)
+        finally:
+            self.kernel = base_kernel
 
-        kernel_mean = K.mean(self.kernel, axis=[0, 1, 2])
-        kernel_std = K.std(self.kernel, axis=[0, 1, 2])
-        kernel = (self.kernel - kernel_mean) / (kernel_std + 1e-5)
 
-        outputs = K.conv2d(
-            inputs,
-            kernel,
-            strides=self.strides,
-            padding=self.padding,
-            data_format=self.data_format,
-            dilation_rate=self.dilation_rate,
+@tf.keras.utils.register_keras_serializable()
+class RMSConv2D(tf.keras.layers.Conv2D):
+    """Weight Standardizationの謎アレンジ版。"""
+
+    def call(self, inputs):
+        # pylint: disable=access-member-before-definition,attribute-defined-outside-init
+        base_kernel = self.kernel
+        nu2 = tf.math.reduce_mean(
+            tf.math.square(base_kernel), axis=[0, 1, 2], keepdims=True
         )
-        if self.use_bias:
-            outputs = K.bias_add(outputs, self.bias, self.data_format)
-        if self.activation is not None:
-            outputs = self.activation(outputs)
-        return outputs
+        self.kernel = base_kernel * tf.math.rsqrt(nu2 + 1e-3)
+        try:
+            return super().call(inputs)
+        finally:
+            self.kernel = base_kernel

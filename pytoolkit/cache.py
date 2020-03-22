@@ -12,11 +12,14 @@ import joblib
 import pytoolkit as tk
 
 
-def memorize(cache_dir: tk.typing.PathLike = "./cache", compress: int = 0):
+def memoize(
+    cache_dir: tk.typing.PathLike = "./cache", prefix: str = "", compress: int = 0
+):
     """関数の戻り値をファイルにキャッシュするデコレーター。
 
     Args:
         cache_dir: 保存先ディレクトリ
+        prefix: キャッシュファイル名のプレフィクス (同名関数の衝突を避ける用)
         compress: 0～9の圧縮レベル。一般的には3がおすすめ。
 
     """
@@ -24,7 +27,7 @@ def memorize(cache_dir: tk.typing.PathLike = "./cache", compress: int = 0):
     def decorator(func):
         @functools.wraps(func)
         def memorized_func(*args, **kwargs):
-            cache_path = get_cache_path(cache_dir, func, args, kwargs)
+            cache_path = get_cache_path(cache_dir, func, args, kwargs, prefix)
             # キャッシュがあれば読む
             if cache_path.is_file():
                 tk.log.get(__name__).info(f"Cache is found: {cache_path}")
@@ -52,13 +55,16 @@ def get_cache_path(
     func: typing.Callable,
     args: typing.Sequence,
     kwargs: typing.Dict,
+    prefix: str = "",
 ):
     """キャッシュのパスを作って返す。"""
     cache_dir = pathlib.Path(cache_dir)
+
     bound_args = inspect.signature(func).bind(*args, **kwargs).arguments
     args_list = sorted(dict(bound_args).items())
     args_str = ",".join([f"{repr(k)}:{repr(v)}" for k, v in args_list])
-    args_hash = hashlib.md5(args_str.encode("utf-8")).hexdigest()[:8]
-    tk.log.get(__name__).info(f"Cache {args_hash}: arguments={args_str}")
-    cache_path = cache_dir / f"{func.__name__}_{args_hash}.pkl"
+    cache_hash = hashlib.md5(args_str.encode("utf-8")).hexdigest()[:8]
+
+    tk.log.get(__name__).info(f"Cache {cache_hash}: arguments={args_str}")
+    cache_path = cache_dir / f"{prefix}_{func.__name__}_{cache_hash}.pkl"
     return cache_path

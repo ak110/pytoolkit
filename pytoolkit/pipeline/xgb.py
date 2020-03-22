@@ -113,8 +113,7 @@ class XGBModel(Model):
         data = xgboost.DMatrix(
             data=dataset.data, feature_names=dataset.data.columns.values
         )
-        gbm = self.gbms_[fold]
-        return gbm.predict(data, ntree_limit=gbm.best_ntree_limit)
+        return self.gbms_[fold].predict(data, ntree_limit=self.best_ntree_limit_)
 
     def feature_importance(self, importance_type: str = "total_gain"):
         """Feature ImportanceをDataFrameで返す。"""

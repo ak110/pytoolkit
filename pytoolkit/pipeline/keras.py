@@ -113,7 +113,7 @@ class KerasModel(Model):
         assert self.num_replicas_in_sync >= 1
 
         if self.parallel_cv:
-            assert self.refine_data_loader is None, "NotImplemented"
+            assert self.refine_epochs == 0, "NotImplemented"
         if "{fold}" not in self.model_name_format:
             assert nfold == 1
 

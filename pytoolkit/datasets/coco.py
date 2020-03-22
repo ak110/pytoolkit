@@ -17,8 +17,93 @@ import numpy as np
 import pytoolkit as tk
 
 
+CLASS_NAMES = [
+    # chainercvは読んだとき残してなさそうだったので直書き
+    "person",
+    "bicycle",
+    "car",
+    "motorbike",
+    "aeroplane",
+    "bus",
+    "train",
+    "truck",
+    "boat",
+    "traffic light",
+    "fire hydrant",
+    "stop sign",
+    "parking meter",
+    "bench",
+    "bird",
+    "cat",
+    "dog",
+    "horse",
+    "sheep",
+    "cow",
+    "elephant",
+    "bear",
+    "zebra",
+    "giraffe",
+    "backpack",
+    "umbrella",
+    "handbag",
+    "tie",
+    "suitcase",
+    "frisbee",
+    "skis",
+    "snowboard",
+    "sports ball",
+    "kite",
+    "baseball bat",
+    "baseball glove",
+    "skateboard",
+    "surfboard",
+    "tennis racket",
+    "bottle",
+    "wine glass",
+    "cup",
+    "fork",
+    "knife",
+    "spoon",
+    "bowl",
+    "banana",
+    "apple",
+    "sandwich",
+    "orange",
+    "broccoli",
+    "carrot",
+    "hot dog",
+    "pizza",
+    "donut",
+    "cake",
+    "chair",
+    "sofa",
+    "pottedplant",
+    "bed",
+    "diningtable",
+    "toilet",
+    "tvmonitor",
+    "laptop",
+    "mouse",
+    "remote",
+    "keyboard",
+    "cell phone",
+    "microwave",
+    "oven",
+    "toaster",
+    "sink",
+    "refrigerator",
+    "book",
+    "clock",
+    "vase",
+    "scissors",
+    "teddy bear",
+    "hair drier",
+    "toothbrush",
+]
+
+
 def load_coco_od(
-    coco_dir, use_crowded: bool = False, verbose: bool = True
+    coco_dir: tk.typing.PathLike, use_crowded: bool = False, verbose: bool = True
 ) -> typing.Tuple[tk.data.Dataset, tk.data.Dataset]:
     """COCOの物体検出のデータを読み込む。
 
@@ -63,8 +148,9 @@ def _load_from_chainercv(ds, desc, verbose) -> tk.data.Dataset:
         ]
     )
     data = np.array([y.path for y in labels])
-    # TODO: metadata={"class_names": CLASS_NAMES}
-    return tk.data.Dataset(data=data, labels=labels)
+    return tk.data.Dataset(
+        data=data, labels=labels, metadata={"class_names": CLASS_NAMES}
+    )
 
 
 def _get_label(ds, i: int) -> tk.od.ObjectsAnnotation:

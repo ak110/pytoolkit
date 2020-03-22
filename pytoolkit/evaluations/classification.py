@@ -20,7 +20,7 @@ def print_classification_metrics(
         evals = evaluate_classification(y_true, proba_pred, average)
         print_fn = print_fn or tk.log.get(__name__).info
         if evals["type"] == "binary":  # binary
-            print_fn(f"Accuracy:  {evals['acc']:.3f} (Error: {1 - evals['acc']:.3f})")
+            print_fn(f"Accuracy:  {evals['acc']:.3f} (Error: {evals['error']:.3f})")
             print_fn(f"F1-score:  {evals['f1']:.3f}")
             print_fn(f"AUC:       {evals['auc']:.3f}")
             print_fn(f"AP:        {evals['ap']:.3f}")
@@ -28,7 +28,7 @@ def print_classification_metrics(
             print_fn(f"Recall:    {evals['rec']:.3f}")
             print_fn(f"Logloss:   {evals['logloss']:.3f}")
         else:  # multiclass
-            print_fn(f"Accuracy:   {evals['acc']:.3f} (Error: {1 - evals['acc']:.3f})")
+            print_fn(f"Accuracy:   {evals['acc']:.3f} (Error: {evals['error']:.3f})")
             print_fn(f"F1-{average:5s}:   {evals['f1']:.3f}")
             print_fn(f"AUC-{average:5s}:  {evals['auc']:.3f}")
             print_fn(f"AP-{average:5s}:   {evals['ap']:.3f}")
@@ -69,6 +69,7 @@ def evaluate_classification(
             logloss = sklearn.metrics.log_loss(y_true, proba_pred)
             return {
                 "acc": acc,
+                "error": 1 - acc,
                 "f1": f1,
                 "auc": auc,
                 "ap": ap,
@@ -96,6 +97,7 @@ def evaluate_classification(
             logloss = sklearn.metrics.log_loss(ohe_true, proba_pred)
             return {
                 "acc": acc,
+                "error": 1 - acc,
                 "f1": f1,
                 "auc": auc,
                 "ap": ap,

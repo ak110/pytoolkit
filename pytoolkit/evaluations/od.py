@@ -30,7 +30,6 @@ def print_od_metrics(
     print_fn(f"APS:       {evals['map/iou=0.50:0.95/area=small/max_dets=100']:.3f}")
     print_fn(f"APM:       {evals['map/iou=0.50:0.95/area=medium/max_dets=100']:.3f}")
     print_fn(f"APL:       {evals['map/iou=0.50:0.95/area=large/max_dets=100']:.3f}")
-    print_fn(f"VOC MAP:   {evals['voc_map']:.3f}")
     print_fn(f"VOC07 MAP: {evals['voc07_map']:.3f}")
     return evals
 
@@ -38,12 +37,14 @@ def print_od_metrics(
 def evaluate_od(
     y_true: typing.Iterable[tk.od.ObjectsAnnotation],
     y_pred: typing.Iterable[tk.od.ObjectsPrediction],
+    detail: bool = False,
 ) -> tk.evaluations.EvalsType:
     """物体検出の各種metricsを算出してdictで返す。
 
     Args:
         y_true: ラベル
         y_pred: 推論結果
+        detail: 全情報を返すならTrue。(既定値では一部の指標のみ返す)
 
     Returns:
         各種metrics
@@ -91,17 +92,7 @@ def evaluate_od(
             gt_areas_list,
             gt_crowdeds_list,
         )
-
-        voc_evals1 = chainercv.evaluations.eval_detection_voc(
-            pred_bboxes_list,
-            pred_classes_list,
-            pred_confs_list,
-            gt_bboxes_list,
-            gt_classes_list,
-            gt_difficults_list,
-            use_07_metric=False,
-        )
-        voc_evals2 = chainercv.evaluations.eval_detection_voc(
+        voc_evals = chainercv.evaluations.eval_detection_voc(
             pred_bboxes_list,
             pred_classes_list,
             pred_confs_list,
@@ -110,9 +101,21 @@ def evaluate_od(
             gt_difficults_list,
             use_07_metric=True,
         )
-        evals["voc_ap"] = voc_evals1["ap"]
-        evals["voc_map"] = voc_evals1["map"]
-        evals["voc07_ap"] = voc_evals2["ap"]
-        evals["voc07_map"] = voc_evals2["map"]
+        evals["voc07_ap"] = voc_evals["ap"]
+        evals["voc07_map"] = voc_evals["map"]
+
+        if not detail:
+            summary_keys = [
+                "map/iou=0.50:0.95/area=all/max_dets=100",
+                "map/iou=0.50/area=all/max_dets=100",
+                "map/iou=0.75/area=all/max_dets=100",
+                "map/iou=0.50:0.95/area=large/max_dets=100",
+                "map/iou=0.50:0.95/area=medium/max_dets=100",
+                "map/iou=0.50:0.95/area=small/max_dets=100",
+                "voc07_map",
+                "ar/iou=0.50:0.95/area=all/max_dets=100",
+                "voc07_ap",
+            ]
+            evals = {k: evals[k] for k in summary_keys}
 
         return evals

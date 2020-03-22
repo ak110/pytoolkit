@@ -183,7 +183,7 @@ class ObjectsPrediction:
         ]
         return "\n".join(a)
 
-    def plot(self, img, class_names, conf_threshold=0, max_long_side=None):
+    def plot(self, img, class_names=None, conf_threshold=0, max_long_side=None):
         """ワクを描画した画像を作って返す。"""
         return plot_objects(
             img,
@@ -447,8 +447,8 @@ def plot_objects(
     assert len(confs_) == len(bboxes)
     assert len(classes_) == len(bboxes)
     if class_names is not None and classes is not None:
-        assert 0 <= np.min(classes_) < len(class_names)
-        assert 0 <= np.max(classes_) < len(class_names)
+        assert 0 <= np.min(classes_, initial=0) < len(class_names)
+        assert 0 <= np.max(classes_, initial=0) < len(class_names)
 
     img = tk.ndimage.load(base_image, grayscale=False)
     if max_long_side is not None and max(*img.shape[:2]) > max_long_side:
