@@ -180,7 +180,7 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
             self.numeric_cols_ = cols["numeric"]
 
             self.category_cols_ = cols["categorical"]
-            if len(self.category_cols_):
+            if len(self.category_cols_) > 0:
                 if self.category in ("category", "ordinal"):
                     self.ordinal_encoder.fit(X[self.category_cols_].astype(object))
                 elif self.category in ("onehot",):
@@ -192,7 +192,7 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
                 if X[c].nunique() >= 3
                 and X[c].value_counts().min() <= len(X) * self.rare_category_fraction
             ]
-            if len(self.rare_category_cols_):
+            if len(self.rare_category_cols_) > 0:
                 self.target_encoder.fit(X[self.rare_category_cols_], y)
                 self.count_encoder.fit(X[self.rare_category_cols_], y)
 
@@ -233,13 +233,13 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
         with tk.log.trace("FeaturesEncoder.transform"):
             feats = pd.DataFrame(index=X.index)
 
-            if len(self.binary_cols_):
+            if len(self.binary_cols_) > 0:
                 feats[self.binary_cols_] = X[self.binary_cols_].astype(np.bool)
 
-            if len(self.numeric_cols_):
+            if len(self.numeric_cols_) > 0:
                 feats[self.numeric_cols_] = X[self.numeric_cols_].astype(np.float32)
 
-            if len(self.category_cols_):
+            if len(self.category_cols_) > 0:
                 if self.category == "category":
                     feats[self.category_cols_] = self.ordinal_encoder.transform(
                         X[self.category_cols_].astype(object)
@@ -262,7 +262,7 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
                         )[fn],
                     )
 
-            if len(self.rare_category_cols_):
+            if len(self.rare_category_cols_) > 0:
                 tk.table.add_cols(
                     feats,
                     [f"{c}_target" for c in self.rare_category_cols_],
@@ -274,13 +274,13 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
                     self.count_encoder.transform(X[self.rare_category_cols_]),
                 )
 
-            if len(self.iszero_cols_):
+            if len(self.iszero_cols_) > 0:
                 tk.table.add_cols(
                     feats,
                     [f"{c}_iszero" for c in self.iszero_cols_],
                     X[self.iszero_cols_] == 0,
                 )
-            if len(self.isnull_cols_):
+            if len(self.isnull_cols_) > 0:
                 tk.table.add_cols(
                     feats,
                     [f"{c}_isnull" for c in self.isnull_cols_],

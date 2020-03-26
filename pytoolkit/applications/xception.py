@@ -153,7 +153,8 @@ def create(
     if weights == "imagenet":
         weights_path = hvd.get_file(
             "xception_weights_tf_dim_ordering_tf_kernels_notop.h5",
-            "https://github.com/fchollet/deep-learning-models/releases/download/v0.4/xception_weights_tf_dim_ordering_tf_kernels_notop.h5",
+            "https://github.com/fchollet/deep-learning-models/releases/download"
+            "/v0.4/xception_weights_tf_dim_ordering_tf_kernels_notop.h5",
             cache_subdir="models",
             file_hash="b0042744bf5b25fce3cb969f33bebb97",
         )

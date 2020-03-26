@@ -860,7 +860,7 @@ class GridMask(A.ImageOnlyTransform):  # pylint: disable=abstract-method
             mask,
             m,
             (mask.shape[1], mask.shape[0]),
-            flags=cv2.INTER_LINEAR,
+            flags=cv2.INTER_NEAREST,
             borderMode=cv2.BORDER_WRAP,
         )
         assert mask.ndim == 2
@@ -996,7 +996,7 @@ class RandomMorphology(A.ImageOnlyTransform):  # pylint: disable=abstract-method
     References:
         - <https://www.kaggle.com/ren4yu/bengali-morphological-ops-as-image-augmentation>
         - <https://www.kaggle.com/c/bengaliai-cv19/discussion/128198#734220>
-        - <http://labs.eecs.tottori-u.ac.jp/sd/Member/oyamada/OpenCV/html/py_tutorials/py_imgproc/py_morphological_ops/py_morphological_ops.html>
+        - <http://labs.eecs.tottori-u.ac.jp/sd/Member/oyamada/OpenCV/html/py_tutorials/py_imgproc/py_morphological_ops/py_morphological_ops.html>  # noqa
 
     """
 

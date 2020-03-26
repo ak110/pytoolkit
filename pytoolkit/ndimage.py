@@ -492,13 +492,16 @@ def geometric_transform(
         flip_h: Defaults to False. Trueなら水平に反転する。
         flip_v: Defaults to False. Trueなら垂直に反転する。
         degrees: Defaults to 0. 回転する角度。(0や360なら回転無し。)
-        scale_h: Defaults to 1.0. 水平方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
-        scale_v: Defaults to 1.0. 垂直方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
+        scale_h: Defaults to 1.0. 水平方向のスケール。
+                 例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
+        scale_v: Defaults to 1.0. 垂直方向のスケール。
+                 例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
         pos_h: Defaults to 0.5. スケール変換に伴う水平位置。0で左端、0.5で中央、1で右端。
         pos_v: Defaults to 0.5. スケール変換に伴う垂直位置。0で上端、0.5で中央、1で下端。
         translate_h: Defaults to 0.0. 変形元を水平にずらす量。-0.125なら12.5%左にずらし、+0.125なら12.5%右にずらす。
         translate_v: Defaults to 0.0. 変形元を垂直にずらす量。-0.125なら12.5%上にずらし、+0.125なら12.5%下にずらす。
-        interp: Defaults to 'lanczos'. 補間方法。'nearest', 'bilinear', 'bicubic', 'lanczos'。縮小時は自動的にcv2.INTER_AREA。
+        interp: Defaults to 'lanczos'. 補間方法。
+                'nearest', 'bilinear', 'bicubic', 'lanczos'。縮小時は自動的にcv2.INTER_AREA。
         border_mode: Defaults to 'edge'. パディング方法。'edge', 'reflect', 'wrap'
 
     Returns:
@@ -551,8 +554,10 @@ def compute_perspective(
         flip_h: Defaults to False. Trueなら水平に反転する。
         flip_v: Defaults to False. Trueなら垂直に反転する。
         degrees: Defaults to 0. 回転する角度。(0や360なら回転無し。)
-        scale_h: Defaults to 1.0. 水平方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
-        scale_v: Defaults to 1.0. 垂直方向のスケール。例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
+        scale_h: Defaults to 1.0. 水平方向のスケール。
+                 例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
+        scale_v: Defaults to 1.0. 垂直方向のスケール。
+                 例えば0.5だと半分に縮小(zoom out / padding)、2.0だと倍に拡大(zoom in / crop)、1.0で等倍。
         pos_h: Defaults to 0.5. スケール変換に伴う水平位置。0で左端、0.5で中央、1で右端。
         pos_v: Defaults to 0.5. スケール変換に伴う垂直位置。0で上端、0.5で中央、1で下端。
         translate_h: Defaults to 0.0. 変形元を水平にずらす量。-0.125なら12.5%左にずらし、+0.125なら12.5%右にずらす。
@@ -607,7 +612,8 @@ def perspective_transform(
         width: 出力サイズ
         height: 出力サイズ
         m: 変換行列。
-        interp: Defaults to 'lanczos'. 補間方法。'nearest', 'bilinear', 'bicubic', 'lanczos'。縮小時は自動的にcv2.INTER_AREA。
+        interp: Defaults to 'lanczos'. 補間方法。
+                'nearest', 'bilinear', 'bicubic', 'lanczos'。縮小時は自動的にcv2.INTER_AREA。
         border_mode: Defaults to 'edge'. パディング方法。'edge', 'reflect', 'wrap'
 
     Returns:
@@ -868,8 +874,8 @@ def mask_to_onehot(
     """
     num_classes = len(class_colors) + (1 if append_bg else 0)
     result = np.zeros((rgb.shape[0], rgb.shape[1], num_classes), np.float32)
-    for i in range(len(class_colors)):
-        result[np.all(rgb == class_colors[i], axis=-1), i] = 1
+    for i, cc in enumerate(class_colors):
+        result[np.all(rgb == cc, axis=-1), i] = 1
     if append_bg:
         result[:, :, -1] = 1 - result[:, :, :-1].sum(axis=-1)
     return result
@@ -893,8 +899,8 @@ def mask_to_class(
         void_class = len(class_colors)
     result = np.empty(rgb.shape[:2], dtype=np.int32)
     result[:] = void_class
-    for i in range(len(class_colors)):
-        result[np.all(rgb == class_colors[i], axis=-1)] = i
+    for i, cc in enumerate(class_colors):
+        result[np.all(rgb == cc, axis=-1)] = i
     return result
 
 

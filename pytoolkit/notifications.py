@@ -18,7 +18,7 @@ import sys
 import pytoolkit as tk
 
 
-def post_evals(evals: tk.evaluations.EvalsType, precision=3):
+def post_evals(evals: tk.evaluations.EvalsType, precision: int = 3):
     """評価結果を通知。
 
     Args:
@@ -48,7 +48,7 @@ def post(text: str):
 
             slack_url = os.environ.get("SLACK_URL", "")
             if len(slack_url) > 0:
-                data = {"text": f"{pre_text}```\n{text}\n```\n<!channel>"}
+                data = {"text": f"{pre_text}```\n{text}\n```"}  # \n<!channel>
                 r = requests.post(
                     slack_url,
                     data=json.dumps(data),
@@ -67,4 +67,4 @@ def post(text: str):
                 r.raise_for_status()
 
         except Exception:
-            tk.log.get(__name__).warning("Slackへの投稿失敗", exc_info=True)
+            tk.log.get(__name__).warning("投稿失敗", exc_info=True)

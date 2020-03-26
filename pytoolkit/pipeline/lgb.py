@@ -102,8 +102,14 @@ class LGBModel(Model):
         # 独自拡張: sklearn風の指定
         if params.get("feature_fraction") == "sqrt":
             params["feature_fraction"] = np.sqrt(num_features) / num_features
+            tk.log.get(__name__).info(
+                f'feature_fraction: "sqrt" -> {params["feature_fraction"]:.3f}'
+            )
         elif params.get("feature_fraction") == "log2":
             params["feature_fraction"] = np.log2(num_features) / num_features
+            tk.log.get(__name__).info(
+                f'feature_fraction: "log2" -> {params["feature_fraction"]:.3f}'
+            )
         # 独自拡張: クラス別の重みの指定
         if "class_weights" in params:
             if params.get("class_weights") == "balanced":

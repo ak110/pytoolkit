@@ -12,7 +12,6 @@ pushd docs/
 make html
 popd
 
-pylint -j0 pytoolkit
+pylint -j4 pytoolkit
 
 CUDA_VISIBLE_DEVICES=none pytest
-

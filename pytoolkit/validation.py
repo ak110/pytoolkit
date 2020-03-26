@@ -24,7 +24,8 @@ def split(
         nfold: 分割数。ただし1の場合は特別に5foldの最初の1個しか実行しないバージョンということにする。
                (もうちょっと分かりやすいインターフェースにしたいが利便性と両立する案が無いのでとりあえず…)
         split_seed: シード値
-        stratify: Trueの場合か、Noneでかつdataset.labelsがndarrayかつndim == 1ならStratifiedKFold。FalseならKFold。ndarrayの場合はそれを使ってStratifiedKFold。
+        stratify: Trueの場合か、Noneでかつdataset.labelsがndarrayかつndim == 1ならStratifiedKFold。
+                  FalseならKFold。ndarrayの場合はそれを使ってStratifiedKFold。
 
     """
     if nfold == 1:

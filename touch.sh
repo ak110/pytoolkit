@@ -15,4 +15,3 @@ for f in $(find pytoolkit -name '*.py') ; do
         fi
     fi
 done
-
