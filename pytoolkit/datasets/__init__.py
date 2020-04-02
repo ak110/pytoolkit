@@ -4,6 +4,7 @@
 from .coco import *
 from .ic_ import *
 from .keras import *
+from .samples import *
 from .sklearn import *
 from .ss import *
 from .voc import *

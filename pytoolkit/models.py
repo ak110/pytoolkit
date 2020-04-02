@@ -384,7 +384,7 @@ def predict(
                 desc="predict",
             )
             results = list(gen)
-            if isinstance(results[0], list):  # multiple output
+            if isinstance(results[0], (list, tuple)):  # multiple output
                 values = [
                     np.array([r[i] for r in results]) for i in range(len(results[0]))
                 ]
@@ -456,11 +456,11 @@ def _predict_flow(
     ):
         for cb in callbacks:
             cb.on_predict_batch_begin(batch)
-        pred_batch = on_batch_fn(model, X.numpy())
+        pred_batch = on_batch_fn(model, X)
         for cb in callbacks:
             cb.on_predict_batch_end(batch)
 
-        if isinstance(pred_batch, list):  # multiple output
+        if isinstance(pred_batch, (list, tuple)):  # multiple output
             assert len(pred_batch) >= 2
             for b in zip(*pred_batch):
                 yield list(b)
@@ -575,7 +575,7 @@ def predict_on_batch_augmented(
     result = model.predict(
         np.concatenate(X_batch2, axis=0), batch_size=shape[0], verbose=0
     )
-    if isinstance(result, list):  # multiple output
+    if isinstance(result, (list, tuple)):  # multiple output
         result = [
             r.reshape((len(X_batch2), len(X_batch)) + r.shape[1:]) for r in result
         ]

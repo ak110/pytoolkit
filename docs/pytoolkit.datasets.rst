@@ -28,6 +28,14 @@ pytoolkit.datasets.keras module
    :undoc-members:
    :show-inheritance:
 
+pytoolkit.datasets.samples module
+---------------------------------
+
+.. automodule:: pytoolkit.datasets.samples
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 pytoolkit.datasets.sklearn module
 ---------------------------------
 

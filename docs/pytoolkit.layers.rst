@@ -20,6 +20,14 @@ pytoolkit.layers.attentions module
    :undoc-members:
    :show-inheritance:
 
+pytoolkit.layers.blocks module
+------------------------------
+
+.. automodule:: pytoolkit.layers.blocks
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 pytoolkit.layers.convolutional module
 -------------------------------------
 

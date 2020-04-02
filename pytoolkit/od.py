@@ -1,6 +1,7 @@
-"""機械学習(主にsklearn)関連。"""
+"""物体検出関連。"""
 import pathlib
 import typing
+import warnings
 
 import cv2
 import numpy as np
@@ -466,8 +467,8 @@ def plot_objects(
     for clazz, conf, bbox in zip(classes_, confs_, bboxes):
         if conf is not None and conf < conf_threshold:
             continue  # skip
-        assert bbox[0] <= bbox[2], f"bbox error: bbox={bbox} class={clazz} conf={conf}"
-        assert bbox[1] <= bbox[3], f"bbox error: bbox={bbox} class={clazz} conf={conf}"
+        if bbox[0] <= bbox[2] or bbox[1] <= bbox[3]:
+            warnings.warn("Negative size bbox")
         xmin = max(int(round(bbox[0] * img.shape[1])), 0)
         ymin = max(int(round(bbox[1] * img.shape[0])), 0)
         xmax = min(int(round(bbox[2] * img.shape[1])), img.shape[1])

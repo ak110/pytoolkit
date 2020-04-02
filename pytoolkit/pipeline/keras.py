@@ -41,6 +41,8 @@ class KerasModel(Model):
         callbacks: tk.models.fit()のパラメータ
         fit_params: tk.models.fit()のパラメータ
         parallel_cv: lgb.cvなどのように全foldまとめて処理するならTrue
+        on_batch_fn: predictで使用するon_batch_fn。
+        load_by_name: load()でby_name=TrueするならTrue。既定値はFalse。
 
     Attributes:
         num_replicas_in_sync: tf.distributeによる並列数
@@ -80,6 +82,7 @@ class KerasModel(Model):
         fit_params: dict = None,
         parallel_cv: bool = False,
         on_batch_fn: tk.models.OnBatchFnType = None,
+        load_by_name: bool = False,
         preprocessors: tk.pipeline.EstimatorListType = None,
         postprocessors: tk.pipeline.EstimatorListType = None,
     ):
@@ -106,6 +109,7 @@ class KerasModel(Model):
         self.fit_params = fit_params
         self.parallel_cv = parallel_cv
         self.on_batch_fn = on_batch_fn
+        self.load_by_name = load_by_name
         self.training_models: typing.List[tf.keras.models.Model] = [None] * nfold
         self.prediction_models: typing.List[tf.keras.models.Model] = [None] * nfold
 
@@ -140,7 +144,9 @@ class KerasModel(Model):
         self.create_network(fold)
         models_dir = models_dir or self.models_dir
         model_path = models_dir / self.model_name_format.format(fold=fold)
-        tk.models.load_weights(self.prediction_models[fold], model_path)
+        tk.models.load_weights(
+            self.prediction_models[fold], model_path, by_name=self.load_by_name
+        )
 
     def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> None:
         assert len(folds) == self.nfold
@@ -463,10 +469,16 @@ class KerasModel(Model):
         # 訓練データと検証データの評価
         tk.hvd.barrier()
         try:
-            self.evaluate(train_set, prefix="", fold=fold)
+            train_evals = self.evaluate(train_set, prefix="", fold=fold)
+            tk.log.get(__name__).info(
+                f"fold{fold} evaluations: {tk.evaluations.to_str(train_evals)}"
+            )
             if val_set is None:
                 return None
             evals = self.evaluate(val_set, prefix="val_", fold=fold)
+            tk.log.get(__name__).info(
+                f"fold{fold} evaluations: {tk.evaluations.to_str(evals)}"
+            )
         except Exception:
             tk.log.get(__name__).warning("evaluate error", exc_info=True)
             evals = {}
