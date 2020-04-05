@@ -19,6 +19,12 @@ def reduce(x, reduce_mode):
     )
 
 
+def empty(y_true, y_pred):
+    """ダミーのloss"""
+    del y_true, y_pred
+    return tf.zeros((), dtype=tf.float32)
+
+
 def binary_crossentropy(
     y_true, y_pred, from_logits=False, alpha=None, reduce_mode="sum"
 ):

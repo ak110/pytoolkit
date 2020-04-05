@@ -493,7 +493,7 @@ def mixup(
 
     @tf.function
     def mixup_fn(*data):
-        r = tf.random.uniform((), 0, 1)
+        r = _tf_random_beta(alpha=0.2, beta=0.2)
         data = [
             tf.cast(d[0], tf.float32) * r + tf.cast(d[1], tf.float32) * (1 - r)
             for d in data
@@ -504,3 +504,10 @@ def mixup(
     ds = ds.batch(2)
     ds = ds.map(mixup_fn, num_parallel_calls=num_parallel_calls)
     return ds
+
+
+def _tf_random_beta(alpha, beta, shape=()):
+    """β分布の乱数を生成する。"""
+    r1 = tf.random.gamma(alpha=alpha, beta=1.0, shape=shape)
+    r2 = tf.random.gamma(alpha=beta, beta=1.0, shape=shape)
+    return r1 / (r1 + r2)
