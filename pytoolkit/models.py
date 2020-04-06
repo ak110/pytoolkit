@@ -38,8 +38,9 @@ def check(
     training_model: tf.keras.models.Model,
     prediction_model: tf.keras.models.Model,
     models_dir: tk.typing.PathLike,
-    training_iterator: tk.data.Iterator = None,
-    prediction_iterator: tk.data.Iterator = None,
+    dataset: tk.data.Dataset = None,
+    training_data_loader: tk.data.DataLoader = None,
+    prediction_data_loader: tk.data.DataLoader = None,
     save_mode: str = "hdf5",
 ):
     """モデルの簡易動作確認用コード。
@@ -48,8 +49,9 @@ def check(
         training_model: 学習用モデル
         prediction_model: 推論用モデル
         models_dir: 情報の保存先ディレクトリ
-        training_iterator: 学習チェック用データ (少数にしておくこと)
-        prediction_iterator: 推論チェック用データ (少数にしておくこと)
+        dataset: チェック用データ (少数にしておくこと)
+        training_data_loader: 学習用DataLoader
+        prediction_data_loader: 推論用DataLoader
         save_mode: 保存形式 ("hdf5", "saved_model", "onnx", "tflite"のいずれか)
 
     """
@@ -69,7 +71,8 @@ def check(
         prediction_model = tk.models.load(save_path)
 
     # training_model.evaluate
-    if training_iterator is not None:
+    if dataset is not None and training_data_loader is not None:
+        training_iterator = training_data_loader.iter(dataset, shuffle=True)
         logger.info(f"training_iterator: {training_iterator.to_str()}")
         values = training_model.evaluate(
             training_iterator.ds, steps=training_iterator.steps, verbose=1
@@ -81,7 +84,8 @@ def check(
         logger.info(f"check.evaluate: {tk.evaluations.to_str(evals)}")
 
     # prediction_model.predict
-    if prediction_iterator is not None:
+    if dataset is not None and prediction_data_loader is not None:
+        prediction_iterator = prediction_data_loader.iter(dataset)
         logger.info(f"prediction_iterator: {prediction_iterator.to_str()}")
         pred = prediction_model.predict(
             prediction_iterator.ds, steps=prediction_iterator.steps, verbose=1
@@ -94,7 +98,8 @@ def check(
             logger.info(f"check.predict: shape={pred.shape}")
 
     # training_model.fit
-    if training_iterator is not None:
+    if dataset is not None and training_data_loader is not None:
+        training_iterator = training_data_loader.iter(dataset, shuffle=True)
         training_model.fit(
             training_iterator.ds,
             steps_per_epoch=training_iterator.steps,
@@ -335,15 +340,15 @@ def fit(
         num_replicas_in_sync: tf.distribute使用時の並列数(バッチサイズに掛け算する)
 
     """
-    use_horovod = tk.hvd.size() > 1
-    if use_horovod:
-        assert num_replicas_in_sync <= 1
     # Horovodはそれぞれのワーカーが勝手にvalidateするのでshuffleする必要がある。
     # shuffleするならデータ数分だけでは全体をカバーできないため3倍回す。
-    # (horovodのexamplesの真似: <https://github.com/horovod/horovod/blob/9bdd70d/examples/keras_mnist_advanced.py#L112,L115>)
-    val_scale = 3 if use_horovod else 1
+    # horovodのexamplesの真似:
+    # <https://github.com/horovod/horovod/blob/9bdd70d/examples/keras_mnist_advanced.py#L112,L115>
+    use_horovod = tk.hvd.is_active()
+    if use_horovod:
+        assert num_replicas_in_sync <= 1
 
-    if validation_freq == 0:
+    if validation_freq == 0 or val_set is None or val_data_loader is None:
         # validation_freq == 0ならvalidationしない(独自仕様)
         validation_freq = None
         val_set = None
@@ -353,25 +358,18 @@ def fit(
         validation_freq = make_validation_freq(
             validation_freq,
             epochs,
-            train_set,
-            val_set,
-            max_val_per_train=0.1 / val_scale,
+            len(train_set),
+            len(val_set) * (3 if use_horovod else 1),
         )
     if val_set is not None:
         assert val_data_loader is not None
 
     train_iterator = train_data_loader.iter(
-        train_set,
-        shuffle=True,
-        use_horovod=use_horovod,
-        num_replicas_in_sync=num_replicas_in_sync,
+        train_set, shuffle=True, num_replicas_in_sync=num_replicas_in_sync,
     )
     val_iterator = (
         val_data_loader.iter(
-            val_set,
-            shuffle=use_horovod,
-            use_horovod=use_horovod,
-            num_replicas_in_sync=num_replicas_in_sync,
+            val_set, shuffle=use_horovod, num_replicas_in_sync=num_replicas_in_sync,
         )
         if val_set is not None and val_data_loader is not None
         else None
@@ -389,9 +387,13 @@ def fit(
     with tk.log.trace("fit"):
         model.fit(
             train_iterator.ds,
-            steps_per_epoch=train_iterator.steps,
+            steps_per_epoch=train_iterator.steps // tk.hvd.size(),
             validation_data=val_iterator.ds if val_iterator is not None else None,
-            validation_steps=val_iterator.steps * val_scale
+            validation_steps=(
+                val_iterator.steps * 3 // tk.hvd.size()
+                if use_horovod
+                else val_iterator.steps
+            )
             if val_iterator is not None
             else None,
             class_weight=class_weight,
@@ -404,17 +406,13 @@ def fit(
 
 
 def make_validation_freq(
-    validation_freq, epochs, train_set, val_set, max_val_per_train=0.1
+    validation_freq, epochs, train_size, val_size, max_val_per_train=0.1
 ):
     """validation_freqをほどよい感じに作成する。"""
-    if val_set is None:
-        return None
     # sqrt(epochs)回くらいやれば十分？ (指標にも依るが…)
     # valがtrainの10%未満くらいなら毎回やっても問題無い
     validation_freq = max(
-        int(np.sqrt(epochs)),
-        int(len(val_set) / (len(train_set) * max_val_per_train)),
-        1,
+        int(np.sqrt(epochs)), int(val_size / (train_size * max_val_per_train)), 1,
     )
     # 最低でも10回くらいはやりたい
     validation_freq = min(validation_freq, max(1, epochs // 10))
@@ -432,7 +430,7 @@ def make_callbacks(callbacks, training: bool) -> list:
     if training:
         callbacks.append(tk.callbacks.EpochLogger())
         callbacks.append(tk.callbacks.ErrorOnNaN())
-    if tk.hvd.initialized() and tk.hvd.size() > 1:
+    if tk.hvd.is_active():
         callbacks.append(tk.hvd.get().callbacks.BroadcastGlobalVariablesCallback(0))
         callbacks.append(tk.hvd.get().callbacks.MetricAverageCallback())
     return callbacks
@@ -444,7 +442,6 @@ def predict(
     data_loader: tk.data.DataLoader,
     callbacks: list = None,
     verbose: int = 1,
-    use_horovod: bool = False,
     on_batch_fn: OnBatchFnType = None,
     num_replicas_in_sync: int = 1,
 ) -> ModelIOType:
@@ -456,7 +453,6 @@ def predict(
         data_loader: データの読み込み
         callbacks: コールバック
         verbose: プログレスバーを表示するか否か
-        use_horovod: MPIによる分散処理をするか否か
         on_batch_fn: モデルとミニバッチ分の入力データを受け取り、推論結果を返す処理。(TTA用)
         flow: 結果をgeneratorで返すならTrue
         desc: flow時のtqdmのdesc
@@ -467,6 +463,7 @@ def predict(
 
     """
     with tk.log.trace("predict"):
+        use_horovod = tk.hvd.is_active()
         verbose = verbose if tk.hvd.is_master() else 0
         callbacks = make_callbacks(callbacks, training=False)
         dataset = tk.hvd.split(dataset) if use_horovod else dataset
@@ -582,7 +579,6 @@ def evaluate(
     data_loader: tk.data.DataLoader,
     callbacks: list = None,
     verbose: int = 1,
-    use_horovod: bool = False,
     num_replicas_in_sync: int = 1,
 ) -> typing.Dict[str, float]:
     """評価。
@@ -593,7 +589,6 @@ def evaluate(
         data_loader: データの読み込み
         callbacks: コールバック
         verbose: 1ならプログレスバー表示
-        use_horovod: MPIによる分散処理をするか否か
         num_replicas_in_sync: tf.distribute使用時の並列数(バッチサイズに掛け算する)
 
     Returns:
@@ -601,6 +596,7 @@ def evaluate(
 
     """
     with tk.log.trace("evaluate"):
+        use_horovod = tk.hvd.is_active()
         verbose = verbose if tk.hvd.is_master() else 0
         callbacks = make_callbacks(callbacks, training=False)
         dataset = tk.hvd.split(dataset) if use_horovod else dataset

@@ -467,7 +467,7 @@ def plot_objects(
     for clazz, conf, bbox in zip(classes_, confs_, bboxes):
         if conf is not None and conf < conf_threshold:
             continue  # skip
-        if bbox[0] <= bbox[2] or bbox[1] <= bbox[3]:
+        if bbox[2] <= bbox[0] or bbox[3] <= bbox[1]:
             warnings.warn("Negative size bbox")
         xmin = max(int(round(bbox[0] * img.shape[1])), 0)
         ymin = max(int(round(bbox[1] * img.shape[0])), 0)

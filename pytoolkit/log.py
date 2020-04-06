@@ -116,11 +116,13 @@ class trace:
 
     Examples:
         decoratorの例::
+
             @tk.log.trace()
             def func()
                 pass
 
         context managerの例::
+
             with tk.log.trace("process"):
                 process()
 

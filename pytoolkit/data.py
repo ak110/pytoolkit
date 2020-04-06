@@ -222,7 +222,6 @@ class DataLoader:
         dataset: Dataset,
         shuffle: bool = False,
         without_label: bool = False,
-        use_horovod: bool = False,
         num_replicas_in_sync: int = 1,
     ) -> Iterator:
         """Iteratorを作成する。
@@ -231,7 +230,6 @@ class DataLoader:
             dataset: データセット
             shuffle: シャッフルするのか否か
             without_label: ラベルを使わない場合(predict)、Trueを指定する。
-            use_horovod: 1エポックあたりのミニバッチ数(__len__の戻り値)の算出にHorovodを考慮するか否か。
             num_replicas_in_sync: tf.distribute使用時の並列数(バッチサイズに掛け算する)
 
         Returns:
@@ -240,11 +238,7 @@ class DataLoader:
         """
         assert len(dataset) >= 1
         ds = self.get_ds(dataset, shuffle, without_label, num_replicas_in_sync)
-        bs = (
-            self.batch_size
-            * (tk.hvd.size() if use_horovod else 1)
-            * num_replicas_in_sync
-        )
+        bs = self.batch_size * num_replicas_in_sync
         steps = -(-len(dataset) // bs)
         return Iterator(ds=ds, data_size=len(dataset), steps=steps)
 

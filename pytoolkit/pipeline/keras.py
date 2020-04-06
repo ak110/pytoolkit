@@ -214,10 +214,7 @@ class KerasModel(Model):
 
         def generator(datasets, data_loader):
             iterators = [
-                data_loader.iter(
-                    dataset, shuffle=True, use_horovod=tk.hvd.initialized()
-                ).run()
-                for dataset in datasets
+                data_loader.iter(dataset, shuffle=True).ds for dataset in datasets
             ]
             while True:
                 X_batch = {}
@@ -279,7 +276,6 @@ class KerasModel(Model):
             self.prediction_models[fold],
             dataset,
             self.val_data_loader,
-            use_horovod=tk.hvd.initialized(),
             num_replicas_in_sync=self.num_replicas_in_sync,
             on_batch_fn=self.on_batch_fn,
         )
@@ -306,25 +302,9 @@ class KerasModel(Model):
             self.training_models[0],
             self.prediction_models[0],
             self.models_dir,
-            training_iterator=(
-                self.train_data_loader.iter(
-                    dataset,
-                    shuffle=True,
-                    use_horovod=True,
-                    num_replicas_in_sync=self.num_replicas_in_sync,
-                )
-                if dataset is not None
-                else None
-            ),
-            prediction_iterator=(
-                self.train_data_loader.iter(
-                    dataset,
-                    use_horovod=True,
-                    num_replicas_in_sync=self.num_replicas_in_sync,
-                )
-                if dataset is not None
-                else None
-            ),
+            dataset,
+            self.train_data_loader,
+            self.val_data_loader,
             save_mode="hdf5"
             if pathlib.Path(self.model_name_format).suffix in (".h5", ".hdf5", ".keras")
             else "saved_model",
@@ -535,7 +515,6 @@ class KerasModel(Model):
             self.training_models[fold],
             dataset,
             data_loader=self.val_data_loader,  # DataAugmentation無しで評価
-            use_horovod=tk.hvd.initialized(),
             num_replicas_in_sync=self.num_replicas_in_sync,
         )
         return evals

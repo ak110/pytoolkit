@@ -32,8 +32,7 @@ def test_to_str():
 
 def test_plot_objects(data_dir, check_dir):
     img_path = data_dir / "od" / "JPEGImages" / "無題.png"
-    class_name_to_id = {"～": 0, "〇": 1}
-    class_id_to_name = {v: k for k, v in class_name_to_id.items()}
+    class_names = ["～", "〇"]
     ann = tk.od.ObjectsAnnotation(
         img_path, 768, 614, [0], [[203 / 768, 255 / 614, 601 / 768, 355 / 614]]
     )
@@ -41,11 +40,11 @@ def test_plot_objects(data_dir, check_dir):
     img = tk.od.plot_objects(img_path, ann.classes, None, ann.bboxes, None)
     tk.ndimage.save(check_dir / "plot_objects1.png", img)
 
-    img = tk.od.plot_objects(img_path, ann.classes, None, ann.bboxes, class_id_to_name)
+    img = tk.od.plot_objects(img_path, ann.classes, None, ann.bboxes, class_names)
     tk.ndimage.save(check_dir / "plot_objects2.png", img)
 
     img = tk.od.plot_objects(
-        img_path, ann.classes, np.array([0.5]), ann.bboxes, class_id_to_name
+        img_path, ann.classes, np.array([0.5]), ann.bboxes, class_names
     )
     tk.ndimage.save(check_dir / "plot_objects3.png", img)
 

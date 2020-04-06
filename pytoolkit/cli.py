@@ -91,6 +91,7 @@ class App:
             if command_name in self.commands:
                 raise ValueError(f"Duplicated command: {command_name}")
             self.commands[command_name] = Command(
+                name=command_name,
                 entrypoint=entrypoint,
                 logfile=logfile,
                 then=then,
@@ -104,17 +105,17 @@ class App:
 
         return _decorator
 
-    def run(self, argv: typing.Sequence[str] = None, default: str = None):
+    def run(self, args: typing.Sequence[str] = None, default: str = None):
         """実行。
 
         Args:
-            argv: 引数。(既定値はsys.argv)
+            args: 引数。(既定値はsys.argv)
             default: 未指定時に実行するコマンド名 (既定値は先頭のコマンド)
 
         """
         commands = self.commands.copy()
         if "ipy" not in commands:
-            commands["ipy"] = Command(entrypoint=_ipy, logfile=False)
+            commands["ipy"] = Command(name="ipy", entrypoint=_ipy, logfile=False)
         default = default or list(commands)[0]
 
         parser = argparse.ArgumentParser()
@@ -123,10 +124,10 @@ class App:
             p = subparsers.add_parser(command_name)
             for k, v in (command.args or {}).items():
                 p.add_argument(k, **v)
-        args = vars(parser.parse_args(argv))
+        kwargs = vars(parser.parse_args(args))
 
-        self.current_command = args["command"] or default
-        args.pop("command")
+        self.current_command = kwargs["command"] or default
+        kwargs.pop("command")
         while True:
             assert self.current_command is not None
             command = commands[self.current_command]
@@ -152,9 +153,9 @@ class App:
                             tk.log.get(__name__).info(
                                 f"Number of devices: {self.num_replicas_in_sync}"
                             )
-                            command.entrypoint(**args)
+                            command.entrypoint(**kwargs)
                     else:
-                        command.entrypoint(**args)
+                        command.entrypoint(**kwargs)
             except Exception as e:
                 # ログファイルを出力する(ような重要な)コマンドの場合のみ通知を送信
                 if command.logfile:
@@ -172,7 +173,7 @@ class App:
             self.current_command = command.then
             if self.current_command is None:
                 break
-            args = {}
+            kwargs = {}
 
     @property
     def num_replicas_in_sync(self) -> int:
@@ -190,6 +191,7 @@ class Command:
     """コマンド。
 
     Args:
+        name: コマンド名
         entrypoint: 呼び出される関数
         logfile: ログファイルを出力するのか否か
         then: 当該コマンドが終わった後に続けて実行するコマンドの名前
@@ -200,6 +202,7 @@ class Command:
 
     """
 
+    name: str
     entrypoint: typing.Callable
     logfile: bool = True
     then: typing.Optional[str] = None

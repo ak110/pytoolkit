@@ -43,6 +43,11 @@ def initialized() -> bool:
     return _initialized
 
 
+def is_active() -> bool:
+    """初期化済みかつsize() > 1ならTrue。"""
+    return size() > 1
+
+
 def size() -> int:
     """hvd.size。"""
     return get().size() if initialized() else 1

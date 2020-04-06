@@ -27,7 +27,8 @@ def test_save(tmpdir, mode):
     tk.models.save(model, path, mode=mode)
 
     if mode in ("hdf5", "saved_model"):
-        tk.models.load_weights(model, path)
+        model.set_weights([-np.ones_like(w) for w in model.get_weights()])  # -1埋め
+        tk.models.load_weights(model, path)  # strict=Trueでチェック
         tk.models.load(path)
 
 
