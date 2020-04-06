@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import tempfile
 import typing
 
 import numpy as np
@@ -33,6 +34,75 @@ MetricType = typing.Union[
 MetricsType = typing.List[MetricType]
 
 
+def check(
+    training_model: tf.keras.models.Model,
+    prediction_model: tf.keras.models.Model,
+    models_dir: tk.typing.PathLike,
+    training_iterator: tk.data.Iterator = None,
+    prediction_iterator: tk.data.Iterator = None,
+    save_mode: str = "hdf5",
+):
+    """モデルの簡易動作確認用コード。
+
+    Args:
+        training_model: 学習用モデル
+        prediction_model: 推論用モデル
+        models_dir: 情報の保存先ディレクトリ
+        training_iterator: 学習チェック用データ (少数にしておくこと)
+        prediction_iterator: 推論チェック用データ (少数にしておくこと)
+        save_mode: 保存形式 ("hdf5", "saved_model", "onnx", "tflite"のいずれか)
+
+    """
+    models_dir = pathlib.Path(models_dir)
+    logger = tk.log.get(__name__)
+
+    # summary表示
+    tk.models.summary(training_model)
+
+    # グラフを出力
+    tk.models.plot(training_model, models_dir / "model.svg")
+
+    # save/loadの動作確認 (とりあえず落ちなければOKとする)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_path = pathlib.Path(tmpdir) / f"model.{save_mode}"
+        tk.models.save(prediction_model, save_path)
+        prediction_model = tk.models.load(save_path)
+
+    # training_model.evaluate
+    if training_iterator is not None:
+        logger.info(f"training_iterator: {training_iterator.to_str()}")
+        values = training_model.evaluate(
+            training_iterator.ds, steps=training_iterator.steps, verbose=1
+        )
+        if len(training_model.metrics_names) == 1:
+            evals = {training_model.metrics_names[0]: values}
+        else:
+            evals = dict(zip(training_model.metrics_names, values))
+        logger.info(f"check.evaluate: {tk.evaluations.to_str(evals)}")
+
+    # prediction_model.predict
+    if prediction_iterator is not None:
+        logger.info(f"prediction_iterator: {prediction_iterator.to_str()}")
+        pred = prediction_model.predict(
+            prediction_iterator.ds, steps=prediction_iterator.steps, verbose=1
+        )
+        if isinstance(pred, (list, tuple)):
+            logger.info(f"check.predict: shape={[p.shape for p in pred]}")
+        elif isinstance(pred, dict):
+            logger.info(f"check.predict: shape={{k: pred[k].shape for k in pred}}")
+        else:
+            logger.info(f"check.predict: shape={pred.shape}")
+
+    # training_model.fit
+    if training_iterator is not None:
+        training_model.fit(
+            training_iterator.ds,
+            steps_per_epoch=training_iterator.steps,
+            epochs=1,
+            verbose=1,
+        )
+
+
 def load(
     path: tk.typing.PathLike,
     custom_objects: dict = None,
@@ -51,13 +121,24 @@ def load_weights(
     path: tk.typing.PathLike,
     by_name: bool = False,
     skip_not_exist: bool = False,
-    verbose: bool = True,
+    strict: bool = True,
+    strict_fraction: float = 0.95,
 ):
-    """モデルの重みの読み込み。"""
+    """モデルの重みの読み込み。
+
+    Args:
+        model: モデル
+        path: ファイルパス
+        by_name: レイヤー名が一致する重みを読むモードにするならTrue。Falseなら並び順。
+        skip_not_exist: ファイルが存在しない場合にエラーにしないならTrue。
+        strict: 読み込み前と重みがあまり変わらなかったらエラーにする。
+        strict_fraction: 重み不一致率の最低値。これ以下ならエラーにする。
+
+    """
     path = pathlib.Path(path)
     if path.exists():
         with tk.log.trace(f"load_weights({path})"):
-            if verbose:
+            if strict:
                 old_weights = model.get_weights()
             if path.is_dir():
                 # SavedModelはload_weights未対応？
@@ -66,7 +147,7 @@ def load_weights(
                 model.set_weights(loaded_model.get_weights())
             else:
                 model.load_weights(str(path), by_name=by_name)
-            if verbose:
+            if strict:
                 new_weights = model.get_weights()
                 changed_params = np.sum(
                     [
@@ -75,9 +156,11 @@ def load_weights(
                     ]
                 )
                 num_params = np.sum([w.size for w in new_weights])
-                tk.log.get(__name__).info(
-                    f"{changed_params:,} params chagnged. ({changed_params / num_params:.1%})"
-                )
+                r = changed_params / num_params
+                msg = f"{changed_params:,} params chagnged. ({r:.1%})"
+                if r < strict_fraction:
+                    raise RuntimeError(msg)
+                tk.log.get(__name__).info(msg)
     elif skip_not_exist:
         tk.log.get(__name__).info(f"{path} is not found.")
     else:
@@ -208,6 +291,17 @@ def recompile(model: tf.keras.models.Model):
             metrics=model.metrics,
             experimental_run_tf_function=False,
         )
+
+
+def modify_learning_rate(model: tf.keras.models.Model, factor: float):
+    """学習率にfactorを掛け算する。"""
+    lr = tf.keras.backend.get_value(model.optimizer.learning_rate) * factor
+    set_learning_rate(model, lr)
+
+
+def set_learning_rate(model: tf.keras.models.Model, learnig_rate: float):
+    """学習率を設定する。"""
+    tf.keras.backend.set_value(model.optimizer.learning_rate, learnig_rate)
 
 
 def fit(

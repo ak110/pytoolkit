@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import gc
 import pathlib
-import tempfile
 import time
 import typing
 
@@ -303,22 +302,33 @@ class KerasModel(Model):
         assert self.training_models[0] is not None
         if self.compile_fn is not None:
             self.compile_fn(self.training_models[0])
-        # summary表示
-        tk.models.summary(self.training_models[0])
-        # グラフを出力
-        tk.models.plot(self.training_models[0], self.models_dir / "model.svg")
-        # save/loadの動作確認 (とりあえず落ちなければOKとする)
-        with tempfile.TemporaryDirectory() as tmpdir_path:
-            tmpdir = pathlib.Path(tmpdir_path)
-            self._save_model(fold=0, models_dir=tmpdir)
-            self._load_model(fold=0, models_dir=tmpdir)
-        # evaluate
-        if dataset is not None:
-            self.evaluate(dataset, prefix="check_", fold=0)
-            if self.score_fn is not None:
-                evals = self._model_evaluate(dataset, fold=0)
-                evals = tk.evaluations.add_prefix(evals, "check_")
-                tk.log.get(__name__).info(f"check: {tk.evaluations.to_str(evals)}")
+        tk.models.check(
+            self.training_models[0],
+            self.prediction_models[0],
+            self.models_dir,
+            training_iterator=(
+                self.train_data_loader.iter(
+                    dataset,
+                    shuffle=True,
+                    use_horovod=True,
+                    num_replicas_in_sync=self.num_replicas_in_sync,
+                )
+                if dataset is not None
+                else None
+            ),
+            prediction_iterator=(
+                self.train_data_loader.iter(
+                    dataset,
+                    use_horovod=True,
+                    num_replicas_in_sync=self.num_replicas_in_sync,
+                )
+                if dataset is not None
+                else None
+            ),
+            save_mode="hdf5"
+            if pathlib.Path(self.model_name_format).suffix in (".h5", ".hdf5", ".keras")
+            else "saved_model",
+        )
         return self
 
     def bench(self, dataset: tk.data.Dataset) -> KerasModel:

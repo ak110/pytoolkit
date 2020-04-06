@@ -54,10 +54,10 @@ class CosineAnnealing(tf.keras.optimizers.schedules.LearningRateSchedule):
             # cosine annealing
             r = tf.math.minimum(step, decay_steps) / decay_steps
             fraction2 = 0.5 * (1.0 + tf.math.cos(np.pi * r))
-            fraction2 = tf.math.maximum(fraction2, min_fraction)
+            fraction2 = (1 - min_fraction) * fraction2 + min_fraction
 
             fraction = tf.where(step < warmup_steps, fraction1, fraction2)
-            return tf.math.multiply(initial_learning_rate, fraction)
+            return initial_learning_rate * fraction
 
     def get_config(self):
         return {

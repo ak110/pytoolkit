@@ -7,7 +7,7 @@ import pytoolkit as tk
 
 
 def load_sample_od():
-    """物体検出のサンプルデータ。"""
+    """物体検出のサンプルデータ。num_classes=2"""
     X_train = np.array(sklearn.datasets.load_sample_images().filenames)
     y_train = np.array(
         [

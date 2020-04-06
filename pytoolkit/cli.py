@@ -19,6 +19,8 @@ class App:
 
     Args:
         output_dir: ログ出力先ディレクトリ
+        use_horovod: horovodを使うならTrue (全コマンドの既定値)
+        distribute_strategy_fn: tf.distributeを使う場合のStrategyの作成関数 (全コマンドの既定値)
 
     Attributes:
         output_dir: ログ出力先ディレクトリ
@@ -26,8 +28,15 @@ class App:
 
     """
 
-    def __init__(self, output_dir: typing.Union[tk.typing.PathLike, None]):
+    def __init__(
+        self,
+        output_dir: typing.Union[tk.typing.PathLike, None],
+        use_horovod: bool = False,
+        distribute_strategy_fn: typing.Callable[[], tf.distribute.Strategy] = None,
+    ):
         self.output_dir = pathlib.Path(output_dir) if output_dir is not None else None
+        self.use_horovod = use_horovod
+        self.distribute_strategy_fn = distribute_strategy_fn
         self.inits: typing.List[typing.Callable[[], None]] = [
             tk.utils.better_exceptions,
             tk.math.set_ndarray_format,
@@ -59,7 +68,7 @@ class App:
         self,
         logfile: bool = True,
         then: str = None,
-        use_horovod: bool = False,
+        use_horovod: bool = None,
         distribute_strategy_fn: typing.Callable[[], tf.distribute.Strategy] = None,
         args: typing.Dict[str, typing.Dict[str, typing.Any]] = None,
     ):
@@ -85,8 +94,10 @@ class App:
                 entrypoint=entrypoint,
                 logfile=logfile,
                 then=then,
-                use_horovod=use_horovod,
-                distribute_strategy_fn=distribute_strategy_fn,
+                use_horovod=self.use_horovod if use_horovod is None else use_horovod,
+                distribute_strategy_fn=self.distribute_strategy_fn
+                if distribute_strategy_fn is None
+                else distribute_strategy_fn,
                 args=args,
             )
             return entrypoint

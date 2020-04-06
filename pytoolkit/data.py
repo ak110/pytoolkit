@@ -51,7 +51,7 @@ class Dataset:
     weights: np.ndarray = None
     ids: np.ndarray = None
     init_score: np.ndarray = None
-    metadata: typing.Optional[dict] = None
+    metadata: typing.Dict[str, typing.Any] = dataclasses.field(default_factory=dict)
 
     def __len__(self) -> int:
         """データ件数を返す。"""
@@ -475,6 +475,18 @@ class Iterator:
             f" data_size={self.data_size}"
             f" steps={self.steps}"
         )
+
+
+def make_iterator(
+    ds: tf.data.Dataset, data_size: int, global_batch_size: int, prefetch: bool = True
+) -> Iterator:
+    """Iteratorを作成するヘルパー。"""
+    ds = ds.batch(global_batch_size)
+    if prefetch:
+        ds = ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+    return tk.data.Iterator(
+        ds=ds, data_size=data_size, steps=-(-data_size // global_batch_size)
+    )
 
 
 def mixup(
