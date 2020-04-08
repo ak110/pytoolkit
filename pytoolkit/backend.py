@@ -1,4 +1,5 @@
 """tf.keras.backendやtensorflowの基礎的な関数など。"""
+import typing
 
 import numpy as np
 import tensorflow as tf
@@ -41,3 +42,20 @@ def logcosh(x):
 def log_softmax(x, axis=-1):
     """log(softmax(x))"""
     return x - tf.math.reduce_logsumexp(x, axis=axis, keepdims=True)
+
+
+def reduce_mask(x: tf.Tensor, mask: tf.Tensor, axis: typing.Sequence[int]):
+    """加重平均。reduce_sum(x * mask, axis) / reduce_sum(mask, axis)"""
+    assert x.shape.rank == mask.shape.rank, f"shape error: x={x} mask={mask}"
+    if mask.dtype != x.dtype:
+        mask = tf.cast(mask, x.dtype)
+    axis = tuple(axis)
+    size = tf.math.reduce_sum(mask, axis=axis)
+    return tf.math.reduce_sum(x * mask, axis=axis) / tf.math.maximum(size, 1)
+
+
+def reduce_losses(losses: typing.Sequence[tf.Tensor]) -> tf.Tensor:
+    """1次元のtensorを複数受け取り、0次元のtensorを1つ返す。Endpointレイヤー作るとき用。"""
+    for x in losses:
+        assert x.shape.rank == 1, f"shape error: {x}"
+    return tf.math.reduce_mean(tf.stack(losses))

@@ -279,12 +279,6 @@ def compile(
         )
 
 
-def compile_for_predict(model: tf.keras.models.Model):
-    """tf.distribute用にlossなどはどうでもいい場合用のcompile。"""
-    with tk.log.trace("compile_for_predict"):
-        model.compile("sgd", tk.losses.empty)
-
-
 def recompile(model: tf.keras.models.Model):
     """optimizerなどを再利用してコンパイル。"""
     with tk.log.trace("recompile"):

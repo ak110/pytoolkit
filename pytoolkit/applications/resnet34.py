@@ -41,4 +41,4 @@ def get_1_over_16(model):
 
 def get_1_over_32(model):
     """入力から縦横1/32のところのテンソルを返す。"""
-    return model.output
+    return model.get_layer("relu1").output

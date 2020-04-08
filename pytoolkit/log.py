@@ -108,7 +108,7 @@ def close(logger):
 
 
 class trace:
-    """開始・終了をログdecorator＆context manager。
+    """開始・終了をログるdecorator＆context manager。
 
     Args:
         process_name: ログに出力する処理の名前。(Noneなら関数名。context managerとしての使用時は必須)
