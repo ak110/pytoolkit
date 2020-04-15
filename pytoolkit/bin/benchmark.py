@@ -98,8 +98,6 @@ def _run(data_iterator, iterations):
 
 
 class MyDataLoader(tk.data.DataLoader):
-    """DataLoader"""
-
     def __init__(self, data_augmentation, mask):
         super().__init__(batch_size=batch_size)
         self.data_augmentation = data_augmentation
