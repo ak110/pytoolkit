@@ -196,7 +196,7 @@ def rotate(
 
 def compute_rotate(
     width: int, height: int, degrees: float, expand: bool = False
-) -> tuple:
+) -> typing.Tuple[np.ndarray, int, int]:
     """回転の変換行列を作成して返す。
 
     Args:
@@ -754,7 +754,10 @@ def erase_random(
     return rgb
 
 
-def mixup(sample1: tuple, sample2: tuple, mode: str = "beta", alpha=0.2) -> tuple:
+T = typing.TypeVar("T")
+
+
+def mixup(sample1: T, sample2: T, mode: str = "beta", alpha=0.2) -> T:
     """mixup。 <https://arxiv.org/abs/1710.09412>
 
     常に「sample1の重み >= sample2の重み」となるようにしている。
@@ -784,19 +787,7 @@ def mixup(sample1: tuple, sample2: tuple, mode: str = "beta", alpha=0.2) -> tupl
     return mix_data(sample1, sample2, r)
 
 
-@typing.overload
-def mix_data(sample1: tuple, sample2: tuple, r: np.float32) -> tuple:
-    # pylint: disable=function-redefined
-    raise NotImplementedError()
-
-
-@typing.overload
-def mix_data(sample1: typing.Any, sample2: typing.Any, r: np.float32) -> typing.Any:
-    # pylint: disable=function-redefined
-    raise NotImplementedError()
-
-
-def mix_data(sample1, sample2, r: np.float32):
+def mix_data(sample1: T, sample2: T, r: np.float32) -> T:
     """mixup用に入力や出力を混ぜる処理。rはsample1側に掛ける率。"""
     # pylint: disable=function-redefined
     if sample1 is None:
@@ -805,20 +796,24 @@ def mix_data(sample1, sample2, r: np.float32):
     elif isinstance(sample1, tuple):
         assert isinstance(sample2, tuple)
         assert len(sample1) == len(sample2)
-        return tuple(mix_data(s1, s2, r) for s1, s2 in zip(sample1, sample2))
+        return tuple(mix_data(s1, s2, r) for s1, s2 in zip(sample1, sample2))  # type: ignore
     elif isinstance(sample1, list):
         assert isinstance(sample2, list)
         assert len(sample1) == len(sample2)
-        return [mix_data(s1, s2, r) for s1, s2 in zip(sample1, sample2)]
+        return [mix_data(s1, s2, r) for s1, s2 in zip(sample1, sample2)]  # type: ignore
     elif isinstance(sample1, dict):
         assert isinstance(sample2, dict)
         assert tuple(sample1.keys()) == tuple(sample2.keys())
-        return {k: mix_data(sample1[k], sample2[k], r) for k in sample1}
+        return {k: mix_data(sample1[k], sample2[k], r) for k in sample1}  # type: ignore
     else:
         return np.float32(sample1) * r + np.float32(sample2) * (1 - r)
 
 
-def cut_mix(sample1: tuple, sample2: tuple, beta: float = 1.0) -> tuple:
+def cut_mix(
+    sample1: typing.Tuple[np.ndarray, np.ndarray],
+    sample2: typing.Tuple[np.ndarray, np.ndarray],
+    beta: float = 1.0,
+) -> typing.Tuple[np.ndarray, np.ndarray]:
     """CutMix。 <https://arxiv.org/abs/1905.04899>
 
     Args:

@@ -86,7 +86,7 @@ class App:
         """
         assert not logfile or self.output_dir is not None
 
-        def _decorator(entrypoint: typing.Callable):
+        def _decorator(entrypoint: typing.Callable[..., None]):
             command_name = entrypoint.__name__.replace("_", "-")
             if command_name in self.commands:
                 raise ValueError(f"Duplicated command: {command_name}")
@@ -203,7 +203,7 @@ class Command:
     """
 
     name: str
-    entrypoint: typing.Callable
+    entrypoint: typing.Callable[..., None]
     logfile: bool = True
     then: typing.Optional[str] = None
     use_horovod: bool = False

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import random
+import typing
 import warnings
 
 import albumentations as A
@@ -81,14 +82,14 @@ class RandomTransform(A.DualTransform):
     @classmethod
     def create_refine(
         cls,
-        size: tuple,
-        flip: tuple = (False, True),
-        translate: tuple = (0.0625, 0.0625),
+        size: typing.Tuple[int, int],
+        flip: typing.Tuple[bool, bool] = (False, True),
+        translate: typing.Tuple[float, float] = (0.0625, 0.0625),
         border_mode: str = "edge",
         clip_bboxes=True,
         always_apply: bool = False,
         p: float = 1.0,
-    ):
+    ) -> RandomTransform:
         """Refined Data Augmentation <https://arxiv.org/abs/1909.09148> 用の控えめバージョンを作成する。"""
         return cls(
             size=size,
@@ -106,15 +107,15 @@ class RandomTransform(A.DualTransform):
     def __init__(
         self,
         size,
-        flip: tuple = (False, True),
-        translate: tuple = (0.125, 0.125),
+        flip: typing.Tuple[bool, bool] = (False, True),
+        translate: typing.Tuple[float, float] = (0.125, 0.125),
         scale_prob: float = 0.5,
-        scale_range: tuple = (2 / 3, 3 / 2),
+        scale_range: typing.Tuple[float, float] = (2 / 3, 3 / 2),
         base_scale: float = 1.0,
         aspect_prob: float = 0.5,
-        aspect_range: tuple = (3 / 4, 4 / 3),
+        aspect_range: typing.Tuple[float, float] = (3 / 4, 4 / 3),
         rotate_prob: float = 0.25,
-        rotate_range: tuple = (-15, +15),
+        rotate_range: typing.Tuple[int, int] = (-15, +15),
         border_mode: str = "edge",
         clip_bboxes: bool = True,
         always_apply: bool = False,

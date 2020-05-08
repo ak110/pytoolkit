@@ -17,7 +17,9 @@ def safe_apply(s: pd.Series, fn) -> pd.Series:
     return s.apply(lambda x: x if pd.isnull(x) else fn(x))
 
 
-def add_col(df: pd.DataFrame, column_name: str, values: typing.Sequence) -> None:
+def add_col(
+    df: pd.DataFrame, column_name: str, values: typing.Sequence[typing.Any]
+) -> None:
     """上書きしないようにチェックしつつ列追加。"""
     if column_name in df:
         raise ValueError(f"Column '{column_name}' already exists.")
@@ -25,7 +27,9 @@ def add_col(df: pd.DataFrame, column_name: str, values: typing.Sequence) -> None
 
 
 def add_cols(
-    df: pd.DataFrame, column_names: typing.List[str], values: typing.Sequence
+    df: pd.DataFrame,
+    column_names: typing.List[str],
+    values: typing.Sequence[typing.Any],
 ) -> None:
     """上書きしないようにチェックしつつ列追加。"""
     for column_name in column_names:

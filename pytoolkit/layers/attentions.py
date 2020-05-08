@@ -1,4 +1,6 @@
 """カスタムレイヤー。"""
+import typing
+
 import numpy as np
 import tensorflow as tf
 
@@ -50,12 +52,12 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         self.hidden_rate = hidden_rate
         self.drop_rate = drop_rate
         self.causal = causal
-        self.Wq = None
-        self.Wk = None
-        self.Wv = None
-        self.bq = None
-        self.bk = None
-        self.bv = None
+        self.Wq: typing.Optional[tf.Tensor] = None
+        self.Wk: typing.Optional[tf.Tensor] = None
+        self.Wv: typing.Optional[tf.Tensor] = None
+        self.bq: typing.Optional[tf.Tensor] = None
+        self.bk: typing.Optional[tf.Tensor] = None
+        self.bv: typing.Optional[tf.Tensor] = None
 
     def compute_output_shape(self, input_shape):
         seq_shape, _ = input_shape
@@ -100,6 +102,12 @@ class MultiHeadAttention(tf.keras.layers.Layer):
     def call(self, inputs, **kwargs):
         del kwargs
         seq, ctx = inputs
+        assert self.Wq is not None
+        assert self.Wk is not None
+        assert self.Wv is not None
+        assert self.bq is not None
+        assert self.bk is not None
+        assert self.bv is not None
 
         outputs = []
         for h in range(self.heads):
@@ -150,12 +158,12 @@ class MultiHeadAttention2D(tf.keras.layers.Layer):
         self.heads = heads
         self.hidden_rate = hidden_rate
         self.drop_rate = drop_rate
-        self.Wq = None
-        self.Wk = None
-        self.Wv = None
-        self.bq = None
-        self.bk = None
-        self.bv = None
+        self.Wq: typing.Optional[tf.Tensor] = None
+        self.Wk: typing.Optional[tf.Tensor] = None
+        self.Wv: typing.Optional[tf.Tensor] = None
+        self.bq: typing.Optional[tf.Tensor] = None
+        self.bk: typing.Optional[tf.Tensor] = None
+        self.bv: typing.Optional[tf.Tensor] = None
 
     def compute_output_shape(self, input_shape):
         seq_shape, _ = input_shape
@@ -206,6 +214,12 @@ class MultiHeadAttention2D(tf.keras.layers.Layer):
     def call(self, inputs, **kwargs):
         del kwargs
         seq, ctx = inputs
+        assert self.Wq is not None
+        assert self.Wk is not None
+        assert self.Wv is not None
+        assert self.bq is not None
+        assert self.bk is not None
+        assert self.bv is not None
         batch_size = K.shape(seq)[0]
 
         outputs = []

@@ -1,4 +1,6 @@
 """カスタムレイヤー。"""
+import typing
+
 import numpy as np
 import tensorflow as tf
 
@@ -254,7 +256,7 @@ class ImputeNaN(tf.keras.layers.Layer):
 class TrainOnly(tf.keras.layers.Wrapper):
     """訓練時のみ適用するlayer wrapper"""
 
-    def call(self, inputs, training=None, **kwargs):
+    def call(self, inputs, training=None, **kwargs):  # pylint: disable=arguments-differ
         return K.in_train_phase(
             lambda: self.layer.call(inputs, **kwargs), inputs, training
         )
@@ -264,7 +266,7 @@ class TrainOnly(tf.keras.layers.Wrapper):
 class TestOnly(tf.keras.layers.Wrapper):
     """推論時のみ適用するlayer wrapper"""
 
-    def call(self, inputs, training=None, **kwargs):
+    def call(self, inputs, training=None, **kwargs):  # pylint: disable=arguments-differ
         return K.in_train_phase(
             inputs, lambda: self.layer.call(inputs, **kwargs), training
         )
@@ -333,7 +335,7 @@ class RandomScale(tf.keras.layers.Layer):
         self,
         min_scale: float = 0.5,
         max_scale: float = 2.0,
-        shape: tuple = (),
+        shape: typing.Tuple[int, ...] = (),
         **kwargs,
     ):
         super().__init__(**kwargs)

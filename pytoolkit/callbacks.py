@@ -1,6 +1,7 @@
 """DeepLearning(主にKeras)関連。"""
 import pathlib
 import time
+import typing
 
 import numpy as np
 import tensorflow as tf
@@ -16,8 +17,8 @@ class LearningRateStepDecay(tf.keras.callbacks.Callback):
         self.reduce_epoch_rates = reduce_epoch_rates
         self.factor = factor
         self.epochs = epochs
-        self.start_lr = None
-        self.reduce_epochs = None
+        self.start_lr: typing.Optional[float] = None
+        self.reduce_epochs: typing.Optional[typing.List[int]] = None
 
     def on_train_begin(self, logs=None):
         del logs
@@ -33,6 +34,7 @@ class LearningRateStepDecay(tf.keras.callbacks.Callback):
 
     def on_epoch_begin(self, epoch, logs=None):
         del logs
+        assert self.reduce_epochs is not None
         if epoch + 1 in self.reduce_epochs:
             lr1 = tf.keras.backend.get_value(self.model.optimizer.learning_rate)
             lr2 = lr1 * self.factor
@@ -152,7 +154,7 @@ class Checkpoint(tf.keras.callbacks.Callback):
         super().__init__()
         self.checkpoint_path = pathlib.Path(checkpoint_path)
         self.checkpoints = checkpoints
-        self.target_epochs = {}
+        self.target_epochs = set()
 
     def on_train_begin(self, logs=None):
         del logs
@@ -175,6 +177,7 @@ class ErrorOnNaN(tf.keras.callbacks.Callback):
     """NaNやinfで異常終了させる。"""
 
     def __init__(self, save_path=None):
+        super().__init__()
         self.save_path = pathlib.Path(save_path or "___broken___.h5")
 
     def on_batch_end(self, batch, logs=None):

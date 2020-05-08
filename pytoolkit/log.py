@@ -86,7 +86,7 @@ def file_handler(
     output_path = pathlib.Path(output_path)
     output_path.resolve().parent.mkdir(parents=True, exist_ok=True)
     if rotate:
-        handler = logging.handlers.RotatingFileHandler(
+        handler: logging.Handler = logging.handlers.RotatingFileHandler(
             str(output_path), "a", max_bytes, backup_count, encoding=encoding
         )
     else:
@@ -151,6 +151,7 @@ class trace:
         return self
 
     def __exit__(self, *exc):
+        assert self.start_time is not None
         elapsed_time = time.time() - self.start_time
         if exc[0] is None:
             get(__name__).log(

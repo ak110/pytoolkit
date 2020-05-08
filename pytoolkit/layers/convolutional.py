@@ -82,27 +82,10 @@ class WSConv2D(tf.keras.layers.Conv2D):
 
     def call(self, inputs):
         # pylint: disable=access-member-before-definition,attribute-defined-outside-init
-        base_kernel = self.kernel
+        base_kernel = self.kernel  # type: ignore
         kernel_mean = tf.math.reduce_mean(base_kernel, axis=[0, 1, 2], keepdims=True)
         kernel_std = tf.math.reduce_std(base_kernel, axis=[0, 1, 2], keepdims=True)
         self.kernel = (base_kernel - kernel_mean) / (kernel_std + 1e-5)
-        try:
-            return super().call(inputs)
-        finally:
-            self.kernel = base_kernel
-
-
-@tf.keras.utils.register_keras_serializable()
-class RMSConv2D(tf.keras.layers.Conv2D):
-    """Weight Standardizationの謎アレンジ版。"""
-
-    def call(self, inputs):
-        # pylint: disable=access-member-before-definition,attribute-defined-outside-init
-        base_kernel = self.kernel
-        nu2 = tf.math.reduce_mean(
-            tf.math.square(base_kernel), axis=[0, 1, 2], keepdims=True
-        )
-        self.kernel = base_kernel * tf.math.rsqrt(nu2 + 1e-3)
         try:
             return super().call(inputs)
         finally:

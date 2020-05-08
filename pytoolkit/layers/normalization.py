@@ -417,7 +417,7 @@ class RandomRMSNormalization(tf.keras.layers.Layer):
             )
         super().build(input_shape)
 
-    def call(self, inputs, training=None, **kwargs):
+    def call(self, inputs, training=None, **kwargs):  # pylint: disable=arguments-differ
         del kwargs
         axes = list(range(1, inputs.shape.rank - 1))
 

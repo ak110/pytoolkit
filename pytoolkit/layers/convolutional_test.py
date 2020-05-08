@@ -27,10 +27,3 @@ def test_WSConv2D():
         tk.layers.WSConv2D(filters=2, kernel_size=3, padding="same"),
         np.zeros((1, 8, 8, 3)),
     )
-
-
-def test_RMSConv2D():
-    _predict_layer(
-        tk.layers.RMSConv2D(filters=2, kernel_size=3, padding="same"),
-        np.zeros((1, 8, 8, 3)),
-    )

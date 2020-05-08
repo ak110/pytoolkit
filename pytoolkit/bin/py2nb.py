@@ -8,6 +8,7 @@
 import argparse
 import pathlib
 import sys
+import typing
 
 import nbformat
 
@@ -38,7 +39,7 @@ def main():
                 logger.info(f"Generated: {save_path}")
 
 
-def parse(path: pathlib.Path, code: list) -> nbformat.v4:
+def parse(path: pathlib.Path, code: typing.List[str]) -> nbformat.v4:
     nb = nbformat.v4.new_notebook()
     nb["cells"] = []
     cell_value = ""

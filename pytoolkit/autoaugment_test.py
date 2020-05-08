@@ -1,4 +1,6 @@
 # pylint: disable=redefined-outer-name
+
+import albumentations as A
 import pytest
 
 import pytoolkit as tk
@@ -23,7 +25,7 @@ def save_dir(check_dir):
 )
 def test_autoaugment(data_dir, save_dir, policy, filename):
     """画像の変換のテスト。目視したいので結果を`../___check/autoaugment/`に保存しちゃう。"""
-    aug = {
+    aug: A.Transforms = {
         "cifar10": tk.autoaugment.CIFAR10Policy,
         "svhn": tk.autoaugment.SVHNPolicy,
         "imagenet": tk.autoaugment.ImageNetPolicy,

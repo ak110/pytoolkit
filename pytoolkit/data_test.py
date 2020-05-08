@@ -30,7 +30,7 @@ def test_data_loader_2():
     """data_per_sample=2のケース"""
 
     class MyDataLoader(tk.data.DataLoader):
-        def get_sample(self, data: list) -> tuple:
+        def get_sample(self, data):
             assert len(data) == 2
             data1, data2 = data
             assert isinstance(data1, tuple) and len(data1) == 2  # X, y
@@ -51,7 +51,7 @@ def test_data_loader_dict_and_none(data_per_sample):
     """X=dict(), y=Noneのケース"""
 
     class MyDataLoader(tk.data.DataLoader):
-        def get_sample(self, data: list) -> tuple:
+        def get_sample(self, data):
             assert len(data) == data_per_sample
             assert isinstance(data[0], tuple) and len(data[0]) == 2  # X, y
             return data[0]

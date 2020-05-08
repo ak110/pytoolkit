@@ -123,8 +123,8 @@ def load_voc_od_split(
 
         bboxes = np.array(bboxes, dtype=np.float32)
         if len(bboxes) > 0:
-            bboxes[:, [0, 2]] /= width  # type: ignore
-            bboxes[:, [1, 3]] /= height  # type: ignore
+            bboxes[:, [0, 2]] /= width
+            bboxes[:, [1, 3]] /= height
 
         label = tk.od.ObjectsAnnotation(
             path=data_dir / f"JPEGImages/{id_}.jpg",

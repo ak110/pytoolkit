@@ -30,14 +30,14 @@ class XGBModel(Model):
 
     def __init__(
         self,
-        params: dict,
+        params: typing.Dict[str, typing.Any],
         nfold: int,
         models_dir: tk.typing.PathLike,
         early_stopping_rounds: int = 200,
         num_boost_round: int = 9999,
         verbose_eval: int = 100,
-        callbacks: list = None,
-        cv_params: dict = None,
+        callbacks: typing.List[typing.Callable[[typing.Any], None]] = None,
+        cv_params: typing.Dict[str, typing.Any] = None,
         preprocessors: tk.pipeline.EstimatorListType = None,
         postprocessors: tk.pipeline.EstimatorListType = None,
     ):
@@ -82,6 +82,7 @@ class XGBModel(Model):
         self.gbms_ = []
 
         def model_extractor(env):
+            assert self.gbms_ is not None
             self.gbms_.clear()
             self.gbms_.extend([f.bst for f in env.cvfolds])
 

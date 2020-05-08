@@ -25,10 +25,10 @@ class CBModel(Model):
 
     def __init__(
         self,
-        params: dict,
+        params: typing.Dict[str, typing.Any],
         nfold: int,
         models_dir: tk.typing.PathLike,
-        cv_params: dict = None,
+        cv_params: typing.Dict[str, typing.Any] = None,
         preprocessors=None,
         postprocessors=None,
     ):
@@ -109,6 +109,7 @@ class CBModel(Model):
 
     def feature_importance(self):
         """Feature ImportanceをDataFrameで返す。"""
+        assert self.gbms_ is not None
         columns = self.gbms_[0].feature_names_
         for gbm in self.gbms_:
             assert tuple(columns) == tuple(gbm.feature_names_)

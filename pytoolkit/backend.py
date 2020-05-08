@@ -5,12 +5,12 @@ import numpy as np
 import tensorflow as tf
 
 
-def clip64(x, epsilon=1e-7):
+def clip64(x: tf.Tensor, epsilon=1e-7) -> tf.Tensor:
     """float64にキャストして[epsilon, 1 - epsilon]にclip。"""
     return tf.clip_by_value(tf.cast(x, tf.float64), epsilon, 1 - epsilon)
 
 
-def logit(x, epsilon=1e-7):
+def logit(x: tf.Tensor, epsilon=1e-7) -> tf.Tensor:
     """ロジット関数。シグモイド関数の逆関数。
 
     logit(x) = log(x / (1 - x)) なのだが、

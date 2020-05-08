@@ -32,6 +32,7 @@ def memoize(
 
         @functools.wraps(func)
         def memorized_func(*args, **kwargs):
+            assert cache_dir is not None
             cache_path = get_cache_path(cache_dir, func, args, kwargs, prefix)
             return memoized_call(lambda: func(*args, **kwargs), cache_path, compress)
 
@@ -79,9 +80,9 @@ def memoized_call(
 
 def get_cache_path(
     cache_dir: tk.typing.PathLike,
-    func: typing.Callable,
-    args: typing.Sequence,
-    kwargs: typing.Dict,
+    func: typing.Callable[..., typing.Any],
+    args: typing.Sequence[typing.Any],
+    kwargs: typing.Dict[str, typing.Any],
     prefix: str = "",
 ) -> pathlib.Path:
     """キャッシュのパスを作って返す。"""

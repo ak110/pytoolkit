@@ -47,23 +47,22 @@ def listup_classification(
     class_names = list(class_names)
 
     # 各クラスのデータを列挙
-    X: list = []
-    y: list = []
-    errors: list = []
+    X: typing.List[pathlib.Path] = []
+    y: typing.List[int] = []
     for class_id, class_name in enumerate(
         tk.utils.tqdm(class_names, desc="listup", disable=not use_tqdm)
     ):
         class_dir = dirpath / class_name
         if class_dir.is_dir():
-            t, err = _listup_files(
+            t, errors = _listup_files(
                 class_dir, recurse=False, use_tqdm=False, check_image=check_image
             )
             X.extend(t)
             y.extend([class_id] * len(t))
-            errors.extend(err)
+            with tk.utils.tqdm_external_write_mode():
+                for e in errors:
+                    print(e)
     assert len(X) == len(y)
-    for e in errors:
-        print(e)
     return class_names, np.array(X), np.array(y)
 
 

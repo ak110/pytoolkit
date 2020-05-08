@@ -49,8 +49,10 @@ def test_predict_flow(output_count):
         on_batch_fn=on_batch,
     )
     if output_count == 1:
+        assert isinstance(result, np.ndarray)
         assert (result == dataset.data).all()
     else:
+        assert isinstance(result, list)
         assert len(result) == 2
         assert (result[0] == dataset.data).all()
         assert (result[1] == dataset.data).all()
@@ -70,8 +72,10 @@ def test_predict_on_batch_augmented(output_count):
         padding_size=(8, 8),
     )
     if output_count == 1:
+        assert isinstance(result, np.ndarray)
         assert result.shape == (2 * 3 * 3, 4, 32, 32, 3)
     else:
+        assert isinstance(result, list)
         assert len(result) == output_count
         assert result[0].shape == (2 * 3 * 3, 4, 32, 32, 3)
         assert result[1].shape == (2 * 3 * 3, 4, 32, 32, 3)

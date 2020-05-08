@@ -332,7 +332,7 @@ class DataLoader:
         ds = ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
         return ds
 
-    def get_sample(self, data: list) -> tuple:
+    def get_sample(self, data):
         """1件のサンプルを取得する。"""
         assert len(data) == self.data_per_sample
         assert self.data_per_sample == 1
@@ -485,7 +485,7 @@ def make_iterator(
 
 def mixup(
     ds: tf.data.Dataset,
-    postmix_fn: typing.Callable = None,
+    postmix_fn: typing.Callable[..., typing.Any] = None,
     num_parallel_calls: int = None,
 ):
     """tf.dataでのmixup: <https://arxiv.org/abs/1710.09412>

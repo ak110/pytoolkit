@@ -46,8 +46,9 @@ class AutomatedFocalLoss(tf.keras.layers.Layer):
         else:
             return logits_shape[:-1]
 
-    def call(self, inputs):
+    def call(self, inputs):  # pylint: disable=arguments-differ
         labels, logits = inputs
+        assert self.phat_correct is not None
 
         if self.mode == "binary":
             p = tf.math.sigmoid(logits)

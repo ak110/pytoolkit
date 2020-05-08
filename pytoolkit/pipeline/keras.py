@@ -78,7 +78,7 @@ class KerasModel(Model):
         skip_if_exists: bool = True,
         skip_folds: typing.Sequence[int] = (),
         base_models_dir: tk.typing.PathLike = None,
-        fit_params: dict = None,
+        fit_params: typing.Dict[str, typing.Any] = None,
         parallel_cv: bool = False,
         on_batch_fn: tk.models.OnBatchFnType = None,
         load_by_name: bool = False,
@@ -163,7 +163,7 @@ class KerasModel(Model):
         targets = []
         outputs = []
         losses = []
-        metrics: dict = {
+        metrics: typing.Dict[str, typing.Any] = {
             n: [] for n in self.training_models[0].metrics_names if n != "loss"
         }
         for i, model in enumerate(self.training_models):
@@ -502,7 +502,7 @@ class KerasModel(Model):
             evals = tk.evaluations.add_prefix(evals, prefix)
         return evals
 
-    def _model_evaluate(self, dataset, fold):
+    def _model_evaluate(self, dataset, fold) -> typing.Dict[str, float]:
         assert self.preprocessors is None  # とりあえず未対応
         assert self.postprocessors is None  # とりあえず未対応
 

@@ -21,7 +21,7 @@ def find_by_name(arr, name):
     raise ValueError(f'"{name}" is not exist in [{arr}]')
 
 
-def normalize_tuple(value, n: int) -> tuple:
+def normalize_tuple(value, n: int) -> typing.Tuple[int, ...]:
     """n個の要素を持つtupleにして返す。"""
     assert value is not None
     if isinstance(value, int):
