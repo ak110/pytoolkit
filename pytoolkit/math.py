@@ -18,7 +18,7 @@ def set_ndarray_format() -> None:
                 result += f" mean={x.mean(dtype=np.float32)}"
             s = np.array_str(x).replace("\n", "")
             result += f" values={s}"
-            result += f">"
+            result += ">"
             return result
         except Exception:
             return np.array_repr(x)  # 念のため

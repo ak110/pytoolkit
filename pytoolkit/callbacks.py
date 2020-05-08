@@ -130,8 +130,12 @@ class EpochLogger(tf.keras.callbacks.Callback):
         elapsed_time = now - self.epoch_start_time
         time_per_epoch = (now - self.train_start_time) / (epoch + 1)
         eta = time_per_epoch * (self.params["epochs"] - epoch - 1)
+        metrics_names = self.params.get("metrics")
+        if metrics_names is None:  # TF 2.2対策 (?)
+            metrics_names = list(self.model.metrics_names)
+            metrics_names += [f"val_{n}" for n in metrics_names if f"val_{n}" in logs]
         metrics = " ".join(
-            [f"{k}={logs.get(k):.4f}" for k in self.params["metrics"] if k in logs]
+            [f"{k}={logs.get(k):.4f}" for k in metrics_names if k in logs]
         )
         if self.enabled:
             tk.log.get(__name__).debug(

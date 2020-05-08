@@ -11,7 +11,7 @@ class CosineAnnealing(tf.keras.optimizers.schedules.LearningRateSchedule):
     Args:
         initial_learning_rate: 初期学習率
         decay_steps: 全体のステップ数 (len(train_set) // (batch_size * app.num_replicas_in_sync * tk.hvd.size()) * epochs)
-        warmup_steps: 最初にlinear warmupするステップ数
+        warmup_steps: 最初にlinear warmupするステップ数。既定値は1000。ただし最大でdecay_steps // 8。
         min_fraction: 初期学習率に対する最小の倍率
         name: 名前
 
@@ -31,11 +31,11 @@ class CosineAnnealing(tf.keras.optimizers.schedules.LearningRateSchedule):
         super().__init__()
         self.initial_learning_rate = initial_learning_rate
         self.decay_steps = decay_steps
-        self.warmup_steps = warmup_steps
+        self.warmup_steps = min(warmup_steps, decay_steps // 8)
         self.min_fraction = min_fraction
         self.name = name
         assert initial_learning_rate > 0
-        assert 0 < warmup_steps < decay_steps
+        assert 0 <= self.warmup_steps < self.decay_steps
         assert min_fraction >= 0
 
     def __call__(self, step):
@@ -49,7 +49,7 @@ class CosineAnnealing(tf.keras.optimizers.schedules.LearningRateSchedule):
             step = tf.cast(step, tf.float32)
 
             # linear warmup
-            fraction1 = (step + 1) / warmup_steps
+            fraction1 = (step + 1) / tf.math.maximum(warmup_steps, 1)
 
             # cosine annealing
             r = tf.math.minimum(step, decay_steps) / decay_steps

@@ -9,10 +9,12 @@ disable=
     fixme,
     global-statement,
     import-outside-toplevel,
+    import-self,  # for pytoolkit/__init__.py
     invalid-name,
     invalid-unary-operand-type,  # for tf.Tensor
     len-as-condition,
     logging-format-interpolation,
+    logging-fstring-interpolation,
     missing-docstring,
     no-else-return,
     no-self-use,

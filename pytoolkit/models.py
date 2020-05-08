@@ -92,8 +92,6 @@ def check(
         )
         if isinstance(pred, (list, tuple)):
             logger.info(f"check.predict: shape={[p.shape for p in pred]}")
-        elif isinstance(pred, dict):
-            logger.info(f"check.predict: shape={{k: pred[k].shape for k in pred}}")
         else:
             logger.info(f"check.predict: shape={pred.shape}")
 

@@ -6,6 +6,15 @@ import sklearn.datasets
 import pytoolkit as tk
 
 
+def load_sample_ic():
+    """画像分類のサンプルデータ。num_classes=2"""
+    X_train = np.array(sklearn.datasets.load_sample_images().filenames)
+    y_train = np.array([0, 1])
+    return tk.data.Dataset(
+        X_train, y_train, metadata={"class_names": ["china", "flower"]}
+    )
+
+
 def load_sample_od():
     """物体検出のサンプルデータ。num_classes=2"""
     X_train = np.array(sklearn.datasets.load_sample_images().filenames)

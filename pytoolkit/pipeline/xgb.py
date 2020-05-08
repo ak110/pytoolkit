@@ -55,15 +55,15 @@ class XGBModel(Model):
 
     def _save(self, models_dir: pathlib.Path):
         assert self.gbms_ is not None
-        tk.utils.dump(self.gbms_, models_dir / f"model.pkl")
-        tk.utils.dump(self.best_ntree_limit_, models_dir / f"best_ntree_limit.pkl")
+        tk.utils.dump(self.gbms_, models_dir / "model.pkl")
+        tk.utils.dump(self.best_ntree_limit_, models_dir / "best_ntree_limit.pkl")
         # ついでにfeature_importanceも。
         df_importance = self.feature_importance()
         df_importance.to_excel(str(models_dir / "feature_importance.xlsx"))
 
     def _load(self, models_dir: pathlib.Path):
-        self.gbms_ = tk.utils.load(models_dir / f"model.pkl")
-        self.best_ntree_limit_ = tk.utils.load(models_dir / f"best_ntree_limit.pkl")
+        self.gbms_ = tk.utils.load(models_dir / "model.pkl")
+        self.best_ntree_limit_ = tk.utils.load(models_dir / "best_ntree_limit.pkl")
         assert self.gbms_ is not None
         assert len(self.gbms_) == self.nfold
 

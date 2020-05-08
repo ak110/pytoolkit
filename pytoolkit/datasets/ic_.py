@@ -77,7 +77,7 @@ def load_imagenet(data_dir: tk.typing.PathLike, verbose: bool = True):
 
     X_val, y_val = [], []
     val_dir = data_dir / "Annotations/CLS-LOC/val"
-    for xml_path in tk.utils.tqdm(val_dir.glob("*.xml"), disable=not verbose):
+    for xml_path in tk.utils.tqdm(list(val_dir.glob("*.xml")), disable=not verbose):
         root = xml.etree.ElementTree.parse(str(xml_path)).getroot()
         class_name: str = root.find("object").find("name").text  # type: ignore
 

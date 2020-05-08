@@ -59,7 +59,7 @@ def test_ToGrayScale(data_dir, save_dir):
     """ToGrayScale"""
     aug = tk.image.ToGrayScale(p=1)
     img = tk.ndimage.load(data_dir / "Lenna.png")
-    tk.ndimage.save(save_dir / f"Lenna.ToGrayScale.png", aug(image=img)["image"])
+    tk.ndimage.save(save_dir / "Lenna.ToGrayScale.png", aug(image=img)["image"])
 
 
 def test_RandomBinarize(data_dir, save_dir):
