@@ -1,4 +1,5 @@
 """カスタムレイヤー。"""
+import typing
 
 import numpy as np
 import tensorflow as tf
@@ -25,7 +26,7 @@ class AutomatedFocalLoss(tf.keras.layers.Layer):
         assert mode in ("binary", "categorical")
         self.mode = mode
         self.class_weights = class_weights
-        self.phat_correct = None
+        self.phat_correct: typing.Optional[tf.Tensor] = None
 
     def build(self, input_shape):
         _, logits_shape = input_shape
@@ -61,7 +62,7 @@ class AutomatedFocalLoss(tf.keras.layers.Layer):
         phat_correct = self.phat_correct * 0.95 + p_new * 0.05
         tf.keras.backend.update(self.phat_correct, phat_correct)
 
-        gamma = -tf.math.log(tf.math.maximum(phat_correct, 0.01))
+        gamma = tf.math.negative(tf.math.log(tf.math.maximum(phat_correct, 0.01)))
 
         w = (1 - p_correct) ** gamma
         w = tf.stop_gradient(w)  # ？
@@ -73,7 +74,7 @@ class AutomatedFocalLoss(tf.keras.layers.Layer):
             base_loss = labels * log_p
             if self.class_weights is not None:
                 base_loss = base_loss * self.class_weights
-            loss = -w * tf.math.reduce_sum(base_loss, axis=-1)
+            loss = tf.math.negative(w) * tf.math.reduce_sum(base_loss, axis=-1)
         return loss
 
     def get_config(self):

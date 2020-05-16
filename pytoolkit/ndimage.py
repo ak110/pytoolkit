@@ -787,24 +787,34 @@ def mixup(sample1: T, sample2: T, mode: str = "beta", alpha=0.2) -> T:
     return mix_data(sample1, sample2, r)
 
 
+@typing.overload
+def mix_data(sample1: None, sample2: None, r: np.float32) -> None:
+    pass
+
+
+@typing.overload
 def mix_data(sample1: T, sample2: T, r: np.float32) -> T:
+    pass
+
+
+def mix_data(sample1, sample2, r: np.float32):
     """mixup用に入力や出力を混ぜる処理。rはsample1側に掛ける率。"""
     # pylint: disable=function-redefined
     if sample1 is None:
-        assert sample2 is None
+        assert sample2 is None  # typing: ignore
         return None
     elif isinstance(sample1, tuple):
         assert isinstance(sample2, tuple)
         assert len(sample1) == len(sample2)
-        return tuple(mix_data(s1, s2, r) for s1, s2 in zip(sample1, sample2))  # type: ignore
+        return tuple(mix_data(s1, s2, r) for s1, s2 in zip(sample1, sample2))
     elif isinstance(sample1, list):
         assert isinstance(sample2, list)
         assert len(sample1) == len(sample2)
-        return [mix_data(s1, s2, r) for s1, s2 in zip(sample1, sample2)]  # type: ignore
+        return [mix_data(s1, s2, r) for s1, s2 in zip(sample1, sample2)]
     elif isinstance(sample1, dict):
         assert isinstance(sample2, dict)
         assert tuple(sample1.keys()) == tuple(sample2.keys())
-        return {k: mix_data(sample1[k], sample2[k], r) for k in sample1}  # type: ignore
+        return {k: mix_data(sample1[k], sample2[k], r) for k in sample1}
     else:
         return np.float32(sample1) * r + np.float32(sample2) * (1 - r)
 

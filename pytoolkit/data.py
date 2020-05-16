@@ -105,7 +105,7 @@ class Dataset:
             weights=self.__class__.slice_field(self.weights, rindex),
             ids=self.__class__.slice_field(self.ids, rindex),
             init_score=self.__class__.slice_field(self.init_score, rindex),
-            metadata=self.metadata.copy() if self.metadata is not None else None,
+            metadata=self.metadata.copy(),
         )
 
     def copy(self) -> Dataset:
@@ -122,7 +122,7 @@ class Dataset:
             weights=self.__class__.copy_field(self.weights),
             ids=self.__class__.copy_field(self.ids),
             init_score=self.__class__.copy_field(self.init_score),
-            metadata=self.metadata.copy() if self.metadata is not None else None,
+            metadata=self.metadata.copy(),
         )
 
     @classmethod

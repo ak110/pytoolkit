@@ -7,7 +7,6 @@ import typing
 import numpy as np
 
 import pytoolkit as tk
-
 from .core import Model
 
 
@@ -50,6 +49,7 @@ class BlendingModel(Model):
         self.weights_ = tk.utils.load(models_dir / "weights.pkl")
 
     def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> None:
+        del folds
         if self.score_fn is None:
             pass
         else:

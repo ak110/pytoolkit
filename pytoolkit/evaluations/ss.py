@@ -79,7 +79,7 @@ def evaluate_ss(
             assert np.ndim(yt) == 3  # (H, W, C)
             assert np.ndim(yp) == 3  # (H, W, C)
             if yt.shape[:2] != yp.shape[:2]:
-                warnings.warn(f"Predictions need resize.")  # リサイズ忘れちゃダメだぞ警告
+                warnings.warn("Predictions need resize.")  # リサイズ忘れちゃダメだぞ警告
                 yp = tk.ndimage.resize(yp, width=yt.shape[1], height=yt.shape[0])
             assert yt.shape == yp.shape
 

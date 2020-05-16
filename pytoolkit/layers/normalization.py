@@ -106,7 +106,7 @@ class GroupNormalization(tf.keras.layers.Layer):
     def build(self, input_shape):
         dim = int(input_shape[-1])
         groups = min(dim, self.groups)
-        assert dim is None or dim % groups == 0
+        assert dim % groups == 0
         shape = (dim,)
         if self.scale:
             self.gamma = self.add_weight(

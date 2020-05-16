@@ -17,7 +17,7 @@ def get_gpu_count():
         result_text = nvidia_smi("--list-gpus").strip()
         if "No devices found" in result_text:
             return 0
-        return len([l for l in result_text.split("\n") if len(l) > 0])
+        return len([line for line in result_text.split("\n") if len(line) > 0])
     except FileNotFoundError:
         return 0
 
