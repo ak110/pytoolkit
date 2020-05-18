@@ -147,10 +147,7 @@ def _load_from_chainercv(ds, desc, verbose) -> tk.data.Dataset:
             for i in tk.utils.trange(len(ds), desc=desc, disable=not verbose)
         ]
     )
-    data = np.array([y.path for y in labels])
-    return tk.data.Dataset(
-        data=data, labels=labels, metadata={"class_names": CLASS_NAMES}
-    )
+    return tk.od.ObjectsAnnotation.create_dataset(labels, class_names=CLASS_NAMES)
 
 
 def _get_label(ds, i: int) -> tk.od.ObjectsAnnotation:

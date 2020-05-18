@@ -136,11 +136,7 @@ def load_voc_od_split(
         )
         labels.append(label)
 
-    labels = np.array(labels)
-    data = np.array([y.path for y in labels])
-    return tk.data.Dataset(
-        data=data, labels=labels, metadata={"class_names": class_names}
-    )
+    return tk.od.ObjectsAnnotation.create_dataset(labels, class_names=CLASS_NAMES)
 
 
 def _load_label_map(label_map_path):

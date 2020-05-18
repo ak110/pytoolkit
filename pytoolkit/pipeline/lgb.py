@@ -1,6 +1,7 @@
 """LightGBM"""
 from __future__ import annotations
 
+import logging
 import pathlib
 import typing
 
@@ -11,6 +12,8 @@ import sklearn.metrics
 import pytoolkit as tk
 
 from .core import Model
+
+logger = logging.getLogger(__name__)
 
 
 class LGBModel(Model):
@@ -102,14 +105,10 @@ class LGBModel(Model):
         # 独自拡張: sklearn風の指定
         if params.get("feature_fraction") == "sqrt":
             params["feature_fraction"] = np.sqrt(num_features) / num_features
-            tk.log.get(__name__).info(
-                f'feature_fraction: "sqrt" -> {params["feature_fraction"]:.3f}'
-            )
+            logger.info(f'feature_fraction: "sqrt" -> {params["feature_fraction"]:.3f}')
         elif params.get("feature_fraction") == "log2":
             params["feature_fraction"] = np.log2(num_features) / num_features
-            tk.log.get(__name__).info(
-                f'feature_fraction: "log2" -> {params["feature_fraction"]:.3f}'
-            )
+            logger.info(f'feature_fraction: "log2" -> {params["feature_fraction"]:.3f}')
         # 独自拡張: クラス別の重みの指定
         if "class_weights" in params:
             if params.get("class_weights") == "balanced":
@@ -139,28 +138,26 @@ class LGBModel(Model):
         self.gbms_ = np.empty((len(folds), len(seeds)), dtype=object)
         for seed_i, seed in enumerate(seeds):
             with tk.log.trace(f"seed averaging({seed_i + 1}/{len(seeds)})"):
-                model_extractor = ModelExtractionCallback()
+                model_extractor = ModelExtractor()
                 eval_hist = lgb.cv(
                     params,
                     train_set,
                     folds=folds,
                     early_stopping_rounds=self.early_stopping_rounds,
                     num_boost_round=self.num_boost_round,
-                    verbose_eval=self.verbose_eval,
-                    callbacks=list(self.callbacks or []) + [model_extractor],
+                    callbacks=list(self.callbacks or [])
+                    + [model_extractor, EvaluationLogger(period=self.verbose_eval)],
                     seed=seed,
                     **(self.cv_params or {}),
                 )
-                tk.log.get(__name__).info(
-                    f"best iteration: {model_extractor.best_iteration}"
-                )
+                logger.info(f"best iteration: {model_extractor.best_iteration}")
                 for k in eval_hist:
                     if k.endswith("-mean"):
                         name, score = k[:-5], np.float32(eval_hist[k][-1])
                         if name not in scores:
                             scores[name] = []
                         scores[name].append(score)
-                        tk.log.get(__name__).info(f"cv {name}: {score}")
+                        logger.info(f"cv {name}: {score}")
                 self.gbms_[:, seed_i] = model_extractor.raw_boosters
                 # 怪しいけどとりあえずいったん書き換えちゃう
                 for gbm in self.gbms_[:, seed_i]:
@@ -169,7 +166,7 @@ class LGBModel(Model):
         for name, score_list in scores.items():
             scores[name] = np.mean(score_list)
         for k, v in scores.items():
-            tk.log.get(__name__).info(f"cv(mean) {k}: {v:,.3f}")
+            logger.info(f"cv(mean) {k}: {v:,.3f}")
 
     def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
         assert self.gbms_ is not None
@@ -207,7 +204,7 @@ class LGBModel(Model):
         return pd.DataFrame(data={"importance": fi}, index=columns)
 
 
-class ModelExtractionCallback:
+class ModelExtractor:
     """lightgbm.cv() から学習済みモデルを取り出すためのコールバックに使うクラス
 
     NOTE: 非公開クラス '_CVBooster' に依存しているため将来的に動かなく恐れがある
@@ -241,6 +238,37 @@ class ModelExtractionCallback:
         """Early stop したときの boosting round を返す。"""
         assert self._model is not None, "callback has not called yet"
         return self._model.best_iteration
+
+
+class EvaluationLogger:
+    """pythonのloggingモジュールでログ出力するcallback。
+
+    References:
+        - <https://amalog.hateblo.jp/entry/lightgbm-logging-callback>
+
+    """
+
+    def __init__(self, period=100, show_stdv=True, level=logging.INFO):
+        self.period = period
+        self.show_stdv = show_stdv
+        self.level = level
+        self.order = 10
+
+    def __call__(self, env):
+        if (
+            self.period > 0
+            and env.evaluation_result_list
+            and (env.iteration + 1) % self.period == 0
+        ):
+            from lightgbm.callback import _format_eval_result
+
+            result = "\t".join(
+                [
+                    _format_eval_result(x, self.show_stdv)
+                    for x in env.evaluation_result_list
+                ]
+            )
+            logger.log(self.level, f"[{env.iteration + 1}]\t{result}")
 
 
 def lgb_r2(preds, train_data):

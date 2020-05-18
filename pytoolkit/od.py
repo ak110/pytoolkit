@@ -1,4 +1,6 @@
 """物体検出関連。"""
+from __future__ import annotations
+
 import pathlib
 import typing
 import warnings
@@ -23,6 +25,27 @@ class ObjectsAnnotation:
         crowdeds: クラウドソーシングでアノテーションされたか否か (MS COCO用)
 
     """
+
+    @staticmethod
+    def create_dataset(
+        labels: typing.Sequence[ObjectsAnnotation],
+        class_names: typing.List[str] = None,
+    ) -> tk.data.Dataset:
+        """ObjectsAnnotationの配列からDatasetを作成する。
+
+        Args:
+            labels: ObjectsAnnotationの配列
+            class_names: クラス名の配列
+
+        Return:
+            Dataset
+
+        """
+        data = np.array([y.path for y in labels])
+        ds = tk.data.Dataset(data=data, labels=np.asarray(labels))
+        if class_names is not None:
+            ds.metadata["class_names"] = class_names
+        return ds
 
     def __init__(
         self,
