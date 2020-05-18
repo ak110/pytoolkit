@@ -32,7 +32,7 @@ def split(
         return split(dataset, nfold=5, split_seed=split_seed, stratify=stratify)[:1]
 
     tk.log.get(__name__).info(
-        f"split: len(dataset)={len(dataset)} nfold={nfold} split_seed={split_seed} stratify={stratify}"
+        f"split: {len(dataset)=} {nfold=} {split_seed=} {stratify=}"
     )
 
     if dataset.groups is not None:

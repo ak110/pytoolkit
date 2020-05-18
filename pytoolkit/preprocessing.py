@@ -446,7 +446,7 @@ class Normalizer(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
         self.params_ = {}
         for c in _get_cols(self.cols, X):
             values = _get_col_values(X, c).astype(np.float32)
-            assert not np.isinf(values).any(), f"Invalid value: c={c} values={values}"
+            assert not np.isinf(values).any(), f"Invalid value: {c=} {values=}"
 
             # nanの削除
             values = values[~np.isnan(values)]

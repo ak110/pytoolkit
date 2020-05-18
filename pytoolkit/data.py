@@ -257,10 +257,10 @@ class DataLoader:
         )
         assert (
             len(exsample_data) == 2
-        ), f"get_data returns {len(exsample_data)} values, but expects to see 2 values. exsample_data={exsample_data}"
+        ), f"get_data returns {len(exsample_data)} values, but expects to see 2 values. {exsample_data=}"
         assert (
             len(exsample_sample) == 2
-        ), f"get_sample returns {len(exsample_sample)} values, but expects to see 2 values. exsample_data={exsample_sample}"
+        ), f"get_sample returns {len(exsample_sample)} values, but expects to see 2 values. {exsample_sample=}"
         data_tf_type = _get_tf_types(exsample_data)
         sample_tf_type = _get_tf_types(exsample_sample)
 
@@ -383,20 +383,18 @@ def _unflatten(exsample_data, data):
         lengths = [
             len(v) if isinstance(v, (tuple, list, dict)) else 1 for v in exsample_data
         ]
-        assert sum(lengths) == len(data), f"exsample_data={exsample_data} data={data}"
+        assert sum(lengths) == len(data), f"{exsample_data=} {data=}"
         offsets = np.concatenate([[0], np.cumsum(lengths)[:-1]])
         return tuple(
             _unflatten(v, data[o : o + l])
             for v, o, l in zip(exsample_data, offsets, lengths)
         )
     elif isinstance(exsample_data, dict):
-        assert len(exsample_data) == len(
-            data
-        ), f"exsample_data={exsample_data} data={data}"
+        assert len(exsample_data) == len(data), f"{exsample_data=} {data=}"
         return {k: _unflatten(v, d) for (k, v), d in zip(exsample_data.items(), data)}
     else:
         if isinstance(data, (tuple, list)):
-            assert len(data) == 1, f"exsample_data={exsample_data} data={data}"
+            assert len(data) == 1, f"{exsample_data=} {data=}"
             data = data[0]
         return np.asarray(data, dtype=exsample_data.dtype)
 
@@ -412,7 +410,7 @@ def _unflatten_tensor(exsample_data, tensor):
             # tf.numpy_functionがdict未対応なので展開しているのでここで戻す
             assert (
                 len(exsample_data) == 2
-            ), f"exsample_data={exsample_data} tensor={tensor}"
+            ), f"{exsample_data=} {tensor=}"
             if isinstance(exsample_data[0], (tuple, list, dict)):
                 len1 = len(exsample_data[0])
                 X = _unflatten_tensor(exsample_data[0], tensor[:len1])
@@ -427,18 +425,14 @@ def _unflatten_tensor(exsample_data, tensor):
                 y = _unflatten_tensor(exsample_data[1], tensor[len1])
             assert len1 + len2 == len(
                 tensor
-            ), f"exsample_data={exsample_data} tensor={tensor}"
+            ), f"{exsample_data=} {tensor=}"
             return X, y
     elif isinstance(exsample_data, list):
-        assert len(exsample_data) == len(
-            tensor
-        ), f"exsample_data={exsample_data} tensor={tensor}"
+        assert len(exsample_data) == len(tensor), f"{exsample_data=} {tensor=}"
         return [_unflatten_tensor(v, t) for v, t in zip(exsample_data, tensor)]
     elif isinstance(exsample_data, dict):
         # tf.numpy_functionがdict未対応なのでtensorはlistになっている
-        assert len(exsample_data) == len(
-            tensor
-        ), f"exsample_data={exsample_data} tensor={tensor}"
+        assert len(exsample_data) == len(tensor), f"{exsample_data=} {tensor=}"
         return {
             k: _unflatten_tensor(v, t)
             for (k, v), t in zip(exsample_data.items(), tensor)

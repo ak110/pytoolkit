@@ -46,7 +46,7 @@ def log_softmax(x, axis=-1):
 
 def reduce_mask(x: tf.Tensor, mask: tf.Tensor, axis: typing.Sequence[int]):
     """加重平均。reduce_sum(x * mask, axis) / reduce_sum(mask, axis)"""
-    assert x.shape.rank == mask.shape.rank, f"shape error: x={x} mask={mask}"
+    assert x.shape.rank == mask.shape.rank, f"shape error: {x=} {mask=}"
     if mask.dtype != x.dtype:
         mask = tf.cast(mask, x.dtype)
     axis = tuple(axis)

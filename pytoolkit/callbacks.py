@@ -216,4 +216,4 @@ class ErrorOnNaN(tf.keras.callbacks.Callback):
                     logger.warning("save error", exc_info=True)
 
             # エラーを飛ばす
-            raise RuntimeError(f"Batch {batch}: Invalid loss (logs={logs})")
+            raise RuntimeError(f"Batch {batch}: Invalid loss ({logs=})")

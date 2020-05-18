@@ -126,7 +126,7 @@ def load_weights(
     skip_not_exist: bool = False,
     strict: bool = True,
     strict_fraction: float = 0.95,
-):
+) -> bool:
     """モデルの重みの読み込み。
 
     Args:
@@ -136,6 +136,9 @@ def load_weights(
         skip_not_exist: ファイルが存在しない場合にエラーにしないならTrue。
         strict: 読み込み前と重みがあまり変わらなかったらエラーにする。
         strict_fraction: 重み不一致率の最低値。これ以下ならエラーにする。
+
+    Returns:
+        読み込んだか否か。skip_not_exist=Trueの場合に限りFalseが返る可能性がある。
 
     """
     path = pathlib.Path(path)
@@ -166,8 +169,10 @@ def load_weights(
                 tk.log.get(__name__).info(msg)
     elif skip_not_exist:
         tk.log.get(__name__).info(f"{path} is not found.")
+        return False
     else:
         raise RuntimeError(f"{path} is not found.")
+    return True
 
 
 def save(
