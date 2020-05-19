@@ -8,8 +8,8 @@ import pytoolkit as tk
 
 
 def print_od_metrics(
-    y_true: typing.Iterable[tk.od.ObjectsAnnotation],
-    y_pred: typing.Iterable[tk.od.ObjectsPrediction],
+    y_true: typing.Sequence[tk.od.ObjectsAnnotation],
+    y_pred: typing.Sequence[tk.od.ObjectsPrediction],
     print_fn: typing.Callable[[str], None] = None,
 ) -> tk.evaluations.EvalsType:
     """物体検出の各種metricsを算出してprintする。
@@ -35,9 +35,11 @@ def print_od_metrics(
 
 
 def evaluate_od(
-    y_true: typing.Iterable[tk.od.ObjectsAnnotation],
-    y_pred: typing.Iterable[tk.od.ObjectsPrediction],
+    y_true: typing.Sequence[tk.od.ObjectsAnnotation],
+    y_pred: typing.Sequence[tk.od.ObjectsPrediction],
     detail: bool = False,
+    conf_threshold: float = 0.5,
+    iou_threshold: float = 0.5,
 ) -> tk.evaluations.EvalsType:
     """物体検出の各種metricsを算出してdictで返す。
 
@@ -45,6 +47,8 @@ def evaluate_od(
         y_true: ラベル
         y_pred: 推論結果
         detail: 全情報を返すならTrue。(既定値では一部の指標のみ返す)
+        conf_threshold: 確信度の閾値 (accなどに影響)
+        iou_threshold: 一致扱いする最低IoU (accなどに影響)
 
     Returns:
         各種metrics
@@ -117,5 +121,21 @@ def evaluate_od(
                 "voc07_ap",
             ]
             evals = {k: evals[k] for k in summary_keys}
+
+        # 独自指標
+        acc = tk.od.od_accuracy(
+            y_true, y_pred, conf_threshold=conf_threshold, iou_threshold=iou_threshold
+        )
+        prec, rec, fscores, _ = tk.od.compute_scores(
+            y_true, y_pred, conf_threshold=conf_threshold, iou_threshold=iou_threshold
+        )
+        cm = tk.od.confusion_matrix(
+            y_true, y_pred, conf_threshold=conf_threshold, iou_threshold=iou_threshold
+        )
+        evals["acc"] = acc
+        evals["prec"] = prec
+        evals["rec"] = rec
+        evals["F"] = fscores
+        evals["cm"] = cm
 
         return evals

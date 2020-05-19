@@ -408,9 +408,7 @@ def _unflatten_tensor(exsample_data, tensor):
             return tuple(_unflatten_tensor(v, t) for v, t in zip(exsample_data, tensor))
         else:
             # tf.numpy_functionがdict未対応なので展開しているのでここで戻す
-            assert (
-                len(exsample_data) == 2
-            ), f"{exsample_data=} {tensor=}"
+            assert len(exsample_data) == 2, f"{exsample_data=} {tensor=}"
             if isinstance(exsample_data[0], (tuple, list, dict)):
                 len1 = len(exsample_data[0])
                 X = _unflatten_tensor(exsample_data[0], tensor[:len1])
@@ -423,9 +421,7 @@ def _unflatten_tensor(exsample_data, tensor):
             else:
                 len2 = 1
                 y = _unflatten_tensor(exsample_data[1], tensor[len1])
-            assert len1 + len2 == len(
-                tensor
-            ), f"{exsample_data=} {tensor=}"
+            assert len1 + len2 == len(tensor), f"{exsample_data=} {tensor=}"
             return X, y
     elif isinstance(exsample_data, list):
         assert len(exsample_data) == len(tensor), f"{exsample_data=} {tensor=}"

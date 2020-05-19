@@ -261,12 +261,16 @@ class ObjectsPrediction:
         ]
 
 
-def search_conf_threshold(gt, pred, iou_threshold=0.5):
+def search_conf_threshold(
+    y_true: typing.Sequence[tk.od.ObjectsAnnotation],
+    y_pred: typing.Sequence[tk.od.ObjectsPrediction],
+    iou_threshold: float = 0.5,
+):
     """物体検出の正解と予測結果から、F1スコアが最大になるconf_thresholdを返す。"""
     conf_threshold_list = np.linspace(0.01, 0.99, 50)
     scores = []
     for conf_th in conf_threshold_list:
-        _, _, fscores, supports = compute_scores(gt, pred, conf_th, iou_threshold)
+        _, _, fscores, supports = compute_scores(y_true, y_pred, conf_th, iou_threshold)
         score = np.average(fscores, weights=supports)  # sklearnで言うaverage='weighted'
         scores.append(score)
     scores = np.array(scores)
@@ -276,43 +280,52 @@ def search_conf_threshold(gt, pred, iou_threshold=0.5):
     return conf_threshold_list[scores.argmax()]
 
 
-def od_accuracy(gt, pred, conf_threshold=0, iou_threshold=0.5):
+def od_accuracy(
+    y_true: typing.Sequence[tk.od.ObjectsAnnotation],
+    y_pred: typing.Sequence[tk.od.ObjectsPrediction],
+    conf_threshold: float = 0.0,
+    iou_threshold: float = 0.5,
+):
     """物体検出で過不足なく検出できた時だけ正解扱いとした正解率を算出する。"""
-    assert len(gt) == len(pred)
+    assert len(y_true) == len(y_pred)
     assert 0 < iou_threshold < 1
     assert 0 <= conf_threshold < 1
     return np.mean(
         [
-            y_pred.is_match(
-                y_true.classes, y_true.bboxes, conf_threshold, iou_threshold
-            )
-            for y_true, y_pred in zip(gt, pred)
+            yp.is_match(yt.classes, yt.bboxes, conf_threshold, iou_threshold)
+            for yt, yp in zip(y_true, y_pred)
         ]
     )
 
 
-def compute_scores(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=None):
+def compute_scores(
+    y_true: typing.Sequence[tk.od.ObjectsAnnotation],
+    y_pred: typing.Sequence[tk.od.ObjectsPrediction],
+    conf_threshold: float = 0.0,
+    iou_threshold: float = 0.5,
+    num_classes: int = None,
+):
     """物体検出の正解と予測結果から、適合率、再現率、F値、該当回数を算出して返す。"""
-    assert len(gt) == len(pred)
+    assert len(y_true) == len(y_pred)
     assert 0 < iou_threshold < 1
     assert 0 <= conf_threshold < 1
     if num_classes is None:
-        num_classes = np.max(np.concatenate([y.classes for y in gt])) + 1
+        num_classes = np.max(np.concatenate([y.classes for y in y_true])) + 1
 
     tp = np.zeros((num_classes,), dtype=np.int32)  # true positive
     fp = np.zeros((num_classes,), dtype=np.int32)  # false positive
     fn = np.zeros((num_classes,), dtype=np.int32)  # false negative
 
-    for y_true, y_pred in zip(gt, pred):
+    for yt, yp in zip(y_true, y_pred):
         # conf_threshold以上をいったんすべて対象とする
-        pred_enabled = y_pred.confs >= conf_threshold
+        pred_enabled = yp.confs >= conf_threshold
         # 各正解が予測結果に含まれるか否か: true positive/negative
         for gt_class, gt_bbox, gt_difficult in zip(
-            y_true.classes, y_true.bboxes, y_true.difficults
+            yt.classes, yt.bboxes, yt.difficults
         ):
-            pred_mask = np.logical_and(pred_enabled, y_pred.classes == gt_class)
+            pred_mask = np.logical_and(pred_enabled, yp.classes == gt_class)
             if pred_mask.any():
-                pred_bboxes = y_pred.bboxes[pred_mask]
+                pred_bboxes = yp.bboxes[pred_mask]
                 iou = compute_iou(np.expand_dims(gt_bbox, axis=0), pred_bboxes)[0, :]
                 pred_ix = iou.argmax()
                 pred_iou = iou[pred_ix]
@@ -330,7 +343,7 @@ def compute_scores(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=No
                 if not gt_difficult:
                     fn[gt_class] += 1
         # 正解に含まれなかった予測結果: false positive
-        for pred_class in y_pred.classes[pred_enabled]:
+        for pred_class in yp.classes[pred_enabled]:
             fp[pred_class] += 1
 
     supports = tp + fn
@@ -340,38 +353,44 @@ def compute_scores(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=No
     return precisions, recalls, fscores, supports
 
 
-def confusion_matrix(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=None):
+def confusion_matrix(
+    y_true: typing.Sequence[tk.od.ObjectsAnnotation],
+    y_pred: typing.Sequence[tk.od.ObjectsPrediction],
+    conf_threshold: float = 0.0,
+    iou_threshold: float = 0.5,
+    num_classes: int = None,
+):
     """物体検出用の混同行列を作る。
 
     分類と異なり、検出漏れと誤検出があるのでその分列と行を1つずつ増やしたものを返す。
     difficultは扱いが難しいので無視。
     """
-    assert len(gt) == len(pred)
+    assert len(y_true) == len(y_pred)
     assert 0 < iou_threshold < 1
     assert 0 <= conf_threshold < 1
     if num_classes is None:
-        num_classes = np.max(np.concatenate([y.classes for y in gt])) + 1
+        num_classes = np.max(np.concatenate([y.classes for y in y_true])) + 1
 
     cm = np.zeros((num_classes + 1, num_classes + 1), dtype=np.int32)
 
-    for y_true, y_pred in zip(gt, pred):
-        pred_enabled = y_pred.confs >= conf_threshold
-        if y_true.num_objects > 0:
-            if y_pred.num_objects > 0:
-                iou = compute_iou(y_true.bboxes, y_pred.bboxes)
+    for yt, yp in zip(y_true, y_pred):
+        pred_enabled = yp.confs >= conf_threshold
+        if yt.num_objects > 0:
+            if yp.num_objects > 0:
+                iou = compute_iou(yt.bboxes, yp.bboxes)
                 pred_gt = iou.argmax(axis=0)  # 一番近いboxにマッチさせる (やや怪しい)
                 pred_iou_mask = iou.max(axis=0) >= iou_threshold
                 # 正解毎にループ
-                for gt_ix, gt_class in enumerate(y_true.classes):
+                for gt_ix, gt_class in enumerate(yt.classes):
                     m = np.logical_and(
                         pred_enabled, pred_iou_mask
                     )  # まだ使用済みでなく、IoUが大きく、
                     m = np.logical_and(m, pred_gt == gt_ix)  # IoUの対象がgt_ixなものが対象
-                    pred_targets = y_pred.confs.argsort()[::-1][m]  # 対象のindexを確信度順で
+                    pred_targets = yp.confs.argsort()[::-1][m]  # 対象のindexを確信度順で
                     found = False
                     # クラスもあってる検出
                     for pred_ix in pred_targets:
-                        pc = y_pred.classes[pred_ix]
+                        pc = yp.classes[pred_ix]
                         if gt_class == pc:
                             if found:
                                 cm[-1, pc] += 1  # 誤検出(重複)
@@ -382,7 +401,7 @@ def confusion_matrix(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=
                             pred_enabled[pred_ix] = False
                     # クラス違い
                     for pred_ix in pred_targets:
-                        pc = y_pred.classes[pred_ix]
+                        pc = yp.classes[pred_ix]
                         if pred_enabled[pred_ix] and gt_class != pc:
                             if found:
                                 cm[-1, pc] += 1  # 誤検出(重複&クラス違い)
@@ -396,10 +415,10 @@ def confusion_matrix(gt, pred, conf_threshold=0, iou_threshold=0.5, num_classes=
                         cm[gt_class, -1] += 1  # 検出漏れ
             else:
                 # 全て検出漏れ
-                for gt_class in y_true.classes:
+                for gt_class in yt.classes:
                     cm[gt_class, -1] += 1  # 検出漏れ
         # 余った予測結果：誤検出
-        for pred_class in y_pred.classes[pred_enabled]:
+        for pred_class in yp.classes[pred_enabled]:
             cm[-1, pred_class] += 1
 
     return cm

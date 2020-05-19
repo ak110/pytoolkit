@@ -1,6 +1,5 @@
 [MASTER]
 extension-pkg-whitelist=numpy,cv2
-init-hook='import sys; sys.path.append("./pytoolkit")'
 
 [MESSAGES CONTROL]
 disable=

@@ -8,7 +8,7 @@
 
 いわゆるオレオレライブラリ。
 
-`git submodule add https://github.com/ak110/pytoolkit.git` で配置して `import pytoolkit as tk` とかで使う。
+`git submodule add https://github.com/ak110/pytoolkit.git pytoolkit.git && ln -s pytoolkit.git/pytoolkit` で配置して `import pytoolkit as tk` とかで使う。
 
 (一応 `pip install --user -e .` とかもできるようにしているけどバージョニングとかはちゃんとしてないので基本的にはsubmoduleでコミット単位で紐付け。)
 
