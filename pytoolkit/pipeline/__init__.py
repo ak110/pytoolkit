@@ -1,5 +1,6 @@
 """前処理＋モデル＋後処理のパイプライン。"""
 # pylint: skip-file
+# flake8: noqa
 
 from .blending import *
 from .cb import *

@@ -1,5 +1,6 @@
 """カスタムレイヤー。"""
 # pylint: skip-file
+# flake8: noqa
 
 from .activations import *
 from .attentions import *

@@ -19,4 +19,4 @@ script:
   - flake8
   - mypy pytoolkit
   - pylint --jobs=4 pytoolkit
-  - pytest
+  - pytest pytoolkit

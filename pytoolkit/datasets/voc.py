@@ -136,7 +136,7 @@ def load_voc_od_split(
         )
         labels.append(label)
 
-    return tk.od.ObjectsAnnotation.create_dataset(labels, class_names=CLASS_NAMES)
+    return tk.od.ObjectsAnnotation.create_dataset(labels, class_names=class_names)
 
 
 def _load_label_map(label_map_path):
@@ -150,7 +150,11 @@ def _load_label_map(label_map_path):
         elif line.startswith("name:"):
             name = line[5:].strip()
             if name[0] == "'" and name[-1] == "'":
-                name = name[1:-1]  # TODO: エスケープ
+                name = (
+                    name[1:-1]
+                    .encode("ascii", "backslashreplace")
+                    .decode("unicode-escape")
+                )
         if id_ is not None and name is not None:
             class_id_names.append((id_, name))
             id_, name = None, None

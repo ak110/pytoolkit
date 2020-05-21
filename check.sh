@@ -14,4 +14,4 @@ popd
 
 pylint -j4 pytoolkit
 
-CUDA_VISIBLE_DEVICES=none pytest
+CUDA_VISIBLE_DEVICES=none pytest pytoolkit
