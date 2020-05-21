@@ -7,7 +7,7 @@ import tensorflow as tf
 K = tf.keras.backend
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class ConvertColor(tf.keras.layers.Layer):
     """ColorNet <https://arxiv.org/abs/1902.00267> 用の色変換とついでにスケーリング。
 
@@ -110,7 +110,7 @@ class ConvertColor(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class RemoveMask(tf.keras.layers.Layer):
     """マスクを取り除く。"""
 
@@ -127,7 +127,7 @@ class RemoveMask(tf.keras.layers.Layer):
         return inputs
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class ChannelPair2D(tf.keras.layers.Layer):
     """チャンネル同士の2個の組み合わせの積。"""
 
@@ -143,7 +143,7 @@ class ChannelPair2D(tf.keras.layers.Layer):
         )
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class ScaleValue(tf.keras.layers.Layer):
     """値だけをスケーリングしてシフトするレイヤー。回帰の出力前とかに。"""
 
@@ -173,7 +173,7 @@ class ScaleValue(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class ScaleGradient(tf.keras.layers.Layer):
     """勾配だけをスケーリングするレイヤー。転移学習するときとかに。"""
 
@@ -202,7 +202,7 @@ class ScaleGradient(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class ImputeNaN(tf.keras.layers.Layer):
     """NaNを適当な値に変換する層。"""
 
@@ -252,7 +252,7 @@ class ImputeNaN(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class TrainOnly(tf.keras.layers.Wrapper):
     """訓練時のみ適用するlayer wrapper"""
 
@@ -262,7 +262,7 @@ class TrainOnly(tf.keras.layers.Wrapper):
         )
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class TestOnly(tf.keras.layers.Wrapper):
     """推論時のみ適用するlayer wrapper"""
 
@@ -272,7 +272,7 @@ class TestOnly(tf.keras.layers.Wrapper):
         )
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class Scale(tf.keras.layers.Layer):
     """学習可能なスケール値。"""
 
@@ -320,7 +320,7 @@ class Scale(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class RandomScale(tf.keras.layers.Layer):
     """ランダムにスケーリング
 

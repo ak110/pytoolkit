@@ -16,7 +16,6 @@ import numpy as np
 
 import pytoolkit as tk
 
-
 CLASS_NAMES = [
     # chainercvは読んだとき残してなさそうだったので直書き
     "person",

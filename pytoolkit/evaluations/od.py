@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import typing
+
 import numpy as np
 
 import pytoolkit as tk
@@ -133,9 +134,12 @@ def evaluate_od(
             y_true, y_pred, conf_threshold=conf_threshold, iou_threshold=iou_threshold
         )
         evals["acc"] = acc
+        evals["prec-macro"] = np.nanmean(prec)
+        evals["rec-macro"] = np.nanmean(rec)
+        evals["F1-macro"] = np.nanmean(fscores)
         evals["prec"] = prec
         evals["rec"] = rec
-        evals["F"] = fscores
+        evals["F1"] = fscores
         evals["cm"] = cm
 
         return evals

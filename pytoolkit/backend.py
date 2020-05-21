@@ -5,12 +5,12 @@ import numpy as np
 import tensorflow as tf
 
 
-def clip64(x: tf.Tensor, epsilon=1e-7) -> tf.Tensor:
+def clip64(x, epsilon=1e-7):
     """float64にキャストして[epsilon, 1 - epsilon]にclip。"""
     return tf.clip_by_value(tf.cast(x, tf.float64), epsilon, 1 - epsilon)
 
 
-def logit(x: tf.Tensor, epsilon=1e-7) -> tf.Tensor:
+def logit(x, epsilon=1e-7):
     """ロジット関数。シグモイド関数の逆関数。
 
     logit(x) = log(x / (1 - x)) なのだが、
@@ -54,7 +54,7 @@ def reduce_mask(x: tf.Tensor, mask: tf.Tensor, axis: typing.Sequence[int]):
     return tf.math.reduce_sum(x * mask, axis=axis) / tf.math.maximum(size, 1)
 
 
-def reduce_losses(losses: typing.Sequence[tf.Tensor]) -> tf.Tensor:
+def reduce_losses(losses: typing.Sequence[tf.Tensor]):
     """1次元のtensorを複数受け取り、0次元のtensorを1つ返す。Endpointレイヤー作るとき用。"""
     for x in losses:
         assert x.shape.rank == 1, f"shape error: {x}"

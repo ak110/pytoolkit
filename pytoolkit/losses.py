@@ -26,7 +26,12 @@ def empty(y_true, y_pred):
 
 
 def binary_crossentropy(
-    y_true, y_pred, from_logits=False, alpha=None, reduce_mode="sum"
+    y_true,
+    y_pred,
+    from_logits=False,
+    alpha=None,
+    label_smoothing=None,
+    reduce_mode="sum",
 ):
     """クラス間のバランス補正ありのbinary_crossentropy。
 
@@ -38,6 +43,9 @@ def binary_crossentropy(
 
     if not from_logits:
         y_pred = tk.backend.logit(y_pred)
+
+    if label_smoothing is not None:
+        y_true = (1 - label_smoothing) * y_true + label_smoothing * 0.5
 
     # 前提知識:
     # -log(sigmoid(x)) = log(1 + exp(-x))

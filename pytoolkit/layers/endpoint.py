@@ -7,7 +7,7 @@ import tensorflow as tf
 import pytoolkit as tk
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class AutomatedFocalLoss(tf.keras.layers.Layer):
     """Automated Focal Loss <https://arxiv.org/abs/1904.09048>
 

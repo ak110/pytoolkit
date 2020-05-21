@@ -1,10 +1,18 @@
 import pytoolkit as tk
 
+module = tk.applications.seresnext50
+
 
 def test_model():
-    module = tk.applications.seresnext50
     model = module.create(input_shape=(256, 256, 3), weights=None)
     assert tuple(module.get_1_over_4(model).shape[1:3]) == (64, 64)
     assert tuple(module.get_1_over_8(model).shape[1:3]) == (32, 32)
     assert tuple(module.get_1_over_16(model).shape[1:3]) == (16, 16)
     assert tuple(module.get_1_over_32(model).shape[1:3]) == (8, 8)
+
+
+def test_save_load(tmpdir):
+    # SavedModel形式のみ対応
+    model = module.create(input_shape=(32, 32, 3), weights=None)
+    tk.models.save(model, str(tmpdir / "model"), mode="saved_model")
+    tk.models.load(str(tmpdir / "model"))

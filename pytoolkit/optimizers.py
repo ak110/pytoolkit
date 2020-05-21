@@ -6,7 +6,7 @@ import tensorflow as tf
 K = tf.keras.backend
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class SGDEx(tf.keras.optimizers.SGD):
     """重み別に学習率の係数を設定できるSGD。
 

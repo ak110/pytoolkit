@@ -5,7 +5,7 @@ import tensorflow as tf
 K = tf.keras.backend
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class MixFeat(tf.keras.layers.Layer):
     """MixFeat <https://openreview.net/forum?id=HygT9oRqFX>"""
 

@@ -7,7 +7,7 @@ import pytoolkit as tk
 K = tf.keras.backend
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class Resize2D(tf.keras.layers.Layer):
     """リサイズ。
 
@@ -70,7 +70,7 @@ class Resize2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class ParallelGridPooling2D(tf.keras.layers.Layer):
     """Parallel Grid Poolingレイヤー。
 
@@ -117,7 +117,7 @@ class ParallelGridPooling2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class ParallelGridGather(tf.keras.layers.Layer):
     """ParallelGridPoolingでparallelにしたのを戻すレイヤー。"""
 
@@ -145,7 +145,7 @@ class ParallelGridGather(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class SubpixelConv2D(tf.keras.layers.Layer):
     """Sub-Pixel Convolutional Layer。
 
@@ -167,7 +167,7 @@ class SubpixelConv2D(tf.keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         del kwargs
-        return tf.compat.v1.depth_to_space(input=inputs, block_size=self.scale)
+        return tf.nn.depth_to_space(inputs, block_size=self.scale)
 
     def get_config(self):
         config = {"scale": self.scale}
@@ -175,7 +175,7 @@ class SubpixelConv2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class BlurPooling2D(tf.keras.layers.Layer):
     """Blur Pooling Layer <https://arxiv.org/abs/1904.11486>"""
 
@@ -220,7 +220,7 @@ class BlurPooling2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class GeM2D(tf.keras.layers.Layer):
     """Generalized Mean Pooling (GeM) <https://github.com/filipradenovic/cnnimageretrieval-pytorch>"""
 
@@ -248,7 +248,7 @@ class GeM2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class GeMPooling2D(tf.keras.layers.Layer):
     """Generalized Mean Pooling (GeM)
 

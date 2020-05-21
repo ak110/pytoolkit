@@ -4,7 +4,7 @@ import tensorflow as tf
 K = tf.keras.backend
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class CoordChannel1D(tf.keras.layers.Layer):
     """CoordConvなレイヤー。
 
@@ -30,7 +30,7 @@ class CoordChannel1D(tf.keras.layers.Layer):
         return K.concatenate([inputs] + [pad_channel], axis=-1)
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class CoordChannel2D(tf.keras.layers.Layer):
     """CoordConvなレイヤー。
 
@@ -76,7 +76,7 @@ class CoordChannel2D(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class WSConv2D(tf.keras.layers.Conv2D):
     """Weight StandardizationなConv2D <https://arxiv.org/abs/1903.10520>"""
 

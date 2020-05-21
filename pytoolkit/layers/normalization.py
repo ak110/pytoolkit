@@ -6,7 +6,7 @@ import pytoolkit as tk
 K = tf.keras.backend
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
     """Sync BN。"""
 
@@ -62,7 +62,7 @@ class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
         return inputs * K.cast(a, K.dtype(inputs)) + K.cast(b, K.dtype(inputs))
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class GroupNormalization(tf.keras.layers.Layer):
     """Group Normalization。
 
@@ -183,7 +183,7 @@ class GroupNormalization(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class InstanceNormalization(tf.keras.layers.Layer):
     """Instance Normalization"""
 
@@ -276,7 +276,7 @@ class InstanceNormalization(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class RMSNormalization(tf.keras.layers.Layer):
     """Root Mean Square Layer Normalization <https://arxiv.org/abs/1910.07467>"""
 
@@ -368,7 +368,7 @@ class RMSNormalization(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class RandomRMSNormalization(tf.keras.layers.Layer):
     """ランダム要素のあるrmsを使ったnormalization。<https://twitter.com/ak11/status/1202838201716490240>"""
 

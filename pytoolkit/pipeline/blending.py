@@ -4,9 +4,11 @@ from __future__ import annotations
 import pathlib
 import typing
 
+
 import numpy as np
 
 import pytoolkit as tk
+
 from .core import Model
 
 

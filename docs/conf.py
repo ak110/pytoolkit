@@ -14,6 +14,7 @@
 #
 import os
 import sys
+import typing
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
@@ -100,7 +101,7 @@ html_theme = "sphinx_rtd_theme"
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 # html_static_path = ['_static']
-html_static_path: list = []
+html_static_path: typing.List = []
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
@@ -121,7 +122,7 @@ htmlhelp_basename = "pytoolkitdoc"
 
 # -- Options for LaTeX output ------------------------------------------------
 
-latex_elements: dict = {
+latex_elements: typing.Dict = {
     # The paper size ('letterpaper' or 'a4paper').
     #
     # 'papersize': 'letterpaper',
@@ -210,8 +211,9 @@ def linkcode_resolve(domain, info):
         obj = sys.modules[info["module"]]
         for part in info["fullname"].split("."):
             obj = getattr(obj, part)
-        fn = inspect.getsourcefile(obj)
-        fn = os.path.relpath(fn, start=os.path.dirname(tk.__file__))
+        path = inspect.getsourcefile(obj)
+        assert path is not None
+        fn = os.path.relpath(path, start=os.path.dirname(tk.__file__))
         source, lineno = inspect.getsourcelines(obj)
         filename = f"pytoolkit/{fn}#L{lineno}-L{lineno + len(source) - 1}"
     except Exception:

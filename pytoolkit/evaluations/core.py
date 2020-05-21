@@ -3,8 +3,8 @@
 指標名と値(float or ndarray)のdictを基本としてそれを扱うヘルパーなどをここで提供する。
 
 """
-import typing
 import numbers
+import typing
 
 import numpy as np
 

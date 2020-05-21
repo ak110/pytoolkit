@@ -2,7 +2,7 @@
 import tensorflow as tf
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class DropActivation(tf.keras.layers.Layer):
     """Drop-Activation <https://arxiv.org/abs/1811.05850>"""
 

@@ -2,7 +2,7 @@
 import tensorflow as tf
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class GreaterThanOrEqualTo(tf.keras.constraints.Constraint):
     """指定した値以上に制約する。"""
 
@@ -19,7 +19,7 @@ class GreaterThanOrEqualTo(tf.keras.constraints.Constraint):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class Clip(tf.keras.constraints.Constraint):
     """指定した値の範囲に制約する。"""
 

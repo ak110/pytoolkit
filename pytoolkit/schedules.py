@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class CosineAnnealing(tf.keras.optimizers.schedules.LearningRateSchedule):
     """Cosine Annealing without restart。
 
@@ -71,7 +71,7 @@ class CosineAnnealing(tf.keras.optimizers.schedules.LearningRateSchedule):
         }
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class LinearDecay(tf.keras.optimizers.schedules.LearningRateSchedule):
     """学習率を線形に減らす(& 最初はwarmup)。
 
@@ -137,7 +137,7 @@ class LinearDecay(tf.keras.optimizers.schedules.LearningRateSchedule):
         }
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class ExponentialDecay(tf.keras.optimizers.schedules.LearningRateSchedule):
     """学習率を指数的に減らす(& 最初はwarmup)。
 

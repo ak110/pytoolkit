@@ -7,7 +7,7 @@ import tensorflow as tf
 K = tf.keras.backend
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class PositionalEncoding(tf.keras.layers.Layer):
     """Positional Encodingレイヤー。
 
@@ -38,7 +38,7 @@ class PositionalEncoding(tf.keras.layers.Layer):
         return inputs + pe
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class MultiHeadAttention(tf.keras.layers.Layer):
     """Multi-head Attetion"""
 
@@ -147,7 +147,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class MultiHeadAttention2D(tf.keras.layers.Layer):
     """Multi-head Attetionの2D版のようなもの。(怪)"""
 

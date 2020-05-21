@@ -62,7 +62,7 @@ def check(
     tk.models.summary(training_model)
 
     # グラフを出力
-    tk.models.plot(training_model, models_dir / "model.svg")
+    tk.models.plot(training_model, models_dir / "model.png")
 
     # save/loadの動作確認 (とりあえず落ちなければOKとする)
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -228,7 +228,7 @@ def summary(model: tf.keras.models.Model):
 
 def plot(
     model: tf.keras.models.Model,
-    to_file: tk.typing.PathLike = "model.svg",
+    to_file: tk.typing.PathLike = "model.png",
     show_shapes: bool = True,
     show_layer_names: bool = True,
     rankdir: str = "TB",
