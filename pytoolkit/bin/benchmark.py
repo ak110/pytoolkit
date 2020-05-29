@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ImageDataGeneratorの速度チェック用コード。
+"""DataAugmentationの速度チェック用コード。
 
 --profileを付けるとvmprofを使う。
 
@@ -15,6 +15,7 @@ import argparse
 import pathlib
 import random
 import sys
+import tempfile
 import time
 
 import albumentations as A
@@ -23,7 +24,7 @@ import numpy as np
 try:
     import pytoolkit as tk
 except ImportError:
-    sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent.parent))
     import pytoolkit as tk
 
 batch_size = 16
@@ -39,16 +40,22 @@ def main():
     random.seed(1)
     np.random.seed(1)
 
+    default_output_dir = pathlib.Path(tempfile.gettempdir()) / "tk-benchmark-data"
     parser = argparse.ArgumentParser()
     parser.add_argument("--load", action="store_true")
     parser.add_argument("--mask", action="store_true")
     parser.add_argument("--profile", action="store_true")
+    parser.add_argument(
+        "--output-dir",
+        default=default_output_dir,
+        type=pathlib.Path,
+        help=f"確認用画像の出力先ディレクトリ (既定値: {default_output_dir})",
+    )
     args = parser.parse_args()
 
     base_dir = pathlib.Path(__file__).resolve().parent.parent.parent
     data_dir = base_dir / "pytoolkit" / "_test_data"
-    save_dir = base_dir / "___check" / "bench"
-    save_dir.mkdir(parents=True, exist_ok=True)
+    args.output_dir.mkdir(parents=True, exist_ok=True)
 
     iterations = 128
     if args.load:
@@ -78,7 +85,9 @@ def main():
         # 1バッチ分を保存
         X_batch, _ = next(iter(data_iterator.ds))
         for ix, x in enumerate(X_batch):
-            tk.ndimage.save(save_dir / f"{ix}.png", np.clip(x, 0, 255).astype(np.uint8))
+            tk.ndimage.save(
+                args.output_dir / f"{ix}.png", np.clip(x, 0, 255).astype(np.uint8)
+            )
         # 適当にループして速度を見る
         _run(data_iterator, iterations=iterations)
 

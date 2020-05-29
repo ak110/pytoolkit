@@ -10,7 +10,7 @@ import tensorflow as tf
 try:
     import pytoolkit as tk
 except ImportError:
-    sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent.parent))
     import pytoolkit as tk
 
 logger = tk.log.get(__name__)

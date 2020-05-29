@@ -26,6 +26,14 @@ class App:
         output_dir: ログ出力先ディレクトリ
         current_command: 現在実行中のコマンド名
 
+    例::
+
+        @app.command()
+        def train():
+            ...
+
+    ./xxx.py train でtrain関数が呼ばれる。サブコマンド名は関数名(ただし_は-に置き換えたもの)。
+
     """
 
     def __init__(
@@ -47,7 +55,11 @@ class App:
         self.current_command: typing.Optional[str] = None
 
     def init(self):
-        """前処理の追加用デコレーター"""
+        """前処理の追加用デコレーター。
+
+        他のデコレーターと共用する場合は一番上に付ける必要あり。(下から順に適用されるため)
+
+        """
 
         def _decorator(func):
             self.inits.append(func)
@@ -56,7 +68,11 @@ class App:
         return _decorator
 
     def term(self):
-        """後処理の追加用デコレーター"""
+        """後処理の追加用デコレーター。
+
+        他のデコレーターと共用する場合は一番上に付ける必要あり。(下から順に適用されるため)
+
+        """
 
         def _decorator(func):
             self.terms.append(func)
@@ -74,14 +90,14 @@ class App:
     ):
         """コマンドの追加用デコレーター。
 
-        コマンド名は関数名。ただし_は-に置き換えたもの。
-
         Args:
             logfile: ログファイルを出力するのか否か
             then: 当該コマンドが終わった後に続けて実行するコマンドの名前
             use_horovod: horovodを使うならTrue
             distribute_strategy_fn: tf.distributeを使う場合のStrategyの作成関数
             args: add_argumentの引数。(例: args={"--x": {"type": int}})
+
+        他のデコレーターと共用する場合は一番上に付ける必要あり。(下から順に適用されるため)
 
         """
         assert not logfile or self.output_dir is not None

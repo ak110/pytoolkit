@@ -86,7 +86,7 @@ class RandomTransform(A.DualTransform):
         flip: typing.Tuple[bool, bool] = (False, True),
         translate: typing.Tuple[float, float] = (0.0625, 0.0625),
         border_mode: str = "edge",
-        clip_bboxes=True,
+        clip_bboxes: bool = True,
         always_apply: bool = False,
         p: float = 1.0,
     ) -> RandomTransform:
@@ -96,6 +96,27 @@ class RandomTransform(A.DualTransform):
             flip=flip,
             translate=translate,
             border_mode=border_mode,
+            scale_prob=0.0,
+            aspect_prob=0.0,
+            rotate_prob=0.0,
+            clip_bboxes=clip_bboxes,
+            always_apply=always_apply,
+            p=p,
+        )
+
+    @classmethod
+    def create_test(
+        cls,
+        size: typing.Tuple[int, int],
+        clip_bboxes: bool = True,
+        always_apply: bool = False,
+        p: float = 1.0,
+    ):
+        """Data Augmentation無しバージョン(リサイズのみ)を作成する。"""
+        return cls(
+            size=size,
+            flip=(False, False),
+            translate=(0.0, 0.0),
             scale_prob=0.0,
             aspect_prob=0.0,
             rotate_prob=0.0,

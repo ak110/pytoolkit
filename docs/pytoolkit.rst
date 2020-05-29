@@ -216,6 +216,14 @@ pytoolkit.threading module
    :undoc-members:
    :show-inheritance:
 
+pytoolkit.training module
+-------------------------
+
+.. automodule:: pytoolkit.training
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 pytoolkit.typing module
 -----------------------
 

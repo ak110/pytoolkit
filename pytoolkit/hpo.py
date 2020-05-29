@@ -47,7 +47,8 @@ def optimize(
     suggest_*メモ:
         - trial.suggest_categorical(name, choices)
         - trial.suggest_discrete_uniform(name, low, high, q)
-        - trial.suggest_int(name, low, high)  # [low, high]
+        - trial.suggest_float(name, low, high, step=None, log=False)  # [low, high]
+        - trial.suggest_int(name, low, high, step=1, log=False)  # [low, high]
         - trial.suggest_loguniform(name, low, high)  # [low,high)
         - trial.suggest_uniform(name, low, high)  # [low,high)
 

@@ -7,6 +7,7 @@ Horovodに対応した簡単なwrapperなど。
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import pathlib
 import tempfile
@@ -116,6 +117,8 @@ def load(
         model = tf.keras.models.load_model(
             str(path), custom_objects=custom_objects, compile=compile
         )
+        # 念のため重みのfingerprintをログ出力しておく
+        tk.log.get(__name__).info(f"fingerprint: {tk.models.fingerprint(model)}")
     return model
 
 
@@ -167,6 +170,8 @@ def load_weights(
                 if r < strict_fraction:
                     raise RuntimeError(msg)
                 tk.log.get(__name__).info(msg)
+            # 念のため重みのfingerprintをログ出力しておく
+            tk.log.get(__name__).info(f"fingerprint: {tk.models.fingerprint(model)}")
     elif skip_not_exist:
         tk.log.get(__name__).info(f"{path} is not found.")
         return False
@@ -216,6 +221,8 @@ def save(
                     f.write(tflite_model)
             else:
                 raise ValueError(f"Invalid save format: {mode}")
+            # 念のため重みのfingerprintをログ出力しておく
+            tk.log.get(__name__).info(f"fingerprint: {tk.models.fingerprint(model)}")
     tk.hvd.barrier()
 
 
@@ -685,3 +692,12 @@ def predict_on_batch_augmented(
     else:
         result = result.reshape((len(X_batch2), len(X_batch)) + result.shape[1:])
     return result
+
+
+def fingerprint(model: tf.keras.models.Model) -> str:
+    """重みの同一性を確認するための文字列を作成して返す。"xx:xx:xx:xx"形式。"""
+    m = hashlib.sha256()
+    for w in model.get_weights():
+        m.update(w.tobytes())
+    h = m.hexdigest()
+    return f"{h[:2]}:{h[2:4]}:{h[4:6]}:{h[6:8]}"

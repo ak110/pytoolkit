@@ -133,7 +133,7 @@ class ObjectsAnnotation:
         a = [
             f"({x1}, {y1}) [{x2 - x1} x {y2 - y1}]: {class_names[c]}"
             for (x1, y1, x2, y2), c in sorted(
-                zip(self.real_bboxes, self.classes), key=lambda x: _rbb_sortkey(x[0])
+                zip(self.real_bboxes, self.classes), key=lambda x: rbb_sortkey(x[0])
             )
         ]
         return "\n".join(a)
@@ -201,7 +201,7 @@ class ObjectsPrediction:
             f"({x1}, {y1}) [{x2 - x1} x {y2 - y1}]: {class_names[c]}"
             for (x1, y1, x2, y2), c, cf in sorted(
                 zip(self.get_real_bboxes(width, height), self.classes, self.confs),
-                key=lambda x: _rbb_sortkey(x[0]),
+                key=lambda x: rbb_sortkey(x[0]),
             )
             if cf >= conf_threshold
         ]
@@ -425,10 +425,7 @@ def confusion_matrix(
 
 
 def compute_iou(bboxes_a, bboxes_b):
-    """IoU(Intersection over union、Jaccard係数)の算出。
-
-    重なり具合を示す係数。(0～1)
-    """
+    """IoU(Intersection over union、Jaccard係数)の算出。重なり具合を示す係数。(0～1)"""
     assert bboxes_a.shape[0] > 0
     assert bboxes_b.shape[0] > 0
     assert bboxes_a.shape == (len(bboxes_a), 4)
@@ -539,7 +536,7 @@ def plot_objects(
     return img
 
 
-def _rbb_sortkey(bb):
+def rbb_sortkey(bb):
     """real_bboxesのソートキーを作って返す。"""
     x1, y1, x2, y2 = bb
     return f"{y1:05d}-{x1:05d}-{y2:05d}-{x2:05d}"
