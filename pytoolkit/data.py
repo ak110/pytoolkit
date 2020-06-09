@@ -209,47 +209,43 @@ class DataLoader:
         batch_size: バッチサイズ
         data_per_sample: sampleあたりのデータ数。mixupとかするなら2にする。
         parallel: self.get_dataの呼び出しを並列化するか否か。
+        num_replicas_in_sync: tf.distribute.Strategy.num_replicas_in_syncの値。
 
     """
 
-    def __init__(self, batch_size: int = 16, data_per_sample=1, parallel=True):
+    def __init__(
+        self,
+        batch_size: int = 16,
+        data_per_sample: int = 1,
+        parallel: bool = True,
+        num_replicas_in_sync: int = None,
+    ):
         self.batch_size = batch_size
         self.data_per_sample = data_per_sample
         self.parallel = parallel
+        self.num_replicas_in_sync: int = num_replicas_in_sync or tf.distribute.get_strategy().num_replicas_in_sync
 
-    def iter(
+    def load(self, dataset: Dataset) -> Iterator:
+        """データを読み込んだことにする。"""
+        return Iterator(self, dataset)
+
+    def get_ds(
         self,
-        dataset: Dataset,
+        dataset: tk.data.Dataset,
         shuffle: bool = False,
         without_label: bool = False,
-        num_replicas_in_sync: int = 1,
-    ) -> Iterator:
-        """Iteratorを作成する。
+    ) -> typing.Tuple[tf.data.Dataset, int]:
+        """tf.data.Datasetを作る。
 
         Args:
             dataset: データセット
             shuffle: シャッフルするのか否か
             without_label: ラベルを使わない場合(predict)、Trueを指定する。
-            num_replicas_in_sync: tf.distribute使用時の並列数(バッチサイズに掛け算する)
 
         Returns:
-            Iterator
+            tf.data.Datasetと1epochあたりのステップ数のタプル
 
         """
-        assert len(dataset) >= 1
-        ds = self.get_ds(dataset, shuffle, without_label, num_replicas_in_sync)
-        bs = self.batch_size * num_replicas_in_sync
-        steps = -(-len(dataset) // bs)
-        return Iterator(ds=ds, data_size=len(dataset), steps=steps)
-
-    def get_ds(
-        self,
-        dataset: tk.data.Dataset,
-        shuffle: bool,
-        without_label: bool,
-        num_replicas_in_sync: int,
-    ) -> tf.data.Dataset:
-        """tf.data.Datasetを作る。"""
         # 試しに1件呼び出してdtypeやshapeを推定 (ダサいが…)
         exsample_data = self.get_data(dataset, 0)
         exsample_sample = self.get_sample(
@@ -317,6 +313,9 @@ class DataLoader:
                 return sample[0]
             return sample
 
+        assert self.num_replicas_in_sync >= 1
+        global_batch_size = self.batch_size * self.num_replicas_in_sync
+
         ds = tf.data.Dataset.from_tensor_slices(np.arange(len(dataset)))
         ds = ds.shuffle(buffer_size=len(dataset)) if shuffle else ds
         ds = ds.map(
@@ -328,9 +327,10 @@ class DataLoader:
         else:
             ds = ds.repeat() if shuffle else ds  # バッチサイズを固定するため先にrepeat
         ds = ds.map(process2)
-        ds = ds.batch(self.batch_size * num_replicas_in_sync)
+        ds = ds.batch(global_batch_size)
         ds = ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-        return ds
+        steps = -(-len(dataset) // global_batch_size)
+        return ds, steps
 
     def get_sample(self, data):
         """1件のサンプルを取得する。"""
@@ -439,38 +439,20 @@ def _unflatten_tensor(exsample_data, tensor):
 
 @dataclasses.dataclass()
 class Iterator:
-    """データをモデルに渡すためのクラス。
+    """Dataset+DataLoaderをtk.modelsに渡すためのクラス。
 
     Args:
-        ds: tf.data.Dataset
-        data_size: データ数
-        steps: 1エポックあたりのミニバッチ数
+        data_loader: データローダー
+        dataset: データセット
 
     """
 
-    ds: tf.data.Dataset
-    data_size: int
-    steps: int
+    data_loader: DataLoader
+    dataset: Dataset
 
-    def to_str(self) -> str:
-        """情報を文字列化して返す。"""
-        return (
-            f"element_spec={self.ds.element_spec}"
-            f" data_size={self.data_size}"
-            f" steps={self.steps}"
-        )
-
-
-def make_iterator(
-    ds: tf.data.Dataset, data_size: int, global_batch_size: int, prefetch: bool = True
-) -> Iterator:
-    """Iteratorを作成するヘルパー。"""
-    ds = ds.batch(global_batch_size)
-    if prefetch:
-        ds = ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-    return tk.data.Iterator(
-        ds=ds, data_size=data_size, steps=-(-data_size // global_batch_size)
-    )
+    def __len__(self) -> int:
+        """データ数を返す。"""
+        return len(self.dataset)
 
 
 def mixup(

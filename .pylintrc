@@ -9,7 +9,6 @@ disable=
     fixme,
     global-statement,
     import-outside-toplevel,
-    import-self,  # for pytoolkit/__init__.py
     invalid-name,
     invalid-unary-operand-type,  # for tf.Tensor
     len-as-condition,
@@ -38,7 +37,6 @@ max-line-length=256
 [TYPECHECK]
 ignored-modules=
     IPython,
-    __init__,
     catboost,
     chainercv,
     distutils,

@@ -1,9 +1,9 @@
 #!/bin/bash
 set -eux
 
-black .
+black pytoolkit
 
-flake8
+flake8 pytoolkit
 
 mypy pytoolkit
 

@@ -1744,7 +1744,7 @@ plotting = ["graphviz", "matplotlib"]
 scikit-learn = ["scikit-learn"]
 
 [metadata]
-content-hash = "245bb682cff6baa57577790fab99e04ee613835b00c213e3538d252a4e5df7f9"
+content-hash = "3db377c8505b01fb73d8c638165ee8d0f727cafd9cb00ffd5491207b1a4e4e7e"
 python-versions = "^3.8"
 
 [metadata.files]

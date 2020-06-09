@@ -44,8 +44,7 @@ def test_predict_flow(output_count):
     dataset = tk.data.Dataset(data=np.arange(5))
     result = tk.models.predict(
         model=None,
-        dataset=dataset,
-        data_loader=tk.data.DataLoader(batch_size=2),
+        iterator=tk.data.DataLoader(batch_size=2).load(dataset),
         on_batch_fn=on_batch,
     )
     if output_count == 1:

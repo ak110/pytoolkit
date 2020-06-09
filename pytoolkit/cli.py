@@ -201,6 +201,11 @@ class App:
             return 1
         return command.distribute_strategy.num_replicas_in_sync
 
+    @property
+    def num_workers(self):
+        """Horovodとtf.distributeの両方を考慮したワーカー数を返す。"""
+        return tk.hvd.size() * self.num_replicas_in_sync
+
 
 @dataclasses.dataclass()
 class Command:

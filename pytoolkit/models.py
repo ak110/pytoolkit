@@ -73,11 +73,9 @@ def check(
 
     # training_model.evaluate
     if dataset is not None and training_data_loader is not None:
-        training_iterator = training_data_loader.iter(dataset, shuffle=True)
-        logger.info(f"training_iterator: {training_iterator.to_str()}")
-        values = training_model.evaluate(
-            training_iterator.ds, steps=training_iterator.steps, verbose=1
-        )
+        ds, steps = training_data_loader.get_ds(dataset, shuffle=True)
+        logger.info(f"training_model.evaluate: {ds.element_spec} {steps=}")
+        values = training_model.evaluate(ds, steps=steps, verbose=1)
         if len(training_model.metrics_names) == 1:
             evals = {training_model.metrics_names[0]: values}
         else:
@@ -86,11 +84,9 @@ def check(
 
     # prediction_model.predict
     if dataset is not None and prediction_data_loader is not None:
-        prediction_iterator = prediction_data_loader.iter(dataset)
-        logger.info(f"prediction_iterator: {prediction_iterator.to_str()}")
-        pred = prediction_model.predict(
-            prediction_iterator.ds, steps=prediction_iterator.steps, verbose=1
-        )
+        ds, steps = prediction_data_loader.get_ds(dataset)
+        logger.info(f"prediction_model.evaluate: {ds.element_spec} {steps=}")
+        pred = prediction_model.predict(ds, steps=steps, verbose=1)
         if isinstance(pred, (list, tuple)):
             logger.info(f"check.predict: shape={[p.shape for p in pred]}")
         else:
@@ -98,13 +94,8 @@ def check(
 
     # training_model.fit
     if dataset is not None and training_data_loader is not None:
-        training_iterator = training_data_loader.iter(dataset, shuffle=True)
-        training_model.fit(
-            training_iterator.ds,
-            steps_per_epoch=training_iterator.steps,
-            epochs=1,
-            verbose=1,
-        )
+        ds, steps = training_data_loader.get_ds(dataset, shuffle=True)
+        training_model.fit(ds, steps_per_epoch=steps, epochs=1, verbose=1)
 
 
 def load(
@@ -323,33 +314,27 @@ def set_learning_rate(model: tf.keras.models.Model, learnig_rate: float):
 
 def fit(
     model: tf.keras.models.Model,
-    train_set: tk.data.Dataset,
-    train_data_loader: tk.data.DataLoader,
-    val_set: tk.data.Dataset = None,
-    val_data_loader: tk.data.DataLoader = None,
+    training_iterator: tk.data.Iterator,
+    validation_iterator: tk.data.Iterator = None,
     validation_freq: typing.Union[int, typing.Sequence[int], str, None] = "auto",
     class_weight: typing.Dict[int, float] = None,
     epochs: int = 1800,
     callbacks: typing.List[tf.keras.callbacks.Callback] = None,
     verbose: int = 1,
     initial_epoch: int = 0,
-    num_replicas_in_sync: int = 1,
 ):
     """学習。
 
     Args:
         model: モデル
-        train_set: 訓練データ
-        train_data_loader: 訓練データの読み込み
-        val_set: 検証データ。Noneなら省略。
-        val_data_loader: 検証データの読み込み
+        training_iterator: 訓練データ
+        validation_iterator: 検証データ。Noneなら省略。
         validation_freq: 検証を行うエポック数の間隔、またはエポック数のリスト。0ならvalidationしない(独自仕様)。"auto"なら適当に決める(独自仕様)。
         class_weight: クラスごとの重みのdict
         epochs: エポック数
         callbacks: コールバック。EpochLoggerとErrorOnNaNとhorovod関連は自動追加。
         verbose: 1ならプログレスバー表示、2ならepoch毎の結果だけ表示。
         initial_epoch: 学習を開始するエポック数 - 1
-        num_replicas_in_sync: tf.distribute使用時の並列数(バッチサイズに掛け算する)
 
     """
     # Horovodはそれぞれのワーカーが勝手にvalidateするのでshuffleする必要がある。
@@ -357,38 +342,33 @@ def fit(
     # horovodのexamplesの真似:
     # <https://github.com/horovod/horovod/blob/9bdd70d/examples/keras_mnist_advanced.py#L112,L115>
     use_horovod = tk.hvd.is_active()
-    if use_horovod:
-        assert num_replicas_in_sync <= 1
 
-    if validation_freq == 0 or val_set is None or val_data_loader is None:
+    if validation_freq == 0 or validation_iterator is None:
         # validation_freq == 0ならvalidationしない(独自仕様)
         validation_freq = None
-        val_set = None
-        val_data_loader = None
+        validation_iterator = None
     elif validation_freq == "auto":
         # "auto"なら適当に決める(独自仕様)
         validation_freq = make_validation_freq(
             validation_freq,
             epochs,
-            len(train_set),
-            len(val_set) * (3 if use_horovod else 1),
+            len(training_iterator.dataset),
+            len(validation_iterator.dataset) * (3 if use_horovod else 1),
         )
-    if val_set is not None:
-        assert val_data_loader is not None
 
-    train_iterator = train_data_loader.iter(
-        train_set, shuffle=True, num_replicas_in_sync=num_replicas_in_sync,
+    train_ds, train_steps = training_iterator.data_loader.get_ds(
+        training_iterator.dataset, shuffle=True
     )
-    val_iterator = (
-        val_data_loader.iter(
-            val_set, shuffle=use_horovod, num_replicas_in_sync=num_replicas_in_sync,
+    val_ds, val_steps = (
+        validation_iterator.data_loader.get_ds(
+            validation_iterator.dataset, shuffle=use_horovod,
         )
-        if val_set is not None and val_data_loader is not None
-        else None
+        if validation_iterator is not None
+        else (None, 0)
     )
-    tk.log.get(__name__).info(f"train_iterator: {train_iterator.to_str()}")
-    if val_iterator is not None:
-        tk.log.get(__name__).info(f"val_iterator:   {val_iterator.to_str()}")
+    tk.log.get(__name__).info(f"fit(train): {train_ds.element_spec} {train_steps=}")
+    if val_ds is not None:
+        tk.log.get(__name__).info(f"fit(val):   {val_ds.element_spec} {val_steps=}")
 
     callbacks = make_callbacks(callbacks, training=True)
 
@@ -398,15 +378,13 @@ def fit(
 
     with tk.log.trace("fit"):
         model.fit(
-            train_iterator.ds,
-            steps_per_epoch=train_iterator.steps // tk.hvd.size(),
-            validation_data=val_iterator.ds if val_iterator is not None else None,
+            train_ds,
+            steps_per_epoch=train_steps // tk.hvd.size(),
+            validation_data=val_ds,
             validation_steps=(
-                val_iterator.steps * 3 // tk.hvd.size()
-                if use_horovod
-                else val_iterator.steps
+                val_steps * 3 // tk.hvd.size() if use_horovod else val_steps
             )
-            if val_iterator is not None
+            if validation_iterator is not None
             else None,
             class_weight=class_weight,
             epochs=epochs,
@@ -452,25 +430,21 @@ def make_callbacks(
 
 def predict(
     model: tf.keras.models.Model,
-    dataset: tk.data.Dataset,
-    data_loader: tk.data.DataLoader,
+    iterator: tk.data.Iterator,
     callbacks: typing.List[tf.keras.callbacks.Callback] = None,
     verbose: int = 1,
     on_batch_fn: OnBatchFnType = None,
-    num_replicas_in_sync: int = 1,
 ) -> ModelIOType:
     """推論。
 
     Args:
         model: モデル
-        dataset: 推論したい入力データ
-        data_loader: データの読み込み
+        iterator: 推論したい入力データ
         callbacks: コールバック
         verbose: プログレスバーを表示するか否か
         on_batch_fn: モデルとミニバッチ分の入力データを受け取り、推論結果を返す処理。(TTA用)
         flow: 結果をgeneratorで返すならTrue
         desc: flow時のtqdmのdesc
-        num_replicas_in_sync: tf.distribute使用時の並列数(バッチサイズに掛け算する)
 
     Returns:
         推論結果。
@@ -480,15 +454,14 @@ def predict(
         use_horovod = tk.hvd.is_active()
         verbose = verbose if tk.hvd.is_master() else 0
         callbacks = make_callbacks(callbacks, training=False)
-        dataset = tk.hvd.split(dataset) if use_horovod else dataset
-        iterator = data_loader.iter(
-            dataset, without_label=True, num_replicas_in_sync=num_replicas_in_sync
-        )
-        tk.log.get(__name__).info(f"iterator: {iterator.to_str()}")
+        dataset = tk.hvd.split(iterator.dataset) if use_horovod else iterator.dataset
+        ds, steps = iterator.data_loader.get_ds(dataset, without_label=True)
+        tk.log.get(__name__).info(f"predict: {ds.element_spec} {steps=}")
         if on_batch_fn is not None:
             gen = _predict_flow(
                 model=model,
-                iterator=iterator,
+                ds=ds,
+                steps=steps,
                 callbacks=callbacks,
                 verbose=verbose,
                 on_batch_fn=on_batch_fn,
@@ -503,7 +476,7 @@ def predict(
                 values = np.array(results)
         else:
             values = model.predict(
-                iterator.ds, steps=iterator.steps, verbose=verbose, callbacks=callbacks,
+                ds, steps=steps, verbose=verbose, callbacks=callbacks,
             )
         values = tk.hvd.allgather(values) if use_horovod else values
         return values
@@ -511,26 +484,24 @@ def predict(
 
 def predict_flow(
     model: tf.keras.models.Model,
-    dataset: tk.data.Dataset,
-    data_loader: tk.data.DataLoader,
+    ds: tf.data.Dataset,
+    steps: int,
     callbacks: typing.List[tf.keras.callbacks.Callback] = None,
     verbose: int = 1,
     on_batch_fn: OnBatchFnType = None,
     desc: str = "predict",
-    num_replicas_in_sync: int = 1,
 ) -> typing.Iterator[ModelIOType]:
     """推論。
 
     Args:
         model: モデル
-        dataset: 推論したい入力データ
-        data_loader: データの読み込み
+        ds: 推論したい入力データ
+        steps: ステップ数
         callbacks: コールバック
         verbose: プログレスバー(tqdm)を表示するか否か
         on_batch_fn: モデルとミニバッチ分の入力データを受け取り、推論結果を返す処理。(TTA用)
         flow: 結果をgeneratorで返すならTrue
         desc: flow時のtqdmのdesc
-        num_replicas_in_sync: tf.distribute使用時の並列数(バッチサイズに掛け算する)
 
     Returns:
         推論結果。サンプルごとのgenerator。
@@ -538,11 +509,11 @@ def predict_flow(
     """
     with tk.log.trace("predict"):
         callbacks = make_callbacks(callbacks, training=False)
-        iterator = data_loader.iter(dataset, num_replicas_in_sync=num_replicas_in_sync)
-        tk.log.get(__name__).info(f"iterator: {iterator.to_str()}")
+        tk.log.get(__name__).info(f"predict_flow: {ds.element_spec} {steps=}")
         return _predict_flow(
             model=model,
-            iterator=iterator,
+            ds=ds,
+            steps=steps,
             callbacks=callbacks,
             verbose=verbose,
             on_batch_fn=on_batch_fn,
@@ -552,7 +523,8 @@ def predict_flow(
 
 def _predict_flow(
     model: tf.keras.models.Model,
-    iterator: tk.data.Iterator,
+    ds: tf.data.Dataset,
+    steps: int,
     callbacks: typing.List[tf.keras.callbacks.Callback],
     verbose: int,
     on_batch_fn: OnBatchFnType = None,
@@ -562,9 +534,7 @@ def _predict_flow(
     for cb in callbacks:
         cb.on_predict_begin()
     batch = 0
-    for X in tk.utils.tqdm(
-        iterator.ds, desc=desc, total=iterator.steps, disable=verbose < 1
-    ):
+    for X in tk.utils.tqdm(ds, desc=desc, total=steps, disable=verbose < 1):
         for cb in callbacks:
             cb.on_predict_batch_begin(batch)
         pred_batch = on_batch_fn(model, X)
@@ -589,21 +559,17 @@ def _predict_on_batch(model: tf.keras.models.Model, X):
 
 def evaluate(
     model: tf.keras.models.Model,
-    dataset: tk.data.Dataset,
-    data_loader: tk.data.DataLoader,
+    iterator: tk.data.Iterator,
     callbacks: typing.List[tf.keras.callbacks.Callback] = None,
     verbose: int = 1,
-    num_replicas_in_sync: int = 1,
 ) -> typing.Dict[str, float]:
     """評価。
 
     Args:
-        model: モデル。
-        dataset: データ。
-        data_loader: データの読み込み
+        model: モデル
+        iterator: データ
         callbacks: コールバック
         verbose: 1ならプログレスバー表示
-        num_replicas_in_sync: tf.distribute使用時の並列数(バッチサイズに掛け算する)
 
     Returns:
         メトリクス名と値のdict
@@ -613,12 +579,10 @@ def evaluate(
         use_horovod = tk.hvd.is_active()
         verbose = verbose if tk.hvd.is_master() else 0
         callbacks = make_callbacks(callbacks, training=False)
-        dataset = tk.hvd.split(dataset) if use_horovod else dataset
-        iterator = data_loader.iter(dataset, num_replicas_in_sync=num_replicas_in_sync)
-        tk.log.get(__name__).info(f"iterator: {iterator.to_str()}")
-        values = model.evaluate(
-            iterator.ds, steps=iterator.steps, verbose=verbose, callbacks=callbacks,
-        )
+        dataset = tk.hvd.split(iterator.dataset) if use_horovod else iterator.dataset
+        ds, steps = iterator.data_loader.get_ds(dataset)
+        tk.log.get(__name__).info(f"evaluate: {ds.element_spec} {steps=}")
+        values = model.evaluate(ds, steps=steps, verbose=verbose, callbacks=callbacks,)
         values = tk.hvd.allreduce(values) if use_horovod else values
         if len(model.metrics_names) == 1:
             evals = {model.metrics_names[0]: values}

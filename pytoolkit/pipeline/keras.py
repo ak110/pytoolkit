@@ -44,7 +44,6 @@ class KerasModel(Model):
         load_by_name: load()でby_name=TrueするならTrue。既定値はFalse。
 
     Attributes:
-        num_replicas_in_sync: tf.distributeによる並列数
         training_models: 訓練用モデル
         prediction_models: 推論用モデル
 
@@ -115,9 +114,6 @@ class KerasModel(Model):
         self.load_by_name = load_by_name
         self.training_models: typing.List[tf.keras.models.Model] = [None] * nfold
         self.prediction_models: typing.List[tf.keras.models.Model] = [None] * nfold
-
-        self.num_replicas_in_sync: int = tf.distribute.get_strategy().num_replicas_in_sync
-        assert self.num_replicas_in_sync >= 1
 
         if self.parallel_cv:
             assert self.refine_epochs == 0, "NotImplemented"
@@ -278,9 +274,7 @@ class KerasModel(Model):
     def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
         pred = tk.models.predict(
             self.prediction_models[fold],
-            dataset,
-            self.val_data_loader,
-            num_replicas_in_sync=self.num_replicas_in_sync,
+            self.val_data_loader.load(dataset),
             on_batch_fn=self.on_batch_fn,
         )
         # # メモリを食いがちなので再構築してみる
@@ -332,13 +326,11 @@ class KerasModel(Model):
         ]:
             if data_loader is None:
                 continue
-            it = data_loader.iter(
-                dataset, shuffle=shuffle, num_replicas_in_sync=self.num_replicas_in_sync
-            )
+            ds, _ = data_loader.get_ds(dataset, shuffle=shuffle)
             time.sleep(3)  # prefetch待ち (一応レベル)
             steps = 100
             start_time = time.perf_counter()
-            for i, _ in enumerate(it.ds.repeat()):
+            for i, _ in enumerate(ds.repeat()):
                 if i >= steps - 1:
                     break
             elapsed = time.perf_counter() - start_time
@@ -380,7 +372,7 @@ class KerasModel(Model):
         tk.log.get(__name__).info(
             f"train: {len(train_set)} samples, "
             f"val: {len(val_set) if val_set is not None else 0} samples, "
-            f"batch_size: {self.train_data_loader.batch_size}x{tk.hvd.size() * self.num_replicas_in_sync}"
+            f"batch_size: {self.train_data_loader.batch_size}x{tk.hvd.size() * self.train_data_loader.num_replicas_in_sync}"
         )
 
         model_path = self.models_dir / self.model_name_format.format(fold=fold)
@@ -421,13 +413,12 @@ class KerasModel(Model):
             if self.epochs > 0:
                 tk.models.fit(
                     self.training_models[fold],
-                    train_set=train_set,
-                    train_data_loader=self.train_data_loader,
-                    val_set=val_set,
-                    val_data_loader=self.val_data_loader,
+                    training_iterator=self.train_data_loader.load(train_set),
+                    validation_iterator=self.val_data_loader.load(val_set)
+                    if val_set is not None
+                    else None,
                     epochs=self.epochs,
                     callbacks=self.callbacks,
-                    num_replicas_in_sync=self.num_replicas_in_sync,
                     **(self.fit_params or {}),
                 )
 
@@ -449,12 +440,11 @@ class KerasModel(Model):
                 )
                 tk.models.fit(
                     self.training_models[fold],
-                    train_set=train_set,
-                    train_data_loader=self.refine_data_loader,
-                    val_set=val_set,
-                    val_data_loader=self.val_data_loader,
+                    training_iterator=self.refine_data_loader.load(train_set),
+                    validation_iterator=self.val_data_loader.load(val_set)
+                    if val_set is not None
+                    else None,
                     epochs=self.refine_epochs,
-                    num_replicas_in_sync=self.num_replicas_in_sync,
                 )
 
             # 保存 TODO: preprocessorsなどが。。
@@ -517,9 +507,7 @@ class KerasModel(Model):
 
         evals = tk.models.evaluate(
             self.training_models[fold],
-            dataset,
-            data_loader=self.val_data_loader,  # DataAugmentation無しで評価
-            num_replicas_in_sync=self.num_replicas_in_sync,
+            self.val_data_loader.load(dataset),  # DataAugmentation無しで評価
         )
         return evals
 
@@ -535,12 +523,12 @@ class KerasModel(Model):
         """
         assert self.preprocessors is None  # とりあえず未対応
         assert self.postprocessors is None  # とりあえず未対応
+        ds, steps = self.val_data_loader.get_ds(dataset)
         return tk.models.predict_flow(
             self.prediction_models[fold],
-            dataset,
-            self.val_data_loader,
+            ds=ds,
+            steps=steps,
             on_batch_fn=self.on_batch_fn,
-            num_replicas_in_sync=self.num_replicas_in_sync,
         )
 
     def create_network(self, fold: int) -> None:

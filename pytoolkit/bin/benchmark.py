@@ -71,32 +71,32 @@ def main():
         y = np.zeros((batch_size,))
     dataset = tk.data.Dataset(X, y)
     data_loader = MyDataLoader(data_augmentation=True, mask=args.mask)
-    data_iterator = data_loader.iter(dataset, shuffle=True)
+    ds, _ = data_loader.get_ds(dataset, shuffle=True)
 
     if args.profile:
         import vmprof
 
         with pathlib.Path("benchmark.prof").open("w+b") as fd:
             vmprof.enable(fd.fileno())
-            _run(data_iterator, iterations=iterations)
+            _run(ds, iterations=iterations)
             vmprof.disable()
         logger.info("example: vmprofshow --prune_percent=5 benchmark.prof")
     else:
         # 1バッチ分を保存
-        X_batch, _ = next(iter(data_iterator.ds))
+        X_batch, _ = next(iter(ds))
         for ix, x in enumerate(X_batch):
             tk.ndimage.save(
                 args.output_dir / f"{ix}.png", np.clip(x, 0, 255).astype(np.uint8)
             )
         # 適当にループして速度を見る
-        _run(data_iterator, iterations=iterations)
+        _run(ds, iterations=iterations)
 
 
-def _run(data_iterator, iterations):
+def _run(ds, iterations):
     """ループして速度を見るための処理。"""
     start_time = time.perf_counter()
     with tk.utils.tqdm(total=batch_size * iterations, unit="f") as pbar:
-        for X_batch, y_batch in data_iterator.ds:
+        for X_batch, y_batch in ds:
             assert len(X_batch) == batch_size
             assert len(y_batch) == batch_size
             pbar.update(len(X_batch))
