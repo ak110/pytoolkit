@@ -44,6 +44,6 @@ def test_keras_xor(tmpdir):
     model.train(train_set, train_set)
 
     proba = model.predict(tk.data.Dataset(X, y), fold=0)
-    tk.evaluations.print_classification_metrics(y, proba)
+    tk.evaluations.print_classification(y, proba)
 
     assert proba.shape == (len(X), 1)

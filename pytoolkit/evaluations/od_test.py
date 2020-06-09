@@ -3,7 +3,7 @@ import numpy as np
 import pytoolkit as tk
 
 
-def test_print_od_metrics():
+def test_print_od():
     y_true = np.tile(
         np.array(
             [
@@ -64,4 +64,4 @@ def test_print_od_metrics():
             ),
         ]
     )
-    tk.evaluations.print_od_metrics(y_true, y_pred)
+    tk.evaluations.print_od(y_true, y_pred)

@@ -8,7 +8,7 @@ import numpy as np
 import pytoolkit as tk
 
 
-def print_od_metrics(
+def print_od(
     y_true: typing.Sequence[tk.od.ObjectsAnnotation],
     y_pred: typing.Sequence[tk.od.ObjectsPrediction],
     print_fn: typing.Callable[[str], None] = None,

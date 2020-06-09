@@ -9,7 +9,7 @@ import sklearn.metrics
 import pytoolkit as tk
 
 
-def print_regression_metrics(
+def print_regression(
     y_true: np.ndarray,
     y_pred: np.ndarray,
     print_fn: typing.Callable[[str], None] = None,
@@ -24,7 +24,7 @@ def print_regression_metrics(
         print_fn(f"RMSE/MAE: {evals['rmse/mae']:.3f}")
         return evals
     except Exception:
-        tk.log.get(__name__).warning("Error: print_regression_metrics", exc_info=True)
+        tk.log.get(__name__).warning("Error: print_regression", exc_info=True)
         return {}
 
 

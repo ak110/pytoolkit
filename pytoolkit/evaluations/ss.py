@@ -9,7 +9,7 @@ import numpy as np
 import pytoolkit as tk
 
 
-def print_ss_metrics(
+def print_ss(
     y_true: typing.Iterable[np.ndarray],
     y_pred: typing.Iterable[np.ndarray],
     threshold: float = 0.5,
