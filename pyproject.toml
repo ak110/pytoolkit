@@ -36,7 +36,7 @@ chainercv = {version = "^0.13.1", optional = true}
 h5py = {version = "^2.10.0", optional = true}
 horovod = {version = "^0.19.2", optional = true}
 ipython = {version = "^7.14.0", optional = true}
-keras2onnx = {version = "^1.6.1", optional = true}
+keras2onnx = {version = "^1.7.0", optional = true}
 lightgbm = {version = "^2.3.1", optional = true}
 matplotlib = {version = "^3.2.1", optional = true}
 mpi4py = {version = "^3.0.3", optional = true}
@@ -45,7 +45,7 @@ optuna = {version = "^1.4.0", optional = true}
 python-dotenv = {version = "^0.13.0", optional = true}
 requests = {version = "^2.23.0", optional = true}
 tensorflow = {version = "^2.2.0", optional = true}
-tf2onnx = {version = "^1.5.6", optional = true}
+tf2onnx = {version = "^1.6.1", optional = true}
 tqdm = {version = "^4.46.0", optional = true}
 xgboost = {version = "^1.0.2", optional = true}
 

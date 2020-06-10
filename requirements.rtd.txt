@@ -1,4 +1,4 @@
-# Read the Docs用 requirements。
+# Read the Docs用
 Pillow
 albumentations
 numba

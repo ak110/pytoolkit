@@ -1,4 +1,4 @@
-# Travis CI用 requirements。
+# Travis CI用
 Pillow
 albumentations
 attrs>=19.2.0  # flake8-bugbear 20.1.4 has requirement attrs>=19.2.0
@@ -10,7 +10,7 @@ efficientnet
 flake8
 flake8-bugbear
 image-classifiers
-keras2onnx
+keras2onnx>=1.7.0
 matplotlib
 mypy
 nbformat
@@ -32,5 +32,5 @@ setuptools>=41.0.0  # tensorboard 2.2.1 has requirement setuptools>=41.0.0
 six>=1.13.0
 tensorflow-cpu>=2.1.0
 tf2cv
-tf2onnx
+tf2onnx>=1.6.1
 tqdm
