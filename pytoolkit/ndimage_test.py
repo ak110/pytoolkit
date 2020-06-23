@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import tensorflow as tf
 
 import pytoolkit as tk
 
@@ -319,4 +320,19 @@ def test_cut_mix(data_dir, check_dir):
 def test_preprocess_tf():
     rgb = np.array([0, 127, 128, 255], dtype=np.uint8)
     X = tk.ndimage.preprocess_tf(rgb)
-    assert X == pytest.approx([-1, -0.003921, +0.003921, +1], 1e-3)
+    assert X == pytest.approx([-1, -0.003921, +0.003921, +1], abs=1e-5)
+    assert X == pytest.approx(
+        tf.keras.applications.imagenet_utils.preprocess_input(rgb, mode="tf"), abs=1e-5
+    )
+    rgb2 = tk.ndimage.deprocess_tf(X)
+    assert rgb2 == pytest.approx(rgb)
+
+
+def test_preprocess_torch():
+    rgb = np.array([[[[127, 128, 255]]]], dtype=np.uint8)
+    X = tk.ndimage.preprocess_torch(rgb)
+    assert X == pytest.approx(
+        tf.keras.applications.imagenet_utils.preprocess_input(rgb, mode="torch")
+    )
+    rgb2 = tk.ndimage.deprocess_torch(X)
+    assert rgb2 == pytest.approx(rgb)

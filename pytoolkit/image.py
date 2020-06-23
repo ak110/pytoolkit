@@ -76,6 +76,7 @@ class RandomTransform(A.DualTransform):
         flip: 反転の有無(vertical, horizontal)
         translate: 平行移動の量(vertical, horizontal)
         border_mode: edge, reflect, wrap, zero, half, one
+        preserve_aspect: アスペクト比を維持するように縮小するならTrue
 
     """
 
@@ -87,6 +88,7 @@ class RandomTransform(A.DualTransform):
         translate: typing.Tuple[float, float] = (0.0625, 0.0625),
         border_mode: str = "edge",
         clip_bboxes: bool = True,
+        preserve_aspect: bool = False,
         always_apply: bool = False,
         p: float = 1.0,
     ) -> RandomTransform:
@@ -100,6 +102,7 @@ class RandomTransform(A.DualTransform):
             aspect_prob=0.0,
             rotate_prob=0.0,
             clip_bboxes=clip_bboxes,
+            preserve_aspect=preserve_aspect,
             always_apply=always_apply,
             p=p,
         )
@@ -109,6 +112,7 @@ class RandomTransform(A.DualTransform):
         cls,
         size: typing.Tuple[int, int],
         clip_bboxes: bool = True,
+        preserve_aspect: bool = False,
         always_apply: bool = False,
         p: float = 1.0,
     ):
@@ -121,6 +125,7 @@ class RandomTransform(A.DualTransform):
             aspect_prob=0.0,
             rotate_prob=0.0,
             clip_bboxes=clip_bboxes,
+            preserve_aspect=preserve_aspect,
             always_apply=always_apply,
             p=p,
         )
@@ -139,6 +144,7 @@ class RandomTransform(A.DualTransform):
         rotate_range: typing.Tuple[int, int] = (-15, +15),
         border_mode: str = "edge",
         clip_bboxes: bool = True,
+        preserve_aspect: bool = False,
         always_apply: bool = False,
         p: float = 1.0,
     ):
@@ -155,6 +161,7 @@ class RandomTransform(A.DualTransform):
         self.rotate_range = rotate_range
         self.border_mode = border_mode
         self.clip_bboxes = clip_bboxes
+        self.preserve_aspect = preserve_aspect
 
     def apply(self, image, m, interp=None, **params):
         # pylint: disable=arguments-differ
@@ -162,9 +169,9 @@ class RandomTransform(A.DualTransform):
             "edge": (cv2.BORDER_REPLICATE, None),
             "reflect": (cv2.BORDER_REFLECT_101, None),
             "wrap": (cv2.BORDER_WRAP, None),
-            "zero": (cv2.BORDER_CONSTANT, 0),
-            "half": (cv2.BORDER_CONSTANT, 127),
-            "one": (cv2.BORDER_CONSTANT, 255),
+            "zero": (cv2.BORDER_CONSTANT, [0, 0, 0]),
+            "half": (cv2.BORDER_CONSTANT, [127, 127, 127]),
+            "one": (cv2.BORDER_CONSTANT, [255, 255, 255]),
         }[self.border_mode]
 
         if interp == "nearest":
@@ -276,7 +283,25 @@ class RandomTransform(A.DualTransform):
         translate_h = random.uniform(-self.translate[1], self.translate[1])
         # 左上から時計回りに座標を用意
         src_points = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32)
-        dst_points = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32)
+        if self.preserve_aspect:
+            # アスペクト比を維持するように縮小する
+            if image.shape[0] < image.shape[1]:
+                # 横長
+                hr = image.shape[0] / image.shape[1]
+                yr = (1 - hr) / 2
+                dst_points = np.array(
+                    [[0, yr], [1, yr], [1, yr + hr], [0, yr + hr]], dtype=np.float32
+                )
+            else:
+                # 縦長
+                wr = image.shape[1] / image.shape[0]
+                xr = (1 - wr) / 2
+                dst_points = np.array(
+                    [[xr, 0], [xr + wr, 0], [xr + wr, 1], [xr, 1]], dtype=np.float32
+                )
+        else:
+            # アスペクト比を無視して出力サイズに合わせる
+            dst_points = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32)
         # 反転
         if flip_h:
             dst_points = dst_points[[1, 0, 3, 2]]

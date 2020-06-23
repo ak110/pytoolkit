@@ -861,6 +861,34 @@ def preprocess_tf(rgb):
     return rgb.astype(np.float32) / np.float32(127.5) - 1
 
 
+@numba.njit(fastmath=True, nogil=True)
+def deprocess_tf(rgb, clip=True, cast=True):
+    """preprocess_tfの逆変換"""
+    rgb = (rgb + 1) * np.float32(127.5)
+    if clip:
+        rgb = np.minimum(np.maximum(rgb, np.float32(0.0)), np.float32(255.0))
+    return rgb.astype(np.uint8)
+
+
+@numba.njit(fastmath=True, nogil=True)
+def preprocess_torch(rgb):
+    """RGB値のpytorch風(?)変換"""
+    mean = np.array([123.675, 116.28, 103.53], dtype=np.float32)
+    std = np.array([58.395, 57.12, 57.375], dtype=np.float32)
+    return (rgb.astype(np.float32) - mean) / std
+
+
+@numba.njit(fastmath=True, nogil=True)
+def deprocess_torch(rgb, clip=True):
+    """preprocess_torchの逆変換"""
+    mean = np.array([123.675, 116.28, 103.53], dtype=np.float32)
+    std = np.array([58.395, 57.12, 57.375], dtype=np.float32)
+    rgb = rgb * std + mean
+    if clip:
+        rgb = np.minimum(np.maximum(rgb, np.float32(0.0)), np.float32(255.0))
+    return rgb.astype(np.uint8)
+
+
 # @numba.njit(fastmath=True, nogil=True)
 def mask_to_onehot(
     rgb: np.ndarray, class_colors: np.ndarray, append_bg: bool = False
