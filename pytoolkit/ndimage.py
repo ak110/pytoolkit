@@ -862,7 +862,7 @@ def preprocess_tf(rgb):
 
 
 @numba.njit(fastmath=True, nogil=True)
-def deprocess_tf(rgb, clip=True, cast=True):
+def deprocess_tf(rgb, clip=True):
     """preprocess_tfの逆変換"""
     rgb = (rgb + 1) * np.float32(127.5)
     if clip:
