@@ -178,8 +178,10 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
             ]
 
             self.numeric_cols_ = cols["numeric"]
-
             self.category_cols_ = cols["categorical"]
+            assert self.numeric_cols_ is not None
+            assert self.category_cols_ is not None
+
             if len(self.category_cols_) > 0:
                 if self.category in ("category", "ordinal"):
                     self.ordinal_encoder.fit(X[self.category_cols_].astype(object))

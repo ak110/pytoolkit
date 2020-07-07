@@ -104,21 +104,23 @@ def eda_html(df_train: pd.DataFrame, df_test: pd.DataFrame):
 
     binary_cols = np.unique(train_cols["binary"] + test_cols["binary"])
     if len(binary_cols):
-        result += "<h2>binary</h2>"
-        result += "<table>"
-        result += "<thead>"
-        result += "<tr>"
-        result += "<td></td>"
-        result += "<td colspan=1 style='text-align: left;'>train</td>"
-        result += "<td colspan=1 style='text-align: left;'>test</td>"
-        result += "</tr>"
-        result += "<tr>"
-        result += "<td style='text-align: left;'>列名</td>"
-        result += "<td style='text-align: center;'>True%</td>"
-        result += "<td style='text-align: center;'>True%</td>"
-        result += "</tr>"
-        result += "</thead>"
-        result += "<tbody>"
+        result += (
+            "<h2>binary</h2>"
+            "<table>"
+            "<thead>"
+            "<tr>"
+            "<td></td>"
+            "<td colspan=1 style='text-align: left;'>train</td>"
+            "<td colspan=1 style='text-align: left;'>test</td>"
+            "</tr>"
+            "<tr>"
+            "<td style='text-align: left;'>列名</td>"
+            "<td style='text-align: center;'>True%</td>"
+            "<td style='text-align: center;'>True%</td>"
+            "</tr>"
+            "</thead>"
+            "<tbody>"
+        )
         for c in binary_cols:
             result += "<tr>"
             result += f"<td style='text-align: left;'>{html.escape(c)}</td>"
@@ -136,27 +138,29 @@ def eda_html(df_train: pd.DataFrame, df_test: pd.DataFrame):
 
     numeric_cols = np.unique(train_cols["numeric"] + test_cols["numeric"])
     if len(numeric_cols):
-        result += "<h2>numeric</h2>"
-        result += "<table>"
-        result += "<thead>"
-        result += "<tr>"
-        result += "<td></td>"
-        result += "<td colspan=4 style='text-align: left;'>train</td>"
-        result += "<td colspan=4 style='text-align: left;'>test</td>"
-        result += "</tr>"
-        result += "<tr>"
-        result += "<td style='text-align: left;'>列名</td>"
-        result += "<td style='text-align: center;'>null</td>"
-        result += "<td style='text-align: center;'>nunique</td>"
-        result += "<td style='text-align: center;'>mean</td>"
-        result += "<td style='text-align: center;'>std</td>"
-        result += "<td style='text-align: center;'>null</td>"
-        result += "<td style='text-align: center;'>nunique</td>"
-        result += "<td style='text-align: center;'>mean</td>"
-        result += "<td style='text-align: center;'>std</td>"
-        result += "</tr>"
-        result += "</thead>"
-        result += "<tbody>"
+        result += (
+            "<h2>numeric</h2>"
+            "<table>"
+            "<thead>"
+            "<tr>"
+            "<td></td>"
+            "<td colspan=4 style='text-align: left;'>train</td>"
+            "<td colspan=4 style='text-align: left;'>test</td>"
+            "</tr>"
+            "<tr>"
+            "<td style='text-align: left;'>列名</td>"
+            "<td style='text-align: center;'>null</td>"
+            "<td style='text-align: center;'>nunique</td>"
+            "<td style='text-align: center;'>mean</td>"
+            "<td style='text-align: center;'>std</td>"
+            "<td style='text-align: center;'>null</td>"
+            "<td style='text-align: center;'>nunique</td>"
+            "<td style='text-align: center;'>mean</td>"
+            "<td style='text-align: center;'>std</td>"
+            "</tr>"
+            "</thead>"
+            "<tbody>"
+        )
         for c in numeric_cols:
             result += "<tr>"
             result += f"<td style='text-align: left;'>{html.escape(c)}</td>"
@@ -177,22 +181,26 @@ def eda_html(df_train: pd.DataFrame, df_test: pd.DataFrame):
 
     categorical_cols = np.unique(train_cols["categorical"] + test_cols["categorical"])
     if len(categorical_cols):
-        result += "<h2>categorical</h2>"
-        result += "<table>"
-        result += "<thead>"
-        result += "<tr>"
-        result += "<td style='text-align: left;'>列名</td>"
-        result += "<td style='text-align: left;'>値</td>"
-        result += "</tr>"
-        result += "</thead>"
-        result += "<tbody>"
+        result += (
+            "<h2>categorical</h2>"
+            "<table>"
+            "<thead>"
+            "<tr>"
+            "<td style='text-align: left;'>列名</td>"
+            "<td style='text-align: left;'>値</td>"
+            "</tr>"
+            "</thead>"
+            "<tbody>"
+        )
         for c in categorical_cols:
-            result += "<tr>"
-            result += f"<td style='text-align: left; vertical-align: top;'>{html.escape(c)}</td>"
-            result += "<td>"
-            result += "<table>"
-            result += "<tbody>"
-            result += "<tr>"
+            result += (
+                "<tr>"
+                f"<td style='text-align: left; vertical-align: top;'>{html.escape(c)}</td>"
+                "<td>"
+                "<table>"
+                "<tbody>"
+                "<tr>"
+            )
             if c in train_cols["categorical"]:
                 values1 = df_train[c].value_counts().to_dict()
                 nulls = df_train[c].isnull().sum()
@@ -217,32 +225,31 @@ def eda_html(df_train: pd.DataFrame, df_test: pd.DataFrame):
                     td_count(values2[v], len(df_test)) if v in values2 else "<td></td>"
                 )
                 result += "</tr>"
-            result += "</tr>"
-            result += "</tbody>"
-            result += "</table>"
-            result += "</td>"
-            result += "</tr>"
-        result += "</tbody>"
-        result += "</table>"
+            result += "</tr></tbody></table></td></tr>"
+        result += "</tbody></table>"
 
     unknown_cols = np.unique(train_cols["unknown"] + test_cols["unknown"])
     if len(unknown_cols):
-        result += "<h2>unknown</h2>"
-        result += "<table>"
-        result += "<thead>"
-        result += "<tr>"
-        result += "<td style='text-align: left;'>列名</td>"
-        result += "<td style='text-align: left;'>値</td>"
-        result += "</tr>"
-        result += "</thead>"
-        result += "<tbody>"
+        result += (
+            "<h2>unknown</h2>"
+            "<table>"
+            "<thead>"
+            "<tr>"
+            "<td style='text-align: left;'>列名</td>"
+            "<td style='text-align: left;'>値</td>"
+            "</tr>"
+            "</thead>"
+            "<tbody>"
+        )
         for c in unknown_cols:
-            result += "<tr>"
-            result += f"<td style='text-align: left; vertical-align: top;'>{html.escape(c)}</td>"
-            result += "<td>"
-            result += "<table>"
-            result += "<tbody>"
-            result += "<tr>"
+            result += (
+                "<tr>"
+                f"<td style='text-align: left; vertical-align: top;'>{html.escape(c)}</td>"
+                "<td>"
+                "<table>"
+                "<tbody>"
+                "<tr>"
+            )
             if c in train_cols["unknown"]:
                 values1 = df_train[c].value_counts().to_dict()
                 nulls = df_train[c].isnull().sum()
@@ -267,13 +274,8 @@ def eda_html(df_train: pd.DataFrame, df_test: pd.DataFrame):
                     td_count(values2[v], len(df_test)) if v in values2 else "<td></td>"
                 )
                 result += "</tr>"
-            result += "</tr>"
-            result += "</tbody>"
-            result += "</table>"
-            result += "</td>"
-            result += "</tr>"
-        result += "</tbody>"
-        result += "</table>"
+            result += "</tr></tbody></table></td></tr>"
+        result += "</tbody></table>"
 
     return result
 

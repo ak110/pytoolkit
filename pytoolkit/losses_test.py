@@ -88,3 +88,38 @@ def _categorical_loss_test(loss, symmetric):
         loss2[0] == pytest.approx(loss2[1], abs=1e-5) or not symmetric
     ), "symmetricity of loss(y_true, y_pred)"
     return loss1, loss2
+
+
+def test_ciou_loss():
+    y_true = tf.constant(
+        [
+            [
+                [
+                    [100, 100, 300, 300],
+                    [100, 100, 300, 300],
+                    [100, 100, 300, 300],
+                    [0, 0, 0, 0],
+                ]
+            ]
+        ],
+        dtype=tf.float32,
+    )
+    y_pred = tf.constant(
+        [
+            [
+                [
+                    [150, 150, 250, 250],
+                    [100, 100, 300, 300],
+                    [-1, -1, 0, 0],
+                    [0, 0, 0, 0],
+                ],
+            ],
+        ],
+        dtype=tf.float32,
+    )
+    assert y_true.shape.rank == 4
+    assert y_pred.shape.rank == 4
+    loss = tk.losses.ciou(y_true, y_pred).numpy()
+    assert loss.ndim == 3
+    assert not np.isnan(loss).any()
+    assert not np.isinf(loss).any()

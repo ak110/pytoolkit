@@ -20,7 +20,7 @@ def load(
     path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path],
     grayscale=False,
 ) -> np.ndarray:
-    """画像の読み込みの実装。"""
+    """画像の読み込み。"""
     if isinstance(path_or_array, np.ndarray):
         # ndarrayならそのまま画像扱い
         img = np.copy(path_or_array)  # 念のためコピー
@@ -33,35 +33,14 @@ def load(
         )
         if suffix in (".npy", ".npz"):
             # .npyなら読み込んでそのまま画像扱い
-            img = np.load(str(path_or_array))
-            if isinstance(img, np.lib.npyio.NpzFile):
-                if len(img.files) != 1:
-                    raise ValueError(
-                        f'Image load failed: "{path_or_array}" has multiple keys. ({img.files})'
-                    )
-                img = img[img.files[0]]
-            assert img.dtype == np.uint8, f"{suffix} dtype error: {img.dtype}"
+            img = _load_npy(path_or_array)
         else:
             # PILで読み込む
-            try:
-                with PIL.Image.open(path_or_array) as pil_img:
-                    try:
-                        pil_img = PIL.ImageOps.exif_transpose(pil_img)
-                    except Exception as e:
-                        warnings.warn(f"{type(e).__name__}: {e}")
-                    try:
-                        img = PIL.ImageOps.exif_transpose(img)
-                    except Exception:
-                        # Pillow 7.0.0で修正されるバグがある。
-                        # https://github.com/python-pillow/Pillow/issues/3973
-                        # これに限らず失敗時も害はそれほど無いと思われるので無視する。
-                        pass
-                    target_mode = "L" if grayscale else "RGB"
-                    if pil_img.mode != target_mode:
-                        pil_img = pil_img.convert(target_mode)
-                    img = np.asarray(pil_img, dtype=np.uint8)
-            except Exception as e:
-                raise ValueError(f"Image load failed: {path_or_array}") from e
+            pil_img = _load_pil(path_or_array)
+            target_mode = "L" if grayscale else "RGB"
+            if pil_img.mode != target_mode:
+                pil_img = pil_img.convert(target_mode)
+            img = np.asarray(pil_img, dtype=np.uint8)
 
     if img is None:
         raise ValueError(f"Image load failed: {path_or_array}")
@@ -69,8 +48,36 @@ def load(
         img = np.expand_dims(img, axis=-1)
     if len(img.shape) != 3:
         raise ValueError(f"Image load failed: shape={path_or_array}")
-
     return img
+
+
+def _load_npy(path_or_array):
+    """npy, npzを画像として読み込み。"""
+    img = np.load(str(path_or_array))
+    if isinstance(img, np.lib.npyio.NpzFile):
+        if len(img.files) != 1:
+            raise ValueError(
+                f'Image load failed: "{path_or_array}" has multiple keys. ({img.files})'
+            )
+        img = img[img.files[0]]
+    assert img.dtype == np.uint8, f"{path_or_array} dtype error: {img.dtype}"
+    return img
+
+
+def _load_pil(path_or_array):
+    """PILによる画像の読み込み。"""
+    try:
+        with PIL.Image.open(path_or_array) as pil_img:
+            try:
+                pil_img = PIL.ImageOps.exif_transpose(pil_img)
+            except Exception as e:
+                # Pillow 7.0.0で修正されるバグがある。
+                # https://github.com/python-pillow/Pillow/issues/3973
+                # これに限らず失敗時も害はそれほど無いと思われるので無視する。
+                warnings.warn(f"{type(e).__name__}: {e}")
+            return pil_img
+    except Exception as e:
+        raise ValueError(f"Image load failed: {path_or_array}") from e
 
 
 def get_image_size(
@@ -90,33 +97,12 @@ def get_image_size(
         )
         if suffix in (".npy", ".npz"):
             # .npyなら読み込んでそのまま画像扱い
-            img = np.load(str(path_or_array))
-            if isinstance(img, np.lib.npyio.NpzFile):
-                if len(img.files) != 1:
-                    raise ValueError(
-                        f'Image load failed: "{path_or_array}" has multiple keys. ({img.files})'
-                    )
-                img = img[img.files[0]]
-            assert img.dtype == np.uint8, f"{suffix} dtype error: {img.dtype}"
+            img = _load_npy(path_or_array)
             return img.shape[:2]
         else:
-            # PILで読み込む
-            try:
-                with PIL.Image.open(path_or_array) as pil_img:
-                    try:
-                        pil_img = PIL.ImageOps.exif_transpose(pil_img)
-                    except Exception as e:
-                        warnings.warn(f"{type(e).__name__}: {e}")
-                    try:
-                        pil_img = PIL.ImageOps.exif_transpose(pil_img)
-                    except Exception:
-                        # Pillow 7.0.0で修正されるバグがある。
-                        # https://github.com/python-pillow/Pillow/issues/3973
-                        # これに限らず失敗時も害はそれほど無いと思われるので無視する。
-                        pass
-                    return pil_img.height, pil_img.width
-            except Exception as e:
-                raise ValueError(f"Image load failed: {path_or_array}") from e
+            # PILで画像サイズを取得
+            pil_img = _load_pil(path_or_array)
+            return pil_img.height, pil_img.width
 
 
 def save(

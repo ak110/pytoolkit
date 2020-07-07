@@ -121,7 +121,7 @@ class App:
 
         return _decorator
 
-    def run(self, args: typing.Sequence[str] = None, default: str = None):
+    def run(self, args: typing.Sequence[str] = None, default: str = None) -> None:
         """実行。
 
         Args:
@@ -148,30 +148,9 @@ class App:
             assert self.current_command is not None
             command = commands[self.current_command]
 
-            # horovod
-            if command.use_horovod:
-                tk.hvd.init()
-            # ログ初期化
-            tk.log.init(
-                self.output_dir / f"{self.current_command}.log"
-                if command.logfile and self.output_dir is not None
-                else None
-            )
-            # 前処理
-            for f in self.inits:
-                with tk.log.trace(f.__qualname__):
-                    f()
+            self._command_init(command)
             try:
-                with tk.log.trace(command.entrypoint.__qualname__):
-                    if command.distribute_strategy_fn is not None:
-                        command.distribute_strategy = command.distribute_strategy_fn()
-                        with command.distribute_strategy.scope():
-                            tk.log.get(__name__).info(
-                                f"Number of devices: {self.num_replicas_in_sync}"
-                            )
-                            command.entrypoint(**kwargs)
-                    else:
-                        command.entrypoint(**kwargs)
+                command.run(kwargs)
             except Exception as e:
                 # ログファイルを出力する(ような重要な)コマンドの場合のみ通知を送信
                 if command.logfile:
@@ -180,16 +159,35 @@ class App:
                 tk.log.get(__name__).critical("Application error.", exc_info=True)
                 sys.exit(1)
             finally:
-                # 後処理
-                for f in self.terms:
-                    with tk.log.trace(f.__qualname__):
-                        f()
+                self._command_term()
 
             # 次のコマンド
             self.current_command = command.then
             if self.current_command is None:
                 break
             kwargs = {}
+
+    def _command_init(self, command) -> None:
+        """コマンド毎の前処理。"""
+        # horovod
+        if command.use_horovod:
+            tk.hvd.init()
+        # ログ初期化
+        tk.log.init(
+            self.output_dir / f"{command.name}.log"
+            if command.logfile and self.output_dir is not None
+            else None
+        )
+        # 前処理
+        for f in self.inits:
+            with tk.log.trace(f.__qualname__):
+                f()
+
+    def _command_term(self) -> None:
+        """コマンド毎の後処理。"""
+        for f in self.terms:
+            with tk.log.trace(f.__qualname__):
+                f()
 
     @property
     def num_replicas_in_sync(self) -> int:
@@ -233,6 +231,17 @@ class Command:
     ] = None
     distribute_strategy: typing.Optional[tf.distribute.Strategy] = None
     args: typing.Optional[typing.Dict[str, typing.Dict[str, typing.Any]]] = None
+
+    def run(self, kwargs) -> None:
+        """コマンドの実行。"""
+        with tk.log.trace(self.entrypoint.__qualname__):
+            if self.distribute_strategy_fn is not None:
+                self.distribute_strategy = self.distribute_strategy_fn()
+                tf.distribute.experimental_set_strategy(self.distribute_strategy)
+                tk.log.get(__name__).info(
+                    f"Number of devices: {self.distribute_strategy.num_replicas_in_sync}"
+                )
+            self.entrypoint(**kwargs)
 
 
 def _ipy():

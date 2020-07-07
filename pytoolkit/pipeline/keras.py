@@ -44,13 +44,13 @@ class KerasModel(Model):
         load_by_name: load()でby_name=TrueするならTrue。既定値はFalse。
 
     Attributes:
-        training_models: 訓練用モデル
-        prediction_models: 推論用モデル
+        train_models: 訓練用モデル
+        pred_models: 推論用モデル
 
     model_name_formatに"{fold}"が含まれない名前を指定した場合、
     cvではなくtrainを使うモードということにする。
 
-    事前にself.training_modelsにモデルがある状態でcvやfitを呼んだ場合は追加学習ということにする。
+    事前にself.train_modelsにモデルがある状態でcvやfitを呼んだ場合は追加学習ということにする。
 
     """
 
@@ -112,8 +112,8 @@ class KerasModel(Model):
         self.parallel_cv = parallel_cv
         self.on_batch_fn = on_batch_fn
         self.load_by_name = load_by_name
-        self.training_models: typing.List[tf.keras.models.Model] = [None] * nfold
-        self.prediction_models: typing.List[tf.keras.models.Model] = [None] * nfold
+        self.train_models: typing.List[tf.keras.models.Model] = [None] * nfold
+        self.pred_models: typing.List[tf.keras.models.Model] = [None] * nfold
 
         if self.parallel_cv:
             assert self.refine_epochs == 0, "NotImplemented"
@@ -132,7 +132,7 @@ class KerasModel(Model):
         models_dir = models_dir or self.models_dir
         model_path = models_dir / self.model_name_format.format(fold=fold)
         tk.models.save(
-            self.prediction_models[fold],
+            self.pred_models[fold],
             model_path,
             mode="hdf5"
             if model_path.suffix in (".h5", ".hdf5", ".keras")
@@ -144,7 +144,7 @@ class KerasModel(Model):
         models_dir = models_dir or self.models_dir
         model_path = models_dir / self.model_name_format.format(fold=fold)
         tk.models.load_weights(
-            self.prediction_models[fold], model_path, by_name=self.load_by_name
+            self.pred_models[fold], model_path, by_name=self.load_by_name
         )
 
     def _cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType) -> None:
@@ -157,16 +157,16 @@ class KerasModel(Model):
     def _parallel_cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType):
         for fold in range(len(folds)):
             self.create_network(fold)
-        assert self.training_models[0] is not None
+        assert self.train_models[0] is not None
 
         inputs = []
         targets = []
         outputs = []
         losses = []
         metrics: typing.Dict[str, typing.Any] = {
-            n: [] for n in self.training_models[0].metrics_names if n != "loss"
+            n: [] for n in self.train_models[0].metrics_names if n != "loss"
         }
-        for i, model in enumerate(self.training_models):
+        for i, model in enumerate(self.train_models):
             assert model is not None
             input_shape = model.input_shape
             output_shape = model.output_shape
@@ -209,7 +209,7 @@ class KerasModel(Model):
             metrics[k] = metric_func
 
         model = tf.keras.models.Model(inputs=inputs + targets, outputs=outputs)
-        model.compile(self.training_models[0].optimizer, loss, list(metrics.values()))
+        model.compile(self.train_models[0].optimizer, loss, list(metrics.values()))
         tk.models.summary(model)
 
         def generator(datasets, data_loader):
@@ -273,7 +273,7 @@ class KerasModel(Model):
 
     def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
         pred = tk.models.predict(
-            self.prediction_models[fold],
+            self.pred_models[fold],
             self.val_data_loader.load(dataset),
             on_batch_fn=self.on_batch_fn,
         )
@@ -293,12 +293,12 @@ class KerasModel(Model):
         """
         assert self.nfold >= 1
         self.create_network(fold=0)
-        assert self.training_models[0] is not None
+        assert self.train_models[0] is not None
         if self.compile_fn is not None:
-            self.compile_fn(self.training_models[0])
+            self.compile_fn(self.train_models[0])
         tk.models.check(
-            self.training_models[0],
-            self.prediction_models[0],
+            self.train_models[0],
+            self.pred_models[0],
             self.models_dir,
             dataset,
             self.train_data_loader,
@@ -340,9 +340,7 @@ class KerasModel(Model):
         return self
 
     @typing.overload
-    def train(
-        self, train_set: tk.data.Dataset, val_set: None = None, fold: int = 0
-    ) -> None:
+    def train(self, train_set: tk.data.Dataset, val_set: None = None, fold: int = 0):
         pass
 
     @typing.overload
@@ -391,30 +389,30 @@ class KerasModel(Model):
             trained = False
         else:
             self.create_network(fold)
-            assert self.training_models[fold] is not None
-            assert self.prediction_models[fold] is not None
+            assert self.train_models[fold] is not None
+            assert self.pred_models[fold] is not None
             trained = True
             if self.compile_fn is not None:
-                self.compile_fn(self.training_models[fold])
+                self.compile_fn(self.train_models[fold])
 
             if self.base_models_dir is not None:
                 tk.models.load_weights(
-                    self.prediction_models[fold],
+                    self.pred_models[fold],
                     self.base_models_dir / self.model_name_format.format(fold=fold),
                 )
 
             if self.refine_data_loader is not None:
                 start_lr = tf.keras.backend.get_value(
-                    self.training_models[fold].optimizer.learning_rate
+                    self.train_models[fold].optimizer.learning_rate
                 )
 
             # fit
             tk.hvd.barrier()
             if self.epochs > 0:
                 tk.models.fit(
-                    self.training_models[fold],
-                    training_iterator=self.train_data_loader.load(train_set),
-                    validation_iterator=self.val_data_loader.load(val_set)
+                    self.train_models[fold],
+                    train_iterator=self.train_data_loader.load(train_set),
+                    val_iterator=self.val_data_loader.load(val_set)
                     if val_set is not None
                     else None,
                     epochs=self.epochs,
@@ -428,20 +426,20 @@ class KerasModel(Model):
                     f"fold{fold}: Refining {self.refine_epochs} epochs..."
                 )
                 tk.models.freeze_layers(
-                    self.training_models[fold], tf.keras.layers.BatchNormalization
+                    self.train_models[fold], tf.keras.layers.BatchNormalization
                 )
                 if self.compile_fn is None:
-                    tk.models.recompile(self.training_models[fold])
+                    tk.models.recompile(self.train_models[fold])
                 else:
-                    self.compile_fn(self.training_models[fold])
+                    self.compile_fn(self.train_models[fold])
                 tf.keras.backend.set_value(
-                    self.training_models[fold].optimizer.learning_rate,
+                    self.train_models[fold].optimizer.learning_rate,
                     start_lr * self.refine_lr_factor,
                 )
                 tk.models.fit(
-                    self.training_models[fold],
-                    training_iterator=self.refine_data_loader.load(train_set),
-                    validation_iterator=self.val_data_loader.load(val_set)
+                    self.train_models[fold],
+                    train_iterator=self.refine_data_loader.load(train_set),
+                    val_iterator=self.val_data_loader.load(val_set)
                     if val_set is not None
                     else None,
                     epochs=self.refine_epochs,
@@ -501,12 +499,12 @@ class KerasModel(Model):
         assert self.postprocessors is None  # とりあえず未対応
 
         # 未コンパイルならmetricsが無いかもしれないのでcompile
-        if self.training_models[fold].optimizer is None:
+        if self.train_models[fold].optimizer is None:
             assert self.compile_fn is not None
-            self.compile_fn(self.training_models[fold])
+            self.compile_fn(self.train_models[fold])
 
         evals = tk.models.evaluate(
-            self.training_models[fold],
+            self.train_models[fold],
             self.val_data_loader.load(dataset),  # DataAugmentation無しで評価
         )
         return evals
@@ -525,26 +523,23 @@ class KerasModel(Model):
         assert self.postprocessors is None  # とりあえず未対応
         ds, steps = self.val_data_loader.get_ds(dataset)
         return tk.models.predict_flow(
-            self.prediction_models[fold],
-            ds=ds,
-            steps=steps,
-            on_batch_fn=self.on_batch_fn,
+            self.pred_models[fold], ds=ds, steps=steps, on_batch_fn=self.on_batch_fn,
         )
 
     def create_network(self, fold: int) -> None:
         """指定foldのモデルの作成。"""
-        if self.training_models[fold] is not None:  # 既にあればそれを使う
-            assert self.prediction_models[fold] is not None
+        if self.train_models[fold] is not None:  # 既にあればそれを使う
+            assert self.pred_models[fold] is not None
         else:
             network = self.create_network_fn()
             if not isinstance(network, tuple):
                 network = network, network
-            self.training_models[fold] = network[0]
-            self.prediction_models[fold] = network[1]
+            self.train_models[fold] = network[0]
+            self.pred_models[fold] = network[1]
 
     def _rebuild_model(self, fold: int) -> None:
         """メモリ節約のための処理。"""
-        self.training_models[fold] = None
-        self.prediction_models[fold] = None
+        self.train_models[fold] = None
+        self.pred_models[fold] = None
         gc.collect()
         self._load_model(fold)

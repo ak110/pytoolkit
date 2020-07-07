@@ -1,15 +1,29 @@
 """tf.keras.backendやtensorflowの基礎的な関数など。"""
+import functools
 import typing
 
 import numpy as np
 import tensorflow as tf
 
 
+def name_scope(f):
+    """tf.name_scopeで囲むデコレーター。"""
+
+    @functools.wraps(f)
+    def _scoped_func(*args, **kwargs):
+        with tf.name_scope(f.__name__):
+            return f(*args, **kwargs)
+
+    return _scoped_func
+
+
+@name_scope
 def clip64(x, epsilon=1e-7):
     """float64にキャストして[epsilon, 1 - epsilon]にclip。"""
     return tf.clip_by_value(tf.cast(x, tf.float64), epsilon, 1 - epsilon)
 
 
+@name_scope
 def logit(x, epsilon=1e-7):
     """ロジット関数。シグモイド関数の逆関数。
 
@@ -21,6 +35,7 @@ def logit(x, epsilon=1e-7):
     return tf.math.log(tf.cast(x / (1 - x), tf.float32))
 
 
+@name_scope
 def lovasz_weights(y_true, perm, alpha=None):
     """Lovasz hingeなどの損失の重み付け部分。"""
     y_true_sorted = tf.gather(y_true, perm)
@@ -34,16 +49,19 @@ def lovasz_weights(y_true, perm, alpha=None):
     return weights
 
 
+@name_scope
 def logcosh(x):
     """log(cosh(x))。Smooth L1 lossみたいなもの。"""
     return x + tf.math.softplus(-2.0 * x) - np.log(2.0)
 
 
+@name_scope
 def log_softmax(x, axis=-1):
     """log(softmax(x))"""
     return x - tf.math.reduce_logsumexp(x, axis=axis, keepdims=True)
 
 
+@name_scope
 def reduce_mask(x: tf.Tensor, mask: tf.Tensor, axis: typing.Sequence[int]):
     """加重平均。reduce_sum(x * mask, axis) / reduce_sum(mask, axis)"""
     assert x.shape.rank == mask.shape.rank, f"shape error: {x=} {mask=}"
@@ -54,6 +72,7 @@ def reduce_mask(x: tf.Tensor, mask: tf.Tensor, axis: typing.Sequence[int]):
     return tf.math.reduce_sum(x * mask, axis=axis) / tf.math.maximum(size, 1)
 
 
+@name_scope
 def reduce_losses(losses: typing.Sequence[tf.Tensor]):
     """1次元のtensorを複数受け取り、0次元のtensorを1つ返す。Endpointレイヤー作るとき用。"""
     for x in losses:

@@ -14,6 +14,7 @@ from . import (
     datasets,
     dl,
     evaluations,
+    exp,
     hpo,
     hvd,
     image,

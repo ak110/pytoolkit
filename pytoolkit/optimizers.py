@@ -48,7 +48,7 @@ class SGDEx(tf.keras.optimizers.SGD):
 
     def _resource_apply_dense(self, grad, var, apply_state=None):
         # pylint: disable=no-name-in-module,import-error
-        from tensorflow.python.training import training_ops
+        from tensorflow.python.training import train_ops
 
         var_device, var_dtype = var.device, var.dtype.base_dtype
         coefficients = (apply_state or {}).get(
@@ -62,7 +62,7 @@ class SGDEx(tf.keras.optimizers.SGD):
 
         if self._momentum:
             momentum_var = self.get_slot(var, "momentum")
-            return training_ops.resource_apply_keras_momentum(
+            return train_ops.resource_apply_keras_momentum(
                 var.handle,
                 momentum_var.handle,
                 lr_t,
@@ -72,7 +72,7 @@ class SGDEx(tf.keras.optimizers.SGD):
                 use_nesterov=self.nesterov,
             )
         else:
-            return training_ops.resource_apply_gradient_descent(
+            return train_ops.resource_apply_gradient_descent(
                 var.handle, lr_t, grad, use_locking=self._use_locking
             )
 

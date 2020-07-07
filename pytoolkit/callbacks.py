@@ -188,32 +188,34 @@ class ErrorOnNaN(tf.keras.callbacks.Callback):
         logs = logs or {}
         loss = logs.get("loss")
         if loss is not None and (np.isnan(loss) or np.isinf(loss)):
-            logger = tk.log.get(__name__)
-            # モデルの中に怪しい値が無いか調べる
-            max_value, max_value_weight = 0, ""
-            broken = False
-            try:
-                for layer in self.model.layers:
-                    for w, t in zip(layer.get_weights(), layer.weights):
-                        m = np.max(np.abs(w[~np.isinf(w)]), initial=0)
-                        if max_value < m:
-                            max_value = m
-                            max_value_weight = t.name
-                        if np.isnan(w).any():
-                            logger.info(f"nan in weights: {t.name}")
-                            broken = True
-                        elif np.isinf(w).any():
-                            logger.info(f"inf in weights: {t.name}")
-                            broken = True
-                logger.info(f"max_weights={max_value} (by {max_value_weight})")
-            except Exception:
-                logger.warning("check error", exc_info=True)
-            # inf/nanが含まれていたら調査用に出力
-            if broken:
-                try:
-                    self.model.save(str(self.save_path))
-                except Exception:
-                    logger.warning("save error", exc_info=True)
-
+            self._check_model()
             # エラーを飛ばす
             raise RuntimeError(f"Batch {batch}: Invalid loss ({logs=})")
+
+    def _check_model(self):
+        """モデルの中に怪しい値が無いか調べる"""
+        logger = tk.log.get(__name__)
+        max_value, max_value_weight = 0, ""
+        broken = False
+        try:
+            for layer in self.model.layers:
+                for w, t in zip(layer.get_weights(), layer.weights):
+                    m = np.max(np.abs(w[~np.isinf(w)]), initial=0)
+                    if max_value < m:
+                        max_value = m
+                        max_value_weight = t.name
+                    if np.isnan(w).any():
+                        logger.info(f"nan in weights: {t.name}")
+                        broken = True
+                    elif np.isinf(w).any():
+                        logger.info(f"inf in weights: {t.name}")
+                        broken = True
+            logger.info(f"max_weights={max_value} (by {max_value_weight})")
+        except Exception:
+            logger.warning("check error", exc_info=True)
+        # inf/nanが含まれていたら調査用に出力
+        if broken:
+            try:
+                self.model.save(str(self.save_path))
+            except Exception:
+                logger.warning("save error", exc_info=True)

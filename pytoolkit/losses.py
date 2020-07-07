@@ -6,6 +6,7 @@ import tensorflow as tf
 import pytoolkit as tk
 
 
+@tk.backend.name_scope
 def reduce(x, reduce_mode):
     """バッチ次元だけ残して合計や平均を取る。"""
     assert x.shape.rank >= 1, f"shape error: {x}"
@@ -19,12 +20,14 @@ def reduce(x, reduce_mode):
     )
 
 
+@tk.backend.name_scope
 def empty(y_true, y_pred):
     """ダミーのloss"""
     del y_true, y_pred
     return tf.zeros((), dtype=tf.float32)
 
 
+@tk.backend.name_scope
 def binary_crossentropy(
     y_true,
     y_pred,
@@ -63,6 +66,7 @@ def binary_crossentropy(
     return reduce(loss, reduce_mode)
 
 
+@tk.backend.name_scope
 def binary_focal_loss(
     y_true, y_pred, gamma=2.0, from_logits=False, alpha=None, reduce_mode="sum"
 ):
@@ -100,6 +104,7 @@ def binary_focal_loss(
     return reduce(loss, reduce_mode)
 
 
+@tk.backend.name_scope
 def categorical_crossentropy(
     y_true,
     y_pred,
@@ -145,6 +150,7 @@ def categorical_crossentropy(
     return reduce(loss, reduce_mode)
 
 
+@tk.backend.name_scope
 def categorical_focal_loss(
     y_true,
     y_pred,
@@ -183,6 +189,7 @@ def categorical_focal_loss(
     return reduce(loss, reduce_mode)
 
 
+@tk.backend.name_scope
 def symmetric_lovasz_hinge(
     y_true, y_pred, from_logits=False, per_sample=True, activation="elu+1"
 ):
@@ -195,6 +202,7 @@ def symmetric_lovasz_hinge(
     return (loss1 + loss2) / 2
 
 
+@tk.backend.name_scope
 def lovasz_hinge(
     y_true, y_pred, from_logits=False, per_sample=True, activation="elu+1"
 ):
@@ -229,6 +237,7 @@ def lovasz_hinge(
     return loss
 
 
+@tk.backend.name_scope
 def lovasz_binary_crossentropy(
     y_true, y_pred, from_logits=False, per_sample=True, epsilon=0.01, alpha=None
 ):
@@ -272,6 +281,7 @@ def lovasz_binary_crossentropy(
     return loss
 
 
+@tk.backend.name_scope
 def l1_smooth_loss(y_true, y_pred):
     """L1-smooth loss。"""
     abs_loss = tf.math.abs(y_true - y_pred)
@@ -281,21 +291,76 @@ def l1_smooth_loss(y_true, y_pred):
     return l1_loss
 
 
+@tk.backend.name_scope
 def mse(y_true, y_pred, reduce_mode="mean"):
     """mean squared error。"""
     return reduce(tf.math.square(y_pred - y_true), reduce_mode)
 
 
+@tk.backend.name_scope
 def mae(y_true, y_pred, reduce_mode="mean"):
     """mean absolute error。"""
     return reduce(tf.math.abs(y_pred - y_true), reduce_mode)
 
 
+@tk.backend.name_scope
 def rmse(y_true, y_pred, reduce_mode="mean"):
     """root mean squared error。"""
     return tf.math.sqrt(reduce(tf.math.square(y_pred - y_true), reduce_mode))
 
 
+@tk.backend.name_scope
 def mape(y_true, y_pred, reduce_mode="mean"):
     """mean absolute percentage error。"""
     return reduce(tf.math.abs((y_true - y_pred) / y_true), reduce_mode)
+
+
+@tk.backend.name_scope
+def ciou(y_true, y_pred, epsilon=1e-7):
+    """Complete IoU loss <https://arxiv.org/abs/1911.08287>
+
+    Args:
+        y_true: 答えのbboxes。shape=(samples, anchors_h, anchors_w, 4)
+        y_pred: 出力のbboxes。shape=(samples, anchors_h, anchors_w, 4)
+
+    Returns:
+        損失の値。shape=(samples, anchors_h, anchors_w)
+
+    """
+    inter_lt = tf.math.maximum(y_true[..., :2], y_pred[..., :2])  # 左と上
+    inter_rb = tf.math.minimum(y_true[..., 2:], y_pred[..., 2:])  # 右と下
+    union_lt = tf.math.minimum(y_true[..., :2], y_pred[..., :2])  # 左と上
+    union_rb = tf.math.maximum(y_true[..., 2:], y_pred[..., 2:])  # 右と下
+    wh_true = tf.math.maximum(y_true[..., 2:] - y_true[..., :2], 0.0)
+    wh_pred = tf.math.maximum(y_pred[..., 2:] - y_pred[..., :2], 0.0)
+    c_true = (y_true[..., :2] + y_true[..., 2:]) / 2
+    c_pred = (y_pred[..., :2] + y_pred[..., 2:]) / 2
+
+    with tf.name_scope("iou"):
+        has_area = tf.math.reduce_all(inter_lt < inter_rb, axis=-1)
+        area_inter = tf.math.reduce_prod(inter_rb - inter_lt, axis=-1) * tf.cast(
+            has_area, tf.float32
+        )
+        area_a = tf.math.reduce_prod(wh_true, axis=-1)
+        area_b = tf.math.reduce_prod(wh_pred, axis=-1)
+        area_union = area_a + area_b - area_inter
+        iou = area_inter / (area_union + epsilon)
+
+    with tf.name_scope("distance"):
+        d2 = tf.math.reduce_sum((c_true - c_pred) ** 2, axis=-1)
+        c2 = tf.math.reduce_sum((union_rb - union_lt) ** 2, axis=-1)
+        r_diou = d2 / (c2 + epsilon)
+
+    with tf.name_scope("aspect_ratio"):
+        atan_true = tf.math.atan(wh_true[..., 0] / (wh_true[..., 1] + epsilon))
+        atan_pred = tf.math.atan(wh_pred[..., 0] / (wh_pred[..., 1] + epsilon))
+        v = (4 / np.pi ** 2) * (atan_true - atan_pred) ** 2
+
+    with tf.name_scope("tradeoff"):
+        alpha = v / ((1 - iou) + v + epsilon)
+
+    with tf.name_scope("loss"):
+        loss = 1 - iou + r_diou + alpha * v
+        assert loss.shape.rank == y_true.shape.rank - 1
+
+    return loss

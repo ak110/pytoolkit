@@ -36,23 +36,23 @@ MetricsType = typing.List[MetricType]
 
 
 def check(
-    training_model: tf.keras.models.Model,
-    prediction_model: tf.keras.models.Model,
+    train_model: tf.keras.models.Model,
+    pred_model: tf.keras.models.Model,
     models_dir: tk.typing.PathLike,
     dataset: tk.data.Dataset = None,
-    training_data_loader: tk.data.DataLoader = None,
-    prediction_data_loader: tk.data.DataLoader = None,
+    train_data_loader: tk.data.DataLoader = None,
+    pred_data_loader: tk.data.DataLoader = None,
     save_mode: str = "hdf5",
 ):
     """モデルの簡易動作確認用コード。
 
     Args:
-        training_model: 学習用モデル
-        prediction_model: 推論用モデル
+        train_model: 学習用モデル
+        pred_model: 推論用モデル
         models_dir: 情報の保存先ディレクトリ
         dataset: チェック用データ (少数にしておくこと)
-        training_data_loader: 学習用DataLoader
-        prediction_data_loader: 推論用DataLoader
+        train_data_loader: 学習用DataLoader
+        pred_data_loader: 推論用DataLoader
         save_mode: 保存形式 ("hdf5", "saved_model", "onnx", "tflite"のいずれか)
 
     """
@@ -60,42 +60,42 @@ def check(
     logger = tk.log.get(__name__)
 
     # summary表示
-    tk.models.summary(training_model)
+    tk.models.summary(train_model)
 
     # グラフを出力
-    tk.models.plot(training_model, models_dir / "model.png")
+    tk.models.plot(train_model, models_dir / "model.png")
 
     # save/loadの動作確認 (とりあえず落ちなければOKとする)
     with tempfile.TemporaryDirectory() as tmpdir:
         save_path = pathlib.Path(tmpdir) / f"model.{save_mode}"
-        tk.models.save(prediction_model, save_path)
-        prediction_model = tk.models.load(save_path)
+        tk.models.save(pred_model, save_path)
+        pred_model = tk.models.load(save_path)
 
-    # training_model.evaluate
-    if dataset is not None and training_data_loader is not None:
-        ds, steps = training_data_loader.get_ds(dataset, shuffle=True)
-        logger.info(f"training_model.evaluate: {ds.element_spec} {steps=}")
-        values = training_model.evaluate(ds, steps=steps, verbose=1)
-        if len(training_model.metrics_names) == 1:
-            evals = {training_model.metrics_names[0]: values}
+    # train_model.evaluate
+    if dataset is not None and train_data_loader is not None:
+        ds, steps = train_data_loader.get_ds(dataset, shuffle=True)
+        logger.info(f"train_model.evaluate: {ds.element_spec} {steps=}")
+        values = train_model.evaluate(ds, steps=steps, verbose=1)
+        if len(train_model.metrics_names) == 1:
+            evals = {train_model.metrics_names[0]: values}
         else:
-            evals = dict(zip(training_model.metrics_names, values))
+            evals = dict(zip(train_model.metrics_names, values))
         logger.info(f"check.evaluate: {tk.evaluations.to_str(evals)}")
 
-    # prediction_model.predict
-    if dataset is not None and prediction_data_loader is not None:
-        ds, steps = prediction_data_loader.get_ds(dataset)
-        logger.info(f"prediction_model.evaluate: {ds.element_spec} {steps=}")
-        pred = prediction_model.predict(ds, steps=steps, verbose=1)
+    # pred_model.predict
+    if dataset is not None and pred_data_loader is not None:
+        ds, steps = pred_data_loader.get_ds(dataset)
+        logger.info(f"pred_model.evaluate: {ds.element_spec} {steps=}")
+        pred = pred_model.predict(ds, steps=steps, verbose=1)
         if isinstance(pred, (list, tuple)):
             logger.info(f"check.predict: shape={[p.shape for p in pred]}")
         else:
             logger.info(f"check.predict: shape={pred.shape}")
 
-    # training_model.fit
-    if dataset is not None and training_data_loader is not None:
-        ds, steps = training_data_loader.get_ds(dataset, shuffle=True)
-        training_model.fit(ds, steps_per_epoch=steps, epochs=1, verbose=1)
+    # train_model.fit
+    if dataset is not None and train_data_loader is not None:
+        ds, steps = train_data_loader.get_ds(dataset, shuffle=True)
+        train_model.fit(ds, steps_per_epoch=steps, epochs=1, verbose=1)
 
 
 def load(
@@ -314,9 +314,9 @@ def set_learning_rate(model: tf.keras.models.Model, learnig_rate: float):
 
 def fit(
     model: tf.keras.models.Model,
-    training_iterator: tk.data.Iterator,
-    validation_iterator: tk.data.Iterator = None,
-    validation_freq: typing.Union[int, typing.Sequence[int], str, None] = "auto",
+    train_iterator: tk.data.Iterator,
+    val_iterator: tk.data.Iterator = None,
+    val_freq: typing.Union[int, typing.Sequence[int], str, None] = "auto",
     class_weight: typing.Dict[int, float] = None,
     epochs: int = 1800,
     callbacks: typing.List[tf.keras.callbacks.Callback] = None,
@@ -327,9 +327,9 @@ def fit(
 
     Args:
         model: モデル
-        training_iterator: 訓練データ
-        validation_iterator: 検証データ。Noneなら省略。
-        validation_freq: 検証を行うエポック数の間隔、またはエポック数のリスト。0ならvalidationしない(独自仕様)。"auto"なら適当に決める(独自仕様)。
+        train_iterator: 訓練データ
+        val_iterator: 検証データ。Noneなら省略。
+        val_freq: 検証を行うエポック数の間隔、またはエポック数のリスト。0ならvalidationしない(独自仕様)。"auto"なら適当に決める(独自仕様)。
         class_weight: クラスごとの重みのdict
         epochs: エポック数
         callbacks: コールバック。EpochLoggerとErrorOnNaNとhorovod関連は自動追加。
@@ -343,27 +343,25 @@ def fit(
     # <https://github.com/horovod/horovod/blob/9bdd70d/examples/keras_mnist_advanced.py#L112,L115>
     use_horovod = tk.hvd.is_active()
 
-    if validation_freq == 0 or validation_iterator is None:
-        # validation_freq == 0ならvalidationしない(独自仕様)
-        validation_freq = None
-        validation_iterator = None
-    elif validation_freq == "auto":
+    if val_freq == 0 or val_iterator is None:
+        # val_freq == 0ならvalidationしない(独自仕様)
+        val_freq = None
+        val_iterator = None
+    elif val_freq == "auto":
         # "auto"なら適当に決める(独自仕様)
-        validation_freq = make_validation_freq(
-            validation_freq,
+        val_freq = make_val_freq(
+            val_freq,
             epochs,
-            len(training_iterator.dataset),
-            len(validation_iterator.dataset) * (3 if use_horovod else 1),
+            len(train_iterator.dataset),
+            len(val_iterator.dataset) * (3 if use_horovod else 1),
         )
 
-    train_ds, train_steps = training_iterator.data_loader.get_ds(
-        training_iterator.dataset, shuffle=True
+    train_ds, train_steps = train_iterator.data_loader.get_ds(
+        train_iterator.dataset, shuffle=True
     )
     val_ds, val_steps = (
-        validation_iterator.data_loader.get_ds(
-            validation_iterator.dataset, shuffle=use_horovod,
-        )
-        if validation_iterator is not None
+        val_iterator.data_loader.get_ds(val_iterator.dataset, shuffle=use_horovod,)
+        if val_iterator is not None
         else (None, 0)
     )
     tk.log.get(__name__).info(f"fit(train): {train_ds.element_spec} {train_steps=}")
@@ -373,8 +371,8 @@ def fit(
     callbacks = make_callbacks(callbacks, training=True)
 
     fit_kwargs = {}
-    if validation_freq is not None:
-        fit_kwargs["validation_freq"] = validation_freq
+    if val_freq is not None:
+        fit_kwargs["validation_freq"] = val_freq
 
     with tk.log.trace("fit"):
         model.fit(
@@ -384,7 +382,7 @@ def fit(
             validation_steps=(
                 val_steps * 3 // tk.hvd.size() if use_horovod else val_steps
             )
-            if validation_iterator is not None
+            if val_iterator is not None
             else None,
             class_weight=class_weight,
             epochs=epochs,
@@ -395,23 +393,21 @@ def fit(
         )
 
 
-def make_validation_freq(
-    validation_freq, epochs, train_size, val_size, max_val_per_train=0.1
-):
-    """validation_freqをほどよい感じに作成する。"""
+def make_val_freq(val_freq, epochs, train_size, val_size, max_val_per_train=0.1):
+    """val_freqをほどよい感じに作成する。"""
     # sqrt(epochs)回くらいやれば十分？ (指標にも依るが…)
     # valがtrainの10%未満くらいなら毎回やっても問題無い
-    validation_freq = max(
+    val_freq = max(
         int(np.sqrt(epochs)), int(val_size / (train_size * max_val_per_train)), 1,
     )
     # 最低でも10回くらいはやりたい
-    validation_freq = min(validation_freq, max(1, epochs // 10))
-    # 最後のepochはvalidationしたいので、そこからvalidation_freq毎に。
-    validation_list = list(range(epochs, 0, -validation_freq))
+    val_freq = min(val_freq, max(1, epochs // 10))
+    # 最後のepochはvalidationしたいので、そこからval_freq毎に。
+    val_list = list(range(epochs, 0, -val_freq))
     # あまり早いepochではやらない
-    if len(validation_list) >= 2 and validation_list[0] < validation_freq:
-        validation_list = validation_list[1:]
-    return validation_list
+    if len(val_list) >= 2 and val_list[0] < val_freq:
+        val_list = val_list[1:]
+    return val_list
 
 
 def make_callbacks(
