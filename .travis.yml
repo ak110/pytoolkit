@@ -12,7 +12,7 @@ env:
 install:
   - sudo apt-get install graphviz
   - pip install cython
-  - pip install -U -r requirements.travis.txt
+  - pip install --upgrade -r requirements.travis.txt
 
 script:
   - black --check .

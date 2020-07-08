@@ -31,9 +31,10 @@ def post_evals(evals: tk.evaluations.EvalsType, precision: int = 3):
 def post(body: str, subject: str = None):
     """通知。"""
     if subject is None:
-        subject = f"{' '.join([shlex.quote(a) for a in sys.argv])}\n"
+        subject = " ".join([shlex.quote(a) for a in sys.argv])
+    subject = subject.strip()
     body = body.strip()
-    for line in body.split("\n"):
+    for line in [subject] + body.split("\n"):
         tk.log.get(__name__).info(line)
 
     if tk.hvd.is_master():
@@ -49,7 +50,7 @@ def post(body: str, subject: str = None):
 
             slack_url = os.environ.get("SLACK_URL", "")
             if len(slack_url) > 0:
-                data = {"text": f"{subject}```\n{body}\n```"}  # \n<!channel>
+                data = {"text": f"{subject}\n```\n{body}\n```"}  # \n<!channel>
                 r = requests.post(
                     slack_url,
                     data=json.dumps(data),
@@ -59,7 +60,7 @@ def post(body: str, subject: str = None):
 
             line_token = os.environ.get("LINE_TOKEN", "")
             if len(line_token) > 0:
-                data = {"message": subject + body}
+                data = {"message": f"{subject}\n{body}"}
                 r = requests.post(
                     "https://notify-api.line.me/api/notify",
                     data=data,

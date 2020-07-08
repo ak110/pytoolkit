@@ -21,7 +21,7 @@ opencv-python
 pandas
 pycocotools
 pydot
-pylint<2.5.0
+pylint
 pytest
 python-dotenv
 requests

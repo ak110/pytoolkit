@@ -103,7 +103,7 @@ def eda_html(df_train: pd.DataFrame, df_test: pd.DataFrame):
         return f"<td style='text-align: right;'>{value:,.1f}</td>"
 
     binary_cols = np.unique(train_cols["binary"] + test_cols["binary"])
-    if len(binary_cols):
+    if len(binary_cols) > 0:
         result += (
             "<h2>binary</h2>"
             "<table>"
@@ -137,7 +137,7 @@ def eda_html(df_train: pd.DataFrame, df_test: pd.DataFrame):
         result += "</table>"
 
     numeric_cols = np.unique(train_cols["numeric"] + test_cols["numeric"])
-    if len(numeric_cols):
+    if len(numeric_cols) > 0:
         result += (
             "<h2>numeric</h2>"
             "<table>"
@@ -180,7 +180,7 @@ def eda_html(df_train: pd.DataFrame, df_test: pd.DataFrame):
         result += "</table>"
 
     categorical_cols = np.unique(train_cols["categorical"] + test_cols["categorical"])
-    if len(categorical_cols):
+    if len(categorical_cols) > 0:
         result += (
             "<h2>categorical</h2>"
             "<table>"
@@ -229,7 +229,7 @@ def eda_html(df_train: pd.DataFrame, df_test: pd.DataFrame):
         result += "</tbody></table>"
 
     unknown_cols = np.unique(train_cols["unknown"] + test_cols["unknown"])
-    if len(unknown_cols):
+    if len(unknown_cols) > 0:
         result += (
             "<h2>unknown</h2>"
             "<table>"

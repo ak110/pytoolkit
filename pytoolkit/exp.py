@@ -17,54 +17,31 @@ class ExperimentLogger:
 
     Args:
         output_dir: 出力先ディレクトリ
-        name: 実験名。(過去との重複不可)
+        name: 実験名とかメモ的なもの
 
     """
 
-    def __init__(self, output_dir: tk.typing.PathLike, name: str, precision: int = 3):
+    def __init__(
+        self, output_dir: tk.typing.PathLike, name: str = None, precision: int = 3
+    ):
         self.output_dir = pathlib.Path(output_dir)
         self.name = name
         self.precision = precision
-        # 名前の重複チェック
-        data = self._load_data()
-        if name in [e.get("name") for e in data["entries"]]:
-            raise ValueError(f"Duplicate experiment name: {name}")
 
     def add(self, evals: tk.evaluations.EvalsType):
         """ログ出力。"""
         now = datetime.datetime.now()
 
         # experiments.json
-        data = self._load_data()
+        data_path = self.output_dir / "experiments.json"
+        data = (
+            json.loads(data_path.read_text(encoding="utf-8"))
+            if data_path.exists()
+            else {"entries": []}
+        )
         data["entries"].append(
             {"time": now.isoformat(), "name": self.name, "evals": evals}
         )
-        self._save_data(data)
-
-        # report.txt
-        commandline = " ".join([shlex.quote(a) for a in sys.argv])
-        subject = f"[{now.isoformat()}] {self.name} ({commandline})"
-        body = tk.evaluations.to_str(evals, multiline=True, precision=self.precision)
-        report_path = self.output_dir / "report.txt"
-        report_path.write_text(f"{subject}\n{body}")
-
-        # notifications
-        tk.notifications.post(body=body, subject=subject)
-
-    def _load_data(self):
-        data_path = self.output_dir / "experiments.json"
-        if not data_path.exists():
-            return {"entries": []}
-        return json.loads(data_path.read_text(encoding="utf-8"))
-
-    def _save_data(self, data):
-        data_path = self.output_dir / "experiments.json"
-
-        def _default(o):
-            if isinstance(o, np.ndarray):
-                return o.tolist()
-            return repr(o)
-
         data_path.write_text(
             json.dumps(
                 data,
@@ -75,3 +52,25 @@ class ExperimentLogger:
             ),
             encoding="utf-8",
         )
+
+        # report.txt
+        commandline = " ".join([shlex.quote(a) for a in sys.argv])
+        subject = f"[{now.isoformat()}] {commandline}"
+        if self.name is not None:
+            subject += f": {self.name}"
+        body = tk.evaluations.to_str(evals, multiline=True, precision=self.precision)
+        report_path = self.output_dir / "report.txt"
+        report_path.write_text(f"{subject}\n{body}")
+
+        # notifications
+        tk.notifications.post(body=body, subject=subject)
+
+
+def _default(o):
+    if isinstance(o, np.ndarray):
+        return o.tolist()
+    elif isinstance(o, np.floating):
+        return float(o)
+    elif isinstance(o, np.integer):
+        return float(o)
+    return repr(o)

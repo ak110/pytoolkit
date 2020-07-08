@@ -11,12 +11,11 @@ disable=
     import-outside-toplevel,
     invalid-name,
     invalid-unary-operand-type,  # for tf.Tensor
-    len-as-condition,
-    logging-format-interpolation,
     logging-fstring-interpolation,
     missing-docstring,
     no-else-return,
     no-self-use,
+    no-value-for-parameter,  # TF 2.2 False Positive
     too-few-public-methods,
     too-many-ancestors,
     too-many-arguments,
@@ -27,9 +26,7 @@ disable=
     too-many-nested-blocks,
     too-many-return-statements,
     too-many-statements,
-    using-constant-test,
     unexpected-keyword-arg,  # TF 2.2 False Positive
-    no-value-for-parameter,  # TF 2.2 False Positive
 
 [FORMAT]
 max-line-length=256
@@ -45,8 +42,6 @@ ignored-modules=
     matplotlib.cm,
     mpi4py,
     mpi4py.MPI,
-    numpy,
     optuna,
-    tensorflow,
     vmprof,
     xgboost,

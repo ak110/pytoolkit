@@ -18,7 +18,7 @@ import typing
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-if True:
+if True:  # pylint: disable=using-constant-test
     import pytoolkit as tk
 
 # -- Project information -----------------------------------------------------

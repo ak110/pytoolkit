@@ -80,6 +80,14 @@ pytoolkit.dl module
    :undoc-members:
    :show-inheritance:
 
+pytoolkit.exp module
+--------------------
+
+.. automodule:: pytoolkit.exp
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 pytoolkit.hpo module
 --------------------
 

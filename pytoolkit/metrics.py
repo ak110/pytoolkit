@@ -103,3 +103,34 @@ recall = tpr
 binary_accuracy.__name__ = "safe_acc"
 binary_iou.__name__ = "iou"
 categorical_iou.__name__ = "iou"
+
+
+class CosineSimilarity(tf.keras.metrics.Metric):
+    """コサイン類似度。"""
+
+    def __init__(self, from_logits=False, axis=-1, name="cs", **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.from_logits = from_logits
+        self.axis = axis
+        self.total = self.add_weight(name="total", initializer="zeros")
+        self.count = self.add_weight(name="count", initializer="zeros")
+
+    def update_state(self, y_true, y_pred):  # pylint: disable=arguments-differ
+        """指標の算出。"""
+        if self.from_logits:
+            y_pred = tf.nn.softmax(y_pred, axis=self.axis)
+        y_true = tf.math.l2_normalize(y_true, axis=self.axis)
+        y_pred = tf.math.l2_normalize(y_pred, axis=self.axis)
+        cs = tf.math.reduce_sum(y_true * y_pred, axis=self.axis)
+        cs = tf.math.reduce_mean(cs)
+        batch_size = tf.cast(tf.shape(y_true)[0], y_true.dtype)
+        self.total.assign_add(cs * batch_size)
+        self.count.assign_add(batch_size)
+
+    def result(self):
+        return self.total / tf.math.maximum(self.count, 1)
+
+    def get_config(self):
+        config = {"from_logits": self.from_logits, "axis": self.axis}
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))

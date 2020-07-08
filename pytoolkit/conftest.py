@@ -18,7 +18,7 @@ def data_dir():
     return pathlib.Path(__file__).resolve().parent / "_test_data"
 
 
-if True:
+if True:  # pylint: disable=using-constant-test
     import pytoolkit as tk
 
     tk.math.set_ndarray_format()
