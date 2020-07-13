@@ -90,7 +90,7 @@ def _categorical_loss_test(loss, symmetric):
     return loss1, loss2
 
 
-def test_ciou_loss():
+def test_ciou():
     y_true = tf.constant(
         [
             [
@@ -108,10 +108,10 @@ def test_ciou_loss():
         [
             [
                 [
-                    [150, 150, 250, 250],
                     [100, 100, 300, 300],
-                    [-1, -1, 0, 0],
+                    [150, 150, 250, 250],
                     [0, 0, 0, 0],
+                    [-1, -1, 0, 0],
                 ],
             ],
         ],
@@ -123,3 +123,9 @@ def test_ciou_loss():
     assert loss.ndim == 3
     assert not np.isnan(loss).any()
     assert not np.isinf(loss).any()
+    assert loss[..., 0] == 0.0
+    assert (loss[..., 1:] > 0).all()
+
+    # scale
+    loss_scaled = tk.losses.ciou(y_true * 123, y_pred * 123).numpy()
+    assert loss == pytest.approx(loss_scaled)

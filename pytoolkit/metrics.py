@@ -8,6 +8,7 @@ import pytoolkit as tk
 K = tf.keras.backend
 
 
+@tk.backend.name_scope
 def binary_accuracy(y_true, y_pred):
     """Soft-targetとかでも一応それっぽい値を返すbinary accuracy。
 
@@ -22,6 +23,7 @@ def binary_accuracy(y_true, y_pred):
     return tk.losses.reduce(K.cast(loss < th, "float32"), reduce_mode="mean")
 
 
+@tk.backend.name_scope
 def binary_iou(y_true, y_pred, target_classes=None, threshold=0.5):
     """画像ごとクラスごとのIoUを算出して平均するmetric。
 
@@ -41,6 +43,7 @@ def binary_iou(y_true, y_pred, target_classes=None, threshold=0.5):
     return inter / K.maximum(union, 1)
 
 
+@tk.backend.name_scope
 def categorical_iou(y_true, y_pred, target_classes=None, strict=True):
     """画像ごとクラスごとのIoUを算出して平均するmetric。
 
@@ -67,6 +70,7 @@ def categorical_iou(y_true, y_pred, target_classes=None, strict=True):
     return K.sum(iou_list, axis=0) / (K.sum(active_list, axis=0) + K.epsilon())
 
 
+@tk.backend.name_scope
 def tpr(y_true, y_pred):
     """True positive rate。(真陽性率、再現率、Recall)"""
     axes = list(range(1, K.ndim(y_true)))
@@ -75,6 +79,7 @@ def tpr(y_true, y_pred):
     return K.sum(pred * mask, axis=axes) / K.sum(mask, axis=axes)
 
 
+@tk.backend.name_scope
 def tnr(y_true, y_pred):
     """True negative rate。(真陰性率)"""
     axes = list(range(1, K.ndim(y_true)))
@@ -83,6 +88,7 @@ def tnr(y_true, y_pred):
     return K.sum(pred * mask, axis=axes) / K.sum(mask, axis=axes)
 
 
+@tk.backend.name_scope
 def fbeta_score(y_true, y_pred, beta=1):
     """Fβ-score。"""
     y_true = K.round(y_true)
@@ -94,6 +100,34 @@ def fbeta_score(y_true, y_pred, beta=1):
     prec = tp / (p + K.epsilon())
     rec = tp / (t + K.epsilon())
     return ((1 + beta ** 2) * prec * rec) / ((beta ** 2) * prec + rec + K.epsilon())
+
+
+@tk.backend.name_scope
+def iou(y_true, y_pred, epsilon=1e-7):
+    """bounding boxesのIoU。
+
+    Args:
+        y_true: 答えのbboxes。shape=(samples, anchors_h, anchors_w, 4)
+        y_pred: 出力のbboxes。shape=(samples, anchors_h, anchors_w, 4)
+
+    Returns:
+        IoU値。shape=(samples, anchors_h, anchors_w)
+
+    """
+    inter_lt = tf.math.maximum(y_true[..., :2], y_pred[..., :2])  # 左と上
+    inter_rb = tf.math.minimum(y_true[..., 2:], y_pred[..., 2:])  # 右と下
+    wh_true = tf.math.maximum(y_true[..., 2:] - y_true[..., :2], 0.0)
+    wh_pred = tf.math.maximum(y_pred[..., 2:] - y_pred[..., :2], 0.0)
+
+    has_area = tf.math.reduce_all(inter_lt < inter_rb, axis=-1)
+    area_inter = tf.math.reduce_prod(inter_rb - inter_lt, axis=-1) * tf.cast(
+        has_area, tf.float32
+    )
+    area_a = tf.math.reduce_prod(wh_true, axis=-1)
+    area_b = tf.math.reduce_prod(wh_pred, axis=-1)
+    area_union = area_a + area_b - area_inter
+    iou = area_inter / (area_union + epsilon)
+    return iou
 
 
 # 省略名・別名

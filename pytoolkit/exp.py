@@ -18,6 +18,7 @@ class ExperimentLogger:
     Args:
         output_dir: 出力先ディレクトリ
         name: 実験名とかメモ的なもの
+        precision: ログ出力時の小数点以下の桁数
 
     """
 
