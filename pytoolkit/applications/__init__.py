@@ -2,4 +2,4 @@
 # pylint: skip-file
 # flake8: noqa
 
-from . import darknet53, efficientnet, resnet34, seresnext50, xception
+from . import darknet53, efficientnet, resnet34, xception

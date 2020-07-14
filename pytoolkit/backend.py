@@ -46,7 +46,7 @@ def lovasz_weights(y_true, perm, alpha=None):
     weights = tf.concat((iou[:1], iou[1:] - iou[:-1]), 0)
     if alpha is not None:
         weights *= 2 * (y_true_sorted * alpha + (1 - y_true_sorted) * (1 - alpha))
-    return weights
+    return tf.stop_gradient(weights)
 
 
 @name_scope
@@ -64,7 +64,7 @@ def log_softmax(x, axis=-1):
 @name_scope
 def reduce_mask(x: tf.Tensor, mask: tf.Tensor, axis: typing.Sequence[int]):
     """加重平均。reduce_sum(x * mask, axis) / reduce_sum(mask, axis)"""
-    assert x.shape.rank == mask.shape.rank, f"shape error: {x=} {mask=}"
+    tf.debugging.assert_rank(x, mask.shape.rank)
     if mask.dtype != x.dtype:
         mask = tf.cast(mask, x.dtype)
     axis = tuple(axis)
@@ -76,5 +76,6 @@ def reduce_mask(x: tf.Tensor, mask: tf.Tensor, axis: typing.Sequence[int]):
 def reduce_losses(losses: typing.Sequence[tf.Tensor]):
     """1次元のtensorを複数受け取り、0次元のtensorを1つ返す。Endpointレイヤー作るとき用。"""
     for x in losses:
-        assert x.shape.rank == 1, f"shape error: {x}"
+        tf.debugging.assert_rank(x, 1)
+        x = tf.debugging.check_numerics(x, "losses")
     return tf.math.reduce_mean(tf.stack(losses))

@@ -9,7 +9,7 @@ import pytoolkit as tk
 @tk.backend.name_scope
 def reduce(x, reduce_mode):
     """バッチ次元だけ残して合計や平均を取る。"""
-    assert x.shape.rank >= 1, f"shape error: {x}"
+    tf.debugging.assert_rank_at_least(x, 1)
     if reduce_mode is None:
         return x
     axes = list(range(1, x.shape.rank))
@@ -233,7 +233,7 @@ def lovasz_hinge(
     else:
         raise ValueError(f"Invalid activation: {activation}")
     loss = tf.tensordot(errors_sorted, weights, 1)
-    assert loss.shape.rank == 0
+    tf.debugging.assert_rank(loss, 0)
     return loss
 
 
@@ -277,7 +277,7 @@ def lovasz_binary_crossentropy(
     errors_sorted = tf.gather(base_errors, perm)
     weights = tk.backend.lovasz_weights(y_true, perm, alpha=alpha)
     loss = tf.tensordot(errors_sorted, weights, 1)
-    assert loss.shape.rank == 0
+    tf.debugging.assert_rank(loss, 0)
     return loss
 
 
@@ -327,40 +327,53 @@ def ciou(y_true, y_pred, epsilon=1e-7):
         損失の値。shape=(samples, anchors_h, anchors_w)
 
     """
-    inter_lt = tf.math.maximum(y_true[..., :2], y_pred[..., :2])  # 左と上
-    inter_rb = tf.math.minimum(y_true[..., 2:], y_pred[..., 2:])  # 右と下
-    union_lt = tf.math.minimum(y_true[..., :2], y_pred[..., :2])  # 左と上
-    union_rb = tf.math.maximum(y_true[..., 2:], y_pred[..., 2:])  # 右と下
-    wh_true = tf.math.maximum(y_true[..., 2:] - y_true[..., :2], 0.0)
-    wh_pred = tf.math.maximum(y_pred[..., 2:] - y_pred[..., :2], 0.0)
-    c_true = (y_true[..., :2] + y_true[..., 2:]) / 2
-    c_pred = (y_pred[..., :2] + y_pred[..., 2:]) / 2
+    lt_true = tf.math.minimum(y_true[..., :2], y_true[..., 2:])
+    rb_true = tf.math.maximum(y_true[..., :2], y_true[..., 2:])
+    lt_pred = tf.math.minimum(y_pred[..., :2], y_pred[..., 2:])
+    rb_pred = tf.math.maximum(y_pred[..., :2], y_pred[..., 2:])
+    lt_inter = tf.math.maximum(lt_true, lt_pred)
+    rb_inter = tf.math.minimum(rb_true, rb_pred)
+    lt_union = tf.math.minimum(lt_true, lt_pred)
+    rb_union = tf.math.maximum(rb_true, rb_pred)
+    wh_true = tf.math.maximum(rb_true - lt_true, 0.0)
+    wh_pred = tf.math.maximum(rb_pred - lt_pred, 0.0)
+    c_true = (lt_true + rb_true) / 2
+    c_pred = (lt_pred + rb_pred) / 2
 
     with tf.name_scope("iou"):
-        has_area = tf.math.reduce_all(inter_lt < inter_rb, axis=-1)
-        area_inter = tf.math.reduce_prod(inter_rb - inter_lt, axis=-1) * tf.cast(
+        has_area = tf.math.reduce_all(lt_inter < rb_inter, axis=-1)
+        area_inter = tf.math.reduce_prod(rb_inter - lt_inter, axis=-1) * tf.cast(
             has_area, tf.float32
         )
         area_a = tf.math.reduce_prod(wh_true, axis=-1)
         area_b = tf.math.reduce_prod(wh_pred, axis=-1)
         area_union = area_a + area_b - area_inter
         iou = area_inter / (area_union + epsilon)
+        tf.debugging.assert_rank(iou, y_true.shape.rank - 1)
+        tf.debugging.assert_greater_equal(iou, 0.0, "iou >= 0.0")
+        tf.debugging.assert_less_equal(iou, 1.0, "iou <= 1.0")
 
     with tf.name_scope("distance"):
         d2 = tf.math.reduce_sum((c_true - c_pred) ** 2, axis=-1)
-        c2 = tf.math.reduce_sum((union_rb - union_lt) ** 2, axis=-1)
+        c2 = tf.math.reduce_sum((rb_union - lt_union) ** 2, axis=-1)
         r_diou = d2 / (c2 + epsilon)
+        tf.debugging.assert_rank(r_diou, y_true.shape.rank - 1)
+        tf.debugging.assert_greater_equal(r_diou, 0.0, "r_diou >= 0.0")
+        tf.debugging.assert_less_equal(r_diou, 1.0, "r_diou <= 1.0")
 
     with tf.name_scope("aspect_ratio"):
         atan_true = tf.math.atan(wh_true[..., 0] / (wh_true[..., 1] + epsilon))
         atan_pred = tf.math.atan(wh_pred[..., 0] / (wh_pred[..., 1] + epsilon))
         v = (4 / np.pi ** 2) * (atan_true - atan_pred) ** 2
+        tf.debugging.assert_rank(v, y_true.shape.rank - 1)
 
     with tf.name_scope("tradeoff"):
         alpha = v / ((1 - iou) + v + epsilon)
+        alpha = tf.stop_gradient(alpha)
+        tf.debugging.assert_rank(alpha, y_true.shape.rank - 1)
 
     with tf.name_scope("loss"):
         loss = 1 - iou + r_diou + alpha * v
-        assert loss.shape.rank == y_true.shape.rank - 1
+        tf.debugging.assert_rank(loss, y_true.shape.rank - 1)
 
     return loss

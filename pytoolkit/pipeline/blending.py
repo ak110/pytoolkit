@@ -84,9 +84,7 @@ class BlendingModel(Model):
     def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
         assert isinstance(dataset.data, np.ndarray)
         assert dataset.data.ndim == 2
-        assert (
-            dataset.data.shape[1] % self.num_models == 0
-        ), f"shape error: {dataset.data.shape}"
+        assert dataset.data.shape[1] % self.num_models == 0, f"shape error: {dataset}"
         data = self._get_data(dataset)
         return np.average(data, axis=1, weights=self.weights_)
 

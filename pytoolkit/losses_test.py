@@ -5,16 +5,21 @@ import tensorflow as tf
 import pytoolkit as tk
 
 
+def _run(func, *args, **kwargs):
+    """funcをグラフモードで実行する。"""
+    return tf.function(func)(*args, **kwargs)
+
+
 def test_binary_crossentropy():
     # 通常の動作確認
     _binary_loss_test(tk.losses.binary_crossentropy, symmetric=True)
     # alpha
     y_true = tf.constant([[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]])
     y_pred = tf.constant([[0.0, 0.3, 0.7, 1.0], [0.0, 0.3, 0.7, 1.0]])
-    loss_na = tk.losses.binary_crossentropy(y_true, y_pred).numpy()
-    loss_a3 = tk.losses.binary_crossentropy(y_true, y_pred, alpha=0.3).numpy()
-    loss_a5 = tk.losses.binary_crossentropy(y_true, y_pred, alpha=0.5).numpy()
-    loss_a7 = tk.losses.binary_crossentropy(y_true, y_pred, alpha=0.7).numpy()
+    loss_na = _run(tk.losses.binary_crossentropy, y_true, y_pred).numpy()
+    loss_a3 = _run(tk.losses.binary_crossentropy, y_true, y_pred, alpha=0.3).numpy()
+    loss_a5 = _run(tk.losses.binary_crossentropy, y_true, y_pred, alpha=0.5).numpy()
+    loss_a7 = _run(tk.losses.binary_crossentropy, y_true, y_pred, alpha=0.7).numpy()
     assert loss_na == pytest.approx(loss_a5, abs=1e-6)
     assert loss_a3[0] > loss_a3[1]
     assert loss_a7[0] < loss_a7[1]
@@ -32,8 +37,8 @@ def test_lovasz_hinge():
 def test_lovasz_binary_crossentropy():
     y_true = tf.constant([[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]])
     y_pred = tf.constant([[0.0, 0.3, 0.7, 1.0], [0.0, 0.3, 0.7, 1.0]])
-    loss1 = tk.losses.lovasz_binary_crossentropy(y_true, y_true).numpy()
-    loss2 = tk.losses.lovasz_binary_crossentropy(y_true, y_pred).numpy()
+    loss1 = _run(tk.losses.lovasz_binary_crossentropy, y_true, y_true).numpy()
+    loss2 = _run(tk.losses.lovasz_binary_crossentropy, y_true, y_pred).numpy()
     assert loss1 == pytest.approx(
         [0.01, 0.01], abs=1e-3
     ), "loss(y_true, y_true) == zeros"
@@ -41,10 +46,16 @@ def test_lovasz_binary_crossentropy():
     # alpha
     y_true = tf.constant([[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]])
     y_pred = tf.constant([[0.0, 0.3, 0.7, 1.0], [0.0, 0.3, 0.7, 1.0]])
-    loss_na = tk.losses.lovasz_binary_crossentropy(y_true, y_pred).numpy()
-    loss_a3 = tk.losses.lovasz_binary_crossentropy(y_true, y_pred, alpha=0.3).numpy()
-    loss_a5 = tk.losses.lovasz_binary_crossentropy(y_true, y_pred, alpha=0.5).numpy()
-    loss_a7 = tk.losses.lovasz_binary_crossentropy(y_true, y_pred, alpha=0.7).numpy()
+    loss_na = _run(tk.losses.lovasz_binary_crossentropy, y_true, y_pred).numpy()
+    loss_a3 = _run(
+        tk.losses.lovasz_binary_crossentropy, y_true, y_pred, alpha=0.3
+    ).numpy()
+    loss_a5 = _run(
+        tk.losses.lovasz_binary_crossentropy, y_true, y_pred, alpha=0.5
+    ).numpy()
+    loss_a7 = _run(
+        tk.losses.lovasz_binary_crossentropy, y_true, y_pred, alpha=0.7
+    ).numpy()
     assert loss_na == pytest.approx(loss_a5, abs=1e-6)
     assert loss_a3[0] > loss_a7[0]
     assert loss_a3[1] < loss_a7[1]
@@ -57,8 +68,8 @@ def test_categorical_focal_loss():
 def _binary_loss_test(loss, symmetric):
     y_true = tf.constant([[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]])
     y_pred = tf.constant([[0.0, 0.3, 0.7, 1.0], [0.0, 0.3, 0.7, 1.0]])
-    loss1 = loss(y_true, y_true).numpy()
-    loss2 = loss(y_true, y_pred).numpy()
+    loss1 = _run(loss, y_true, y_true).numpy()
+    loss2 = _run(loss, y_true, y_pred).numpy()
     assert loss1 == pytest.approx([0, 0], abs=1e-6), "loss(y_true, y_true) == zeros"
     assert (loss2 > np.array([0, 0])).all(), "loss(y_true, y_pred) > zeros"
     assert (
@@ -80,8 +91,8 @@ def _categorical_loss_test(loss, symmetric):
             [[1.0, 0.0], [0.7, 0.3], [0.3, 0.7], [0.0, 1.0]],
         ]
     )
-    loss1 = loss(y_true, y_true).numpy()
-    loss2 = loss(y_true, y_pred).numpy()
+    loss1 = _run(loss, y_true, y_true).numpy()
+    loss2 = _run(loss, y_true, y_pred).numpy()
     assert loss1 == pytest.approx([0, 0], abs=1e-6), "loss(y_true, y_true) == zeros"
     assert (loss2 > np.array([0, 0])).all(), "loss(y_true, y_pred) > zeros"
     assert (
@@ -119,7 +130,7 @@ def test_ciou():
     )
     assert y_true.shape.rank == 4
     assert y_pred.shape.rank == 4
-    loss = tk.losses.ciou(y_true, y_pred).numpy()
+    loss = _run(tk.losses.ciou, y_true, y_pred).numpy()
     assert loss.ndim == 3
     assert not np.isnan(loss).any()
     assert not np.isinf(loss).any()
@@ -127,5 +138,5 @@ def test_ciou():
     assert (loss[..., 1:] > 0).all()
 
     # scale
-    loss_scaled = tk.losses.ciou(y_true * 123, y_pred * 123).numpy()
+    loss_scaled = _run(tk.losses.ciou, y_true * 123, y_pred * 123).numpy()
     assert loss == pytest.approx(loss_scaled)

@@ -103,7 +103,7 @@ def fbeta_score(y_true, y_pred, beta=1):
 
 
 @tk.backend.name_scope
-def iou(y_true, y_pred, epsilon=1e-7):
+def bboxes_iou(y_true, y_pred, epsilon=1e-7):
     """bounding boxesのIoU。
 
     Args:

@@ -12,7 +12,7 @@ def test_binary_iou():
     assert metric.numpy() == pytest.approx(1 / 3)
 
 
-def test_iou():
+def test_bboxes_iou():
     y_true = tf.constant(
         [
             [
@@ -41,7 +41,7 @@ def test_iou():
     )
     assert y_true.shape.rank == 4
     assert y_pred.shape.rank == 4
-    loss = tk.metrics.iou(y_true, y_pred).numpy()
+    loss = tk.metrics.bboxes_iou(y_true, y_pred).numpy()
     assert loss.ndim == 3
     assert not np.isnan(loss).any()
     assert not np.isinf(loss).any()
@@ -50,5 +50,5 @@ def test_iou():
     assert (loss[..., 1:] >= 0).all()
 
     # scale
-    loss_scaled = tk.metrics.iou(y_true * 123, y_pred * 123).numpy()
+    loss_scaled = tk.metrics.bboxes_iou(y_true * 123, y_pred * 123).numpy()
     assert loss == pytest.approx(loss_scaled)

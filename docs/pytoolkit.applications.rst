@@ -28,14 +28,6 @@ pytoolkit.applications.resnet34 module
    :undoc-members:
    :show-inheritance:
 
-pytoolkit.applications.seresnext50 module
------------------------------------------
-
-.. automodule:: pytoolkit.applications.seresnext50
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 pytoolkit.applications.xception module
 --------------------------------------
 
