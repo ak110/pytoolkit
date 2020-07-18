@@ -97,10 +97,10 @@ class RandomTransform(A.DualTransform):
             size=size,
             flip=flip,
             translate=translate,
-            border_mode=border_mode,
             scale_prob=0.0,
             aspect_prob=0.0,
             rotate_prob=0.0,
+            border_mode=border_mode,
             clip_bboxes=clip_bboxes,
             preserve_aspect=preserve_aspect,
             always_apply=always_apply,
@@ -111,11 +111,12 @@ class RandomTransform(A.DualTransform):
     def create_test(
         cls,
         size: typing.Tuple[int, int],
+        border_mode: str = "edge",
         clip_bboxes: bool = True,
         preserve_aspect: bool = False,
         always_apply: bool = False,
         p: float = 1.0,
-    ):
+    ) -> RandomTransform:
         """Data Augmentation無しバージョン(リサイズのみ)を作成する。"""
         return cls(
             size=size,
@@ -124,6 +125,7 @@ class RandomTransform(A.DualTransform):
             scale_prob=0.0,
             aspect_prob=0.0,
             rotate_prob=0.0,
+            border_mode=border_mode,
             clip_bboxes=clip_bboxes,
             preserve_aspect=preserve_aspect,
             always_apply=always_apply,
@@ -869,16 +871,16 @@ class GridMask(A.ImageOnlyTransform):  # pylint: disable=abstract-method
 
     def __init__(
         self,
-        r=0.6,
-        d=(0.4, 1.0),
-        random_color=False,
-        fill_value=0,
-        always_apply=False,
-        p=0.7,
+        r: typing.Union[float, typing.Tuple[float, float]] = 0.6,
+        d: typing.Tuple[float, float] = (0.4, 1.0),
+        random_color: bool = False,
+        fill_value: int = 0,
+        always_apply: bool = False,
+        p: float = 0.7,
     ):
         super().__init__(always_apply=always_apply, p=p)
-        self.r = r if isinstance(r, tuple) else (r, r)
-        self.d = d
+        self.r: typing.Tuple[float, float] = r if isinstance(r, tuple) else (r, r)
+        self.d: typing.Tuple[float, float] = d
         self.random_color = random_color
         self.fill_value = fill_value
 

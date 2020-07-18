@@ -34,7 +34,7 @@ def normalize_tuple(value, n: int) -> typing.Tuple[int, ...]:
 
 def memoize(func):
     """単純なメモ化のデコレーター。"""
-    cache = {}
+    cache: typing.Dict[bytes, typing.Any] = {}
 
     @functools.wraps(func)
     def memoized_func(*args, **kwargs):

@@ -321,6 +321,7 @@ class DataLoader:
         ds = ds.map(
             process1,
             num_parallel_calls=tf.data.experimental.AUTOTUNE if self.parallel else None,
+            deterministic=False,
         )
         if self.data_per_sample > 1:
             ds = ds.repeat().batch(self.data_per_sample)
@@ -480,7 +481,7 @@ def mixup(
 
     ds = ds.repeat()
     ds = ds.batch(2)
-    ds = ds.map(mixup_fn, num_parallel_calls=num_parallel_calls)
+    ds = ds.map(mixup_fn, num_parallel_calls=num_parallel_calls, deterministic=False)
     return ds
 
 
