@@ -321,7 +321,7 @@ class DataLoader:
         ds = ds.map(
             process1,
             num_parallel_calls=tf.data.experimental.AUTOTUNE if self.parallel else None,
-            deterministic=False,
+            deterministic=not shuffle,
         )
         if self.data_per_sample > 1:
             ds = ds.repeat().batch(self.data_per_sample)
