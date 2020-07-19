@@ -12,7 +12,9 @@ def name_scope(f):
     @functools.wraps(f)
     def _scoped_func(*args, **kwargs):
         with tf.name_scope(f.__name__):
-            return f(*args, **kwargs)
+            value = f(*args, **kwargs)
+            tf.debugging.assert_all_finite(value, f.__name__)
+            return value
 
     return _scoped_func
 
@@ -77,5 +79,7 @@ def reduce_losses(losses: typing.Sequence[tf.Tensor]):
     """1次元のtensorを複数受け取り、0次元のtensorを1つ返す。Endpointレイヤー作るとき用。"""
     for x in losses:
         tf.debugging.assert_rank(x, 1)
-        x = tf.debugging.check_numerics(x, "losses")
-    return tf.math.reduce_mean(tf.stack(losses))
+        tf.debugging.assert_all_finite(x, str(x))
+    loss = tf.math.reduce_mean(tf.stack(losses))
+    tf.debugging.assert_all_finite(loss, str(loss))
+    return loss

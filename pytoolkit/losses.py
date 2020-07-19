@@ -350,6 +350,7 @@ def ciou(y_true, y_pred, epsilon=1e-7):
         area_union = area_a + area_b - area_inter
         iou = area_inter / (area_union + epsilon)
         tf.debugging.assert_rank(iou, y_true.shape.rank - 1)
+        tf.debugging.assert_all_finite(iou, "iou")
         tf.debugging.assert_greater_equal(iou, 0.0, "iou >= 0.0")
         tf.debugging.assert_less_equal(iou, 1.0, "iou <= 1.0")
 
@@ -358,22 +359,27 @@ def ciou(y_true, y_pred, epsilon=1e-7):
         c2 = tf.math.reduce_sum((rb_union - lt_union) ** 2, axis=-1)
         r_diou = d2 / (c2 + epsilon)
         tf.debugging.assert_rank(r_diou, y_true.shape.rank - 1)
+        tf.debugging.assert_all_finite(r_diou, "r_diou")
         tf.debugging.assert_greater_equal(r_diou, 0.0, "r_diou >= 0.0")
         tf.debugging.assert_less_equal(r_diou, 1.0, "r_diou <= 1.0")
 
     with tf.name_scope("aspect_ratio"):
-        atan_true = tf.math.atan(wh_true[..., 0] / (wh_true[..., 1] + epsilon))
-        atan_pred = tf.math.atan(wh_pred[..., 0] / (wh_pred[..., 1] + epsilon))
+        atan_true = tf.math.atan2(wh_true[..., 0], wh_true[..., 1])
+        atan_pred = tf.math.atan2(wh_pred[..., 0], wh_pred[..., 1])
         v = (4 / np.pi ** 2) * (atan_true - atan_pred) ** 2
+        v = tf.stop_gradient(v)
         tf.debugging.assert_rank(v, y_true.shape.rank - 1)
+        tf.debugging.assert_all_finite(v, "v")
 
     with tf.name_scope("tradeoff"):
         alpha = v / ((1 - iou) + v + epsilon)
         alpha = tf.stop_gradient(alpha)
+        tf.debugging.assert_all_finite(alpha, "alpha")
         tf.debugging.assert_rank(alpha, y_true.shape.rank - 1)
 
     with tf.name_scope("loss"):
         loss = 1 - iou + r_diou + alpha * v
+        tf.debugging.assert_all_finite(loss, "loss")
         tf.debugging.assert_rank(loss, y_true.shape.rank - 1)
 
     return loss
