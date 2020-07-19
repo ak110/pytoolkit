@@ -373,7 +373,6 @@ def ciou(y_true, y_pred, epsilon=1e-7):
 
     with tf.name_scope("tradeoff"):
         alpha = v / ((1 - iou) + v + epsilon)
-        alpha = tf.stop_gradient(alpha)
         tf.debugging.assert_all_finite(alpha, "alpha")
         tf.debugging.assert_rank(alpha, y_true.shape.rank - 1)
 
