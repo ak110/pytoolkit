@@ -117,6 +117,7 @@ def load_weights(
     model: tf.keras.models.Model,
     path: tk.typing.PathLike,
     by_name: bool = False,
+    skip_mismatch: bool = False,
     skip_not_exist: bool = False,
     strict: bool = True,
     strict_fraction: float = 0.95,
@@ -127,6 +128,7 @@ def load_weights(
         model: モデル
         path: ファイルパス
         by_name: レイヤー名が一致する重みを読むモードにするならTrue。Falseなら並び順。
+        skip_mismatch: shapeが不一致の場合にskipするならTrue。(by_name=Trueの場合のみ有効)
         skip_not_exist: ファイルが存在しない場合にエラーにしないならTrue。
         strict: 読み込み前と重みがあまり変わらなかったらエラーにする。
         strict_fraction: 重み不一致率の最低値。これ以下ならエラーにする。
@@ -142,11 +144,13 @@ def load_weights(
                 old_weights = model.get_weights()
             if path.is_dir():
                 # SavedModelはload_weights未対応？
-                # TODO: by_name対応？
+                # TODO: by_name, skip_mismatch対応？
                 loaded_model = tf.keras.models.load_model(str(path), compile=False)
                 model.set_weights(loaded_model.get_weights())
             else:
-                model.load_weights(str(path), by_name=by_name)
+                model.load_weights(
+                    str(path), by_name=by_name, skip_mismatch=skip_mismatch
+                )
             if strict:
                 new_weights = model.get_weights()
                 changed_params = np.sum(

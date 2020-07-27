@@ -68,7 +68,13 @@ def binary_crossentropy(
 
 @tk.backend.name_scope
 def binary_focal_loss(
-    y_true, y_pred, gamma=2.0, from_logits=False, alpha=None, reduce_mode="sum"
+    y_true,
+    y_pred,
+    gamma=2.0,
+    from_logits=False,
+    alpha=None,
+    label_smoothing=None,
+    reduce_mode="sum",
 ):
     """2クラス分類用Focal Loss <https://arxiv.org/abs/1708.02002>。
 
@@ -83,7 +89,8 @@ def binary_focal_loss(
     else:
         y_logit = tk.backend.logit(y_pred)
 
-    y_pred_inv = tf.cast(1 - tk.backend.clip64(y_pred), y_pred.dtype)
+    if label_smoothing is not None:
+        y_true = (1 - label_smoothing) * y_true + label_smoothing * 0.5
 
     # 前提知識:
     # -log(sigmoid(x)) = log(1 + exp(-x))
@@ -91,6 +98,8 @@ def binary_focal_loss(
     #                  = -x + log1p(exp(x))
     # -log(1 - sigmoid(x)) = log(exp(x) + 1)
     #                      = log1p(exp(x))
+
+    y_pred_inv = tf.cast(1 - tk.backend.clip64(y_pred), y_pred.dtype)
 
     t = tf.math.log1p(tf.math.exp(y_logit))
     loss1 = y_true * (y_pred_inv ** gamma) * (-y_logit + t)

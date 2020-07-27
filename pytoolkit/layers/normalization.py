@@ -25,39 +25,54 @@ class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
         stat_axes = [a for a in range(K.ndim(inputs)) if a not in target_axis]
 
         # 平均・分散の算出
-        x = inputs if K.dtype(inputs) == "float32" else K.cast(inputs, "float32")
+        x = K.cast(inputs, "float32")
         mean = K.mean(x, axis=stat_axes)
         squared_mean = K.mean(K.square(x), axis=stat_axes)
+
         # Sync BN
         if tk.hvd.initialized():
             import horovod.tensorflow as _hvd
 
             mean = _hvd.allreduce(mean, average=True)
             squared_mean = _hvd.allreduce(squared_mean, average=True)
+        elif (replica_context := tf.distribute.get_replica_context()) is not None:
+            mean = replica_context.all_reduce(tf.distribute.ReduceOp.MEAN, mean)
+            squared_mean = replica_context.all_reduce(
+                tf.distribute.ReduceOp.MEAN, squared_mean
+            )
+        else:
+            strategy = tf.distribute.get_strategy()
+            mean = strategy.reduce(tf.distribute.ReduceOp.MEAN, mean, axis=None)
+            squared_mean = strategy.reduce(
+                tf.distribute.ReduceOp.MEAN, squared_mean, axis=None
+            )
+
         var = squared_mean - K.square(mean)
 
-        # exponential moving average:
-        # m_new = m_old * 0.99 + x * 0.01
-        # m_new - m_old = (x - m_old) * 0.01
-        decay = 1 - self.momentum
-        update1 = tf.compat.v1.assign_add(
-            self.moving_mean, (mean - self.moving_mean) * decay
+        # exponential moving average
+        self.add_update(
+            [
+                tf.keras.backend.moving_average_update(
+                    self.moving_mean, mean, self.momentum
+                ),
+                tf.keras.backend.moving_average_update(
+                    self.moving_variance, var, self.momentum
+                ),
+            ]
         )
-        update2 = tf.compat.v1.assign_add(
-            self.moving_variance, (var - self.moving_variance) * decay
-        )
-        self.add_update([update1, update2], inputs)
+        tf.debugging.assert_all_finite(self.moving_mean, "moving_mean")
+        tf.debugging.assert_all_finite(self.moving_variance, "moving_variance")
 
         # y = (x - mean) / (sqrt(var) + epsilon) * gamma + beta
         #   = x * gamma / (sqrt(var) + epsilon) + (beta - mean * gamma / (sqrt(var) + epsilon))
         #   = x * a + (beta - mean * a)
-        a = self.gamma * tf.math.rsqrt(var + 1e-7)
+        a = self.gamma * tf.math.rsqrt(var + self.epsilon)
         b = self.beta - mean * a
         return inputs * K.cast(a, K.dtype(inputs)) + K.cast(b, K.dtype(inputs))
 
     def _bn_test(self, inputs):
         """予測時のBN。"""
-        a = self.gamma / tf.math.rsqrt(self.moving_variance + 1e-7)
+        a = self.gamma * tf.math.rsqrt(self.moving_variance + self.epsilon)
         b = self.beta - self.moving_mean * a
         return inputs * K.cast(a, K.dtype(inputs)) + K.cast(b, K.dtype(inputs))
 
