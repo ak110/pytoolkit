@@ -1,4 +1,4 @@
-"""tf.keras.backendやtensorflowの基礎的な関数など。"""
+"""TensorFlowの基礎的な関数。"""
 import functools
 import typing
 

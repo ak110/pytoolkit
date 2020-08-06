@@ -7,13 +7,18 @@ import pytoolkit as tk
 
 @pytest.mark.parametrize("mode", ["hdf5", "saved_model", "onnx", "tflite"])
 def test_save(tmpdir, mode):
+    if mode == "tflite" and tf.version.VERSION.startswith("2.3."):
+        pytest.xfail("bug in TFLiteConverter (TF 2.3)")
+
     path = str(tmpdir / "model")
+
     inputs = x = tf.keras.layers.Input((32, 32, 3))
     x = tf.keras.layers.Conv2D(16, 3, padding="same")(x)
     x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.Dropout(0.25)(x)
     x = tk.layers.Resize2D((8, 8))(x)
     x = tk.layers.GroupNormalization()(x)
+    x = tk.layers.SyncBatchNormalization()(x)
     x = tk.layers.BlurPooling2D()(x)
     x = tk.layers.GeMPooling2D()(x)
     model = tf.keras.models.Model(inputs, x)

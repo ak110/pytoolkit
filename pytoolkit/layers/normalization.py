@@ -291,14 +291,14 @@ class GroupNormalization(tf.keras.layers.Layer):
             N, H, W, C = shape[0], shape[1], shape[2], shape[3]
             g = K.minimum(self.groups, C)
             x = tf.reshape(x, [N, H, W, g, C // g])
-            mean, var = tf.nn.moments(x=x, axes=[1, 2, 4], keepdims=True)
+            mean, var = tf.nn.moments(x, axes=[1, 2, 4], keepdims=True)
             x = (x - mean) * tf.math.rsqrt(var + self.epsilon)
             x = tf.reshape(x, [N, H, W, C])
         elif ndim == 5:  # 3D
             N, T, H, W, C = shape[0], shape[1], shape[2], shape[3], shape[4]
             g = K.minimum(self.groups, C)
             x = tf.reshape(x, [N, T, H, W, g, C // g])
-            mean, var = tf.nn.moments(x=x, axes=[1, 2, 3, 5], keepdims=True)
+            mean, var = tf.nn.moments(x, axes=[1, 2, 3, 5], keepdims=True)
             x = (x - mean) * tf.math.rsqrt(var + self.epsilon)
             x = tf.reshape(x, [N, T, H, W, C])
         else:
