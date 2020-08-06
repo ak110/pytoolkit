@@ -7,74 +7,208 @@ K = tf.keras.backend
 
 
 @tf.keras.utils.register_keras_serializable(package="pytoolkit")
-class SyncBatchNormalization(tf.keras.layers.BatchNormalization):
+class SyncBatchNormalization(tf.keras.layers.Layer):
     """Sync BN。"""
+
+    def __init__(
+        self,
+        axis=-1,
+        momentum=0.99,
+        epsilon=1e-3,
+        center=True,
+        scale=True,
+        beta_initializer="zeros",
+        gamma_initializer="ones",
+        moving_mean_initializer="zeros",
+        moving_variance_initializer="ones",
+        beta_regularizer=None,
+        gamma_regularizer=None,
+        beta_constraint=None,
+        gamma_constraint=None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.axis = axis
+        self.momentum = momentum
+        self.epsilon = epsilon
+        self.center = center
+        self.scale = scale
+        self.beta_initializer = tf.keras.initializers.get(beta_initializer)
+        self.gamma_initializer = tf.keras.initializers.get(gamma_initializer)
+        self.moving_mean_initializer = tf.keras.initializers.get(
+            moving_mean_initializer
+        )
+        self.moving_variance_initializer = tf.keras.initializers.get(
+            moving_variance_initializer
+        )
+        self.beta_regularizer = tf.keras.regularizers.get(beta_regularizer)
+        self.gamma_regularizer = tf.keras.regularizers.get(gamma_regularizer)
+        self.beta_constraint = tf.keras.constraints.get(beta_constraint)
+        self.gamma_constraint = tf.keras.constraints.get(gamma_constraint)
+        self.supports_masking = True
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
+
+    def build(self, input_shape):
+        # pylint: disable=attribute-defined-outside-init
+
+        target_axes = self._get_target_axes(ndims=len(input_shape))
+        param_shape = [s for i, s in enumerate(input_shape) if i in target_axes]
+
+        if self.scale:
+            self.gamma = self.add_weight(
+                shape=param_shape,
+                name="gamma",
+                initializer=self.gamma_initializer,
+                regularizer=self.gamma_regularizer,
+                constraint=self.gamma_constraint,
+            )
+        else:
+            self.gamma = None
+        if self.center:
+            self.beta = self.add_weight(
+                shape=param_shape,
+                name="beta",
+                initializer=self.beta_initializer,
+                regularizer=self.beta_regularizer,
+                constraint=self.beta_constraint,
+            )
+        else:
+            self.beta = None
+
+        self.moving_mean = self.add_weight(
+            name="moving_mean",
+            shape=param_shape,
+            dtype=tf.float32,
+            initializer=self.moving_mean_initializer,
+            trainable=False,
+            synchronization=tf.VariableSynchronization.ON_WRITE,
+            aggregation=tf.VariableAggregation.ONLY_FIRST_REPLICA,
+            experimental_autocast=False,
+        )
+
+        self.moving_variance = self.add_weight(
+            name="moving_variance",
+            shape=param_shape,
+            dtype=tf.float32,
+            initializer=self.moving_variance_initializer,
+            trainable=False,
+            synchronization=tf.VariableSynchronization.ON_WRITE,
+            aggregation=tf.VariableAggregation.ONLY_FIRST_REPLICA,
+            experimental_autocast=False,
+        )
+
+        super().build(input_shape)
 
     def call(self, inputs, training=None, **kwargs):  # pylint: disable=arguments-differ
         del kwargs
-        return K.in_train_phase(
-            lambda: self._bn_train(inputs), lambda: self._bn_test(inputs), training
+        return tf.keras.backend.in_train_phase(
+            lambda: self._bn_train(inputs),
+            lambda: self._bn_test(inputs),
+            training if self.trainable else False,
         )
 
     def _bn_train(self, inputs):
         """学習時のBN。"""
         # self.axisを除く軸で平均・分散を算出する
-        target_axis = self.axis
-        if isinstance(target_axis, int):
-            target_axis = [target_axis]
-        stat_axes = [a for a in range(K.ndim(inputs)) if a not in target_axis]
+        target_axes = self._get_target_axes(ndims=inputs.shape.rank)
+        stat_axes = [a for a in range(inputs.shape.rank) if a not in target_axes]
 
         # 平均・分散の算出
-        x = K.cast(inputs, "float32")
-        mean = K.mean(x, axis=stat_axes)
-        squared_mean = K.mean(K.square(x), axis=stat_axes)
+        x = tf.cast(inputs, tf.float32)
+        x = tf.debugging.assert_all_finite(x, "x")
+        mean = tf.math.reduce_mean(x, axis=stat_axes)
+        squared_mean = tf.math.reduce_mean(tf.math.square(x), axis=stat_axes)
+        mean = tf.debugging.assert_all_finite(mean, "mean")
+        squared_mean = tf.debugging.assert_all_finite(squared_mean, "squared_mean")
 
         # Sync BN
         if tk.hvd.initialized():
             import horovod.tensorflow as _hvd
 
-            mean = _hvd.allreduce(mean, average=True)
-            squared_mean = _hvd.allreduce(squared_mean, average=True)
-        elif (replica_context := tf.distribute.get_replica_context()) is not None:
-            mean = replica_context.all_reduce(tf.distribute.ReduceOp.MEAN, mean)
-            squared_mean = replica_context.all_reduce(
-                tf.distribute.ReduceOp.MEAN, squared_mean
-            )
+            mean = _hvd.allreduce(mean, op=_hvd.Average)
+            squared_mean = _hvd.allreduce(squared_mean, op=_hvd.Average)
         else:
-            strategy = tf.distribute.get_strategy()
-            mean = strategy.reduce(tf.distribute.ReduceOp.MEAN, mean, axis=None)
-            squared_mean = strategy.reduce(
-                tf.distribute.ReduceOp.MEAN, squared_mean, axis=None
-            )
+            replica_context = tf.distribute.get_replica_context()
+            if replica_context is not None:
+                mean = replica_context.all_reduce(tf.distribute.ReduceOp.MEAN, mean)
+                squared_mean = replica_context.all_reduce(
+                    tf.distribute.ReduceOp.MEAN, squared_mean
+                )
+            else:
+                strategy = tf.distribute.get_strategy()
+                mean = strategy.reduce(tf.distribute.ReduceOp.MEAN, mean, axis=None)
+                squared_mean = strategy.reduce(
+                    tf.distribute.ReduceOp.MEAN, squared_mean, axis=None
+                )
 
-        var = squared_mean - K.square(mean)
+        var = squared_mean - tf.math.square(mean)
+        mean = tf.debugging.assert_all_finite(mean, "reduced mean")
+        var = tf.debugging.assert_all_finite(var, "reduced var")
 
-        # exponential moving average
+        # exponential moving average:
+        # m_new = m_old * 0.99 + x * 0.01
+        # m_new - m_old = (x - m_old) * 0.01
+        decay = 1 - self.momentum
         self.add_update(
             [
-                tf.keras.backend.moving_average_update(
-                    self.moving_mean, mean, self.momentum
+                self.moving_mean.assign_add(
+                    (mean - self.moving_mean) * decay, read_value=False,
                 ),
-                tf.keras.backend.moving_average_update(
-                    self.moving_variance, var, self.momentum
+                self.moving_variance.assign_add(
+                    (var - self.moving_variance) * decay, read_value=False,
                 ),
             ]
         )
-        tf.debugging.assert_all_finite(self.moving_mean, "moving_mean")
-        tf.debugging.assert_all_finite(self.moving_variance, "moving_variance")
 
         # y = (x - mean) / (sqrt(var) + epsilon) * gamma + beta
         #   = x * gamma / (sqrt(var) + epsilon) + (beta - mean * gamma / (sqrt(var) + epsilon))
         #   = x * a + (beta - mean * a)
         a = self.gamma * tf.math.rsqrt(var + self.epsilon)
         b = self.beta - mean * a
-        return inputs * K.cast(a, K.dtype(inputs)) + K.cast(b, K.dtype(inputs))
+        return K.cast(x * a + b, K.dtype(inputs))
 
     def _bn_test(self, inputs):
         """予測時のBN。"""
+        x = tf.cast(inputs, tf.float32)
         a = self.gamma * tf.math.rsqrt(self.moving_variance + self.epsilon)
         b = self.beta - self.moving_mean * a
-        return inputs * K.cast(a, K.dtype(inputs)) + K.cast(b, K.dtype(inputs))
+        return tf.cast(x * a + b, inputs.dtype)
+
+    def _get_target_axes(self, ndims):
+        axes = [self.axis] if isinstance(self.axis, int) else list(self.axis)
+        for idx, x in enumerate(axes):
+            if x < 0:
+                axes[idx] = ndims + x
+        return axes
+
+    def get_config(self):
+        config = {
+            "axis": self.axis,
+            "momentum": self.momentum,
+            "epsilon": self.epsilon,
+            "center": self.center,
+            "scale": self.scale,
+            "beta_initializer": tf.keras.initializers.serialize(self.beta_initializer),
+            "gamma_initializer": tf.keras.initializers.serialize(
+                self.gamma_initializer
+            ),
+            "moving_mean_initializer": tf.keras.initializers.serialize(
+                self.moving_mean_initializer
+            ),
+            "moving_variance_initializer": tf.keras.initializers.serialize(
+                self.moving_variance_initializer
+            ),
+            "beta_regularizer": tf.keras.regularizers.serialize(self.beta_regularizer),
+            "gamma_regularizer": tf.keras.regularizers.serialize(
+                self.gamma_regularizer
+            ),
+            "beta_constraint": tf.keras.constraints.serialize(self.beta_constraint),
+            "gamma_constraint": tf.keras.constraints.serialize(self.gamma_constraint),
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
 
 
 @tf.keras.utils.register_keras_serializable(package="pytoolkit")

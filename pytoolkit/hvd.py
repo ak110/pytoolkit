@@ -27,12 +27,11 @@ def init() -> None:
             assert get().mpi_threads_supported()
 
             gpus = tf.config.experimental.list_physical_devices("GPU")
-            for gpu in gpus:
-                tf.config.experimental.set_memory_growth(gpu, True)
             if gpus:
                 tf.config.experimental.set_visible_devices(
                     gpus[get().local_rank()], "GPU"
                 )
+
             _initialized = True
         except ImportError:
             tk.log.get(__name__).warning("Horovod読み込み失敗", exc_info=True)
@@ -83,10 +82,13 @@ def allgather(value):
     return value
 
 
-def allreduce(value, average: bool = True):
-    """全ワーカーからデータを集める。"""
+def allreduce(value, op: str = "average"):
+    """全ワーカーからデータを集める。opはaverage, sum, adasum"""
     if initialized():
-        value = get().allreduce(value, average=average)
+        hvd_op = {"average": get().Average, "sum": get().Sum, "adasum": get().AdaSum}[
+            op
+        ]
+        value = get().allreduce(value, op=hvd_op)
         # tensorが来たらnumpy化
         if hasattr(value, "numpy"):
             value = value.numpy()
