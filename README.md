@@ -30,7 +30,7 @@ cookiecutter gh:ak110/cookiecutter-pytoolkit
 - numba
 - pandas
 - scikit-learn
-- tensorflow>=2.1.0
+- tensorflow>=2.2.0
 
 ## 使うときに動的にimportしている依存ライブラリ
 
@@ -38,18 +38,21 @@ cookiecutter gh:ak110/cookiecutter-pytoolkit
 - catboost
 - category_encoders
 - chainercv
+- efficientnet
+- git+https://github.com/cocodataset/coco.git#egg=pycocotools&subdirectory=PythonAPI
 - h5py
 - horovod
+- image-classifiers
 - ipython
 - keras2onnx>=1.7.0
 - lightgbm
 - matplotlib
 - mpi4py
+- nbformat
 - onnxmltools
 - optuna
 - python-dotenv
 - requests
-- tf2cv
 - tf2onnx>=1.6.1
 - tqdm
 - xgboost

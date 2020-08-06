@@ -11,6 +11,7 @@ from .misc_test import _predict_layer
 @pytest.mark.parametrize("trainable", [False, True])
 def test_SyncBatchNormalization(distribute, trainable):
     if distribute:
+        # pylint: disable=protected-access
         old_flag, tk.hvd._initialized = tk.hvd._initialized, False
         try:
             strategy = tf.distribute.MirroredStrategy()

@@ -1,22 +1,35 @@
 language: python
-cache: pip
 
 python:
   - "3.8"
+
+cache:
+  pip: true
+  directories:
+    - $HOME/.cache/pypoetry
+
+# https://docs.travis-ci.com/user/caching/#before_cache-phase
+before_cache:
+  - rm -f $HOME/.cache/pip/log/debug.log
 
 env:
   global:
     - OMP_NUM_THREADS=4
     - CUDA_VISIBLE_DEVICES=-1
 
+before_install:
+  - sudo apt-get install --yes graphviz
+  - pip install --upgrade pip
+  - pip install poetry
+  - poetry config cache-dir "$HOME/.cache/pypoetry"
+
 install:
-  - sudo apt-get install graphviz
-  - pip install cython
-  - pip install --upgrade -r requirements.travis.txt
+  - poetry install --extras "tests tensorflow-cpu"
+  - poetry run pip install "git+https://github.com/cocodataset/coco.git#egg=pycocotools&subdirectory=PythonAPI"
 
 script:
-  - black --check .
-  - flake8
-  - mypy pytoolkit
-  - pylint --jobs=4 pytoolkit
-  - pytest pytoolkit
+  - poetry run black --check .
+  - poetry run flake8
+  - poetry run mypy pytoolkit
+  - poetry run pylint --jobs=4 pytoolkit
+  - poetry run pytest pytoolkit
