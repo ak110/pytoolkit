@@ -25,6 +25,7 @@ class SyncBatchNormalization(tf.keras.layers.Layer):
         gamma_regularizer=None,
         beta_constraint=None,
         gamma_constraint=None,
+        stop_gradient=False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -45,6 +46,7 @@ class SyncBatchNormalization(tf.keras.layers.Layer):
         self.gamma_regularizer = tf.keras.regularizers.get(gamma_regularizer)
         self.beta_constraint = tf.keras.constraints.get(beta_constraint)
         self.gamma_constraint = tf.keras.constraints.get(gamma_constraint)
+        self.stop_gradient = stop_gradient
         self.supports_masking = True
 
     def compute_output_shape(self, input_shape):
@@ -117,9 +119,11 @@ class SyncBatchNormalization(tf.keras.layers.Layer):
 
         # 平均・分散の算出
         x = tf.cast(inputs, tf.float32)
-        x = tf.debugging.assert_all_finite(x, "x")
+        if tf.version.VERSION.startswith("2.2"):  # workaround
+            x = tf.debugging.assert_all_finite(x, "x")
         mean = tf.math.reduce_mean(x, axis=stat_axes)
         squared_mean = tf.math.reduce_mean(tf.math.square(x), axis=stat_axes)
+        # if tf.version.VERSION.startswith("2.2"):  # workaround
         mean = tf.debugging.assert_all_finite(mean, "mean")
         squared_mean = tf.debugging.assert_all_finite(squared_mean, "squared_mean")
 
@@ -144,8 +148,9 @@ class SyncBatchNormalization(tf.keras.layers.Layer):
                 )
 
         var = squared_mean - tf.math.square(mean)
-        mean = tf.debugging.assert_all_finite(mean, "reduced mean")
-        var = tf.debugging.assert_all_finite(var, "reduced var")
+        if tf.version.VERSION.startswith("2.2"):  # workaround
+            mean = tf.debugging.assert_all_finite(mean, "reduced mean")
+            var = tf.debugging.assert_all_finite(var, "reduced var")
 
         # exponential moving average:
         # m_new = m_old * 0.99 + x * 0.01
@@ -161,6 +166,10 @@ class SyncBatchNormalization(tf.keras.layers.Layer):
                 ),
             ]
         )
+
+        if self.stop_gradient:
+            mean = tf.stop_gradient(mean)
+            var = tf.stop_gradient(var)
 
         # y = (x - mean) / (sqrt(var) + epsilon) * gamma + beta
         #   = x * gamma / (sqrt(var) + epsilon) + (beta - mean * gamma / (sqrt(var) + epsilon))

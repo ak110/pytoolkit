@@ -1,6 +1,7 @@
 """物体検出関連。"""
 from __future__ import annotations
 
+import dataclasses
 import pathlib
 import typing
 import warnings
@@ -11,6 +12,7 @@ import numpy as np
 import pytoolkit as tk
 
 
+@dataclasses.dataclass
 class ObjectsAnnotation:
     """物体検出のアノテーションデータを持つためのクラス。
 
@@ -25,6 +27,15 @@ class ObjectsAnnotation:
         crowdeds: クラウドソーシングでアノテーションされたか否か (MS COCO用)
 
     """
+
+    path: pathlib.Path
+    width: int
+    height: int
+    classes: np.ndarray
+    bboxes: np.ndarray
+    difficults: np.ndarray = None
+    areas: np.ndarray = None
+    crowdeds: np.ndarray = None
 
     @staticmethod
     def create_dataset(
@@ -58,38 +69,57 @@ class ObjectsAnnotation:
         areas=None,
         crowdeds=None,
     ):
-        assert len(classes) == len(bboxes)
-        assert difficults is None or len(classes) == len(difficults)
         self.path = pathlib.Path(path)
         self.width = width
         self.height = height
         self.classes = np.asarray(classes, dtype=np.int32)
         self.bboxes = np.asarray(bboxes, dtype=np.float32)
-        if self.num_objects == 0:
-            self.bboxes = self.bboxes.reshape((self.num_objects, 4))
         self.difficults = (
-            np.asarray(difficults, dtype=np.bool)
-            if difficults is not None
-            else np.zeros(len(classes), dtype=np.bool)
+            np.asarray(difficults, dtype=np.bool) if difficults is not None else None
         )
         self.areas = np.asarray(areas, dtype=np.float32) if areas is not None else None
         self.crowdeds = (
             np.asarray(crowdeds, dtype=np.bool) if crowdeds is not None else None
         )
-        assert self.width >= 1, str(self.width)
-        assert self.height >= 1, str(self.height)
-        assert (self.bboxes >= 0).all(), str(self.bboxes)
-        assert (self.bboxes <= 1).all(), str(self.bboxes)
-        assert (self.bboxes[:, :2] < self.bboxes[:, 2:]).all(), str(self.bboxes)
-        assert self.classes.shape == (self.num_objects,), str(self.classes)
-        assert self.bboxes.shape == (self.num_objects, 4), str(self.bboxes)
-        assert self.difficults.shape == (self.num_objects,), str(self.difficults)
-        assert self.areas is None or self.areas.shape == (self.num_objects,), str(
-            self.areas
-        )
-        assert self.crowdeds is None or self.crowdeds.shape == (self.num_objects,), str(
-            self.crowdeds
-        )
+        self.__post_init__()
+
+    def __post_init__(self):
+        assert len(self.classes) == len(self.bboxes)
+        assert self.width >= 1, f"Value error: {self.width=}"
+        assert self.height >= 1, f"Value error: {self.height=}"
+        assert self.classes.dtype == np.int32, f"dtype error: {self.classes.dtype}"
+        assert self.bboxes.dtype == np.float32, f"dtype error: {self.bboxes.dtype}"
+        if self.num_objects == 0:
+            self.bboxes = self.bboxes.reshape((self.num_objects, 4))
+        assert self.classes.shape == (
+            self.num_objects,
+        ), f"Shape error: {self.classes.shape}"
+        assert self.bboxes.shape == (
+            self.num_objects,
+            4,
+        ), f"Shape error: {self.bboxes.shape}"
+        assert (self.bboxes >= 0).all(), f"Value error: {self.bboxes}"
+        assert (self.bboxes <= 1).all(), f"Value error: {self.bboxes}"
+        assert (
+            self.bboxes[:, :2] < self.bboxes[:, 2:]
+        ).all(), f"Value error: {self.bboxes}"
+        if self.difficults is not None:
+            assert (
+                self.difficults.dtype == np.bool
+            ), f"dtype error: {self.difficults.dtype}"
+            assert self.difficults.shape == (
+                self.num_objects,
+            ), f"Shape error: {self.difficults.shape}"
+        if self.areas is not None:
+            assert self.areas.dtype == np.float32, f"dtype error: {self.areas.dtype}"
+            assert self.areas.shape == (
+                self.num_objects,
+            ), f"Shape error: {self.areas.shape=}"
+        if self.crowdeds is not None:
+            assert self.crowdeds.dtype == np.bool, f"dtype error: {self.crowdeds.dtype}"
+            assert self.crowdeds.shape == (
+                self.num_objects,
+            ), f"Shape error: {self.crowdeds.shape=}"
 
     @property
     def num_objects(self):
@@ -115,18 +145,6 @@ class ObjectsAnnotation:
             # 縦長の場合、左右にパディングする想定で補正
             bboxes[:, [0, 2]] *= self.width / self.height
         return bboxes
-
-    def __repr__(self):
-        """文字列化。"""
-        return (
-            f"{type(self).__module__}.{type(self).__name__}("
-            f"path={repr(self.path)},"
-            f" width={repr(self.width)},"
-            f" height={repr(self.height)},"
-            f" classes={repr(self.classes)},"
-            f" bboxes={repr(self.bboxes)},"
-            f" difficults={repr(self.difficults)})"
-        )
 
     def to_str(self, class_names):
         """表示用の文字列化"""
@@ -163,6 +181,7 @@ class ObjectsAnnotation:
             self.bboxes[:, [0, 2]] = 1 - self.bboxes[:, [2, 0]]
 
 
+@dataclasses.dataclass
 class ObjectsPrediction:
     """物体検出の予測結果を持つクラス。
 
@@ -173,27 +192,32 @@ class ObjectsPrediction:
 
     """
 
+    classes: np.ndarray
+    confs: np.ndarray
+    bboxes: np.ndarray
+
     def __init__(self, classes, confs, bboxes):
-        self.classes = np.asarray(classes)
-        self.confs = np.asarray(confs)
-        self.bboxes = np.asarray(bboxes)
+        self.classes = np.asarray(classes, dtype=np.int32)
+        self.confs = np.asarray(confs, dtype=np.float32)
+        self.bboxes = np.asarray(bboxes, dtype=np.float32)
+        self.__post_init__()
+
+    def __post_init__(self):
         assert self.classes.shape == (self.num_objects,)
         assert self.confs.shape == (self.num_objects,)
         assert self.bboxes.shape == (self.num_objects, 4)
+
+    def apply_threshold(self, conf_threshold: float) -> ObjectsPrediction:
+        """確信度が閾値未満の物体を削除したものを作成して返す。"""
+        mask = self.confs >= conf_threshold
+        return ObjectsPrediction(
+            classes=self.classes[mask], confs=self.confs[mask], bboxes=self.bboxes[mask]
+        )
 
     @property
     def num_objects(self):
         """物体の数を返す。"""
         return len(self.classes)
-
-    def __repr__(self):
-        """文字列化。"""
-        return (
-            f"{type(self).__module__}.{type(self).__name__}("
-            f"classes={repr(self.classes)},"
-            f" confs={repr(self.confs)},"
-            f" bboxes={repr(self.bboxes)})"
-        )
 
     def to_str(self, width, height, class_names, conf_threshold=0):
         """表示用の文字列化"""
@@ -320,9 +344,12 @@ def compute_scores(
         # conf_threshold以上をいったんすべて対象とする
         pred_enabled = yp.confs >= conf_threshold
         # 各正解が予測結果に含まれるか否か: true positive/negative
-        for gt_class, gt_bbox, gt_difficult in zip(
-            yt.classes, yt.bboxes, yt.difficults
-        ):
+        difficults = (
+            yt.difficults
+            if yt.difficults is not None
+            else np.zeros((yt.num_objects,), dtype=np.bool)
+        )
+        for gt_class, gt_bbox, gt_difficult in zip(yt.classes, yt.bboxes, difficults):
             pred_mask = np.logical_and(pred_enabled, yp.classes == gt_class)
             if pred_mask.any():
                 pred_bboxes = yp.bboxes[pred_mask]
