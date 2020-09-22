@@ -223,7 +223,9 @@ class DataLoader:
         self.batch_size = batch_size
         self.data_per_sample = data_per_sample
         self.parallel = parallel
-        self.num_replicas_in_sync: int = num_replicas_in_sync or tf.distribute.get_strategy().num_replicas_in_sync
+        self.num_replicas_in_sync: int = (
+            num_replicas_in_sync or tf.distribute.get_strategy().num_replicas_in_sync
+        )
 
     def load(self, dataset: Dataset) -> Iterator:
         """データを読み込んだことにする。"""

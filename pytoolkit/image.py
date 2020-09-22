@@ -134,7 +134,7 @@ class RandomTransform(A.DualTransform):
 
     def __init__(
         self,
-        size,
+        size: typing.Tuple[int, int],
         flip: typing.Tuple[bool, bool] = (False, True),
         translate: typing.Tuple[float, float] = (0.125, 0.125),
         scale_prob: float = 0.5,

@@ -364,7 +364,10 @@ def fit(
         train_iterator.dataset, shuffle=True
     )
     val_ds, val_steps = (
-        val_iterator.data_loader.get_ds(val_iterator.dataset, shuffle=use_horovod,)
+        val_iterator.data_loader.get_ds(
+            val_iterator.dataset,
+            shuffle=use_horovod,
+        )
         if val_iterator is not None
         else (None, 0)
     )
@@ -402,7 +405,9 @@ def make_val_freq(val_freq, epochs, train_size, val_size, max_val_per_train=0.1)
     # sqrt(epochs)回くらいやれば十分？ (指標にも依るが…)
     # valがtrainの10%未満くらいなら毎回やっても問題無い
     val_freq = max(
-        int(np.sqrt(epochs)), int(val_size / (train_size * max_val_per_train)), 1,
+        int(np.sqrt(epochs)),
+        int(val_size / (train_size * max_val_per_train)),
+        1,
     )
     # 最低でも10回くらいはやりたい
     val_freq = min(val_freq, max(1, epochs // 10))
@@ -476,7 +481,10 @@ def predict(
                 values = np.array(results)
         else:
             values = model.predict(
-                ds, steps=steps, verbose=verbose, callbacks=callbacks,
+                ds,
+                steps=steps,
+                verbose=verbose,
+                callbacks=callbacks,
             )
         values = tk.hvd.allgather(values) if use_horovod else values
         return values
@@ -582,7 +590,12 @@ def evaluate(
         dataset = tk.hvd.split(iterator.dataset) if use_horovod else iterator.dataset
         ds, steps = iterator.data_loader.get_ds(dataset)
         tk.log.get(__name__).info(f"evaluate: {ds.element_spec} {steps=}")
-        values = model.evaluate(ds, steps=steps, verbose=verbose, callbacks=callbacks,)
+        values = model.evaluate(
+            ds,
+            steps=steps,
+            verbose=verbose,
+            callbacks=callbacks,
+        )
         values = tk.hvd.allreduce(values) if use_horovod else values
         if len(model.metrics_names) == 1:
             evals = {model.metrics_names[0]: values}

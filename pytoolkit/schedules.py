@@ -41,7 +41,8 @@ class CosineAnnealing(tf.keras.optimizers.schedules.LearningRateSchedule):
     def __call__(self, step):
         with tf.name_scope(self.name or "CosineAnnealing"):
             initial_learning_rate = tf.cast(
-                self.initial_learning_rate, dtype=tf.float32,
+                self.initial_learning_rate,
+                dtype=tf.float32,
             )
             decay_steps = tf.cast(self.decay_steps, tf.float32)
             warmup_steps = tf.cast(self.warmup_steps, tf.float32)
@@ -108,7 +109,8 @@ class LinearDecay(tf.keras.optimizers.schedules.LearningRateSchedule):
     def __call__(self, step):
         with tf.name_scope(self.name or "CosineAnnealing"):
             initial_learning_rate = tf.cast(
-                self.initial_learning_rate, dtype=tf.float32,
+                self.initial_learning_rate,
+                dtype=tf.float32,
             )
             decay_steps = tf.cast(self.decay_steps, tf.float32)
             warmup_steps = tf.cast(self.warmup_steps, tf.float32)
@@ -174,7 +176,8 @@ class ExponentialDecay(tf.keras.optimizers.schedules.LearningRateSchedule):
     def __call__(self, step):
         with tf.name_scope(self.name or "CosineAnnealing"):
             initial_learning_rate = tf.cast(
-                self.initial_learning_rate, dtype=tf.float32,
+                self.initial_learning_rate,
+                dtype=tf.float32,
             )
             decay_steps = tf.cast(self.decay_steps, tf.float32)
             warmup_steps = tf.cast(self.warmup_steps, tf.float32)

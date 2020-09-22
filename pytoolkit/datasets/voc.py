@@ -52,13 +52,19 @@ def load_voc_od(
     """
     voc_dir = pathlib.Path(voc_dir)
     ds_train07 = load_voc_od_split(
-        data_dir=voc_dir / "VOC2007", split="trainval", use_difficult=False,
+        data_dir=voc_dir / "VOC2007",
+        split="trainval",
+        use_difficult=False,
     )
     ds_train12 = load_voc_od_split(
-        data_dir=voc_dir / "VOC2012", split="trainval", use_difficult=False,
+        data_dir=voc_dir / "VOC2012",
+        split="trainval",
+        use_difficult=False,
     )
     ds_val = load_voc_od_split(
-        data_dir=voc_dir / "VOC2007", split="test", use_difficult=True,
+        data_dir=voc_dir / "VOC2007",
+        split="test",
+        use_difficult=True,
     )
     return tk.data.Dataset.concat(ds_train07, ds_train12), ds_val
 

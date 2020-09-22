@@ -11,7 +11,8 @@ import pytoolkit as tk
 
 
 def multi_run(
-    func: typing.Callable[[], tk.evaluations.EvalsType], runs: int = 5,
+    func: typing.Callable[[], tk.evaluations.EvalsType],
+    runs: int = 5,
 ) -> tk.evaluations.EvalsType:
     """funcをruns回実行して結果の平均を返す。"""
     evals_list = []

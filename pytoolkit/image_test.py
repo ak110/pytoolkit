@@ -100,7 +100,8 @@ def test_PerlinNoise(data_dir, save_dir):
     img = tk.ndimage.load(data_dir / "Lenna.png")
     for i in range(10):
         tk.ndimage.save(
-            save_dir / f"Lenna.PerlinNoise.{i}.png", aug(image=img)["image"],
+            save_dir / f"Lenna.PerlinNoise.{i}.png",
+            aug(image=img)["image"],
         )
 
 

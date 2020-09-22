@@ -519,16 +519,19 @@ def plot_objects(
 
     img = tk.ndimage.load(base_image, grayscale=False)
     if max_long_side is not None and max(*img.shape[:2]) > max_long_side:
-        img = tk.ndimage.resize_long_side(img, max_long_side)
-    num_classes = len(class_names) if class_names is not None else 1
-    import matplotlib.cm
-
-    colors = (
-        matplotlib.cm.get_cmap(name="hsv")(
-            np.linspace(0, 1, num_classes + 1)[:num_classes]
+        r = max_long_side / max(*img.shape[:2])
+        img = cv2.resize(
+            img, int(img.shape[1] * r, img.shape[0] * r), interpolation=cv2.INTER_AREA
         )
-        * 255
+    if img.ndim == 2 or img.shape[-1] == 1:
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    num_classes = len(class_names) if class_names is not None else 1
+
+    colors = cv2.applyColorMap(
+        np.linspace(0, 255, num_classes + 1, dtype=np.uint8)[:num_classes],
+        cv2.COLORMAP_HSV,
     )
+    colors = np.squeeze(colors, axis=1)  # (num_classes, 1, 3) → (num_classes, 3)
 
     for clazz, conf, bbox in zip(classes_, confs_, bboxes):
         if conf is not None and conf < conf_threshold:
@@ -542,23 +545,35 @@ def plot_objects(
         if clazz is None:
             color = colors[0]
         else:
-            color = colors[clazz % len(colors)][-2::-1]  # RGBA → BGR
+            color = colors[clazz % len(colors)]
             label = (
                 class_names[clazz] if class_names is not None else f"class{clazz:02d}"
             )
             text = label if conf is None else f"{conf:0.2f}, {label}"
-            tw = 6 * len(text)
-            cv2.rectangle(img, (xmin - 1, ymin), (xmin + tw + 15, ymin + 15), color, -1)
+            text_width = 6 * len(text)
+            cv2.rectangle(
+                img,
+                rec=(xmin - 1, ymin, text_width + 25, 15),
+                color=color.tolist(),
+                thickness=cv2.FILLED,
+            )
+            luminance = color[2] * 0.298912 + color[1] * 0.586611 + color[0] * 0.114478
+            text_color = [0, 0, 0] if luminance >= 127.5 else [255, 255, 255]
             cv2.putText(
                 img,
                 text,
-                (xmin + 5, ymin + 10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.35,
-                (0, 0, 0),
-                1,
+                org=(xmin + 5, ymin + 10),
+                fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                fontScale=0.35,
+                color=text_color,
+                thickness=1,
             )
-        cv2.rectangle(img, (xmin, ymin), (xmax, ymax), color, thickness=2)
+        cv2.rectangle(
+            img,
+            rec=(xmin, ymin, xmax - xmin, ymax - ymin),
+            color=color.tolist(),
+            thickness=2,
+        )
 
     return img
 

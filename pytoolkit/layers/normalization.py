@@ -25,7 +25,6 @@ class SyncBatchNormalization(tf.keras.layers.Layer):
         gamma_regularizer=None,
         beta_constraint=None,
         gamma_constraint=None,
-        stop_gradient=False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -46,7 +45,6 @@ class SyncBatchNormalization(tf.keras.layers.Layer):
         self.gamma_regularizer = tf.keras.regularizers.get(gamma_regularizer)
         self.beta_constraint = tf.keras.constraints.get(beta_constraint)
         self.gamma_constraint = tf.keras.constraints.get(gamma_constraint)
-        self.stop_gradient = stop_gradient
         self.supports_masking = True
 
     def compute_output_shape(self, input_shape):
@@ -159,17 +157,15 @@ class SyncBatchNormalization(tf.keras.layers.Layer):
         self.add_update(
             [
                 self.moving_mean.assign_add(
-                    (mean - self.moving_mean) * decay, read_value=False,
+                    (mean - self.moving_mean) * decay,
+                    read_value=False,
                 ),
                 self.moving_variance.assign_add(
-                    (var - self.moving_variance) * decay, read_value=False,
+                    (var - self.moving_variance) * decay,
+                    read_value=False,
                 ),
             ]
         )
-
-        if self.stop_gradient:
-            mean = tf.stop_gradient(mean)
-            var = tf.stop_gradient(var)
 
         # y = (x - mean) / (sqrt(var) + epsilon) * gamma + beta
         #   = x * gamma / (sqrt(var) + epsilon) + (beta - mean * gamma / (sqrt(var) + epsilon))
