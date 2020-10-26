@@ -12,6 +12,41 @@ import sklearn.utils
 import pytoolkit as tk
 
 
+def target_encoding(
+    values: typing.Union[pd.Series, np.ndarray],
+    values_train: typing.Union[pd.Series, np.ndarray],
+    target_train: np.ndarray,
+    min_samples_leaf: int = 3,
+    smoothing: float = 1.0,
+):
+    """ターゲットエンコーディング。"""
+    d = make_target_encoding_map(
+        values_train, target_train, min_samples_leaf, smoothing
+    )
+    return pd.Series(values).map(d)
+
+
+def make_target_encoding_map(
+    values_train: typing.Union[pd.Series, np.ndarray],
+    target_train: np.ndarray,
+    min_samples_leaf: int = 3,
+    smoothing: float = 1.0,
+) -> typing.Dict[typing.Any, np.float32]:
+    """ターゲットエンコーディングの変換用dictの作成。"""
+    df_tmp = pd.DataFrame()
+    df_tmp["values"] = values_train
+    df_tmp["target"] = target_train
+    g = df_tmp.groupby("values")["target"]
+    s = g.mean()
+    c = g.count()
+    prior = df_tmp["target"].mean()
+    smoove = 1 / (1 + np.exp(-(c - min_samples_leaf) / smoothing))
+    smoothed = prior * (1 - smoove) + s.values * smoove
+    smoothed[c <= min_samples_leaf] = prior
+    d = dict(zip(s.index.values, np.float32(smoothed)))
+    return d
+
+
 def safe_apply(s: pd.Series, fn) -> pd.Series:
     """nan以外にのみapply"""
     return s.apply(lambda x: x if pd.isnull(x) else fn(x))
@@ -358,7 +393,7 @@ def permutation_importance(
 
     importances = []
     for c in tk.utils.tqdm(columns, disable=not verbose):
-        ss = tk.table.shuffled_score(
+        ss = shuffled_score(
             score_fn=score_fn, X=X, c=c, y=y, n_iter=n_iter, random_state=random_state
         )
         s = base_score - ss if greater_is_better else ss - base_score

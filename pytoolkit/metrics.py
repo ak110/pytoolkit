@@ -149,8 +149,11 @@ class CosineSimilarity(tf.keras.metrics.Metric):
         self.total = self.add_weight(name="total", initializer="zeros")
         self.count = self.add_weight(name="count", initializer="zeros")
 
-    def update_state(self, y_true, y_pred):  # pylint: disable=arguments-differ
+    def update_state(
+        self, y_true, y_pred, sample_weight=None
+    ):  # pylint: disable=arguments-differ
         """指標の算出。"""
+        del sample_weight
         if self.from_logits:
             y_pred = tf.nn.softmax(y_pred, axis=self.axis)
         y_true = tf.math.l2_normalize(y_true, axis=self.axis)

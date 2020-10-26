@@ -90,3 +90,33 @@ class WSConv2D(tf.keras.layers.Conv2D):
             return super().call(inputs)
         finally:
             self.kernel = base_kernel
+
+
+@tf.keras.utils.register_keras_serializable(package="pytoolkit")
+class CoordEmbedding2D(tf.keras.layers.Layer):
+    """CoordConvのようなものでチャンネル数を増やさないようにしてみたもの。"""
+
+    def __init__(self, mirror=True, **kwargs):
+        super().__init__(**kwargs)
+        self.mirror = mirror
+
+    def compute_output_shape(self, input_shape):
+        assert len(input_shape) == 4
+        return input_shape
+
+    def call(self, inputs, **kwargs):
+        del kwargs
+        outputs = tf.identity(inputs)
+        s = tf.shape(inputs)
+        ex = tf.reshape(tf.linspace(-1.0, +1.0, s[2]), (1, 1, -1, 1))
+        if self.mirror:
+            ex = tf.math.abs(ex)
+        ey = tf.reshape(tf.linspace(-1.0, +1.0, s[1]), (1, -1, 1, 1))
+        ex = tf.tile(ex, (1, s[1], 1, s[3] // 2))
+        ey = tf.tile(ey, (1, 1, s[2], s[3] - s[3] // 2))
+        return outputs + tf.concat([ex, ey], axis=-1)
+
+    def get_config(self):
+        config = {"mirror": self.mirror}
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))

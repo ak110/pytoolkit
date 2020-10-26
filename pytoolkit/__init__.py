@@ -19,6 +19,7 @@ from . import (
     hvd,
     image,
     layers,
+    lgb,
     log,
     losses,
     math,
