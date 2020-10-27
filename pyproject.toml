@@ -64,6 +64,7 @@ tests = [
     "efficientnet",
     "image-classifiers",
     "keras2onnx",
+    "lightgbm",
     "nbformat",
     "onnxmltools",
     "pydot",
