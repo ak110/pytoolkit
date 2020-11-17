@@ -6,7 +6,7 @@ default_language_version:
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.1.0
+    rev: v3.3.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -18,23 +18,43 @@ repos:
         args: ['--remove']
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: v2.4.4
+    rev: v2.7.4
     hooks:
       - id: pyupgrade
         args: ['--py38-plus']
 
-  - repo: https://github.com/psf/black
-    rev: 20.8b1
+  - repo: local
     hooks:
-      - id: black
+      - id: system
+        name: isort
+        entry: poetry run isort --check --settings-path=setup.cfg
+        types: [python]
+        require_serial: true
+        language: system
 
-  - repo: https://gitlab.com/pycqa/flake8
-    rev: ''  # pick a git hash / tag to point to
+  - repo: local
     hooks:
-      - id: flake8
-        additional_dependencies: ['flake8-bugbear']
+      - id: system
+        name: black
+        entry: poetry run black --check
+        types: [python]
+        require_serial: true
+        language: system
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v0.770
+  - repo: local
     hooks:
-      - id: mypy
+      - id: system
+        name: flake8
+        entry: poetry run flake8
+        types: [python]
+        require_serial: true
+        language: system
+
+  - repo: local
+    hooks:
+      - id: system
+        name: mypy
+        entry: poetry run mypy
+        types: [python]
+        require_serial: true
+        language: system

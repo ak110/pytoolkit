@@ -28,9 +28,4 @@ install:
   - poetry run pip install "git+https://github.com/cocodataset/coco.git#egg=pycocotools&subdirectory=PythonAPI"
 
 script:
-  - poetry run black --check .
-  - poetry run flake8
-  - poetry run mypy pytoolkit
-  - poetry run pylint --jobs=4 pytoolkit
-  - poetry run pytest pytoolkit
-  - poetry run isort --check --settings-path=setup.cfg --recursive pytoolkit
+  - make test
