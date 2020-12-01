@@ -36,7 +36,6 @@ chainercv = {version = "^0.13.1", optional = true}
 efficientnet = {version = "^1.1.0", optional = true}
 h5py = {version = "^2.10.0", optional = true}
 horovod = {version = "^0.19.2", optional = true}
-image-classifiers = {version = "^1.0.0", optional = true}
 ipython = {version = "^7.14.0", optional = true}
 keras2onnx = {version = "^1.7.0", optional = true}
 lightgbm = {version = "^2.3.1", optional = true}
