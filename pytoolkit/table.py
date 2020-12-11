@@ -115,7 +115,7 @@ def group_columns(
 
 def eda(df_train: pd.DataFrame, df_test: pd.DataFrame):
     """色々調べて表示する。(jupyter用)"""
-    from IPython.display import display, HTML
+    from IPython.display import HTML, display
 
     display(HTML(eda_html(df_train, df_test)))
 

@@ -25,33 +25,33 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.8"
-albumentations = "^0.4.5"
-numba = "^0.49.1"
-pandas = "^1.0.3"
-scikit-learn = "^0.23.0"
-better-exceptions = {version = "^0.2.2", optional = true}
-catboost = {version = "^0.23.1", optional = true}
-category_encoders = {version = "^2.2.2", optional = true}
-chainercv = {version = "^0.13.1", optional = true}
-efficientnet = {version = "^1.1.0", optional = true}
-h5py = {version = "^2.10.0", optional = true}
-horovod = {version = "^0.19.2", optional = true}
-ipython = {version = "^7.14.0", optional = true}
-keras2onnx = {version = "^1.7.0", optional = true}
-lightgbm = {version = "^2.3.1", optional = true}
-matplotlib = {version = "^3.2.1", optional = true}
-mpi4py = {version = "^3.0.3", optional = true}
-nbformat = {version = "^5.0.7", optional = true}
-onnxmltools = {version = "^1.6.1", optional = true}
-optuna = {version = "^1.4.0", optional = true}
-pydot = {version = "^1.4.1", optional = true}
-python-dotenv = {version = "^0.13.0", optional = true}
-requests = {version = "^2.23.0", optional = true}
-tensorflow = {version = "^2.2.0", optional = true}
-tensorflow-cpu = {version = "^2.2.0", optional = true}
-tf2onnx = {version = "^1.6.1", optional = true}
-tqdm = {version = "^4.46.0", optional = true}
-xgboost = {version = "^1.0.2", optional = true}
+albumentations = "*"
+numba = "*"
+pandas = "*"
+scikit-learn = "*"
+better-exceptions = {version = "*", optional = true}
+catboost = {version = "*", optional = true}
+category_encoders = {version = "*", optional = true}
+chainercv = {version = "*", optional = true}
+efficientnet = {version = "*", optional = true}
+h5py = {version = "*", optional = true}
+horovod = {version = "*", optional = true}
+ipython = {version = "*", optional = true}
+keras2onnx = {version = "*", optional = true}
+lightgbm = {version = "*", optional = true}
+matplotlib = {version = "*", optional = true}
+mpi4py = {version = "*", optional = true}
+nbformat = {version = "*", optional = true}
+onnxmltools = {version = "*", optional = true}
+optuna = {version = "*", optional = true}
+pydot = {version = "*", optional = true}
+python-dotenv = {version = "*", optional = true}
+requests = {version = "*", optional = true}
+tensorflow = {version = "~2.3", optional = true}
+tensorflow-cpu = {version = "~2.3", optional = true}
+tf2onnx = {version = "^*", optional = true}
+tqdm = {version = "*", optional = true}
+xgboost = {version = "*", optional = true}
 
 [tool.poetry.extras]
 tensorflow = ["tensorflow"]
@@ -73,13 +73,13 @@ tests = [
 ]
 
 [tool.poetry.dev-dependencies]
-black = "^20.8b1"
-flake8 = "^3.7.9"
-flake8-bugbear = "^20.1.4"
-mypy = "^0.790"
-pylint = "^2.4.4"
-pytest = "^5.3.5"
-isort = "^4.3.21"
+black = "~20.8b1"
+flake8 = "*"
+flake8-bugbear = "*"
+mypy = "*"
+pylint = "*"
+pytest = "*"
+isort = "*"
 
 [tool.poetry.scripts]
 tk-benchmark = "pytoolkit.bin.benchmark:main"

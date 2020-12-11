@@ -205,8 +205,8 @@ def save(
             elif mode == "onnx":
                 os.environ["TF_KERAS"] = "1"
 
-                import onnxmltools
                 import keras2onnx
+                import onnxmltools
 
                 onnx_model = keras2onnx.convert_keras(model, model.name)
                 onnxmltools.utils.save_model(onnx_model, str(path))
