@@ -18,12 +18,12 @@ import pytoolkit as tk
 class RandomCompose(A.Compose):
     """シャッフル付きCompose。"""
 
-    def __call__(self, force_apply=False, **data):
+    def __call__(self, *args, force_apply=False, **data):
         """変換の適用。"""
         backup = self.transforms.transforms.copy()
         try:
             random.shuffle(self.transforms.transforms)
-            return super().__call__(force_apply=force_apply, **data)
+            return super().__call__(*args, force_apply=force_apply, **data)
         finally:
             self.transforms.transforms = backup
 

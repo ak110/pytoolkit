@@ -7,8 +7,10 @@ import pytoolkit as tk
 
 @pytest.mark.parametrize("mode", ["hdf5", "saved_model", "onnx", "tflite"])
 def test_save(tmpdir, mode):
-    if mode == "tflite" and tf.version.VERSION.startswith("2.3."):
-        pytest.xfail("bug in TFLiteConverter (TF 2.3)")
+    if mode == "tflite" and tf.version.VERSION.startswith("2.4."):
+        pytest.xfail()
+    if mode == "onnx" and tf.version.VERSION.startswith("2.4."):
+        pytest.xfail()
 
     path = str(tmpdir / "model")
 

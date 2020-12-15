@@ -77,16 +77,16 @@ def evaluate_od(
     """
     import chainercv
 
-    gt_classes_list = np.array([y.classes for y in y_true])
-    gt_bboxes_list = np.array([y.real_bboxes for y in y_true])
-    gt_areas_list = np.array([y.areas for y in y_true])
-    gt_crowdeds_list = np.array([y.crowdeds for y in y_true])
-    gt_difficults_list = np.array([y.difficults for y in y_true])
-    pred_classes_list = np.array([p.classes for p in y_pred])
-    pred_confs_list = np.array([p.confs for p in y_pred])
-    pred_bboxes_list = np.array(
-        [p.get_real_bboxes(y.width, y.height) for (p, y) in zip(y_pred, y_true)]
-    )
+    gt_classes_list = [y.classes for y in y_true]
+    gt_bboxes_list = [y.real_bboxes for y in y_true]
+    gt_areas_list = [y.areas for y in y_true]
+    gt_crowdeds_list = [y.crowdeds for y in y_true]
+    gt_difficults_list = [y.difficults for y in y_true]
+    pred_classes_list = [p.classes for p in y_pred]
+    pred_confs_list = [p.confs for p in y_pred]
+    pred_bboxes_list = [
+        p.get_real_bboxes(y.width, y.height) for (p, y) in zip(y_pred, y_true)
+    ]
     with np.errstate(all="warn"):
         evals = chainercv.evaluations.eval_detection_coco(
             pred_bboxes_list,

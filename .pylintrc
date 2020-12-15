@@ -1,5 +1,7 @@
 [MASTER]
 extension-pkg-whitelist=numpy,cv2
+# workaround: https://github.com/PyCQA/pylint/issues/3836
+init-hook='import sys; sys.setrecursionlimit(3 * sys.getrecursionlimit())'
 
 [MESSAGES CONTROL]
 disable=
@@ -27,6 +29,7 @@ disable=
     too-many-return-statements,
     too-many-statements,
     unexpected-keyword-arg,  # TF 2.2 False Positive
+    using-constant-test,
 
 [FORMAT]
 max-line-length=256
