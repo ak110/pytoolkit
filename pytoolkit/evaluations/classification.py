@@ -50,7 +50,7 @@ def evaluate_classification(
             y_pred = (np.asarray(proba_pred) >= 0.5).astype(np.int32)
             acc = sklearn.metrics.accuracy_score(y_true, y_pred)
             prec, rec, f1, _ = sklearn.metrics.precision_recall_fscore_support(
-                y_true, y_pred
+                y_true, y_pred, zero_division=0
             )
             mcc = sklearn.metrics.matthews_corrcoef(y_true, y_pred)
             auc = sklearn.metrics.roc_auc_score(y_true, proba_pred)
@@ -76,7 +76,7 @@ def evaluate_classification(
             y_pred = np.argmax(proba_pred, axis=-1)
             acc = sklearn.metrics.accuracy_score(y_true, y_pred)
             prec, rec, f1, _ = sklearn.metrics.precision_recall_fscore_support(
-                y_true, y_pred, labels=labels, average=average
+                y_true, y_pred, labels=labels, average=average, zero_division=0
             )
             mcc = sklearn.metrics.matthews_corrcoef(y_true, y_pred)
             auc = sklearn.metrics.roc_auc_score(ohe_true, proba_pred, average=average)

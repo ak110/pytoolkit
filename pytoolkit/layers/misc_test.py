@@ -9,6 +9,12 @@ import pytoolkit as tk
 def test_ConvertColor(color):
     import skimage.color
 
+    if color == "hed":
+        from distutils.version import LooseVersion
+
+        if LooseVersion(skimage.__version__) < LooseVersion("0.18.0"):
+            pytest.xfail("scikit-image too old.")
+
     rgb = np.array(
         [
             [[0, 0, 0], [128, 128, 128], [255, 255, 255]],
@@ -31,10 +37,9 @@ def test_ConvertColor(color):
     layer = tk.layers.ConvertColor(f"rgb_to_{color}")
     actual = layer(tf.constant(np.expand_dims(rgb.astype(np.float32), 0))).numpy()[0]
 
-    actual, expected = np.round(actual, 3), np.round(expected, 3)  # 丸めちゃう
     assert actual.dtype == np.float32
     assert actual.shape == expected.shape
-    assert actual == pytest.approx(expected, 1e-3)
+    assert actual == pytest.approx(expected, abs=1e-3)
 
 
 def test_ChannelPair2D():

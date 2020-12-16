@@ -80,7 +80,7 @@ class ConvertColor(tf.keras.layers.Layer):
             b = np.array([16, 128, 128]).reshape((1,) * (K.ndim(inputs) - 1) + (3,))
             outputs = (K.dot(inputs / 255, m) + K.constant(b)) / 255
         elif self.mode == "rgb_to_hed":
-            t = inputs / 255 + 2
+            t = K.maximum(inputs / 255, 1e-6)
             m = K.constant(
                 [
                     [1.87798274, -1.00767869, -0.55611582],
@@ -88,7 +88,7 @@ class ConvertColor(tf.keras.layers.Layer):
                     [-0.60190736, -0.48041419, 1.57358807],
                 ]
             )
-            outputs = K.dot(-K.log(t) / K.constant(np.log(10)), m)
+            outputs = K.dot(K.log(t) / K.constant(np.log(1e-6)), m)
         elif self.mode == "rgb_to_yiq":
             m = K.constant(
                 np.transpose(
