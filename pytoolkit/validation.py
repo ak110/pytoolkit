@@ -14,7 +14,7 @@ FoldsType = typing.Sequence[typing.Tuple[np.ndarray, np.ndarray]]
 def split(
     dataset: tk.data.Dataset,
     nfold: int,
-    split_seed: int = 1,
+    split_seed: typing.Optional[int] = 1,
     stratify: typing.Union[bool, np.ndarray] = None,
 ) -> FoldsType:
     """nfold CV。
@@ -23,7 +23,7 @@ def split(
         dataset: 分割する元のデータセット
         nfold: 分割数。ただし1の場合は特別に5foldの最初の1個しか実行しないバージョンということにする。
                (もうちょっと分かりやすいインターフェースにしたいが利便性と両立する案が無いのでとりあえず…)
-        split_seed: シード値
+        split_seed: シード値。Noneならシャッフルしない。
         stratify: Trueの場合か、Noneでかつdataset.labelsがndarrayかつndim == 1ならStratifiedKFold。
                   FalseならKFold。ndarrayの場合はそれを使ってStratifiedKFold。
 
@@ -34,11 +34,12 @@ def split(
     tk.log.get(__name__).info(
         f"split: {len(dataset)=} {nfold=} {split_seed=} {stratify=}"
     )
+    shuffle = split_seed is not None
 
     if dataset.groups is not None:
         g = np.unique(dataset.groups)
         cv = sklearn.model_selection.KFold(
-            n_splits=nfold, shuffle=True, random_state=split_seed
+            n_splits=nfold, shuffle=shuffle, random_state=split_seed
         )
         folds = []
         for train_indices, val_indices in cv.split(g, g):
@@ -70,7 +71,7 @@ def split(
             if stratify
             else sklearn.model_selection.KFold
         )
-        cv = cv(nfold, shuffle=True, random_state=split_seed)
+        cv = cv(nfold, shuffle=shuffle, random_state=split_seed)
         folds = list(cv.split(X, y))
 
     return folds

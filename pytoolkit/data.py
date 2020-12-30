@@ -40,9 +40,6 @@ class Dataset:
         metadata: メタデータ。色々独自に入れておいてOK。
                   sliceとかではそのままコピーされたりするので注意。
 
-    get_dataをオーバーライドすることで逐次読み込みなども可能とする。
-    (ただし、sliceとかで__init__が呼ばれるので注意。)
-
     """
 
     data: DataType
@@ -53,8 +50,25 @@ class Dataset:
     init_score: np.ndarray = None
     metadata: typing.Dict[str, typing.Any] = dataclasses.field(default_factory=dict)
 
+    def __post_init__(self):
+        """サイズの不整合が発生していないかチェックする。"""
+        size = self.__len__()
+        if isinstance(self.data, dict):
+            for x in self.data.values():
+                assert len(x) == size
+        if self.labels is not None:
+            if isinstance(self.labels, dict):
+                for x in self.labels.values():
+                    assert len(x) == size
+        assert self.groups is None or len(self.groups) == size
+        assert self.weights is None or len(self.weights) == size
+        assert self.ids is None or len(self.ids) == size
+        assert self.init_score is None or len(self.init_score) == size
+
     def __len__(self) -> int:
         """データ件数を返す。"""
+        if isinstance(self.data, dict):
+            return len(next(iter(self.data.values())))
         return len(self.data)
 
     def get_data(self, index: int) -> typing.Tuple[typing.Any, typing.Any]:

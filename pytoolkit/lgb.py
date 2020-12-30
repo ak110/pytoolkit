@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import logging
+import pathlib
 import typing
 
 import numpy as np
 import pandas as pd
+import sklearn.metrics
+import tqdm
 
 if typing.TYPE_CHECKING:
     import lightgbm as lgb
@@ -14,9 +17,10 @@ logger = logging.getLogger(__name__)
 
 
 def cv(
+    models_dir: typing.Union[str, pathlib.Path],
     feats_train: typing.Union[pd.DataFrame, np.ndarray],
     y_train: np.ndarray,
-    folds,
+    folds: typing.Sequence[typing.Tuple[np.ndarray, np.ndarray]],
     params: dict,
     weights: typing.Union[list, np.ndarray, pd.Series] = None,
     groups: typing.Union[list, np.ndarray, pd.Series] = None,
@@ -26,10 +30,11 @@ def cv(
     early_stopping_rounds: int = 200,
     num_boost_round: int = 9999,
     verbose_eval: int = 100,
-) -> typing.Tuple[typing.List[lgb.Booster], int]:
-    """LightGBMでCVしてboostersとbest_iterationを返す。"""
+) -> None:
+    """LightGBMでCVしてできたモデルをmodels_dir配下に保存する。"""
     import lightgbm as lgb  # pylint: disable=redefined-outer-name
 
+    # 学習
     train_set = lgb.Dataset(
         feats_train,
         y_train,
@@ -38,8 +43,7 @@ def cv(
         init_score=init_score,
         free_raw_data=False,
     )
-    model_extractor = ModelExtractionCallback()
-    eval_hist = lgb.cv(
+    cv_result = lgb.cv(
         params,
         train_set,
         folds=folds,
@@ -47,60 +51,132 @@ def cv(
         feval=feval,
         early_stopping_rounds=early_stopping_rounds,
         num_boost_round=num_boost_round,
-        verbose_eval=verbose_eval,
-        callbacks=[model_extractor],
+        verbose_eval=None,
+        callbacks=[EvaluationLogger(period=verbose_eval)],
         seed=1,
+        return_cvbooster=True,
     )
-    best_iteration = model_extractor.best_iteration
 
-    logger.info(f"lgb: {best_iteration=}")
-    for k in eval_hist:
-        score = np.float32(eval_hist[k][best_iteration - 1])
-        logger.info(f"lgb: {k}={score:.3f}")
+    # ログ出力
+    cvbooster = cv_result["cvbooster"]
+    logger.info(f"lgb: best_iteration={cvbooster.best_iteration}")
+    for k in cv_result:
+        if k != "cvbooster":
+            score = np.float32(cv_result[k][-1])
+            logger.info(f"lgb: {k}={score:.3f}")
 
-    return model_extractor.raw_boosters, model_extractor.best_iteration
+    # 保存
+    models_dir = pathlib.Path(models_dir)
+    models_dir.mkdir(parents=True, exist_ok=True)
+    for fold, booster in enumerate(cvbooster.boosters):
+        booster.save_model(
+            str(models_dir / f"model.fold{fold}.txt"),
+            num_iteration=cvbooster.best_iteration,
+        )
+
+
+def load(models_dir, nfold: int) -> typing.List[lgb.Booster]:
+    """cvで保存したモデルの読み込み。"""
+    import lightgbm as lgb  # pylint: disable=redefined-outer-name
+
+    return [
+        lgb.Booster(model_file=str(models_dir / f"model.fold{fold}.txt"))
+        for fold in range(nfold)
+    ]
 
 
 def predict(
     boosters: typing.List[lgb.Booster],
-    best_iteration: int,
     feats_test: typing.Union[pd.DataFrame, np.ndarray],
 ) -> typing.List[np.ndarray]:
     """推論。"""
-    return [bst.predict(feats_test, num_iteration=best_iteration) for bst in boosters]
+    return [
+        booster.predict(feats_test)
+        for booster in tqdm.tqdm(boosters, ascii=True, ncols=100, desc="predict")
+    ]
 
 
-class ModelExtractionCallback:
-    """lightgbm.cv() から学習済みモデルを取り出すためのコールバックに使うクラス
+def predict_oof(
+    boosters: typing.List[lgb.Booster],
+    feats_train: typing.Union[pd.DataFrame, np.ndarray],
+    folds: typing.Sequence[typing.Tuple[np.ndarray, np.ndarray]],
+) -> np.ndarray:
+    """out-of-fold predictions。"""
+    oof = None
+    for (_, val_indices), booster in tqdm.tqdm(
+        list(zip(folds, boosters)), ascii=True, ncols=100, desc="predict_oof"
+    ):
+        pred = booster.predict(_gather(feats_train, val_indices))
+        if oof is None:
+            oof = np.zeros((len(feats_train),) + pred.shape[1:], dtype=pred.dtype)
+        oof[val_indices] = pred
+    return oof
 
-    NOTE: 非公開クラス '_CVBooster' に依存しているため将来的に動かなく恐れがある
+
+def _gather(feats: typing.Union[pd.DataFrame, np.ndarray], indices):
+    if isinstance(feats, pd.DataFrame):
+        return feats.iloc[indices]
+    return feats[indices]
+
+
+def f1_metric(preds, data):
+    """LightGBM用2クラスF1スコア"""
+    y_true = data.get_label()
+    preds = np.round(preds)
+    return "f1", sklearn.metrics.f1_score(y_true, preds), True
+
+
+def mf1_metric(preds, data):
+    """LightGBM用多クラスF1スコア(マクロ平均)"""
+    y_true = data.get_label()
+    num_classes = len(preds) // len(y_true)
+    preds = preds.reshape(-1, num_classes).argmax(axis=-1)
+    return "f1", sklearn.metrics.f1_score(y_true, preds, average="macro"), True
+
+
+def r2_metric(preds, data):
+    """LightGBM用R2"""
+    y_true = data.get_label()
+    return "r2", sklearn.metrics.r2_score(y_true, preds), True
+
+
+class EvaluationLogger:
+    """pythonのloggingモジュールでログ出力するcallback。
 
     References:
-        - <https://blog.amedama.jp/entry/lightgbm-cv-model>
+        - <https://amalog.hateblo.jp/entry/lightgbm-logging-callback>
 
     """
 
-    def __init__(self):
-        self._model = None
+    def __init__(self, period=100, show_stdv=True, level=logging.INFO):
+        self.period = period
+        self.show_stdv = show_stdv
+        self.level = level
+        self.order = 10
 
     def __call__(self, env):
-        # _CVBooster の参照を保持する
-        self._model = env.model
+        if not env.evaluation_result_list:
+            return None
+        # 最初だけ1, 2, 4, ... で出力。それ以降はperiod毎。
+        n = env.iteration + 1
+        if ((n & (n - 1)) == 0) if n < self.period else (n % self.period == 0):
+            result = "\t".join(
+                [
+                    _format_eval_result(x, show_stdv=self.show_stdv)
+                    for x in env.evaluation_result_list
+                ]
+            )
+            logger.log(self.level, f"[{n:4d}]\t{result}")
 
-    @property
-    def boosters_proxy(self):
-        """Booster へのプロキシオブジェクトを返す。"""
-        assert self._model is not None, "callback has not called yet"
-        return self._model
 
-    @property
-    def raw_boosters(self):
-        """Booster のリストを返す。"""
-        assert self._model is not None, "callback has not called yet"
-        return self._model.boosters
-
-    @property
-    def best_iteration(self):
-        """Early stop したときの boosting round を返す。"""
-        assert self._model is not None, "callback has not called yet"
-        return self._model.best_iteration
+def _format_eval_result(value, show_stdv=True):
+    """Format metric string."""
+    if len(value) == 4:
+        return "%s's %s: %g" % (value[0], value[1], value[2])
+    elif len(value) == 5:
+        if show_stdv:
+            return "%s's %s: %g + %g" % (value[0], value[1], value[2], value[4])
+        else:
+            return "%s's %s: %g" % (value[0], value[1], value[2])
+    else:
+        raise ValueError("Wrong metric value")

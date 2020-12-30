@@ -35,7 +35,7 @@ def post(body: str, subject: str = None):
     subject = subject.strip()
     body = body.strip()
     for line in [subject] + body.split("\n"):
-        tk.log.get(__name__).info(line)
+        tk.log.get(__name__).info(f"notification: {line}")
 
     if tk.hvd.is_master():
         try:

@@ -11,7 +11,7 @@ if typing.TYPE_CHECKING:
 
 
 def optimize(
-    params_fn: typing.Callable[[optuna.BaseTrial], typing.Any],
+    params_fn: typing.Callable[[optuna.trial.BaseTrial], typing.Any],
     score_fn: typing.Callable[..., float],
     storage=None,
     sampler=None,

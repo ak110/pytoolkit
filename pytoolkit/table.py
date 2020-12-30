@@ -12,6 +12,13 @@ import sklearn.utils
 import pytoolkit as tk
 
 
+def label_encoding(
+    values: typing.Union[pd.Series, np.ndarray], values_set: typing.Iterable
+):
+    """ラベルエンコーディング。"""
+    return pd.Series(values).map({v: i for i, v in enumerate(values_set)})
+
+
 def target_encoding(
     values: typing.Union[pd.Series, np.ndarray],
     values_train: typing.Union[pd.Series, np.ndarray],
