@@ -37,7 +37,15 @@ def split(
     shuffle = split_seed is not None
 
     if dataset.groups is not None:
-        g = np.unique(dataset.groups)
+        groups = dataset.groups
+        if groups.dtype == object:
+            # 文字列の場合、in1dが重いようなので連番を振る
+            groups_map = {g: i for i, g in enumerate(np.unique(groups))}
+            assert len(groups_map) < 2 ** 31
+            groups = np.frompyfunc(groups_map.__getitem__, nin=1, nout=1)(
+                groups
+            ).astype(np.int32)
+        g = np.unique(groups)
         cv = sklearn.model_selection.KFold(
             n_splits=nfold, shuffle=shuffle, random_state=split_seed
         )
@@ -45,8 +53,8 @@ def split(
         for train_indices, val_indices in cv.split(g, g):
             folds.append(
                 (
-                    np.where(np.in1d(dataset.groups, g[train_indices]))[0],
-                    np.where(np.in1d(dataset.groups, g[val_indices]))[0],
+                    np.where(np.in1d(groups, g[train_indices]))[0],
+                    np.where(np.in1d(groups, g[val_indices]))[0],
                 )
             )
     else:

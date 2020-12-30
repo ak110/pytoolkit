@@ -172,18 +172,17 @@ class EvaluationLogger:
         self.order = 10
 
     def __call__(self, env):
-        if not env.evaluation_result_list:
-            return None
-        # 最初だけ1, 2, 4, ... で出力。それ以降はperiod毎。
-        n = env.iteration + 1
-        if ((n & (n - 1)) == 0) if n < self.period else (n % self.period == 0):
-            result = "  ".join(
-                [
-                    _format_eval_result(x, show_stdv=self.show_stdv)
-                    for x in env.evaluation_result_list
-                ]
-            )
-            logger.log(self.level, f"[{n:4d}]  {result}")
+        if env.evaluation_result_list:
+            # 最初だけ1, 2, 4, ... で出力。それ以降はperiod毎。
+            n = env.iteration + 1
+            if ((n & (n - 1)) == 0) if n < self.period else (n % self.period == 0):
+                result = "  ".join(
+                    [
+                        _format_eval_result(x, show_stdv=self.show_stdv)
+                        for x in env.evaluation_result_list
+                    ]
+                )
+                logger.log(self.level, f"[{n:4d}]  {result}")
 
 
 def _format_eval_result(value, show_stdv=True):
