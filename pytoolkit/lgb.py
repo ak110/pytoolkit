@@ -30,6 +30,7 @@ def cv(
     early_stopping_rounds: int = 200,
     num_boost_round: int = 9999,
     verbose_eval: int = 100,
+    importance_type: str = "gain",
 ) -> None:
     """LightGBMでCVしてできたモデルをmodels_dir配下に保存する。"""
     import lightgbm as lgb  # pylint: disable=redefined-outer-name
@@ -74,11 +75,27 @@ def cv(
             num_iteration=cvbooster.best_iteration,
         )
 
+    columns = (
+        feats_train.columns.values
+        if isinstance(feats_train, pd.DataFrame)
+        else [f"feature_{i}" for i in range(feats_train.shape[1])]
+    )
+    fi = np.zeros(
+        (len(columns),),
+        dtype=np.int32 if importance_type == "split" else np.float32,
+    )
+    for gbm in cvbooster.boosters:
+        fi += gbm.feature_importance(importance_type=importance_type)
+    df = pd.DataFrame(data={"importance": fi}, index=columns)
+    df = df.sort_values(by="importance", ascending=False)
+    df.to_csv(models_dir / "feature_importance.csv", index_label="feature")
+
 
 def load(models_dir, nfold: int) -> typing.List[lgb.Booster]:
     """cvで保存したモデルの読み込み。"""
     import lightgbm as lgb  # pylint: disable=redefined-outer-name
 
+    models_dir = pathlib.Path(models_dir)
     return [
         lgb.Booster(model_file=str(models_dir / f"model.fold{fold}.txt"))
         for fold in range(nfold)
@@ -160,23 +177,23 @@ class EvaluationLogger:
         # 最初だけ1, 2, 4, ... で出力。それ以降はperiod毎。
         n = env.iteration + 1
         if ((n & (n - 1)) == 0) if n < self.period else (n % self.period == 0):
-            result = "\t".join(
+            result = "  ".join(
                 [
                     _format_eval_result(x, show_stdv=self.show_stdv)
                     for x in env.evaluation_result_list
                 ]
             )
-            logger.log(self.level, f"[{n:4d}]\t{result}")
+            logger.log(self.level, f"[{n:4d}]  {result}")
 
 
 def _format_eval_result(value, show_stdv=True):
     """Format metric string."""
     if len(value) == 4:
-        return "%s's %s: %g" % (value[0], value[1], value[2])
+        return f"{value[0]}'s {value[1]}: {value[2]:.4f}"
     elif len(value) == 5:
         if show_stdv:
-            return "%s's %s: %g + %g" % (value[0], value[1], value[2], value[4])
+            return f"{value[0]}'s {value[1]}: {value[2]:.4f} + {value[4]:.4f}"
         else:
-            return "%s's %s: %g" % (value[0], value[1], value[2])
+            return f"{value[0]}'s {value[1]}: {value[2]:.4f}"
     else:
         raise ValueError("Wrong metric value")
