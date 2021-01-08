@@ -93,6 +93,6 @@ def get_cache_path(
     args_str = ",".join([f"{repr(k)}:{repr(v)}" for k, v in args_list])
     cache_hash = hashlib.md5(args_str.encode("utf-8")).hexdigest()[:8]
 
-    tk.log.get(__name__).info(f"Cache {cache_hash}: arguments={args_str}")
+    tk.log.get(__name__).debug(f"Cache {cache_hash}: arguments={args_str}")
     cache_path = cache_dir / f"{prefix}_{func.__name__}_{cache_hash}.pkl"
     return cache_path
