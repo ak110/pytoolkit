@@ -1,4 +1,5 @@
 """各種ユーティリティ"""
+import contextlib
 import functools
 import os
 import pathlib
@@ -6,6 +7,7 @@ import pickle
 import sys
 import traceback
 import typing
+import warnings
 
 import joblib
 import numpy as np
@@ -69,9 +71,13 @@ def load(filename, mmap_mode=None, skip_not_exist=False):
 
 def tqdm(iterable=None, desc=None, total=None, leave=True, **kwargs):
     """ascii=Trueでncols=100なtqdm。"""
-    from tqdm import tqdm as t
+    try:
+        import tqdm.auto as t
 
-    return t(iterable, desc, total, leave, ascii=True, ncols=100, **kwargs)
+        return t.tqdm(iterable, desc, total, leave, ascii=True, ncols=100, **kwargs)
+    except ImportError:
+        warnings.warn("tqdm import error")
+        return iterable
 
 
 def trange(*args, **kwargs):
@@ -79,18 +85,57 @@ def trange(*args, **kwargs):
     return tqdm(list(range(*args)), **kwargs)
 
 
+def tenumerate(iterable, **tqdm_kwargs):
+    """ascii=Trueでncols=100なtqdm.contrib.tenumerate。"""
+    try:
+        import tqdm.contrib as t
+
+        return t.tenumerate(iterable, ascii=True, ncols=100, **tqdm_kwargs)
+    except ImportError:
+        warnings.warn("tqdm import error")
+        return enumerate(iterable)
+
+
+def tzip(iter1, *iter2plus, **tqdm_kwargs):
+    """ascii=Trueでncols=100なtqdm.contrib.tzip。"""
+    try:
+        import tqdm.contrib as t
+
+        return t.tzip(iter1, *iter2plus, ascii=True, ncols=100, **tqdm_kwargs)
+    except ImportError:
+        warnings.warn("tqdm import error")
+        return zip(iter1, *iter2plus)
+
+
+def tmap(function, *sequences, **tqdm_kwargs):
+    """ascii=Trueでncols=100なtqdm.contrib.tmap。"""
+    try:
+        import tqdm.contrib as t
+
+        return t.tmap(function, *sequences, ascii=True, ncols=100, **tqdm_kwargs)
+    except ImportError:
+        warnings.warn("tqdm import error")
+        return map(function, *sequences)
+
+
 def tqdm_write(s, file=None, end="\n", nolock=False):
     """tqdm中に何か出力したいとき用のやつ。"""
-    from tqdm import tqdm as t
+    try:
+        import tqdm as t
 
-    t.write(s, file=file, end=end, nolock=nolock)
+        t.tqdm.write(s, file=file, end=end, nolock=nolock)
+    except ImportError:
+        pass
 
 
 def tqdm_external_write_mode(file=None, nolock=False):
     """tqdm中に何か出力したいとき用のやつ。"""
-    from tqdm import tqdm as t
+    try:
+        import tqdm as t
 
-    return t.external_write_mode(file=file, nolock=nolock)
+        return t.tqdm.external_write_mode(file=file, nolock=nolock)
+    except ImportError:
+        return contextlib.nullcontext()
 
 
 def better_exceptions():
