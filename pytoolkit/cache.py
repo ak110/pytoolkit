@@ -33,8 +33,13 @@ def memoize(
         @functools.wraps(func)
         def memorized_func(*args, **kwargs):
             assert cache_dir is not None
+
+            @functools.wraps(func)
+            def call_func():
+                return func(*args, **kwargs)
+
             cache_path = get_cache_path(cache_dir, func, args, kwargs, prefix)
-            return memoized_call(lambda: func(*args, **kwargs), cache_path, compress)
+            return memoized_call(call_func, cache_path, compress)
 
         return memorized_func
 
@@ -63,18 +68,21 @@ def memoized_call(
     # キャッシュがあれば読む
     if cache_path.is_file():
         tk.log.get(__name__).info(f"Cache is found: {cache_path}")
-        return joblib.load(cache_path)
+        with tk.log.trace(f"cache-load({func.__name__})"):
+            return joblib.load(cache_path)
     else:
         tk.log.get(__name__).info(f"Cache is not found: {cache_path}")
     # 無ければ実処理してキャッシュとして保存
-    result = func()
-    if tk.hvd.is_master():
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        joblib.dump(result, cache_path, compress=compress)
-    tk.hvd.barrier()
-    if not tk.hvd.is_master():
-        result = typing.cast(T, joblib.load(cache_path))
-    tk.hvd.barrier()
+    with tk.log.trace(func.__name__):
+        result = func()
+    with tk.log.trace(f"cache-store({func.__name__})"):
+        if tk.hvd.is_master():
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            joblib.dump(result, cache_path, compress=compress)
+        tk.hvd.barrier()
+        if not tk.hvd.is_master():
+            result = typing.cast(T, joblib.load(cache_path))
+        tk.hvd.barrier()
     return result
 
 
