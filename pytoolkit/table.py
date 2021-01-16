@@ -1,6 +1,7 @@
 """pandasなどなど関連。"""
 from __future__ import annotations
 
+import gc
 import html
 import logging
 import typing
@@ -524,4 +525,5 @@ def reduce_mem_usage(df: pd.DataFrame) -> pd.DataFrame:
     logger.info(
         f"Mem. usage decreased to {end_mem:5.2f} Mb ({(start_mem - end_mem) / start_mem:.1%} reduction)"
     )
+    gc.collect()  # 切羽詰まってるとき用
     return df
