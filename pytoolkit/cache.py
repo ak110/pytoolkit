@@ -4,12 +4,15 @@ from __future__ import annotations
 import functools
 import hashlib
 import inspect
+import logging
 import pathlib
 import typing
 
 import joblib
 
 import pytoolkit as tk
+
+logger = logging.getLogger(__name__)
 
 
 def memoize(
@@ -67,11 +70,11 @@ def memoized_call(
     cache_path = pathlib.Path(cache_path)
     # キャッシュがあれば読む
     if cache_path.is_file():
-        tk.log.get(__name__).info(f"Cache is found: {cache_path}")
+        logger.info(f"Cache is found: {cache_path}")
         with tk.log.trace(f"cache-load({func.__name__})"):
             return joblib.load(cache_path)
     else:
-        tk.log.get(__name__).info(f"Cache is not found: {cache_path}")
+        logger.info(f"Cache is not found: {cache_path}")
     # 無ければ実処理してキャッシュとして保存
     with tk.log.trace(func.__name__):
         result = func()
@@ -101,6 +104,6 @@ def get_cache_path(
     args_str = ",".join([f"{repr(k)}:{repr(v)}" for k, v in args_list])
     cache_hash = hashlib.md5(args_str.encode("utf-8")).hexdigest()[:8]
 
-    tk.log.get(__name__).debug(f"Cache {cache_hash}: arguments={args_str}")
+    logger.debug(f"Cache {cache_hash}: arguments={args_str}")
     cache_path = cache_dir / f"{prefix}_{func.__name__}_{cache_hash}.pkl"
     return cache_path

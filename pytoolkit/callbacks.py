@@ -1,4 +1,5 @@
 """DeepLearning(主にKeras)関連。"""
+import logging
 import pathlib
 import time
 import typing
@@ -7,6 +8,8 @@ import numpy as np
 import tensorflow as tf
 
 import pytoolkit as tk
+
+logger = logging.getLogger(__name__)
 
 
 class LearningRateStepDecay(tf.keras.callbacks.Callback):
@@ -39,9 +42,7 @@ class LearningRateStepDecay(tf.keras.callbacks.Callback):
             lr1 = tf.keras.backend.get_value(self.model.optimizer.learning_rate)
             lr2 = lr1 * self.factor
             tf.keras.backend.set_value(self.model.optimizer.learning_rate, lr2)
-            tk.log.get(__name__).info(
-                f"Epoch {epoch + 1}: Learning rate {lr1:.1e} -> {lr2:.1e}"
-            )
+            logger.info(f"Epoch {epoch + 1}: Learning rate {lr1:.1e} -> {lr2:.1e}")
 
     def on_train_end(self, logs=None):
         del logs
@@ -138,7 +139,7 @@ class EpochLogger(tf.keras.callbacks.Callback):
             [f"{k}={logs.get(k):.4f}" for k in metrics_names if k in logs]
         )
         if self.enabled:
-            tk.log.get(__name__).debug(
+            logger.debug(
                 f"Epoch {epoch + 1:3d}: lr={lr:.1e} {metrics} time={int(np.ceil(elapsed_time))} ETA={int(np.ceil(eta))}"
             )
 
@@ -169,9 +170,7 @@ class Checkpoint(tf.keras.callbacks.Callback):
         del logs
         if epoch in self.target_epochs:
             if tk.hvd.is_master():
-                tk.log.get(__name__).info(
-                    f"Epoch {epoch}: Saving model to {self.checkpoint_path}"
-                )
+                logger.info(f"Epoch {epoch}: Saving model to {self.checkpoint_path}")
                 self.checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
                 self.model.save(str(self.checkpoint_path))
             tk.hvd.barrier()
@@ -194,7 +193,6 @@ class ErrorOnNaN(tf.keras.callbacks.Callback):
 
     def _check_model(self):
         """モデルの中に怪しい値が無いか調べる"""
-        logger = tk.log.get(__name__)
         max_value, max_value_weight = 0, ""
         broken = False
         try:

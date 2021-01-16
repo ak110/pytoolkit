@@ -1,6 +1,7 @@
 """各種ユーティリティ"""
 import contextlib
 import functools
+import logging
 import os
 import pathlib
 import pickle
@@ -12,7 +13,7 @@ import warnings
 import joblib
 import numpy as np
 
-import pytoolkit as tk
+logger = logging.getLogger(__name__)
 
 
 def find_by_name(arr, name):
@@ -148,7 +149,7 @@ def better_exceptions():
 
         be.hook()
     except Exception:
-        tk.log.get(__name__).warning("better_exceptions error", exc_info=True)
+        logger.warning("better_exceptions error", exc_info=True)
 
 
 def format_exc(color=False, safe=True) -> str:

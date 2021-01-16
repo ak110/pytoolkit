@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html
+import logging
 import typing
 import warnings
 
@@ -10,6 +11,8 @@ import pandas as pd
 import sklearn.utils
 
 import pytoolkit as tk
+
+logger = logging.getLogger(__name__)
 
 
 def label_encoding(
@@ -396,7 +399,7 @@ def permutation_importance(
         columns = X.columns.values
 
     base_score = score_fn(X, y)
-    tk.log.get(__name__).info(f"Base Score: {base_score:.2f}")
+    logger.info(f"Base Score: {base_score:.2f}")
 
     importances = []
     for c in tk.utils.tqdm(columns, disable=not verbose):
@@ -484,3 +487,41 @@ def latlon_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float
         warnings.simplefilter("ignore", RuntimeWarning)
         d = r * np.arccos(s + c * np.cos(delta_x * d2r))
     return d
+
+
+def reduce_mem_usage(df: pd.DataFrame) -> pd.DataFrame:
+    """Kaggleで有名な(?)処理。"""
+    numerics = ["int16", "int32", "int64", "float16", "float32", "float64"]
+    start_mem = df.memory_usage().sum() / 1024 ** 2
+    for col in df.columns:
+        col_type = df[col].dtypes
+        if col_type in numerics:
+            c_min = df[col].min()
+            c_max = df[col].max()
+            if str(col_type)[:3] == "int":
+                if c_min > np.iinfo(np.int8).min and c_max < np.iinfo(np.int8).max:
+                    df[col] = df[col].astype(np.int8)
+                elif c_min > np.iinfo(np.int16).min and c_max < np.iinfo(np.int16).max:
+                    df[col] = df[col].astype(np.int16)
+                elif c_min > np.iinfo(np.int32).min and c_max < np.iinfo(np.int32).max:
+                    df[col] = df[col].astype(np.int32)
+                elif c_min > np.iinfo(np.int64).min and c_max < np.iinfo(np.int64).max:
+                    df[col] = df[col].astype(np.int64)
+            else:
+                if (
+                    c_min > np.finfo(np.float16).min
+                    and c_max < np.finfo(np.float16).max
+                ):
+                    df[col] = df[col].astype(np.float16)
+                elif (
+                    c_min > np.finfo(np.float32).min
+                    and c_max < np.finfo(np.float32).max
+                ):
+                    df[col] = df[col].astype(np.float32)
+                else:
+                    df[col] = df[col].astype(np.float64)
+    end_mem = df.memory_usage().sum() / 1024 ** 2
+    logger.info(
+        f"Mem. usage decreased to {end_mem:5.2f} Mb ({(start_mem - end_mem) / start_mem:.1%} reduction)"
+    )
+    return df

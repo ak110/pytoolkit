@@ -1,6 +1,7 @@
 """scikit-learn"""
 from __future__ import annotations
 
+import logging
 import pathlib
 import typing
 
@@ -10,6 +11,8 @@ import sklearn.base
 import pytoolkit as tk
 
 from .core import Model
+
+logger = logging.getLogger(__name__)
 
 
 class SKLearnModel(Model):
@@ -84,7 +87,7 @@ class SKLearnModel(Model):
             score_weights.append(len(val_set))
 
         evals = tk.evaluations.mean(evals_list, weights=score_weights)
-        tk.log.get(__name__).info(f"cv: {tk.evaluations.to_str(evals)}")
+        logger.info(f"cv: {tk.evaluations.to_str(evals)}")
 
     def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
         assert self.estimators_ is not None

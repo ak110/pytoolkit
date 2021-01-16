@@ -1,12 +1,15 @@
 """分類の評価。"""
 from __future__ import annotations
 
+import logging
 import typing
 
 import numpy as np
 import sklearn.metrics
 
 import pytoolkit as tk
+
+logger = logging.getLogger(__name__)
 
 
 def print_classification(
@@ -18,7 +21,7 @@ def print_classification(
     """分類の指標色々を表示する。"""
     try:
         evals = evaluate_classification(y_true, proba_pred, average)
-        print_fn = print_fn or tk.log.get(__name__).info
+        print_fn = print_fn or logger.info
         print_fn(f"Accuracy:  {evals['acc']:.3f} (Error: {evals['error']:.3f})")
         print_fn(f"F1-score:  {evals['f1']:.3f}")
         print_fn(f"AUC:       {evals['auc']:.3f}")
@@ -28,7 +31,7 @@ def print_classification(
         print_fn(f"Logloss:   {evals['logloss']:.3f}")
         return evals
     except Exception:
-        tk.log.get(__name__).warning("Error: print_classification", exc_info=True)
+        logger.warning("Error: print_classification", exc_info=True)
         return {}
 
 

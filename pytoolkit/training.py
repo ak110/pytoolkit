@@ -5,9 +5,12 @@ tk.evaluations.EvalsType を返す関数を前提にしたヘルパー関数な�
 """
 from __future__ import annotations
 
+import logging
 import typing
 
 import pytoolkit as tk
+
+logger = logging.getLogger(__name__)
 
 
 def multi_run(
@@ -17,7 +20,7 @@ def multi_run(
     """funcをruns回実行して結果の平均を返す。"""
     evals_list = []
     for i in range(runs):
-        tk.log.get(__name__).info(f"multi run: {i + 1}/{runs}")
+        logger.info(f"multi run: {i + 1}/{runs}")
         evals_list.append(func())
     return tk.evaluations.mean(evals_list)
 

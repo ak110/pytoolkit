@@ -8,6 +8,7 @@ Horovodに対応した簡単なwrapperなど。
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import pathlib
 import tempfile
@@ -34,6 +35,8 @@ MetricType = typing.Union[
 ]
 MetricsType = typing.List[MetricType]
 
+logger = logging.getLogger(__name__)
+
 
 def check(
     train_model: tf.keras.models.Model,
@@ -57,7 +60,6 @@ def check(
 
     """
     models_dir = pathlib.Path(models_dir)
-    logger = tk.log.get(__name__)
 
     # summary表示
     tk.models.summary(train_model)
@@ -109,7 +111,7 @@ def load(
             str(path), custom_objects=custom_objects, compile=compile
         )
         # 念のため重みのfingerprintをログ出力しておく
-        tk.log.get(__name__).info(f"fingerprint: {tk.models.fingerprint(model)}")
+        logger.info(f"fingerprint: {tk.models.fingerprint(model)}")
     return model
 
 
@@ -164,11 +166,11 @@ def load_weights(
                 msg = f"{changed_params:,} params chagnged. ({r:.1%})"
                 if r < strict_fraction:
                     raise RuntimeError(msg)
-                tk.log.get(__name__).info(msg)
+                logger.info(msg)
             # 念のため重みのfingerprintをログ出力しておく
-            tk.log.get(__name__).info(f"fingerprint: {tk.models.fingerprint(model)}")
+            logger.info(f"fingerprint: {tk.models.fingerprint(model)}")
     elif skip_not_exist:
-        tk.log.get(__name__).info(f"{path} is not found.")
+        logger.info(f"{path} is not found.")
         return False
     else:
         raise RuntimeError(f"{path} is not found.")
@@ -217,15 +219,13 @@ def save(
             else:
                 raise ValueError(f"Invalid save format: {mode}")
             # 念のため重みのfingerprintをログ出力しておく
-            tk.log.get(__name__).info(f"fingerprint: {tk.models.fingerprint(model)}")
+            logger.info(f"fingerprint: {tk.models.fingerprint(model)}")
     tk.hvd.barrier()
 
 
 def summary(model: tf.keras.models.Model):
     """summaryを実行するだけ。"""
-    model.summary(
-        print_fn=tk.log.get(__name__).info if tk.hvd.is_master() else lambda x: None
-    )
+    model.summary(print_fn=logger.info if tk.hvd.is_master() else lambda x: None)  # type: ignore
 
 
 def plot(
@@ -371,9 +371,9 @@ def fit(
         if val_iterator is not None
         else (None, 0)
     )
-    tk.log.get(__name__).info(f"fit(train): {train_ds.element_spec} {train_steps=}")
+    logger.info(f"fit(train): {train_ds.element_spec} {train_steps=}")
     if val_ds is not None:
-        tk.log.get(__name__).info(f"fit(val):   {val_ds.element_spec} {val_steps=}")
+        logger.info(f"fit(val):   {val_ds.element_spec} {val_steps=}")
 
     callbacks = make_callbacks(callbacks, training=True)
 
@@ -461,7 +461,7 @@ def predict(
         callbacks = make_callbacks(callbacks, training=False)
         dataset = tk.hvd.split(iterator.dataset) if use_horovod else iterator.dataset
         ds, steps = iterator.data_loader.get_ds(dataset, without_label=True)
-        tk.log.get(__name__).info(f"predict: {ds.element_spec} {steps=}")
+        logger.info(f"predict: {ds.element_spec} {steps=}")
         if on_batch_fn is not None:
             gen = _predict_flow(
                 model=model,
@@ -517,7 +517,7 @@ def predict_flow(
     """
     with tk.log.trace("predict"):
         callbacks = make_callbacks(callbacks, training=False)
-        tk.log.get(__name__).info(f"predict_flow: {ds.element_spec} {steps=}")
+        logger.info(f"predict_flow: {ds.element_spec} {steps=}")
         return _predict_flow(
             model=model,
             ds=ds,
@@ -589,7 +589,7 @@ def evaluate(
         callbacks = make_callbacks(callbacks, training=False)
         dataset = tk.hvd.split(iterator.dataset) if use_horovod else iterator.dataset
         ds, steps = iterator.data_loader.get_ds(dataset)
-        tk.log.get(__name__).info(f"evaluate: {ds.element_spec} {steps=}")
+        logger.info(f"evaluate: {ds.element_spec} {steps=}")
         values = model.evaluate(
             ds,
             steps=steps,

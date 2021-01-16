@@ -1,4 +1,5 @@
 """機械学習関連。"""
+import logging
 import pathlib
 import typing
 
@@ -11,6 +12,8 @@ import sklearn.utils
 import tensorflow as tf
 
 import pytoolkit as tk
+
+logger = logging.getLogger(__name__)
 
 
 def listup_classification(
@@ -166,7 +169,7 @@ def print_scores(
     assert len(precisions) == len(supports)
     if class_names is None:
         class_names = [f"class{i:02d}" for i in range(len(precisions))]
-    print_fn = print_fn or tk.log.get(__name__).info
+    print_fn = print_fn or logger.info
 
     print_fn("                   適合率  再現率  F値    件数")
     # .......'0123456789abcdef:  0.123   0.123   0.123  0123456'
@@ -228,7 +231,7 @@ def search_threshold(
         assert best_th is not None
 
         val_score = score_fn(val_t, val_p, best_th)
-        tk.log.get(__name__).info(
+        logger.info(
             f"fold#{fold}: score={best_score:.4f} val_score={val_score:.4f} threshold={best_th:.4f}"
         )
         return val_score, best_th
@@ -239,7 +242,7 @@ def search_threshold(
 
         score = np.mean(scores)
         th = np.mean(ths)
-        tk.log.get(__name__).info(f"mean: score={score:.4f} threshold={th:.4f}")
+        logger.info(f"mean: score={score:.4f} threshold={th:.4f}")
         return score, th
 
 

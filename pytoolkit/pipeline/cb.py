@@ -1,6 +1,7 @@
 """CatBoost"""
 from __future__ import annotations
 
+import logging
 import pathlib
 import typing
 
@@ -10,6 +11,8 @@ import pandas as pd
 import pytoolkit as tk
 
 from .core import Model
+
+logger = logging.getLogger(__name__)
 
 
 class CBModel(Model):
@@ -97,7 +100,7 @@ class CBModel(Model):
             score = [s[k] for s in score_list]
             score = np.float32(np.average(score, weights=cv_weights))
             evals[k] = score
-        tk.log.get(__name__).info(f"cv: {tk.evaluations.to_str(evals)}")
+        logger.info(f"cv: {tk.evaluations.to_str(evals)}")
 
     def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
         assert self.gbms_ is not None

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import logging
 import pathlib
 import sys
 import typing
@@ -10,6 +11,8 @@ import typing
 import tensorflow as tf
 
 import pytoolkit as tk
+
+logger = logging.getLogger(__name__)
 
 
 class App:
@@ -156,7 +159,7 @@ class App:
                 if command.logfile:
                     tk.notifications.post(f"{type(e).__name__}: {e}")
                 # ログ出力して強制終了 (これ以上raiseしても少しトレース増えるだけなので)
-                tk.log.get(__name__).critical("Application error.", exc_info=True)
+                logger.critical("Application error.", exc_info=True)
                 sys.exit(1)
             finally:
                 self._command_term()
@@ -238,7 +241,7 @@ class Command:
             if self.distribute_strategy_fn is not None:
                 self.distribute_strategy = self.distribute_strategy_fn()
                 tf.distribute.experimental_set_strategy(self.distribute_strategy)
-                tk.log.get(__name__).info(
+                logger.info(
                     f"Number of devices: {self.distribute_strategy.num_replicas_in_sync}"
                 )
             self.entrypoint(**kwargs)

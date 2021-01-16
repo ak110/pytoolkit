@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import gc
+import logging
 import pathlib
 import time
 import typing
@@ -12,6 +13,8 @@ import tensorflow as tf
 import pytoolkit as tk
 
 from .core import Model
+
+logger = logging.getLogger(__name__)
 
 
 class KerasModel(Model):
@@ -256,20 +259,18 @@ class KerasModel(Model):
         )
         scores = dict(zip(model.metrics_names, evals))
         for k, v in scores.items():
-            tk.log.get(__name__).info(f"cv {k}: {v:,.3f}")
+            logger.info(f"cv {k}: {v:,.3f}")
 
     def _serial_cv(self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType):
         evals_list = []
         evals_weights = []
         for fold, (train_set, val_set) in enumerate(dataset.iter(folds)):
-            tk.log.get(__name__).info(
-                f"fold{fold}: train={len(train_set)} val={len(val_set)}"
-            )
+            logger.info(f"fold{fold}: train={len(train_set)} val={len(val_set)}")
             evals = self.train(train_set, val_set, fold=fold)
             evals_list.append(evals)
             evals_weights.append(len(val_set))
         evals = tk.evaluations.mean(evals_list, weights=evals_weights)
-        tk.log.get(__name__).info(f"cv: {tk.evaluations.to_str(evals)}")
+        logger.info(f"cv: {tk.evaluations.to_str(evals)}")
 
     def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
         pred = tk.models.predict(
@@ -334,7 +335,7 @@ class KerasModel(Model):
                 if i >= steps - 1:
                     break
             elapsed = time.perf_counter() - start_time
-            tk.log.get(__name__).info(
+            logger.info(
                 f"{name}_data_loader:{' ' * (6 - len(name))} {elapsed * 1000 / steps:.0f}ms/step"
             )
         return self
@@ -367,7 +368,7 @@ class KerasModel(Model):
         # pylint: disable=function-redefined
         assert fold in range(self.nfold)
         tk.hvd.barrier()
-        tk.log.get(__name__).info(
+        logger.info(
             f"train: {len(train_set)} samples, "
             f"val: {len(val_set) if val_set is not None else 0} samples, "
             f"batch_size: {self.train_data_loader.batch_size}x{tk.hvd.size() * self.train_data_loader.num_replicas_in_sync}"
@@ -376,15 +377,11 @@ class KerasModel(Model):
         model_path = self.models_dir / self.model_name_format.format(fold=fold)
 
         if self.skip_if_exists and model_path.exists():
-            tk.log.get(__name__).info(
-                f"fold{fold}: Loading '{model_path}'... (skip_if_exists)"
-            )
+            logger.info(f"fold{fold}: Loading '{model_path}'... (skip_if_exists)")
             self._load_model(fold)
             trained = False
         elif fold in self.skip_folds and model_path.exists():
-            tk.log.get(__name__).info(
-                f"fold{fold}: Loading '{model_path}'... (skip_folds)"
-            )
+            logger.info(f"fold{fold}: Loading '{model_path}'... (skip_folds)")
             self._load_model(fold)
             trained = False
         else:
@@ -422,9 +419,7 @@ class KerasModel(Model):
 
             # refine
             if self.refine_data_loader is not None and self.refine_epochs > 0:
-                tk.log.get(__name__).info(
-                    f"fold{fold}: Refining {self.refine_epochs} epochs..."
-                )
+                logger.info(f"fold{fold}: Refining {self.refine_epochs} epochs...")
                 tk.models.freeze_layers(
                     self.train_models[fold], tf.keras.layers.BatchNormalization
                 )
@@ -452,17 +447,13 @@ class KerasModel(Model):
         tk.hvd.barrier()
         try:
             train_evals = self.evaluate(train_set, prefix="", fold=fold)
-            tk.log.get(__name__).info(
-                f"fold{fold} evaluations: {tk.evaluations.to_str(train_evals)}"
-            )
+            logger.info(f"fold{fold} evaluations: {tk.evaluations.to_str(train_evals)}")
             if val_set is None:
                 return None
             evals = self.evaluate(val_set, prefix="val_", fold=fold)
-            tk.log.get(__name__).info(
-                f"fold{fold} evaluations: {tk.evaluations.to_str(evals)}"
-            )
+            logger.info(f"fold{fold} evaluations: {tk.evaluations.to_str(evals)}")
         except Exception:
-            tk.log.get(__name__).warning("evaluate error", exc_info=True)
+            logger.warning("evaluate error", exc_info=True)
             evals = {}
 
         # メモリを食いがちなので再構築してみる

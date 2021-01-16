@@ -11,11 +11,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shlex
 import sys
 
 import pytoolkit as tk
+
+logger = logging.getLogger(__name__)
 
 
 def post_evals(evals: tk.evaluations.EvalsType, precision: int = 3):
@@ -35,7 +38,7 @@ def post(body: str, subject: str = None):
     subject = subject.strip()
     body = body.strip()
     for line in [subject] + body.split("\n"):
-        tk.log.get(__name__).info(f"notification> {line}")
+        logger.info(f"notification> {line}")
 
     if tk.hvd.is_master():
         try:
@@ -44,7 +47,7 @@ def post(body: str, subject: str = None):
 
                 dotenv.load_dotenv()
             except Exception:
-                tk.log.get(__name__).warning("dotenv読み込み失敗", exc_info=True)
+                logger.warning("dotenv読み込み失敗", exc_info=True)
 
             import requests
 
@@ -69,4 +72,4 @@ def post(body: str, subject: str = None):
                 r.raise_for_status()
 
         except Exception:
-            tk.log.get(__name__).warning("投稿失敗", exc_info=True)
+            logger.warning("投稿失敗", exc_info=True)

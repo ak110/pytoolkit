@@ -1,6 +1,7 @@
 """xgboost"""
 from __future__ import annotations
 
+import logging
 import pathlib
 import typing
 
@@ -11,6 +12,8 @@ import sklearn.metrics
 import pytoolkit as tk
 
 from .core import Model
+
+logger = logging.getLogger(__name__)
 
 
 class XGBModel(Model):
@@ -101,7 +104,7 @@ class XGBModel(Model):
             if k.endswith("-mean"):
                 name, score = k[:-5], v.values[-1]
                 scores[name] = score
-                tk.log.get(__name__).info(f"cv {name}: {score:,.3f}")
+                logger.info(f"cv {name}: {score:,.3f}")
             self.best_ntree_limit_ = len(v)
 
     def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:

@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import inspect
+import logging
 import typing
-
-import pytoolkit as tk
 
 if typing.TYPE_CHECKING:
     import optuna
+
+logger = logging.getLogger(__name__)
 
 
 def optimize(
@@ -58,8 +59,6 @@ def optimize(
 
     """
     import optuna  # pylint: disable=redefined-outer-name
-
-    logger = tk.log.get(__name__)
 
     def objective(trial):
         params = params_fn(trial)

@@ -1,12 +1,15 @@
 """回帰の評価。"""
 from __future__ import annotations
 
+import logging
 import typing
 
 import numpy as np
 import sklearn.metrics
 
 import pytoolkit as tk
+
+logger = logging.getLogger(__name__)
 
 
 def print_regression(
@@ -17,14 +20,14 @@ def print_regression(
     """回帰の指標色々を表示する。"""
     try:
         evals = evaluate_regression(y_true, y_pred)
-        print_fn = print_fn or tk.log.get(__name__).info
+        print_fn = print_fn or logger.info
         print_fn(f"R^2:      {evals['r2']:.3f}")
         print_fn(f"RMSE:     {evals['rmse']:.3f} (base: {evals['rmse_base']:.3f})")
         print_fn(f"MAE:      {evals['mae']:.3f} (base: {evals['mae_base']:.3f})")
         print_fn(f"RMSE/MAE: {evals['rmse/mae']:.3f}")
         return evals
     except Exception:
-        tk.log.get(__name__).warning("Error: print_regression", exc_info=True)
+        logger.warning("Error: print_regression", exc_info=True)
         return {}
 
 

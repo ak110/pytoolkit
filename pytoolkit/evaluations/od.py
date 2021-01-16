@@ -1,11 +1,14 @@
 """物体検出の評価。"""
 from __future__ import annotations
 
+import logging
 import typing
 
 import numpy as np
 
 import pytoolkit as tk
+
+logger = logging.getLogger(__name__)
 
 
 def print_od(
@@ -24,7 +27,7 @@ def print_od(
 
     """
     evals = evaluate_od(y_true, y_pred)
-    print_fn = print_fn or tk.log.get(__name__).info
+    print_fn = print_fn or logger.info
     print_fn(f"BOX AP:    {evals['map/iou=0.50:0.95/area=all/max_dets=100']:.3f}")
     print_fn(f"AP50:      {evals['map/iou=0.50/area=all/max_dets=100']:.3f}")
     print_fn(f"AP75:      {evals['map/iou=0.75/area=all/max_dets=100']:.3f}")

@@ -9,6 +9,7 @@ batch: sampleのバッチサイズ個の集合
 from __future__ import annotations
 
 import dataclasses
+import logging
 import random
 import typing
 
@@ -24,6 +25,8 @@ DataType = typing.Union[typing.Sequence[typing.Any], pd.DataFrame, dict]
 LabelsType = typing.Union[
     np.ndarray, typing.List[np.ndarray], typing.Dict[str, np.ndarray]
 ]
+
+logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass()
@@ -275,8 +278,8 @@ class DataLoader:
         ), f"get_sample returns {len(exsample_sample)} values, but expects to see 2 values. {exsample_sample=}"
         data_tf_type = _get_tf_types(exsample_data)
         sample_tf_type = _get_tf_types(exsample_sample)
-        tk.log.get(__name__).info(f"DataLoader.get_data:   type={data_tf_type}")
-        tk.log.get(__name__).info(f"DataLoader.get_sample: type={sample_tf_type}")
+        logger.info(f"DataLoader.get_data:   type={data_tf_type}")
+        logger.info(f"DataLoader.get_sample: type={sample_tf_type}")
 
         def get_data(i):
             X, y = self.get_data(dataset, i)

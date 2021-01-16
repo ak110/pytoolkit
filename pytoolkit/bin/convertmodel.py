@@ -31,7 +31,7 @@ def main():
     os.environ["CUDA_VISIBLE_DEVICES"] = "none"
     tf.keras.backend.set_learning_phase(0)
 
-    tk.log.get(__name__).info(f"{args.model_path} Loading...")
+    logger.info(f"{args.model_path} Loading...")
     model = tk.models.load(args.model_path)
 
     if args.mode == "hdf5":
@@ -45,10 +45,10 @@ def main():
     else:
         raise ValueError(f"Invalid mode: {args.mode}")
 
-    tk.log.get(__name__).info(f"{save_path} Saving...")
+    logger.info(f"{save_path} Saving...")
     tk.models.save(model, save_path, mode=args.mode)
 
-    tk.log.get(__name__).info("Finished!")
+    logger.info("Finished!")
 
 
 if __name__ == "__main__":

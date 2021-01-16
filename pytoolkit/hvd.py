@@ -1,9 +1,13 @@
 """Horovodの薄いwrapper。"""
 from __future__ import annotations
 
+import logging
+
 import tensorflow as tf
 
 import pytoolkit as tk
+
+logger = logging.getLogger(__name__)
 
 _initialized = False
 
@@ -34,7 +38,7 @@ def init() -> None:
 
             _initialized = True
         except ImportError:
-            tk.log.get(__name__).warning("Horovod読み込み失敗", exc_info=True)
+            logger.warning("Horovod読み込み失敗", exc_info=True)
 
 
 def initialized() -> bool:

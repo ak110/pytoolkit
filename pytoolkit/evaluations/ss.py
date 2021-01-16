@@ -1,12 +1,15 @@
 """セマンティックセグメンテーションの評価。"""
 from __future__ import annotations
 
+import logging
 import typing
 import warnings
 
 import numpy as np
 
 import pytoolkit as tk
+
+logger = logging.getLogger(__name__)
 
 
 def print_ss(
@@ -26,7 +29,7 @@ def print_ss(
 
     """
     evals = evaluate_ss(y_true, y_pred, threshold)
-    print_fn = print_fn or tk.log.get(__name__).info
+    print_fn = print_fn or logger.info
     print_fn(
         f"IoU:            {np.array_str(evals['iou'], precision=3, suppress_small=True)}"
     )

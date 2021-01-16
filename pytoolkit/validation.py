@@ -1,6 +1,7 @@
 """CVなど。"""
 from __future__ import annotations
 
+import logging
 import typing
 
 import numpy as np
@@ -9,6 +10,8 @@ import sklearn.model_selection
 import pytoolkit as tk
 
 FoldsType = typing.Sequence[typing.Tuple[np.ndarray, np.ndarray]]
+
+logger = logging.getLogger(__name__)
 
 
 def split(
@@ -31,9 +34,7 @@ def split(
     if nfold == 1:
         return split(dataset, nfold=5, split_seed=split_seed, stratify=stratify)[:1]
 
-    tk.log.get(__name__).info(
-        f"split: {len(dataset)=} {nfold=} {split_seed=} {stratify=}"
-    )
+    logger.info(f"split: {len(dataset)=} {nfold=} {split_seed=} {stratify=}")
     shuffle = split_seed is not None
 
     if dataset.groups is not None:
