@@ -84,6 +84,7 @@ isort = "*"
 [tool.poetry.scripts]
 tk-benchmark = "pytoolkit.bin.benchmark:main"
 tk-convert-model = "pytoolkit.bin.convertmodel:main"
+tk-notify = "pytoolkit.bin.notify:main"
 tk-plot-log = "pytoolkit.bin.plotlog:main"
 tk-py2nb = "pytoolkit.bin.py2nb:main"
 
