@@ -1,5 +1,6 @@
 """各種ユーティリティ"""
 import contextlib
+import datetime
 import functools
 import logging
 import os
@@ -201,3 +202,11 @@ def encode_rl(mask: np.ndarray) -> str:
     rls = np.where(changes)[0] + 1  # 隣と異なる位置のindex
     rls[1::2] -= rls[::2]  # 開始位置＋サイズ
     return " ".join(str(x) for x in rls)
+
+
+def daterange(
+    start: datetime.date, end: datetime.date
+) -> typing.Iterator[datetime.date]:
+    """startからend-1の日付を列挙"""
+    for i in range((end - start).days):
+        yield start + datetime.timedelta(i)
