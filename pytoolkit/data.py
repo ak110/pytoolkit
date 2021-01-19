@@ -341,7 +341,7 @@ class DataLoader:
         ds = ds.shuffle(buffer_size=len(dataset)) if shuffle else ds
         ds = ds.map(
             process1,
-            num_parallel_calls=tf.data.experimental.AUTOTUNE if self.parallel else None,
+            num_parallel_calls=tf.data.AUTOTUNE if self.parallel else None,
             deterministic=not shuffle,
         )
         if self.data_per_sample > 1:
@@ -350,7 +350,7 @@ class DataLoader:
             ds = ds.repeat() if shuffle else ds  # バッチサイズを固定するため先にrepeat
         ds = ds.map(process2)
         ds = ds.batch(global_batch_size)
-        ds = ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+        ds = ds.prefetch(buffer_size=tf.data.AUTOTUNE)
         steps = -(-len(dataset) // global_batch_size)
         return ds, steps
 

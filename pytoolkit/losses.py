@@ -227,7 +227,9 @@ def lovasz_hinge(
                 yt, yp, from_logits=from_logits, per_sample=False, activation=activation
             )
 
-        return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=y_pred.dtype)
+        return tf.map_fn(
+            loss_per_sample, (y_true, y_pred), fn_output_signature=y_pred.dtype
+        )
 
     y_true = tf.reshape(y_true, (-1,))
     y_pred = tf.reshape(y_pred, (-1,))
@@ -269,7 +271,9 @@ def lovasz_binary_crossentropy(
                 alpha=alpha,
             )
 
-        return tf.map_fn(loss_per_sample, (y_true, y_pred), dtype=y_pred.dtype)
+        return tf.map_fn(
+            loss_per_sample, (y_true, y_pred), fn_output_signature=y_pred.dtype
+        )
 
     y_true = tf.reshape(y_true, (-1,))
     y_pred = tf.reshape(y_pred, (-1,))

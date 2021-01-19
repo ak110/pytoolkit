@@ -61,6 +61,101 @@ def evaluate_ss(
     Returns:
         各種metrics
 
+    """
+    evaluations = [
+        evaluate_ss_single(yt, yp, threshold, multilabel)
+        for yt, yp in zip(y_true, y_pred)
+    ]
+    return gather_ss_evaluations(evaluations)
+
+
+def evaluate_ss_single(
+    yt: np.ndarray,
+    yp: np.ndarray,
+    threshold: float = 0.5,
+    multilabel: bool = False,
+) -> tuple:
+    """1件分の評価のための処理。
+
+    Args:
+        yt: 1件のラベル (shape=(H, W) or (H, W, C))
+        yp: 1件の推論結果 (shape=(H, W) or (H, W, C))
+        threshold: 閾値 (ラベルと推論結果と両方に適用)
+        multilabel: マルチラベルならTrue、多クラスならFalse。
+
+    Returns:
+        評価の途中結果
+
+    """
+    with np.errstate(all="warn"):
+        if np.ndim(yt) == 2:
+            yt = np.expand_dims(yt, axis=-1)
+        if np.ndim(yp) == 2:
+            yp = np.expand_dims(yp, axis=-1)
+        assert np.ndim(yt) == 3  # (H, W, C)
+        assert np.ndim(yp) == 3  # (H, W, C)
+
+        # サイズが合ってないときは警告を出しつつ一応リサイズする
+        # (リサイズアルゴリズムにより結果が変わるので非推奨)
+        if yt.shape[:2] != yp.shape[:2]:
+            warnings.warn("Predictions need resize.")
+            yp = tk.ndimage.resize(yp, width=yt.shape[1], height=yt.shape[0])
+
+        assert yt.shape == yp.shape
+
+        if multilabel or yt.shape[-1] == 1:
+            # マルチラベルか2クラス分類の場合、閾値以上か否かを見る
+            p_true = yt >= threshold
+            p_pred = yp >= threshold
+        else:
+            # 多クラス分類の場合、argmaxしてonehot化
+            p_true = np.zeros(yt.shape, dtype=bool)
+            p_true[yt.argmax(axis=-1)] = True
+            p_pred = np.zeros(yp.shape, dtype=bool)
+            p_pred[yp.argmax(axis=-1)] = True
+        n_true = ~p_true
+        n_pred = ~p_pred
+        tp = np.sum(p_true & p_pred, axis=(0, 1))  # (C,)
+        fp = np.sum(n_true & p_pred, axis=(0, 1))  # (C,)
+        tn = np.sum(n_true & n_pred, axis=(0, 1))  # (C,)
+        fn = np.sum(p_true & n_pred, axis=(0, 1))  # (C,)
+        gp = np.sum(p_true, axis=(0, 1))  # (C,)
+        pp = np.sum(p_pred, axis=(0, 1))  # (C,)
+        if yt.shape[-1] == 1:
+            # class0=bg, class1=fg。(ひっくり返るので要注意)
+            cm = np.array(
+                [
+                    # negative,  positive
+                    [np.sum(tn), np.sum(fp)],  # gt negative
+                    [np.sum(fn), np.sum(tp)],  # gt positive
+                ]
+            )
+        else:
+            assert yt.shape[-1] >= 2
+            num_classes = yt.shape[-1]
+            cm = np.zeros((num_classes, num_classes), dtype=np.int64)
+            yt_c = yt.argmax(axis=-1)
+            yp_c = yp.argmax(axis=-1)
+            for i in range(num_classes):
+                for j in range(num_classes):
+                    cm[i, j] = np.sum((yt_c == i) & (yp_c == j))
+
+        return tp, fp, tn, fn, gp, pp, cm
+
+
+def gather_ss_evaluations(
+    evaluations: typing.Iterable[tuple],
+) -> tk.evaluations.EvalsType:
+    """evaluate_ss_singleの結果のリストから評価結果を作成して返す。
+
+    Args:
+        evaluations: evaluate_ss_singleの結果のリスト
+
+    Returns:
+        各種metrics
+
+        - "iou": クラスごとのIoU
+        - "miou": クラスごとのIoUのマクロ平均
         - "iou_score": IoUスコア (塩コンペのスコア)
         - "dice": ダイス係数
         - "fg_iou": 答えが空でないときのIoUの平均
@@ -73,59 +168,7 @@ def evaluate_ss(
 
     """
     with np.errstate(all="warn"):
-
-        def process_per_image(yt, yp):
-            if np.ndim(yt) == 2:
-                yt = np.expand_dims(yt, axis=-1)
-            if np.ndim(yp) == 2:
-                yp = np.expand_dims(yp, axis=-1)
-            assert np.ndim(yt) == 3  # (H, W, C)
-            assert np.ndim(yp) == 3  # (H, W, C)
-            if yt.shape[:2] != yp.shape[:2]:
-                warnings.warn("Predictions need resize.")  # リサイズ忘れちゃダメだぞ警告
-                yp = tk.ndimage.resize(yp, width=yt.shape[1], height=yt.shape[0])
-            assert yt.shape == yp.shape
-
-            if multilabel or yt.shape[-1] == 1:
-                # マルチラベルか2クラス分類の場合、閾値以上か否かを見る
-                p_true = yt >= threshold
-                p_pred = yp >= threshold
-            else:
-                # 多クラス分類の場合、argmaxしてonehot化
-                p_true = np.zeros(yt.shape, dtype=bool)
-                p_true[yt.argmax(axis=-1)] = True
-                p_pred = np.zeros(yp.shape, dtype=bool)
-                p_pred[yp.argmax(axis=-1)] = True
-            n_true = ~p_true
-            n_pred = ~p_pred
-            tp = np.sum(p_true & p_pred, axis=(0, 1))  # (C,)
-            fp = np.sum(n_true & p_pred, axis=(0, 1))  # (C,)
-            tn = np.sum(n_true & n_pred, axis=(0, 1))  # (C,)
-            fn = np.sum(p_true & n_pred, axis=(0, 1))  # (C,)
-            gp = np.sum(p_true, axis=(0, 1))  # (C,)
-            pp = np.sum(p_pred, axis=(0, 1))  # (C,)
-            if yt.shape[-1] == 1:
-                # class0=bg, class1=fg。(ひっくり返るので要注意)
-                cm = np.array(
-                    [
-                        # negative,  positive
-                        [np.sum(tn), np.sum(fp)],  # gt negative
-                        [np.sum(fn), np.sum(tp)],  # gt positive
-                    ]
-                )
-            else:
-                assert yt.shape[-1] >= 2
-                num_classes = yt.shape[-1]
-                cm = np.zeros((num_classes, num_classes), dtype=np.int64)
-                yt_c = yt.argmax(axis=-1)
-                yp_c = yp.argmax(axis=-1)
-                for i in range(num_classes):
-                    for j in range(num_classes):
-                        cm[i, j] = np.sum((yt_c == i) & (yp_c == j))
-            return tp, fp, tn, fn, gp, pp, cm
-
-        r = [process_per_image(yt, yp) for yt, yp in zip(y_true, y_pred)]
-        tp, fp, tn, fn, gp, pp, cm = zip(*r)
+        tp, fp, tn, fn, gp, pp, cm = zip(*evaluations)
         tp = np.array(tp)  # (N, C), dtype=int
         fp = np.array(fp)  # (N, C), dtype=int
         tn = np.array(tn)  # (N, C), dtype=int

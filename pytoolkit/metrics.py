@@ -154,6 +154,8 @@ class CosineSimilarity(tf.keras.metrics.Metric):
     ):  # pylint: disable=arguments-differ
         """指標の算出。"""
         del sample_weight
+        y_true = tf.cast(y_true, tf.float32)
+        y_pred = tf.cast(y_pred, tf.float32)
         if self.from_logits:
             y_pred = tf.nn.softmax(y_pred, axis=self.axis)
         y_true = tf.math.l2_normalize(y_true, axis=self.axis)
