@@ -76,7 +76,7 @@ class RandomTransform(A.DualTransform):
         flip: 反転の有無(vertical, horizontal)
         translate: 平行移動の量(vertical, horizontal)
         border_mode: edge, reflect, wrap, zero, half, one
-        preserve_aspect: アスペクト比を維持するように縮小するならTrue
+        mode: "normal", "preserve_aspect", "crop"
 
     """
 
@@ -88,7 +88,7 @@ class RandomTransform(A.DualTransform):
         translate: typing.Tuple[float, float] = (0.0625, 0.0625),
         border_mode: str = "edge",
         clip_bboxes: bool = True,
-        preserve_aspect: bool = False,
+        mode: str = "normal",
         always_apply: bool = False,
         p: float = 1.0,
     ) -> RandomTransform:
@@ -102,7 +102,7 @@ class RandomTransform(A.DualTransform):
             rotate_prob=0.0,
             border_mode=border_mode,
             clip_bboxes=clip_bboxes,
-            preserve_aspect=preserve_aspect,
+            mode=mode,
             always_apply=always_apply,
             p=p,
         )
@@ -113,7 +113,7 @@ class RandomTransform(A.DualTransform):
         size: typing.Tuple[int, int],
         border_mode: str = "edge",
         clip_bboxes: bool = True,
-        preserve_aspect: bool = False,
+        mode: str = "normal",
         always_apply: bool = False,
         p: float = 1.0,
     ) -> RandomTransform:
@@ -127,7 +127,7 @@ class RandomTransform(A.DualTransform):
             rotate_prob=0.0,
             border_mode=border_mode,
             clip_bboxes=clip_bboxes,
-            preserve_aspect=preserve_aspect,
+            mode=mode,
             always_apply=always_apply,
             p=p,
         )
@@ -146,7 +146,7 @@ class RandomTransform(A.DualTransform):
         rotate_range: typing.Tuple[int, int] = (-15, +15),
         border_mode: str = "edge",
         clip_bboxes: bool = True,
-        preserve_aspect: bool = False,
+        mode: str = "normal",
         always_apply: bool = False,
         p: float = 1.0,
     ):
@@ -163,7 +163,7 @@ class RandomTransform(A.DualTransform):
         self.rotate_range = rotate_range
         self.border_mode = border_mode
         self.clip_bboxes = clip_bboxes
-        self.preserve_aspect = preserve_aspect
+        self.mode = mode
 
     def apply(self, image, m, interp=None, **params):
         # pylint: disable=arguments-differ
@@ -172,8 +172,18 @@ class RandomTransform(A.DualTransform):
             "reflect": (cv2.BORDER_REFLECT_101, None),
             "wrap": (cv2.BORDER_WRAP, None),
             "zero": (cv2.BORDER_CONSTANT, [0, 0, 0]),
-            "half": (cv2.BORDER_CONSTANT, [127, 127, 127]),
-            "one": (cv2.BORDER_CONSTANT, [255, 255, 255]),
+            "half": (
+                cv2.BORDER_CONSTANT,
+                [0.5, 0.5, 0.5]
+                if image.dtype in (np.float32, np.float64)
+                else [127, 127, 127],
+            ),
+            "one": (
+                cv2.BORDER_CONSTANT,
+                [1, 1, 1]
+                if image.dtype in (np.float32, np.float64)
+                else [255, 255, 255],
+            ),
         }[self.border_mode]
 
         if interp == "nearest":
@@ -285,7 +295,10 @@ class RandomTransform(A.DualTransform):
         translate_h = random.uniform(-self.translate[1], self.translate[1])
         # 左上から時計回りに座標を用意
         src_points = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32)
-        if self.preserve_aspect:
+        if self.mode == "normal":
+            # アスペクト比を無視して出力サイズに合わせる
+            dst_points = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32)
+        elif self.mode == "preserve_aspect":
             # アスペクト比を維持するように縮小する
             if image.shape[0] < image.shape[1]:
                 # 横長
@@ -301,9 +314,18 @@ class RandomTransform(A.DualTransform):
                 dst_points = np.array(
                     [[xr, 0], [xr + wr, 0], [xr + wr, 1], [xr, 1]], dtype=np.float32
                 )
+        elif self.mode == "crop":
+            # 入力サイズによらず固定サイズでcrop
+            hr = self.size[0] / image.shape[0]
+            wr = self.size[1] / image.shape[1]
+            yr = random.uniform(0, 1 - hr)
+            xr = random.uniform(0, 1 - wr)
+            dst_points = np.array(
+                [[xr, yr], [xr + wr, yr], [xr + wr, yr + hr], [xr, yr + hr]],
+                dtype=np.float32,
+            )
         else:
-            # アスペクト比を無視して出力サイズに合わせる
-            dst_points = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32)
+            raise ValueError(f"Invalid mode: {self.mode}")
         # 反転
         if flip_h:
             dst_points = dst_points[[1, 0, 3, 2]]

@@ -130,7 +130,7 @@ def categorical_crossentropy(
     label_smoothing を使う場合は0.2とかを指定。
 
     References:
-        - label smoothing <https://myrtle.ai/how-to-train-your-resnet-8-bag-of-tricks/>
+        - label smoothing <https://myrtle.ai/learn/how-to-train-your-resnet-8-bag-of-tricks/>
 
     """
     assert tf.keras.backend.image_data_format() == "channels_last"
