@@ -89,15 +89,11 @@ def load_voc_od_split(
     class_name_to_id = {n: i for i, n in enumerate(class_names)}
 
     # IDリストの読み込み
-    ids = list(
-        [
-            line
-            for line in (data_dir / f"ImageSets/Main/{split}.txt")
-            .read_text()
-            .split("\n")
-            if len(line) > 0
-        ]
-    )
+    ids = [
+        line
+        for line in (data_dir / f"ImageSets/Main/{split}.txt").read_text().split("\n")
+        if len(line) > 0
+    ]
 
     # xmlの読み込み
     labels = []

@@ -156,7 +156,8 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
         self.fit_transform(X, y)
         return self
 
-    def fit_transform(self, X, y):
+    def fit_transform(self, X, y=None, **fit_params):
+        del fit_params
         with tk.log.trace("FeaturesEncoder.fit_transform"):
             # 対象とする列のリストアップ
             candidate_columns = set(X.columns.values)
