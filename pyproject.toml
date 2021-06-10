@@ -76,10 +76,11 @@ tests = [
 black = "~20.8b1"
 flake8 = "*"
 flake8-bugbear = "*"
+isort = "*"
 mypy = "*"
 pylint = "*"
 pytest = "*"
-isort = "*"
+types-requests = "*"
 
 [tool.poetry.scripts]
 tk-benchmark = "pytoolkit.bin.benchmark:main"

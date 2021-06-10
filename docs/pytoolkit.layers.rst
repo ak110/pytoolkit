@@ -76,7 +76,6 @@ pytoolkit.layers.pooling module
    :undoc-members:
    :show-inheritance:
 
-
 Module contents
 ---------------
 

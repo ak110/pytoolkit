@@ -60,7 +60,6 @@ pytoolkit.pipeline.xgb module
    :undoc-members:
    :show-inheritance:
 
-
 Module contents
 ---------------
 

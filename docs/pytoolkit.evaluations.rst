@@ -44,7 +44,6 @@ pytoolkit.evaluations.ss module
    :undoc-members:
    :show-inheritance:
 
-
 Module contents
 ---------------
 

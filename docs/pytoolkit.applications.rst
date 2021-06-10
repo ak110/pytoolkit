@@ -20,14 +20,6 @@ pytoolkit.applications.efficientnet module
    :undoc-members:
    :show-inheritance:
 
-pytoolkit.applications.resnet34 module
---------------------------------------
-
-.. automodule:: pytoolkit.applications.resnet34
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 pytoolkit.applications.xception module
 --------------------------------------
 
@@ -35,7 +27,6 @@ pytoolkit.applications.xception module
    :members:
    :undoc-members:
    :show-inheritance:
-
 
 Module contents
 ---------------

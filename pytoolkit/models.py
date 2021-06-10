@@ -273,9 +273,10 @@ def compile(
     with tk.log.trace("compile"):
         if tk.hvd.initialized():
             optimizer = tf.keras.optimizers.get(optimizer)
-            optimizer = tk.hvd.get().DistributedOptimizer(
-                optimizer, compression=tk.hvd.get().Compression.fp16
-            )
+            c = tk.hvd.get().__dict__.get("Compression")
+            if c is None:
+                c = tk.hvd.get().__dict__.get("compression").Compression
+            optimizer = tk.hvd.get().DistributedOptimizer(optimizer, compression=c.fp16)
             # Horovod: Specify `experimental_run_tf_function=False` to ensure TensorFlow
             # uses hvd.DistributedOptimizer() to compute gradients.
             if experimental_run_tf_function is None:

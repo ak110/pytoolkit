@@ -1,7 +1,7 @@
 """スレッド関連。"""
 import concurrent.futures
 
-_pool = concurrent.futures.ThreadPoolExecutor()
+_pool = concurrent.futures.ThreadPoolExecutor()  # pylint: disable=consider-using-with
 
 
 def get_pool():

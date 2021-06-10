@@ -112,6 +112,14 @@ pytoolkit.image module
    :undoc-members:
    :show-inheritance:
 
+pytoolkit.lgb module
+--------------------
+
+.. automodule:: pytoolkit.lgb
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 pytoolkit.log module
 --------------------
 
@@ -271,7 +279,6 @@ pytoolkit.web module
    :members:
    :undoc-members:
    :show-inheritance:
-
 
 Module contents
 ---------------
