@@ -89,7 +89,7 @@ def allgather(value):
 def allreduce(value, op: str = "average"):
     """全ワーカーからデータを集める。opはaverage, sum, adasum"""
     if initialized():
-        hvd_op = {"average": get().Average, "sum": get().Sum, "adasum": get().AdaSum}[
+        hvd_op = {"average": get().Average, "sum": get().Sum, "adasum": get().Adasum}[
             op
         ]
         value = get().allreduce(value, op=hvd_op)
