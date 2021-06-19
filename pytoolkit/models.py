@@ -7,6 +7,7 @@ Horovodに対応した簡単なwrapperなど。
 """
 from __future__ import annotations
 
+import functools
 import hashlib
 import logging
 import os
@@ -679,3 +680,50 @@ def fingerprint(model: tf.keras.models.Model) -> str:
         m.update(w.tobytes())
     h = m.hexdigest()
     return f"{h[:2]}:{h[2:4]}:{h[4:6]}:{h[6:8]}"
+
+
+def use_sam(model: tf.keras.models.Model, rho: float = 0.05):
+    """Sharpness-Aware Minimization: <https://arxiv.org/abs/2010.01412>"""
+    model.train_step = functools.partial(sam_train_step, self=model, rho=rho)
+
+
+@tf.function
+def sam_train_step(data, self: tf.keras.models.Model = None, rho: float = 0.05):
+    """Sharpness-Aware Minimization: <https://arxiv.org/abs/2010.01412>"""
+    assert self is not None
+    if isinstance(data, tuple) and len(data) == 2:
+        X, y_true = data
+    else:
+        X, y_true = data, 0
+
+    # 1st step
+    with tf.GradientTape() as tape:
+        y_pred = self(X, training=True)
+        loss = self.compiled_loss(y_true, y_pred, regularization_losses=self.losses)
+
+    trainable_vars = self.trainable_variables
+    gradients = tape.gradient(loss, trainable_vars)
+
+    norm = tf.linalg.global_norm(gradients)
+    scale = rho / (norm + 1e-12)
+    e_w_list = []
+    for v, grad in zip(trainable_vars, gradients):
+        e_w = grad * scale
+        v.assign_add(e_w)
+        e_w_list.append(e_w)
+
+    # 2nd step
+    with tf.GradientTape() as tape:
+        y_pred_adv = self(X, training=True)
+        loss_adv = self.compiled_loss(
+            y_true, y_pred_adv, regularization_losses=self.losses
+        )
+    gradients_adv = tape.gradient(loss_adv, trainable_vars)
+    for v, e_w in zip(trainable_vars, e_w_list):
+        v.assign_sub(e_w)
+
+    # optimize
+    self.optimizer.apply_gradients(zip(gradients_adv, trainable_vars))
+
+    self.compiled_metrics.update_state(y_true, y_pred)
+    return {m.name: m.result() for m in self.metrics}

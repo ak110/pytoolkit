@@ -50,6 +50,17 @@ def memoize(func):
     return memoized_func
 
 
+def subprocess(func):
+    """子プロセスで実行するデコレーター。GPUメモリ周りの対処とか用。"""
+
+    @functools.wraps(func)
+    def subprocess_func(*args, **kwargs):
+        with joblib.Parallel(n_jobs=1, backend="multiprocessing") as parallel:
+            return parallel([joblib.delayed(func)(*args, **kwargs)])
+
+    return subprocess_func
+
+
 def dump(value, filename, compress=0, protocol=None, cache_size=None):
     """ディレクトリを自動的に作るjoblib.dump。"""
     filename = pathlib.Path(filename)
