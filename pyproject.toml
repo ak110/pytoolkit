@@ -47,8 +47,8 @@ optuna = {version = "*", optional = true}
 pydot = {version = "*", optional = true}
 python-dotenv = {version = "*", optional = true}
 requests = {version = "*", optional = true}
-tensorflow = {version = "~2.4", optional = true}
-tensorflow-cpu = {version = "~2.4", optional = true}
+tensorflow = {version = "~2.6", optional = true}
+tensorflow-cpu = {version = "~2.6", optional = true}
 tf2onnx = {version = "^*", optional = true}
 tqdm = {version = "*", optional = true}
 xgboost = {version = "*", optional = true}

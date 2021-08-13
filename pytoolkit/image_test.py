@@ -79,7 +79,7 @@ def test_WrappedTranslateX(data_dir, save_dir):
     for s in [-0.75, -0.25, +0.25, +0.75]:
         tk.ndimage.save(
             save_dir / f"Lenna.WrappedTranslateX.{s:+.2f}.png",
-            aug.apply(image=img, scale=s),
+            aug.apply(img, scale=s),
         )
 
 
@@ -90,7 +90,7 @@ def test_WrappedTranslateY(data_dir, save_dir):
     for s in [-0.75, -0.25, +0.25, +0.75]:
         tk.ndimage.save(
             save_dir / f"Lenna.WrappedTranslateY.{s:+.2f}.png",
-            aug.apply(image=img, scale=s),
+            aug.apply(img, scale=s),
         )
 
 

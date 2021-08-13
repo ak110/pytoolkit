@@ -18,11 +18,11 @@ def test_reduce_losses(graph):
         func = tf.function(func)
 
     with pytest.raises(ValueError):
-        tk.backend.reduce_losses([tf.ones((1, 1))])
+        func([tf.ones((1, 1))])
 
     with pytest.raises(tf.errors.InvalidArgumentError):
-        tk.backend.reduce_losses([tf.ones((1,)) / 0.0])
+        func([tf.ones((1,)) / 0.0])
 
-    x = tk.backend.reduce_losses([tf.ones((1,))])
+    x = func([tf.ones((1,))])
     assert x.shape.rank == 0
     assert x.numpy() == pytest.approx(1.0)

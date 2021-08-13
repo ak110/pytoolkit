@@ -4,8 +4,6 @@ import typing
 import numpy as np
 import tensorflow as tf
 
-import pytoolkit as tk
-
 
 @tf.keras.utils.register_keras_serializable(package="pytoolkit")
 class AutomatedFocalLoss(tf.keras.layers.Layer):
@@ -29,9 +27,8 @@ class AutomatedFocalLoss(tf.keras.layers.Layer):
         self.phat_correct: typing.Optional[tf.Tensor] = None
 
     def build(self, input_shape):
-        _, logits_shape = input_shape
         self.phat_correct = self.add_weight(
-            shape=logits_shape[1:] if self.mode == "binary" else logits_shape[1:-1],
+            shape=(1,),
             initializer=tf.keras.initializers.zeros(),
             trainable=False,
             synchronization=tf.VariableSynchronization.ON_READ,
@@ -58,7 +55,7 @@ class AutomatedFocalLoss(tf.keras.layers.Layer):
             p = tf.nn.softmax(logits)
             p_correct = tf.math.reduce_sum(labels * p, axis=-1)
 
-        p_new = tf.math.reduce_mean(p_correct, axis=0)
+        p_new = tf.math.reduce_mean(p_correct)
         phat_correct = self.phat_correct * 0.95 + p_new * 0.05
         tf.keras.backend.update(self.phat_correct, phat_correct)
 
@@ -70,7 +67,7 @@ class AutomatedFocalLoss(tf.keras.layers.Layer):
             assert self.class_weights is None  # 未実装
             loss = w * (tf.math.log1p(tf.math.exp(logits)) - labels * logits)
         else:
-            log_p = tk.backend.log_softmax(logits)
+            log_p = logits - tf.math.reduce_logsumexp(logits, axis=-1, keepdims=True)
             base_loss = labels * log_p
             if self.class_weights is not None:
                 base_loss = base_loss * self.class_weights

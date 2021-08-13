@@ -48,10 +48,10 @@ class RandomRotate(A.DualTransform):
             "keypoints": self.apply_to_keypoints,
         }
 
-    def apply(self, image, degrees, **params):
+    def apply(self, img, degrees, **params):
         # pylint: disable=arguments-differ
         return tk.ndimage.rotate(
-            image, degrees, expand=self.expand, border_mode=self.border_mode
+            img, degrees, expand=self.expand, border_mode=self.border_mode
         )
 
     def apply_to_bbox(self, bbox, **params):
@@ -165,7 +165,7 @@ class RandomTransform(A.DualTransform):
         self.clip_bboxes = clip_bboxes
         self.mode = mode
 
-    def apply(self, image, m, interp=None, **params):
+    def apply(self, img, m, interp=None, **params):
         # pylint: disable=arguments-differ
         cv2_border, borderValue = {
             "edge": (cv2.BORDER_REPLICATE, None),
@@ -175,14 +175,12 @@ class RandomTransform(A.DualTransform):
             "half": (
                 cv2.BORDER_CONSTANT,
                 [0.5, 0.5, 0.5]
-                if image.dtype in (np.float32, np.float64)
+                if img.dtype in (np.float32, np.float64)
                 else [127, 127, 127],
             ),
             "one": (
                 cv2.BORDER_CONSTANT,
-                [1, 1, 1]
-                if image.dtype in (np.float32, np.float64)
-                else [255, 255, 255],
+                [1, 1, 1] if img.dtype in (np.float32, np.float64) else [255, 255, 255],
             ),
         }[self.border_mode]
 
@@ -190,7 +188,7 @@ class RandomTransform(A.DualTransform):
             cv2_interp = cv2.INTER_NEAREST
         else:
             # 縮小ならINTER_AREA, 拡大ならINTER_LANCZOS4
-            sh, sw = image.shape[:2]
+            sh, sw = img.shape[:2]
             dr = cv2.perspectiveTransform(
                 np.array([(0, 0), (sw, 0), (sw, sh), (0, sh)])
                 .reshape((-1, 1, 2))
@@ -201,31 +199,31 @@ class RandomTransform(A.DualTransform):
             dh = min(np.linalg.norm(dr[3] - dr[0]), np.linalg.norm(dr[2] - dr[1]))
             cv2_interp = cv2.INTER_AREA if dw <= sw or dh <= sh else cv2.INTER_LANCZOS4
 
-        if image.ndim == 2 or image.shape[-1] in (1, 3):
-            image = cv2.warpPerspective(
-                image,
+        if img.ndim == 2 or img.shape[-1] in (1, 3):
+            img = cv2.warpPerspective(
+                img,
                 m,
                 self.size[::-1],
                 flags=cv2_interp,
                 borderMode=cv2_border,
                 borderValue=borderValue,
             )
-            if image.ndim == 2:
-                image = np.expand_dims(image, axis=-1)
+            if img.ndim == 2:
+                img = np.expand_dims(img, axis=-1)
         else:
             resized_list = [
                 cv2.warpPerspective(
-                    image[:, :, ch],
+                    img[:, :, ch],
                     m,
                     self.size[::-1],
                     flags=cv2_interp,
                     borderMode=cv2_border,
                     borderValue=borderValue,
                 )
-                for ch in range(image.shape[-1])
+                for ch in range(img.shape[-1])
             ]
-            image = np.transpose(resized_list, (1, 2, 0))
-        return image
+            img = np.transpose(resized_list, (1, 2, 0))
+        return img
 
     def apply_to_bbox(self, bbox, m, image_size, **params):
         # pylint: disable=arguments-differ
@@ -261,7 +259,7 @@ class RandomTransform(A.DualTransform):
         return self.apply(img, interp="nearest", **params)
 
     def get_params_dependent_on_targets(self, params):
-        image = params["image"]
+        img = params["image"]
         scale = (
             self.base_scale
             * np.exp(
@@ -300,24 +298,24 @@ class RandomTransform(A.DualTransform):
             dst_points = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32)
         elif self.mode == "preserve_aspect":
             # アスペクト比を維持するように縮小する
-            if image.shape[0] < image.shape[1]:
+            if img.shape[0] < img.shape[1]:
                 # 横長
-                hr = image.shape[0] / image.shape[1]
+                hr = img.shape[0] / img.shape[1]
                 yr = (1 - hr) / 2
                 dst_points = np.array(
                     [[0, yr], [1, yr], [1, yr + hr], [0, yr + hr]], dtype=np.float32
                 )
             else:
                 # 縦長
-                wr = image.shape[1] / image.shape[0]
+                wr = img.shape[1] / img.shape[0]
                 xr = (1 - wr) / 2
                 dst_points = np.array(
                     [[xr, 0], [xr + wr, 0], [xr + wr, 1], [xr, 1]], dtype=np.float32
                 )
         elif self.mode == "crop":
             # 入力サイズによらず固定サイズでcrop
-            hr = self.size[0] / image.shape[0]
-            wr = self.size[1] / image.shape[1]
+            hr = self.size[0] / img.shape[0]
+            wr = self.size[1] / img.shape[1]
             yr = random.uniform(0, 1 - hr)
             xr = random.uniform(0, 1 - wr)
             dst_points = np.array(
@@ -345,12 +343,12 @@ class RandomTransform(A.DualTransform):
         src_points[:, 0] -= (1 / scale_h - 1) * pos_h
         src_points[:, 1] -= (1 / scale_v - 1) * pos_v
         # 変換行列の作成
-        src_points[:, 0] *= image.shape[1]
-        src_points[:, 1] *= image.shape[0]
+        src_points[:, 0] *= img.shape[1]
+        src_points[:, 1] *= img.shape[0]
         dst_points[:, 0] *= self.size[1]
         dst_points[:, 1] *= self.size[0]
         m = cv2.getPerspectiveTransform(src_points, dst_points)
-        return {"m": m, "image_size": image.shape[:2]}
+        return {"m": m, "image_size": img.shape[:2]}
 
     @property
     def targets_as_params(self):
@@ -396,28 +394,28 @@ class Resize(A.DualTransform):  # pylint: disable=abstract-method
         self.size = size
         self.mode = mode
 
-    def apply(self, image, **params):
+    def apply(self, img, **params):
         # pylint: disable=arguments-differ
         if self.mode == "cv2":
-            image = tk.ndimage.resize(image, width=self.size[1], height=self.size[0])
+            img = tk.ndimage.resize(img, width=self.size[1], height=self.size[0])
         elif self.mode == "tf":
-            image = tf.image.resize(
-                image, self.size, method=tf.image.ResizeMethod.LANCZOS5, antialias=True
+            img = tf.image.resize(
+                img, self.size, method=tf.image.ResizeMethod.LANCZOS5, antialias=True
             )
-            image = tf.cast(tf.clip_by_value(image, 0, 255), tf.uint8).numpy()
+            img = tf.cast(tf.clip_by_value(img, 0, 255), tf.uint8).numpy()
         elif self.mode == "pil":
-            if image.ndim == 3 and image.shape[2] == 1:
-                image = np.squeeze(image, axis=2)
-            image = np.asarray(
-                PIL.Image.fromarray(image).resize(
+            if img.ndim == 3 and img.shape[2] == 1:
+                img = np.squeeze(img, axis=2)
+            img = np.asarray(
+                PIL.Image.fromarray(img).resize(
                     self.size[::-1], resample=PIL.Image.LANCZOS
                 ),
                 dtype=np.uint8,
             )
-            image = tk.ndimage.ensure_channel_dim(image)
+            img = tk.ndimage.ensure_channel_dim(img)
         else:
             raise ValueError(f"mode={self.mode}")
-        return image
+        return img
 
     def apply_to_bbox(self, bbox, **params):
         return bbox
@@ -475,10 +473,10 @@ class GaussNoise(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         super().__init__(always_apply=always_apply, p=p)
         self.scale = scale
 
-    def apply(self, image, scale, **params):
+    def apply(self, img, scale, **params):
         # pylint: disable=arguments-differ
-        rand = np.random.RandomState(random.randrange(2 ** 32))
-        return tk.ndimage.gaussian_noise(image, rand, scale)
+        rand = np.random.RandomState(random.getrandbits(32))
+        return tk.ndimage.gaussian_noise(img, rand, scale)
 
     def get_params(self):
         return {"scale": random.uniform(*self.scale)}
@@ -495,14 +493,14 @@ class SaltAndPepperNoise(A.ImageOnlyTransform):  # pylint: disable=abstract-meth
         self.salt = salt
         self.pepper = pepper
 
-    def apply(self, image, **params):
+    def apply(self, img, **params):
         # pylint: disable=arguments-differ
-        rand = np.random.RandomState(random.randrange(2 ** 32))
-        map_ = rand.uniform(size=image.shape[:2])
-        image = image.copy()
-        image[map_ < self.salt] = 255
-        image[map_ > 1 - self.pepper] = 0
-        return image
+        rand = np.random.RandomState(random.getrandbits(32))
+        map_ = rand.uniform(size=img.shape[:2])
+        img = img.copy()
+        img[map_ < self.salt] = 255
+        img[map_ > 1 - self.pepper] = 0
+        return img
 
     def get_params(self):
         return {}
@@ -529,16 +527,16 @@ class PerlinNoise(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         self.octaves = octaves
         self.ar = ar
 
-    def apply(self, image, alpha, frequency, octaves, ar, seed, **params):
+    def apply(self, img, alpha, frequency, octaves, ar, seed, **params):
         # pylint: disable=arguments-differ
         noise = PerlinNoise.perlin_noise(
-            image.shape[:2], frequency=frequency, octaves=octaves, ar=ar, seed=seed
+            img.shape[:2], frequency=frequency, octaves=octaves, ar=ar, seed=seed
         )
-        if image.ndim != 2:
-            assert image.ndim == 3
+        if img.ndim != 2:
+            assert img.ndim == 3
             noise = np.expand_dims(noise, axis=-1)
-        image = (image * (1 - alpha) + noise * alpha).astype(image.dtype)
-        return image
+        img = (img * (1 - alpha) + noise * alpha).astype(img.dtype)
+        return img
 
     @staticmethod
     def perlin_noise(
@@ -571,19 +569,19 @@ class PerlinNoise(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         grad_size_v = int(freq_v * lacunarity ** octaves + 1)
         gradient = random_state.uniform(-1, +1, size=(grad_size_h, grad_size_v, 2))
 
-        image = np.zeros(shape, dtype=np.float32)
+        img = np.zeros(shape, dtype=np.float32)
         amplify = 1.0
         for _ in range(octaves):
-            image += (
+            img += (
                 PerlinNoise._perlin_noise_base(shape, freq_v, freq_h, gradient)
                 * amplify
             )
             freq_v *= lacunarity
             freq_h *= lacunarity
             amplify *= persistence
-        image -= image.min()
-        image /= image.max()
-        return np.uint8(image * 255)
+        img -= img.min()
+        img /= img.max()
+        return np.uint8(img * 255)
 
     @staticmethod
     def _perlin_noise_base(shape, freq_v, freq_h, gradient):
@@ -647,9 +645,9 @@ class RandomBlur(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         super().__init__(always_apply=always_apply, p=p)
         self.sigma = sigma
 
-    def apply(self, image, sigma, **params):
+    def apply(self, img, sigma, **params):
         # pylint: disable=arguments-differ
-        return tk.ndimage.blur(image, sigma)
+        return tk.ndimage.blur(img, sigma)
 
     def get_params(self):
         return {"sigma": random.uniform(*self.sigma)}
@@ -666,9 +664,9 @@ class RandomUnsharpMask(A.ImageOnlyTransform):  # pylint: disable=abstract-metho
         self.sigma = sigma
         self.alpha = alpha
 
-    def apply(self, image, alpha, **params):
+    def apply(self, img, alpha, **params):
         # pylint: disable=arguments-differ
-        return tk.ndimage.unsharp_mask(image, self.sigma, alpha)
+        return tk.ndimage.unsharp_mask(img, self.sigma, alpha)
 
     def get_params(self):
         return {"alpha": random.uniform(*self.alpha)}
@@ -684,9 +682,9 @@ class RandomBrightness(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         super().__init__(always_apply=always_apply, p=p)
         self.shift = shift
 
-    def apply(self, image, shift, **params):
+    def apply(self, img, shift, **params):
         # pylint: disable=arguments-differ
-        return tk.ndimage.brightness(image, shift)
+        return tk.ndimage.brightness(img, shift)
 
     def get_params(self):
         return {"shift": random.uniform(*self.shift)}
@@ -702,9 +700,9 @@ class RandomContrast(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         super().__init__(always_apply=always_apply, p=p)
         self.alpha = alpha
 
-    def apply(self, image, alpha, **params):
+    def apply(self, img, alpha, **params):
         # pylint: disable=arguments-differ
-        return tk.ndimage.contrast(image, alpha)
+        return tk.ndimage.contrast(img, alpha)
 
     def get_params(self):
         return {"alpha": _random_loguniform(*self.alpha)}
@@ -720,11 +718,11 @@ class RandomSaturation(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         super().__init__(always_apply=always_apply, p=p)
         self.alpha = alpha
 
-    def apply(self, image, alpha, **params):
+    def apply(self, img, alpha, **params):
         # pylint: disable=arguments-differ
-        if image.shape[-1] != 3:
-            return image
-        return tk.ndimage.saturation(image, alpha)
+        if img.shape[-1] != 3:
+            return img
+        return tk.ndimage.saturation(img, alpha)
 
     def get_params(self):
         return {"alpha": _random_loguniform(*self.alpha)}
@@ -741,11 +739,11 @@ class RandomHue(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         self.alpha = alpha
         self.beta = beta
 
-    def apply(self, image, alpha, beta, **params):
+    def apply(self, img, alpha, beta, **params):
         # pylint: disable=arguments-differ
-        if image.shape[-1] != 3:
-            return image
-        return tk.ndimage.hue_lite(image, alpha, beta)
+        if img.shape[-1] != 3:
+            return img
+        return tk.ndimage.hue_lite(img, alpha, beta)
 
     def get_params(self):
         return {
@@ -779,9 +777,9 @@ class RandomEqualize(A.ImageOnlyTransform):  # pylint: disable=abstract-method
 
     """
 
-    def apply(self, image, **params):
+    def apply(self, img, **params):
         # pylint: disable=arguments-differ
-        return tk.ndimage.equalize(image)
+        return tk.ndimage.equalize(img)
 
     def get_transform_init_args_names(self):
         return ()
@@ -797,9 +795,9 @@ class RandomAutoContrast(A.ImageOnlyTransform):  # pylint: disable=abstract-meth
 
     """
 
-    def apply(self, image, **params):
+    def apply(self, img, **params):
         # pylint: disable=arguments-differ
-        return tk.ndimage.auto_contrast(image)
+        return tk.ndimage.auto_contrast(img)
 
     def get_transform_init_args_names(self):
         return ()
@@ -819,9 +817,9 @@ class RandomPosterize(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         super().__init__(always_apply=always_apply, p=p)
         self.bits = bits
 
-    def apply(self, image, bits, **params):
+    def apply(self, img, bits, **params):
         # pylint: disable=arguments-differ
-        return tk.ndimage.posterize(image, bits)
+        return tk.ndimage.posterize(img, bits)
 
     def get_params(self):
         return {"bits": random.randint(*self.bits)}
@@ -854,11 +852,11 @@ class RandomAlpha(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         self.rate_2 = rate_2
         self.max_tries = max_tries
 
-    def apply(self, image, **params):
+    def apply(self, img, **params):
         # pylint: disable=arguments-differ
-        rand = np.random.RandomState(random.randrange(2 ** 32))
+        rand = np.random.RandomState(random.getrandbits(32))
         return tk.ndimage.erase_random(
-            image,
+            img,
             rand,
             bboxes=None,
             scale_low=self.scale_low,
@@ -905,12 +903,12 @@ class RandomErasing(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         self.object_aware_prob = object_aware_prob
         self.max_tries = max_tries
 
-    def apply(self, image, bboxes=None, **params):
+    def apply(self, img, bboxes=None, **params):
         # pylint: disable=arguments-differ
-        rand = np.random.RandomState(random.randrange(2 ** 32))
-        image = np.copy(image)
+        rand = np.random.RandomState(random.getrandbits(32))
+        img = np.copy(img)
         bboxes = (
-            np.round(bboxes * np.array(image.shape)[[1, 0, 1, 0]])
+            np.round(bboxes * np.array(img.shape)[[1, 0, 1, 0]])
             if bboxes is not None
             else None
         )
@@ -932,8 +930,8 @@ class RandomErasing(A.ImageOnlyTransform):  # pylint: disable=abstract-method
                         np.tile(b[:2], 2), axis=0
                     )  # bに合わせて平行移動
                     # random erasing
-                    image[b[1] : b[3], b[0] : b[2], :] = tk.ndimage.erase_random(
-                        image[b[1] : b[3], b[0] : b[2], :],
+                    img[b[1] : b[3], b[0] : b[2], :] = tk.ndimage.erase_random(
+                        img[b[1] : b[3], b[0] : b[2], :],
                         rand,
                         bboxes=inter_boxes,
                         scale_low=self.scale_low,
@@ -944,8 +942,8 @@ class RandomErasing(A.ImageOnlyTransform):  # pylint: disable=abstract-method
                     )
         else:
             # 画像全体でrandom erasing。
-            image = tk.ndimage.erase_random(
-                image,
+            img = tk.ndimage.erase_random(
+                img,
                 rand,
                 bboxes=None,
                 scale_low=self.scale_low,
@@ -954,7 +952,7 @@ class RandomErasing(A.ImageOnlyTransform):  # pylint: disable=abstract-method
                 rate_2=self.rate_2,
                 max_tries=self.max_tries,
             )
-        return image
+        return img
 
     def get_transform_init_args_names(self):
         return (
@@ -992,11 +990,11 @@ class GridMask(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         self.random_color = random_color
         self.fill_value = fill_value
 
-    def apply(self, image, **params):
+    def apply(self, img, **params):
         # pylint: disable=arguments-differ
         # ↓<https://github.com/PyCQA/pylint/issues/3139>
         # pylint: disable=unsubscriptable-object
-        h, w = image.shape[:2]
+        h, w = img.shape[:2]
         d = int(min(h, w) * random.uniform(*self.d))
         r = random.uniform(*self.r)
         l_ = int(d * r)
@@ -1029,20 +1027,20 @@ class GridMask(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         mask = mask[cy : cy + h, cx : cx + w, :]
 
         # マスクを適用
-        if image.ndim == 2:
-            image = np.expand_dims(image, axis=-1)
+        if img.ndim == 2:
+            img = np.expand_dims(img, axis=-1)
         if self.random_color:
             # ランダムな色でマスク (オリジナル)
             color = np.array(
-                [random.randint(0, 255) for _ in range(image.shape[-1])],
+                [random.randint(0, 255) for _ in range(img.shape[-1])],
                 dtype=np.uint8,
             )
-            return (image * mask + color * (1 - mask)).astype(image.dtype)
+            return (img * mask + color * (1 - mask)).astype(img.dtype)
         elif self.fill_value != 0:
             color = np.asarray(self.fill_value)
-            return (image * mask + color * (1 - mask)).astype(image.dtype)
+            return (img * mask + color * (1 - mask)).astype(img.dtype)
         else:
-            return (image * mask).astype(image.dtype)
+            return (img * mask).astype(img.dtype)
 
     def get_transform_init_args_names(self):
         return ("r", "d", "random_color")
@@ -1051,9 +1049,9 @@ class GridMask(A.ImageOnlyTransform):  # pylint: disable=abstract-method
 class Standardize(A.ImageOnlyTransform):  # pylint: disable=abstract-method
     """標準化。0～255に適当に収める。"""
 
-    def apply(self, image, **params):
+    def apply(self, img, **params):
         # pylint: disable=arguments-differ
-        return tk.ndimage.standardize(image)
+        return tk.ndimage.standardize(img)
 
     def get_transform_init_args_names(self):
         return ()
@@ -1062,14 +1060,14 @@ class Standardize(A.ImageOnlyTransform):  # pylint: disable=abstract-method
 class ToGrayScale(A.ImageOnlyTransform):  # pylint: disable=abstract-method
     """グレースケール化。チャンネル数はとりあえず維持。"""
 
-    def apply(self, image, **params):
+    def apply(self, img, **params):
         # pylint: disable=arguments-differ
-        assert len(image.shape) == 3
-        start_shape = image.shape
-        image = tk.ndimage.to_grayscale(image)
-        image = np.tile(np.expand_dims(image, axis=-1), (1, 1, start_shape[-1]))
-        assert image.shape == start_shape
-        return image
+        assert len(img.shape) == 3
+        start_shape = img.shape
+        img = tk.ndimage.to_grayscale(img)
+        img = np.tile(np.expand_dims(img, axis=-1), (1, 1, start_shape[-1]))
+        assert img.shape == start_shape
+        return img
 
     def get_transform_init_args_names(self):
         return ()
@@ -1083,9 +1081,9 @@ class RandomBinarize(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         assert 0 < threshold[0] <= threshold[1] < 255
         self.threshold = threshold
 
-    def apply(self, image, threshold, **params):
+    def apply(self, img, threshold, **params):
         # pylint: disable=arguments-differ
-        return tk.ndimage.binarize(image, threshold)
+        return tk.ndimage.binarize(img, threshold)
 
     def get_params(self):
         return {"threshold": random.uniform(*self.threshold)}
@@ -1102,9 +1100,9 @@ class Binarize(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         assert 0 < threshold < 255
         self.threshold = threshold
 
-    def apply(self, image, **params):
+    def apply(self, img, **params):
         # pylint: disable=arguments-differ
-        return tk.ndimage.binarize(image, self.threshold)
+        return tk.ndimage.binarize(img, self.threshold)
 
     def get_transform_init_args_names(self):
         return ("threshold",)
@@ -1122,12 +1120,12 @@ class SpeckleNoise(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         super().__init__(always_apply=always_apply, p=p)
         self.scale = scale
 
-    def apply(self, image, scale, **params):
+    def apply(self, img, scale, **params):
         # pylint: disable=arguments-differ
-        rand = np.random.RandomState(random.randrange(2 ** 32))
-        noise = rand.randn(*image.shape) * scale
+        rand = np.random.RandomState(random.getrandbits(32))
+        noise = rand.randn(*img.shape) * scale
         noise = scipy.ndimage.gaussian_filter(noise, 1)
-        return np.uint8(np.clip(image + noise, 0, 255))
+        return np.uint8(np.clip(img + noise, 0, 255))
 
     def get_params(self):
         return {"scale": random.uniform(*self.scale)}
@@ -1151,7 +1149,7 @@ class RandomMorphology(A.ImageOnlyTransform):  # pylint: disable=abstract-method
             - cv2.MORPH_RECT: 矩形
 
     References:
-        - <https://www.kaggle.com/ren4yu/bengali-morphological-ops-as-image-augmentation>
+        - <https://www.kaggle.com/ren4yu/bengali-morphological-ops-as-img-augmentation>
         - <https://www.kaggle.com/c/bengaliai-cv19/discussion/128198#734220>
         - <http://labs.eecs.tottori-u.ac.jp/sd/Member/oyamada/OpenCV/html/py_tutorials/py_imgproc/py_morphological_ops/py_morphological_ops.html>  # noqa
 
@@ -1171,22 +1169,22 @@ class RandomMorphology(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         self.ksize = ksize
         self.element_shape = element_shape
 
-    def apply(self, image, **params):  # pylint: disable=arguments-differ
+    def apply(self, img, **params):  # pylint: disable=arguments-differ
         ksize = random.randint(*self.ksize), random.randint(*self.ksize)
         kernel = cv2.getStructuringElement(self.element_shape, ksize)
 
         if self.mode == "erode":
-            image = cv2.erode(image, kernel, iterations=1)
+            img = cv2.erode(img, kernel, iterations=1)
         elif self.mode == "dilate":
-            image = cv2.dilate(image, kernel, iterations=1)
+            img = cv2.dilate(img, kernel, iterations=1)
         elif self.mode == "open":
-            image = cv2.morphologyEx(image, cv2.MORPH_OPEN, kernel)
+            img = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel)
         elif self.mode == "close":
-            image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel)
+            img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel)
 
-        if image.ndim == 2:
-            image = np.expand_dims(image, axis=-1)
-        return image
+        if img.ndim == 2:
+            img = np.expand_dims(img, axis=-1)
+        return img
 
     def get_transform_init_args_names(self):
         return ("mode", "ksize", "element_shape")
@@ -1199,11 +1197,11 @@ class WrappedTranslateX(A.ImageOnlyTransform):  # pylint: disable=abstract-metho
         super().__init__(always_apply=always_apply, p=p)
         self.scale = scale
 
-    def apply(self, image, scale, **params):
+    def apply(self, img, scale, **params):
         # pylint: disable=arguments-differ
-        scale = int(np.round(image.shape[1] * scale))
-        image = np.concatenate([image[:, scale:, :], image[:, :scale, :]], axis=1)
-        return image
+        scale = int(np.round(img.shape[1] * scale))
+        img = np.concatenate([img[:, scale:, :], img[:, :scale, :]], axis=1)
+        return img
 
     def get_params(self):
         return {"scale": random.uniform(*self.scale)}
@@ -1219,11 +1217,11 @@ class WrappedTranslateY(A.ImageOnlyTransform):  # pylint: disable=abstract-metho
         super().__init__(always_apply=always_apply, p=p)
         self.scale = scale
 
-    def apply(self, image, scale, **params):
+    def apply(self, img, scale, **params):
         # pylint: disable=arguments-differ
-        scale = int(np.round(image.shape[0] * scale))
-        image = np.concatenate([image[scale:, :, :], image[:scale, :, :]], axis=0)
-        return image
+        scale = int(np.round(img.shape[0] * scale))
+        img = np.concatenate([img[scale:, :, :], img[:scale, :, :]], axis=0)
+        return img
 
     def get_params(self):
         return {"scale": random.uniform(*self.scale)}
@@ -1238,15 +1236,15 @@ class To3Channel(A.ImageOnlyTransform):  # pylint: disable=abstract-method
     def __init__(self, always_apply=False, p=1.0):
         super().__init__(always_apply=always_apply, p=p)
 
-    def apply(self, image, **params):
+    def apply(self, img, **params):
         # pylint: disable=arguments-differ
-        if image.ndim == 2:
-            image = np.expand_dims(image, axis=-1)
-        assert image.ndim == 3
-        if image.shape[-1] == 1:
-            image = np.tile(image, (1, 1, 3))
-        assert image.shape[-1] == 3
-        return image
+        if img.ndim == 2:
+            img = np.expand_dims(img, axis=-1)
+        assert img.ndim == 3
+        if img.shape[-1] == 1:
+            img = np.tile(img, (1, 1, 3))
+        assert img.shape[-1] == 3
+        return img
 
     def get_transform_init_args_names(self):
         return ()
@@ -1258,15 +1256,15 @@ class To1Channel(A.ImageOnlyTransform):  # pylint: disable=abstract-method
     def __init__(self, always_apply=False, p=1.0):
         super().__init__(always_apply=always_apply, p=p)
 
-    def apply(self, image, **params):
+    def apply(self, img, **params):
         # pylint: disable=arguments-differ
-        if image.ndim == 2:
-            image = np.expand_dims(image, axis=-1)
-        assert image.ndim == 3
-        if image.shape[-1] == 3:
-            image = np.mean(image, axis=-1, keepdims=True)
-        assert image.shape[-1] == 1
-        return image
+        if img.ndim == 2:
+            img = np.expand_dims(img, axis=-1)
+        assert img.ndim == 3
+        if img.shape[-1] == 3:
+            img = np.mean(img, axis=-1, keepdims=True)
+        assert img.shape[-1] == 1
+        return img
 
     def get_transform_init_args_names(self):
         return ()

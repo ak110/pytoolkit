@@ -55,8 +55,8 @@ def subprocess(func):
 
     @functools.wraps(func)
     def subprocess_func(*args, **kwargs):
-        with joblib.Parallel(n_jobs=1, backend="multiprocessing") as parallel:
-            return parallel([joblib.delayed(func)(*args, **kwargs)])
+        with joblib.Parallel(n_jobs=2, backend="loky") as parallel:
+            return parallel([joblib.delayed(func)(*args, **kwargs)])[0]
 
     return subprocess_func
 

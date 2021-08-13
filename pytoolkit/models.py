@@ -242,14 +242,6 @@ def plot(
         with tk.log.trace(f"plot({path})"):
             path.parent.mkdir(parents=True, exist_ok=True)
             try:
-                # workaround: https://github.com/tensorflow/tensorflow/issues/38988
-                model = tf.keras.models.clone_model(model)
-                model._layers = [  # pylint: disable=protected-access
-                    layer
-                    for layer in model._layers  # pylint: disable=protected-access
-                    if isinstance(layer, tf.keras.layers.Layer)
-                ]
-
                 tf.keras.utils.plot_model(
                     model,
                     str(path),

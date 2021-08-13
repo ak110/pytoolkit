@@ -22,9 +22,7 @@ def test_AutomatedFocalLoss(mode, logit, phat_c):
 
     layer = tk.layers.AutomatedFocalLoss(mode=mode)
     layer.build(input_shape=[input_shape, input_shape])
-    tf.keras.backend.update(
-        layer.phat_correct, np.array([phat_c]) if mode == "binary" else phat_c
-    )
+    tf.keras.backend.update(layer.phat_correct, np.array([phat_c]))
     loss = layer([y_true, logits]).numpy()
     if mode == "binary":
         assert loss.shape == (1, 1)
