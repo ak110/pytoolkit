@@ -23,3 +23,4 @@ if True:  # pylint: disable=using-constant-test
 
     tk.math.set_ndarray_format()
     tk.math.set_numpy_error()
+    tk.log.init(None)

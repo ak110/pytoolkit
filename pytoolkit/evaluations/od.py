@@ -1,7 +1,9 @@
 """物体検出の評価。"""
 from __future__ import annotations
 
+import io
 import logging
+import sys
 import typing
 
 import numpy as np
@@ -34,7 +36,6 @@ def print_od(
     print_fn(f"APS:       {evals['map/iou=0.50:0.95/area=small/max_dets=100']:.3f}")
     print_fn(f"APM:       {evals['map/iou=0.50:0.95/area=medium/max_dets=100']:.3f}")
     print_fn(f"APL:       {evals['map/iou=0.50:0.95/area=large/max_dets=100']:.3f}")
-    print_fn(f"VOC07 MAP: {evals['voc07_map']:.3f}")
     return evals
 
 
@@ -55,63 +56,14 @@ def evaluate_od(
         iou_threshold: 一致扱いする最低IoU (accなどに影響)
 
     Returns:
-        各種metrics
-
-        - "iou_score": IoUスコア (塩コンペのスコア)
-        - "dice": ダイス係数
-        - "fg_iou": 答えが空でないときのIoUの平均
-        - "bg_acc": 答えが空の場合の正解率
-        - "acc": Pixel Accuracy
-
-    ChainerCVを利用。
-    https://chainercv.readthedocs.io/en/stable/reference/evaluations.html?highlight=eval_detection_coco#chainercv.evaluations.eval_detection_coco
-    https://chainercv.readthedocs.io/en/stable/reference/evaluations.html?highlight=eval_detection_coco#eval-detection-voc
-
-    Returns:
         - "map/iou=0.50:0.95/area=all/max_dets=100"
         - "map/iou=0.50/area=all/max_dets=100"
         - "map/iou=0.75/area=all/max_dets=100"
-        - …などなどcoco関連
-        - "voc_ap"
-        - "voc_map"
-        - "voc07_ap"
-        - "voc07_map"
 
     """
-    import chainercv
-
-    gt_classes_list = [y.classes for y in y_true]
-    gt_bboxes_list = [y.real_bboxes for y in y_true]
-    gt_areas_list = [y.areas for y in y_true]
-    gt_crowdeds_list = [y.crowdeds for y in y_true]
-    gt_difficults_list = [y.difficults for y in y_true]
-    pred_classes_list = [p.classes for p in y_pred]
-    pred_confs_list = [p.confs for p in y_pred]
-    pred_bboxes_list = [
-        p.get_real_bboxes(y.width, y.height) for (p, y) in zip(y_pred, y_true)
-    ]
     with np.errstate(all="warn"):
-        evals = chainercv.evaluations.eval_detection_coco(
-            pred_bboxes_list,
-            pred_classes_list,
-            pred_confs_list,
-            gt_bboxes_list,
-            gt_classes_list,
-            gt_areas_list,
-            gt_crowdeds_list,
-        )
-        voc_evals = chainercv.evaluations.eval_detection_voc(
-            pred_bboxes_list,
-            pred_classes_list,
-            pred_confs_list,
-            gt_bboxes_list,
-            gt_classes_list,
-            gt_difficults_list,
-            use_07_metric=True,
-        )
-        evals["voc07_ap"] = voc_evals["ap"]
-        evals["voc07_map"] = voc_evals["map"]
-
+        # pycocotoolsを使った評価
+        evals = _evaluate_coco(y_true, y_pred)
         if not detail:
             summary_keys = [
                 "map/iou=0.50:0.95/area=all/max_dets=100",
@@ -120,9 +72,8 @@ def evaluate_od(
                 "map/iou=0.50:0.95/area=small/max_dets=100",
                 "map/iou=0.50:0.95/area=medium/max_dets=100",
                 "map/iou=0.50:0.95/area=large/max_dets=100",
-                "voc07_map",
+                "ap/iou=0.50:0.95/area=all/max_dets=100",
                 "ar/iou=0.50:0.95/area=all/max_dets=100",
-                "voc07_ap",
             ]
             evals = {k: evals[k] for k in summary_keys}
 
@@ -146,3 +97,139 @@ def evaluate_od(
         evals["cm"] = cm
 
         return evals
+
+
+def _evaluate_coco(
+    y_true: typing.Sequence[tk.od.ObjectsAnnotation],
+    y_pred: typing.Sequence[tk.od.ObjectsPrediction],
+):
+    """pycocotoolsを使った評価。"""
+    import pycocotools
+
+    img_ids = [{"id": i + 1} for i in range(len(y_true))]
+
+    all_classes = np.sort(
+        np.unique(
+            np.concatenate([y.classes for y in y_true] + [y.classes for y in y_pred])
+        )
+    )
+    class_ids = [{"id": c} for c in all_classes]
+
+    gt_anns: typing.List[typing.Dict] = []
+    pr_anns: typing.List[typing.Dict] = []
+    for i, (y1, y2) in enumerate(zip(y_true, y_pred)):
+        img_id = i + 1
+        areas = y1.areas if y1.areas is not None else [None] * y1.num_objects
+        crowdeds = y1.crowdeds if y1.crowdeds is not None else [None] * y1.num_objects
+        for bbox, class_id, area, crowded in zip(
+            y1.real_bboxes, y1.classes, areas, crowdeds
+        ):
+            gt_anns.append(
+                _create_ann(
+                    bbox=bbox,
+                    class_id=class_id,
+                    conf=None,
+                    area=area,
+                    crowded=crowded,
+                    img_id=img_id,
+                    ann_id=len(gt_anns) + 1,
+                )
+            )
+        for bbox, class_id, conf in zip(
+            y2.get_real_bboxes(y1.width, y1.height), y2.classes, y2.confs
+        ):
+            pr_anns.append(
+                _create_ann(
+                    bbox=bbox,
+                    class_id=class_id,
+                    conf=conf,
+                    area=None,
+                    crowded=0,
+                    img_id=img_id,
+                    ann_id=len(pr_anns) + 1,
+                )
+            )
+
+    gt = pycocotools.coco.COCO()
+    pr = pycocotools.coco.COCO()
+    gt.dataset["images"] = img_ids
+    pr.dataset["images"] = img_ids
+    pr.dataset["categories"] = class_ids
+    gt.dataset["categories"] = class_ids
+    gt.dataset["annotations"] = gt_anns
+    pr.dataset["annotations"] = pr_anns
+    old_stdout, sys.stdout = sys.stdout, io.StringIO()  # stdout抑止
+    try:
+        pr.createIndex()
+        gt.createIndex()
+        coco_eval = pycocotools.cocoeval.COCOeval(gt, pr, "bbox")
+        coco_eval.evaluate()
+        coco_eval.accumulate()
+    finally:
+        sys.stdout = old_stdout
+
+    evals = {}
+    for type_ in ["ap", "ar"]:
+        for iou, area, max_dets in [
+            (None, "all", 100),
+            (0.50, "all", 100),
+            (0.75, "all", 100),
+            (None, "small", 100),
+            (None, "medium", 100),
+            (None, "large", 100),
+        ]:
+            iou_str = f"{iou:.2f}" if iou is not None else "0.50:0.95"
+            key = f"{type_}/iou={iou_str}/area={area}/max_dets={max_dets}"
+
+            if type_ == "ap":
+                values = coco_eval.eval["precision"].copy()
+            else:
+                values = coco_eval.eval["recall"].copy()
+            assert values.shape[0] == len(coco_eval.params.iouThrs)
+            assert values.shape[-2] == len(coco_eval.params.areaRngLbl)
+            assert values.shape[-1] == len(coco_eval.params.maxDets)
+            if iou is not None:
+                values = values[iou == coco_eval.params.iouThrs]
+            ai = coco_eval.params.areaRngLbl.index(area)
+            mi = coco_eval.params.maxDets.index(max_dets)
+            values = values[..., ai, mi]
+
+            values[values == -1] = np.nan
+            values = values.reshape((-1, values.shape[-1]))
+
+            cls_values = [
+                np.nanmean(values[:, c], axis=0)
+                if not np.all(np.isnan(values[:, c]))
+                else np.nan
+                for c in all_classes
+            ]
+            evals[key] = cls_values
+            evals[f"m{key}"] = (
+                np.nanmean(cls_values) if not np.all(np.isnan(cls_values)) else np.nan
+            )
+
+    return evals
+
+
+def _create_ann(bbox, class_id, conf, area, crowded, img_id, ann_id):
+    size = bbox[2:] - bbox[:2]
+    if area is None:
+        area = size[0] * size[1]
+    if crowded is None:
+        crowded = 0
+    ann = {
+        "id": ann_id,
+        "image_id": img_id,
+        "category_id": class_id,
+        "bbox": [
+            np.round(bbox[0], 2),
+            np.round(bbox[1], 2),
+            np.round(size[0], 2),
+            np.round(size[1], 2),
+        ],
+        "area": area,
+        "iscrowd": crowded,
+    }
+    if conf is not None:
+        ann["score"] = conf
+    return ann

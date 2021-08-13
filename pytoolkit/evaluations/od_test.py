@@ -64,4 +64,22 @@ def test_print_od():
             ),
         ]
     )
-    tk.evaluations.print_od(y_true, y_pred)
+
+    evals = tk.evaluations.print_od(y_true, y_pred)
+    np.testing.assert_allclose(
+        evals["map/iou=0.50:0.95/area=all/max_dets=100"], 0.717115, rtol=1e-5
+    )
+    np.testing.assert_allclose(
+        evals["map/iou=0.50/area=all/max_dets=100"], 0.717115, rtol=1e-5
+    )
+    np.testing.assert_allclose(
+        evals["map/iou=0.75/area=all/max_dets=100"], 0.717115, rtol=1e-5
+    )
+    np.testing.assert_allclose(
+        evals["map/iou=0.50:0.95/area=small/max_dets=100"], 0.504951, rtol=1e-5
+    )
+    np.testing.assert_allclose(evals["map/iou=0.50:0.95/area=medium/max_dets=100"], 1.0)
+    np.testing.assert_allclose(
+        evals["map/iou=0.50:0.95/area=large/max_dets=100"], np.nan
+    )
+    np.testing.assert_allclose(evals["voc07_map"], 0.637662, rtol=1e-5)
