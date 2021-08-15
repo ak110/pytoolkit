@@ -43,6 +43,7 @@ mpi4py = {version = "*", optional = true}
 nbformat = {version = "*", optional = true}
 onnxmltools = {version = "*", optional = true}
 optuna = {version = "*", optional = true}
+pycocotools = {version = "*", optional = true}
 pydot = {version = "*", optional = true}
 python-dotenv = {version = "*", optional = true}
 requests = {version = "*", optional = true}
@@ -64,6 +65,7 @@ tests = [
     "lightgbm",
     "nbformat",
     "onnxmltools",
+    "pycocotools",
     "pydot",
     "python-dotenv",
     "tf2onnx",

@@ -25,7 +25,6 @@ before_install:
 
 install:
   - poetry install --extras "tests tensorflow-cpu"
-  - poetry run pip install "git+https://github.com/cocodataset/coco.git#egg=pycocotools&subdirectory=PythonAPI"
 
 script:
   - make test

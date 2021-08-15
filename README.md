@@ -38,7 +38,6 @@ cookiecutter gh:ak110/cookiecutter-pytoolkit
 - catboost
 - category_encoders
 - efficientnet
-- git+https://github.com/cocodataset/coco.git#egg=pycocotools&subdirectory=PythonAPI
 - h5py
 - horovod
 - image-classifiers
@@ -50,6 +49,7 @@ cookiecutter gh:ak110/cookiecutter-pytoolkit
 - nbformat
 - onnxmltools
 - optuna
+- pycocotools
 - python-dotenv
 - requests
 - tf2onnx>=1.6.1
