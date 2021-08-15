@@ -69,6 +69,8 @@ class DropBlock2D(tf.keras.layers.Layer):
         return input_shape
 
     def call(self, inputs, training=None, **kwargs):  # pylint: disable=arguments-differ
+        del kwargs
+
         def drop():
             mask = self._create_mask(input_shape=tf.shape(inputs))
             output = inputs * mask

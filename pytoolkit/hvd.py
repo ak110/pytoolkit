@@ -87,11 +87,9 @@ def allgather(value):
 
 
 def allreduce(value, op: str = "average"):
-    """全ワーカーからデータを集める。opはaverage, sum, adasum"""
+    """全ワーカーからデータを集める。opはaverage or sum"""
     if initialized():
-        hvd_op = {"average": get().Average, "sum": get().Sum, "adasum": get().Adasum}[
-            op
-        ]
+        hvd_op = {"average": get().Average, "sum": get().Sum}[op]
         value = get().allreduce(value, op=hvd_op)
         # tensorが来たらnumpy化
         if hasattr(value, "numpy"):
