@@ -37,7 +37,6 @@ cookiecutter gh:ak110/cookiecutter-pytoolkit
 - better-exceptions
 - catboost
 - category_encoders
-- chainercv
 - efficientnet
 - git+https://github.com/cocodataset/coco.git#egg=pycocotools&subdirectory=PythonAPI
 - h5py

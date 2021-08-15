@@ -16,161 +16,65 @@ import numpy as np
 
 import pytoolkit as tk
 
-CLASS_NAMES = [
-    # chainercvは読んだとき残してなさそうだったので直書き
-    "person",
-    "bicycle",
-    "car",
-    "motorbike",
-    "aeroplane",
-    "bus",
-    "train",
-    "truck",
-    "boat",
-    "traffic light",
-    "fire hydrant",
-    "stop sign",
-    "parking meter",
-    "bench",
-    "bird",
-    "cat",
-    "dog",
-    "horse",
-    "sheep",
-    "cow",
-    "elephant",
-    "bear",
-    "zebra",
-    "giraffe",
-    "backpack",
-    "umbrella",
-    "handbag",
-    "tie",
-    "suitcase",
-    "frisbee",
-    "skis",
-    "snowboard",
-    "sports ball",
-    "kite",
-    "baseball bat",
-    "baseball glove",
-    "skateboard",
-    "surfboard",
-    "tennis racket",
-    "bottle",
-    "wine glass",
-    "cup",
-    "fork",
-    "knife",
-    "spoon",
-    "bowl",
-    "banana",
-    "apple",
-    "sandwich",
-    "orange",
-    "broccoli",
-    "carrot",
-    "hot dog",
-    "pizza",
-    "donut",
-    "cake",
-    "chair",
-    "sofa",
-    "pottedplant",
-    "bed",
-    "diningtable",
-    "toilet",
-    "tvmonitor",
-    "laptop",
-    "mouse",
-    "remote",
-    "keyboard",
-    "cell phone",
-    "microwave",
-    "oven",
-    "toaster",
-    "sink",
-    "refrigerator",
-    "book",
-    "clock",
-    "vase",
-    "scissors",
-    "teddy bear",
-    "hair drier",
-    "toothbrush",
-]
-
 
 def load_coco_od(
-    coco_dir: tk.typing.PathLike, use_crowded: bool = False, verbose: bool = True
+    coco_dir: tk.typing.PathLike, use_crowded: bool = False, year: int = 2017
 ) -> typing.Tuple[tk.data.Dataset, tk.data.Dataset]:
-    """COCOの物体検出のデータを読み込む。
-
-    References:
-        - <https://chainercv.readthedocs.io/en/stable/reference/datasets.html#cocobboxdataset>
-
-    """
-    from chainercv.datasets.coco.coco_bbox_dataset import COCOBboxDataset
-
-    ds_train = _load_from_chainercv(
-        COCOBboxDataset(
-            data_dir=str(coco_dir),
-            split="train",
-            year="2017",
-            use_crowded=use_crowded,
-            return_area=True,
-            return_crowded=True,
-        ),
-        desc="load COCO train",
-        verbose=verbose,
-    )
-    ds_val = _load_from_chainercv(
-        COCOBboxDataset(
-            data_dir=str(coco_dir),
-            split="val",
-            year="2017",
-            use_crowded=use_crowded,
-            return_area=True,
-            return_crowded=True,
-        ),
-        desc="load COCO val",
-        verbose=verbose,
+    """COCOの物体検出のデータを読み込む。"""
+    ds_train = load_od_data(coco_dir, f"train{year}", use_crowded=use_crowded)
+    ds_val = load_od_data(coco_dir, f"val{year}", use_crowded=True)
+    assert tuple(ds_train.metadata["class_names"]) == tuple(
+        ds_val.metadata["class_names"]
     )
     return ds_train, ds_val
 
 
-def _load_from_chainercv(ds, desc, verbose) -> tk.data.Dataset:
-    labels = np.array(
-        [
-            _get_label(ds, i)
-            for i in tk.utils.trange(len(ds), desc=desc, disable=not verbose)
-        ]
+def load_od_data(coco_dir, data_name, use_crowded):
+    """物体検出のデータの読み込み。"""
+    import pycocotools.coco
+
+    coco_dir = pathlib.Path(coco_dir)
+    coco = pycocotools.coco.COCO(
+        str(coco_dir / "annotations" / f"instances_{data_name}.json")
     )
-    return tk.od.ObjectsAnnotation.create_dataset(labels, class_names=CLASS_NAMES)
 
+    class_names = [c["name"] for c in coco.loadCats(coco.getCatIds())]
+    jsonclassid_to_index = {
+        c["id"]: class_names.index(c["name"]) for c in coco.loadCats(coco.getCatIds())
+    }
 
-def _get_label(ds, i: int) -> tk.od.ObjectsAnnotation:
-    # pylint: disable=protected-access
+    labels = []
+    for entry in coco.loadImgs(coco.getImgIds()):
+        dirname, filename = entry["coco_url"].split("/")[-2:]
+        objs = coco.loadAnns(
+            coco.getAnnIds(imgIds=entry["id"], iscrowd=None if use_crowded else False)
+        )
 
-    # https://github.com/chainer/chainercv/blob/fddc813/chainercv/datasets/coco/coco_instances_base_dataset.py#L66
-    path = pathlib.Path(ds.img_root) / ds.id_to_prop[ds.ids[i]]["file_name"]
+        bboxes, classes, areas, crowdeds = [], [], [], []
+        width, height = entry["width"], entry["height"]
+        for obj in objs:
+            if obj.get("ignore", 0) == 1:
+                continue
+            x, y, w, h = obj["bbox"]
+            bbox = np.array([x, y, x + w, y + h]) / np.array(
+                [width, height, width, height]
+            )
+            bbox = np.clip(bbox, 0, 1)
+            if (bbox[:2] < bbox[2:]).all():
+                bboxes.append(bbox)
+                classes.append(jsonclassid_to_index[obj["category_id"]])
+                areas.append(obj["area"])
+                crowdeds.append(obj["iscrowd"])
 
-    height, width = tk.ndimage.get_image_size(path)
-
-    # bbox, label, area, crowded
-    bboxes, classes, areas, crowdeds = ds._get_annotations(i)
-
-    # (ymin,xmin,ymax,xmax) -> (xmin,ymin,xmax,ymax)
-    bboxes = bboxes[:, [1, 0, 3, 2]].astype(np.float32)
-    bboxes[:, [0, 2]] /= width
-    bboxes[:, [1, 3]] /= height
-
-    return tk.od.ObjectsAnnotation(
-        path=path,
-        width=width,
-        height=height,
-        classes=classes,
-        bboxes=bboxes,
-        areas=areas,
-        crowdeds=crowdeds,
-    )
+        labels.append(
+            tk.od.ObjectsAnnotation(
+                path=coco_dir / dirname / filename,
+                width=width,
+                height=height,
+                classes=classes,
+                bboxes=bboxes,
+                areas=areas,
+                crowdeds=crowdeds,
+            )
+        )
+    return tk.od.ObjectsAnnotation.create_dataset(labels, class_names=class_names)

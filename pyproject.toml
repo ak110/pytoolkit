@@ -32,7 +32,6 @@ scikit-learn = "*"
 better-exceptions = {version = "*", optional = true}
 catboost = {version = "*", optional = true}
 category_encoders = {version = "*", optional = true}
-chainercv = {version = "*", optional = true}
 efficientnet = {version = "*", optional = true}
 h5py = {version = "*", optional = true}
 horovod = {version = "*", optional = true}
@@ -59,7 +58,6 @@ tensorflow-cpu = ["tensorflow-cpu"]
 tests = [
     "better-exceptions",
     "category_encoders",
-    "chainercv",
     "efficientnet",
     "image-classifiers",
     "keras2onnx",

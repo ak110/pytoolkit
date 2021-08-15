@@ -104,7 +104,8 @@ def _evaluate_coco(
     y_pred: typing.Sequence[tk.od.ObjectsPrediction],
 ):
     """pycocotoolsを使った評価。"""
-    import pycocotools
+    import pycocotools.coco
+    import pycocotools.cocoeval
 
     img_ids = [{"id": i + 1} for i in range(len(y_true))]
 

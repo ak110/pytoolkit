@@ -82,4 +82,3 @@ def test_print_od():
     np.testing.assert_allclose(
         evals["map/iou=0.50:0.95/area=large/max_dets=100"], np.nan
     )
-    np.testing.assert_allclose(evals["voc07_map"], 0.637662, rtol=1e-5)
