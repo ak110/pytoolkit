@@ -48,12 +48,3 @@ repos:
         types: [python]
         require_serial: true
         language: system
-
-  - repo: local
-    hooks:
-      - id: system
-        name: mypy
-        entry: poetry run mypy
-        types: [python]
-        require_serial: true
-        language: system
