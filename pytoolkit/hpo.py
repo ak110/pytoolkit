@@ -106,7 +106,7 @@ def raise_pruned() -> typing.NoReturn:
 def get_best_params(
     study: optuna.study.Study,
     params_fn: typing.Callable[[optuna.trial.BaseTrial], typing.Any] = None,
-) -> typing.Dict[str, float]:
+) -> dict[str, float]:
     """見つけた中で最善のパラメータを返す。"""
     import optuna  # pylint: disable=redefined-outer-name
 

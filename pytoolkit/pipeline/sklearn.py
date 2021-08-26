@@ -47,9 +47,7 @@ class SKLearnModel(Model):
         self.weights_arg_name = weights_arg_name
         self.predict_method = predict_method
         self.score_fn = score_fn
-        self.estimators_: typing.Optional[
-            typing.List[sklearn.base.BaseEstimator]
-        ] = None
+        self.estimators_: None | (list[sklearn.base.BaseEstimator]) = None
 
     def _save(self, models_dir: pathlib.Path):
         tk.utils.dump(self.estimators_, models_dir / "estimators.pkl")

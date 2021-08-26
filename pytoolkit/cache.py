@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def memoize(
-    cache_dir: typing.Optional[tk.typing.PathLike] = "./cache",
+    cache_dir: tk.typing.PathLike | None = "./cache",
     prefix: str = "",
     compress: int = 0,
 ):
@@ -54,7 +54,7 @@ T = typing.TypeVar("T")
 
 def memoized_call(
     func: typing.Callable[[], T],
-    cache_path: typing.Optional[tk.typing.PathLike],
+    cache_path: tk.typing.PathLike | None,
     compress: int = 0,
 ) -> T:
     """キャッシュがあれば読み、無ければ実処理してキャッシュとして保存する。
@@ -93,7 +93,7 @@ def get_cache_path(
     cache_dir: tk.typing.PathLike,
     func: typing.Callable[..., typing.Any],
     args: typing.Sequence[typing.Any],
-    kwargs: typing.Dict[str, typing.Any],
+    kwargs: dict[str, typing.Any],
     prefix: str = "",
 ) -> pathlib.Path:
     """キャッシュのパスを作って返す。"""

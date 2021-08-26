@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import random
-import typing
 import warnings
 
 import albumentations as A
@@ -83,9 +82,9 @@ class RandomTransform(A.DualTransform):
     @classmethod
     def create_refine(
         cls,
-        size: typing.Tuple[int, int],
-        flip: typing.Tuple[bool, bool] = (False, True),
-        translate: typing.Tuple[float, float] = (0.0625, 0.0625),
+        size: tuple[int, int],
+        flip: tuple[bool, bool] = (False, True),
+        translate: tuple[float, float] = (0.0625, 0.0625),
         border_mode: str = "edge",
         clip_bboxes: bool = True,
         mode: str = "normal",
@@ -110,7 +109,7 @@ class RandomTransform(A.DualTransform):
     @classmethod
     def create_test(
         cls,
-        size: typing.Tuple[int, int],
+        size: tuple[int, int],
         border_mode: str = "edge",
         clip_bboxes: bool = True,
         mode: str = "normal",
@@ -134,16 +133,16 @@ class RandomTransform(A.DualTransform):
 
     def __init__(
         self,
-        size: typing.Tuple[int, int],
-        flip: typing.Tuple[bool, bool] = (False, True),
-        translate: typing.Tuple[float, float] = (0.125, 0.125),
+        size: tuple[int, int],
+        flip: tuple[bool, bool] = (False, True),
+        translate: tuple[float, float] = (0.125, 0.125),
         scale_prob: float = 0.5,
-        scale_range: typing.Tuple[float, float] = (2 / 3, 3 / 2),
+        scale_range: tuple[float, float] = (2 / 3, 3 / 2),
         base_scale: float = 1.0,
         aspect_prob: float = 0.5,
-        aspect_range: typing.Tuple[float, float] = (3 / 4, 4 / 3),
+        aspect_range: tuple[float, float] = (3 / 4, 4 / 3),
         rotate_prob: float = 0.25,
-        rotate_range: typing.Tuple[int, int] = (-15, +15),
+        rotate_range: tuple[int, int] = (-15, +15),
         border_mode: str = "edge",
         clip_bboxes: bool = True,
         mode: str = "normal",
@@ -540,7 +539,7 @@ class PerlinNoise(A.ImageOnlyTransform):  # pylint: disable=abstract-method
 
     @staticmethod
     def perlin_noise(
-        shape: typing.Tuple[int, int],
+        shape: tuple[int, int],
         frequency: float = 3.0,
         octaves: int = 5,
         ar: float = 1.0,
@@ -977,16 +976,16 @@ class GridMask(A.ImageOnlyTransform):  # pylint: disable=abstract-method
 
     def __init__(
         self,
-        r: typing.Union[float, typing.Tuple[float, float]] = 0.6,
-        d: typing.Tuple[float, float] = (0.4, 1.0),
+        r: float | tuple[float, float] = 0.6,
+        d: tuple[float, float] = (0.4, 1.0),
         random_color: bool = False,
         fill_value: int = 0,
         always_apply: bool = False,
         p: float = 0.7,
     ):
         super().__init__(always_apply=always_apply, p=p)
-        self.r: typing.Tuple[float, float] = r if isinstance(r, tuple) else (r, r)
-        self.d: typing.Tuple[float, float] = d
+        self.r: tuple[float, float] = r if isinstance(r, tuple) else (r, r)
+        self.d: tuple[float, float] = d
         self.random_color = random_color
         self.fill_value = fill_value
 

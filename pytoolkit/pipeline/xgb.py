@@ -33,14 +33,14 @@ class XGBModel(Model):
 
     def __init__(
         self,
-        params: typing.Dict[str, typing.Any],
+        params: dict[str, typing.Any],
         nfold: int,
         models_dir: tk.typing.PathLike,
         early_stopping_rounds: int = 200,
         num_boost_round: int = 9999,
         verbose_eval: int = 100,
-        callbacks: typing.List[typing.Callable[[typing.Any], None]] = None,
-        cv_params: typing.Dict[str, typing.Any] = None,
+        callbacks: list[typing.Callable[[typing.Any], None]] = None,
+        cv_params: dict[str, typing.Any] = None,
         preprocessors: tk.pipeline.EstimatorListType = None,
         postprocessors: tk.pipeline.EstimatorListType = None,
     ):
@@ -53,8 +53,8 @@ class XGBModel(Model):
         self.verbose_eval = verbose_eval
         self.callbacks = callbacks
         self.cv_params = cv_params
-        self.gbms_: typing.Optional[typing.List[xgboost.Booster]] = None
-        self.best_ntree_limit_: typing.Optional[int] = None
+        self.gbms_: list[xgboost.Booster] | None = None
+        self.best_ntree_limit_: int | None = None
 
     def _save(self, models_dir: pathlib.Path):
         assert self.gbms_ is not None

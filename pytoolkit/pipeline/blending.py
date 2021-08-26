@@ -41,7 +41,7 @@ class BlendingModel(Model):
         self.score_fn = score_fn
         self.direction = direction
         self.n_trials = n_trials
-        self.weights_: typing.Optional[typing.List[float]] = None
+        self.weights_: list[float] | None = None
 
     def _save(self, models_dir: pathlib.Path):
         tk.utils.dump(self.weights_, models_dir / "weights.pkl")

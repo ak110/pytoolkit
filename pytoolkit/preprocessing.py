@@ -143,14 +143,14 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
         self.count_encoder = count_encoder or CountEncoder()
         self.target_encoder = target_encoder or TargetEncoder()
         self.ignore_cols = ignore_cols or []
-        self.binary_cols_: typing.Optional[typing.List[str]] = None
-        self.numeric_cols_: typing.Optional[typing.List[str]] = None
-        self.category_cols_: typing.Optional[typing.List[str]] = None
-        self.rare_category_cols_: typing.Optional[typing.List[str]] = None
-        self.iszero_cols_: typing.Optional[typing.List[str]] = None
-        self.isnull_cols_: typing.Optional[typing.List[str]] = None
-        self.feature_names_: typing.Optional[typing.List[str]] = None
-        self.notnull_cols_: typing.Optional[pd.Series] = None
+        self.binary_cols_: list[str] | None = None
+        self.numeric_cols_: list[str] | None = None
+        self.category_cols_: list[str] | None = None
+        self.rare_category_cols_: list[str] | None = None
+        self.iszero_cols_: list[str] | None = None
+        self.isnull_cols_: list[str] | None = None
+        self.feature_names_: list[str] | None = None
+        self.notnull_cols_: pd.Series | None = None
 
     def fit(self, X, y):
         self.fit_transform(X, y)

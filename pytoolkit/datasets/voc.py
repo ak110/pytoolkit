@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import pathlib
-import typing
 
 import numpy as np
 
@@ -43,7 +42,7 @@ CLASS_NAMES = [
 
 def load_voc_od(
     voc_dir: tk.typing.PathLike,
-) -> typing.Tuple[tk.data.Dataset, tk.data.Dataset]:
+) -> tuple[tk.data.Dataset, tk.data.Dataset]:
     """PASCAL VOCの物体検出のデータを読み込む。(07+12 trainval / 07 test)
 
     Examples:

@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 def split(
     dataset: tk.data.Dataset,
     nfold: int,
-    split_seed: typing.Optional[int] = 1,
-    stratify: typing.Union[bool, np.ndarray] = None,
+    split_seed: int | None = 1,
+    stratify: bool | np.ndarray = None,
 ) -> FoldsType:
     """nfold CV。
 

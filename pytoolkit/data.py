@@ -51,7 +51,7 @@ class Dataset:
     weights: np.ndarray = None
     ids: np.ndarray = None
     init_score: np.ndarray = None
-    metadata: typing.Dict[str, typing.Any] = dataclasses.field(default_factory=dict)
+    metadata: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self):
         """サイズの不整合が発生していないかチェックする。"""
@@ -74,7 +74,7 @@ class Dataset:
             return len(next(iter(self.data.values())))
         return len(self.data)
 
-    def get_data(self, index: int) -> typing.Tuple[typing.Any, typing.Any]:
+    def get_data(self, index: int) -> tuple[typing.Any, typing.Any]:
         """dataとlabelを返す。"""
         if self.labels is None:
             return self.data[index], None
@@ -97,7 +97,7 @@ class Dataset:
 
     def iter(
         self, folds: tk.validation.FoldsType
-    ) -> typing.Generator[typing.Tuple[Dataset, Dataset], None, None]:
+    ) -> typing.Generator[tuple[Dataset, Dataset], None, None]:
         """foldsに従って分割する。"""
         for train_indices, val_indices in folds:
             train_set = self.slice(train_indices)
@@ -253,7 +253,7 @@ class DataLoader:
         dataset: tk.data.Dataset,
         shuffle: bool = False,
         without_label: bool = False,
-    ) -> typing.Tuple[tf.data.Dataset, int]:
+    ) -> tuple[tf.data.Dataset, int]:
         """tf.data.Datasetを作る。
 
         Args:
@@ -377,7 +377,7 @@ class DataLoader:
 def _flatten(a):
     """1次元配列化。"""
     if isinstance(a, (list, tuple)):
-        return sum([_flatten(t) for t in a], [])
+        return sum((_flatten(t) for t in a), [])
     assert not isinstance(a, dict)
     return [a]
 
@@ -387,12 +387,12 @@ def _get_tf_types(exsample_data):
     if exsample_data is None:
         return [tf.int32]  # dummy
     elif isinstance(exsample_data, tuple):
-        return sum([_get_tf_types(v) for v in exsample_data], [])
+        return sum((_get_tf_types(v) for v in exsample_data), [])
     elif isinstance(exsample_data, list):
-        return sum([_get_tf_types(v) for v in exsample_data], [])
+        return sum((_get_tf_types(v) for v in exsample_data), [])
     elif isinstance(exsample_data, dict):
         # tf.numpy_functionがdict未対応なので、値の型だけリストで返す
-        return sum([_get_tf_types(v) for v in exsample_data.values()], [])
+        return sum((_get_tf_types(v) for v in exsample_data.values()), [])
     else:
         return [tf.dtypes.as_dtype(exsample_data.dtype)]
 

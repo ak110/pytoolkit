@@ -35,14 +35,14 @@ class LGBModel(Model):
 
     def __init__(
         self,
-        params: typing.Dict[str, typing.Any],
+        params: dict[str, typing.Any],
         nfold: int,
         models_dir: tk.typing.PathLike,
         early_stopping_rounds: int = 200,
         num_boost_round: int = 9999,
         verbose_eval: int = 100,
         callbacks: typing.Sequence[typing.Callable[[typing.Any], None]] = None,
-        cv_params: typing.Dict[str, typing.Any] = None,
+        cv_params: dict[str, typing.Any] = None,
         seeds: np.ndarray = None,
         init_score: np.ndarray = None,
         preprocessors: tk.pipeline.EstimatorListType = None,
@@ -134,7 +134,7 @@ class LGBModel(Model):
 
         seeds = [123] if self.seeds is None else self.seeds
 
-        scores: typing.Dict[str, typing.List[float]] = {}
+        scores: dict[str, list[float]] = {}
         self.gbms_ = np.empty((len(folds), len(seeds)), dtype=object)
         for seed_i, seed in enumerate(seeds):
             with tk.log.trace(f"seed averaging({seed_i + 1}/{len(seeds)})"):

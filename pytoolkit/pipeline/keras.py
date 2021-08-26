@@ -61,16 +61,16 @@ class KerasModel(Model):
         self,
         create_network_fn: typing.Callable[
             [],
-            typing.Union[
-                tf.keras.models.Model,
-                typing.Tuple[tf.keras.models.Model, tf.keras.models.Model],
-            ],
+            (
+                tf.keras.models.Model
+                | tuple[tf.keras.models.Model, tf.keras.models.Model]
+            ),
         ],
         nfold: int,
         models_dir: tk.typing.PathLike,
         train_data_loader: tk.data.DataLoader,
         val_data_loader: tk.data.DataLoader,
-        refine_data_loader: typing.Optional[tk.data.DataLoader] = None,
+        refine_data_loader: tk.data.DataLoader | None = None,
         *,
         compile_fn: typing.Callable[[tf.keras.models.Model], None] = None,
         score_fn: typing.Callable[
@@ -79,12 +79,12 @@ class KerasModel(Model):
         epochs: int,
         refine_epochs: int = 0,
         refine_lr_factor: float = 0.003,
-        callbacks: typing.List[tf.keras.callbacks.Callback] = None,
+        callbacks: list[tf.keras.callbacks.Callback] = None,
         model_name_format: str = "model.fold{fold}.h5",
         skip_if_exists: bool = True,
         skip_folds: typing.Sequence[int] = (),
         base_models_dir: tk.typing.PathLike = None,
-        fit_params: typing.Dict[str, typing.Any] = None,
+        fit_params: dict[str, typing.Any] = None,
         parallel_cv: bool = False,
         on_batch_fn: tk.models.OnBatchFnType = None,
         load_by_name: bool = False,
@@ -115,8 +115,8 @@ class KerasModel(Model):
         self.parallel_cv = parallel_cv
         self.on_batch_fn = on_batch_fn
         self.load_by_name = load_by_name
-        self.train_models: typing.List[tf.keras.models.Model] = [None] * nfold
-        self.pred_models: typing.List[tf.keras.models.Model] = [None] * nfold
+        self.train_models: list[tf.keras.models.Model] = [None] * nfold
+        self.pred_models: list[tf.keras.models.Model] = [None] * nfold
 
         if self.parallel_cv:
             assert self.refine_epochs == 0, "NotImplemented"
@@ -166,7 +166,7 @@ class KerasModel(Model):
         targets = []
         outputs = []
         losses = []
-        metrics: typing.Dict[str, typing.Any] = {
+        metrics: dict[str, typing.Any] = {
             n: [] for n in self.train_models[0].metrics_names if n != "loss"
         }
         for i, model in enumerate(self.train_models):
@@ -347,13 +347,13 @@ class KerasModel(Model):
     @typing.overload
     def train(
         self, train_set: tk.data.Dataset, val_set: tk.data.Dataset, fold: int = 0
-    ) -> typing.Dict[str, float]:
+    ) -> dict[str, float]:
         # pylint: disable=function-redefined
         pass
 
     def train(
         self, train_set: tk.data.Dataset, val_set: tk.data.Dataset = None, fold: int = 0
-    ) -> typing.Optional[typing.Dict[str, float]]:
+    ) -> dict[str, float] | None:
         """1fold分の学習。(KerasModel独自メソッド)
 
         Args:
@@ -464,7 +464,7 @@ class KerasModel(Model):
 
     def evaluate(
         self, dataset: tk.data.Dataset, prefix: str = None, fold: int = 0
-    ) -> typing.Dict[str, float]:
+    ) -> dict[str, float]:
         """評価する。(KerasModel独自メソッド)
 
         Args:
@@ -485,7 +485,7 @@ class KerasModel(Model):
             evals = tk.evaluations.add_prefix(evals, prefix)
         return evals
 
-    def _model_evaluate(self, dataset, fold) -> typing.Dict[str, float]:
+    def _model_evaluate(self, dataset, fold) -> dict[str, float]:
         assert self.preprocessors is None  # とりあえず未対応
         assert self.postprocessors is None  # とりあえず未対応
 

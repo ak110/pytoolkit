@@ -28,10 +28,10 @@ class CBModel(Model):
 
     def __init__(
         self,
-        params: typing.Dict[str, typing.Any],
+        params: dict[str, typing.Any],
         nfold: int,
         models_dir: tk.typing.PathLike,
-        cv_params: typing.Dict[str, typing.Any] = None,
+        cv_params: dict[str, typing.Any] = None,
         preprocessors=None,
         postprocessors=None,
     ):
@@ -40,7 +40,7 @@ class CBModel(Model):
         super().__init__(nfold, models_dir, preprocessors, postprocessors)
         self.params = params
         self.cv_params = cv_params
-        self.gbms_: typing.Optional[typing.List[catboost.CatBoost]] = None
+        self.gbms_: list[catboost.CatBoost] | None = None
         self.train_pool_: catboost.Pool = None
 
     def _save(self, models_dir: pathlib.Path):

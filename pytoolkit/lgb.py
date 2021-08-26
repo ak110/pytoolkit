@@ -17,14 +17,14 @@ logger = logging.getLogger(__name__)
 
 
 def cv(
-    models_dir: typing.Union[str, pathlib.Path],
-    feats_train: typing.Union[pd.DataFrame, np.ndarray],
+    models_dir: str | pathlib.Path,
+    feats_train: pd.DataFrame | np.ndarray,
     y_train: np.ndarray,
-    folds: typing.Sequence[typing.Tuple[np.ndarray, np.ndarray]],
+    folds: typing.Sequence[tuple[np.ndarray, np.ndarray]],
     params: dict,
-    weights: typing.Union[list, np.ndarray, pd.Series] = None,
-    groups: typing.Union[list, np.ndarray, pd.Series] = None,
-    init_score: typing.Union[list, np.ndarray, pd.Series] = None,
+    weights: list | np.ndarray | pd.Series = None,
+    groups: list | np.ndarray | pd.Series = None,
+    init_score: list | np.ndarray | pd.Series = None,
     fobj=None,
     feval=None,
     early_stopping_rounds: int = 200,
@@ -91,7 +91,7 @@ def cv(
     df.to_csv(models_dir / "feature_importance.csv", index_label="feature")
 
 
-def load(models_dir, nfold: int) -> typing.List[lgb.Booster]:
+def load(models_dir, nfold: int) -> list[lgb.Booster]:
     """cvで保存したモデルの読み込み。"""
     import lightgbm as lgb  # pylint: disable=redefined-outer-name
 
@@ -103,9 +103,9 @@ def load(models_dir, nfold: int) -> typing.List[lgb.Booster]:
 
 
 def predict(
-    boosters: typing.List[lgb.Booster],
-    feats_test: typing.Union[pd.DataFrame, np.ndarray],
-) -> typing.List[np.ndarray]:
+    boosters: list[lgb.Booster],
+    feats_test: pd.DataFrame | np.ndarray,
+) -> list[np.ndarray]:
     """推論。"""
     return [
         booster.predict(feats_test)
@@ -114,9 +114,9 @@ def predict(
 
 
 def predict_oof(
-    boosters: typing.List[lgb.Booster],
-    feats_train: typing.Union[pd.DataFrame, np.ndarray],
-    folds: typing.Sequence[typing.Tuple[np.ndarray, np.ndarray]],
+    boosters: list[lgb.Booster],
+    feats_train: pd.DataFrame | np.ndarray,
+    folds: typing.Sequence[tuple[np.ndarray, np.ndarray]],
 ) -> np.ndarray:
     """out-of-fold predictions。"""
     oof = None
@@ -130,7 +130,7 @@ def predict_oof(
     return oof
 
 
-def _gather(feats: typing.Union[pd.DataFrame, np.ndarray], indices):
+def _gather(feats: pd.DataFrame | np.ndarray, indices):
     if isinstance(feats, pd.DataFrame):
         return feats.iloc[indices]
     return feats[indices]

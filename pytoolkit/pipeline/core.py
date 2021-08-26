@@ -152,7 +152,7 @@ class Model:
             oofp[val_indices] = pred
         return oofp
 
-    def predict_all(self, dataset: tk.data.Dataset) -> typing.List[np.ndarray]:
+    def predict_all(self, dataset: tk.data.Dataset) -> list[np.ndarray]:
         """全fold分の推論結果をリストで返す。"""
         return [self.predict(dataset, fold) for fold in range(self.nfold)]
 

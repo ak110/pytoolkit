@@ -41,21 +41,21 @@ class App:
 
     def __init__(
         self,
-        output_dir: typing.Union[tk.typing.PathLike, None],
+        output_dir: tk.typing.PathLike | None,
         use_horovod: bool = False,
         distribute_strategy_fn: typing.Callable[[], tf.distribute.Strategy] = None,
     ):
         self.output_dir = pathlib.Path(output_dir) if output_dir is not None else None
         self.use_horovod = use_horovod
         self.distribute_strategy_fn = distribute_strategy_fn
-        self.inits: typing.List[typing.Callable[[], None]] = [
+        self.inits: list[typing.Callable[[], None]] = [
             tk.utils.better_exceptions,
             tk.math.set_ndarray_format,
             tk.math.set_numpy_error,
         ]
-        self.terms: typing.List[typing.Callable[[], None]] = []
-        self.commands: typing.Dict[str, Command] = {}
-        self.current_command: typing.Optional[str] = None
+        self.terms: list[typing.Callable[[], None]] = []
+        self.commands: dict[str, Command] = {}
+        self.current_command: str | None = None
 
     def init(self):
         """前処理の追加用デコレーター。
@@ -89,7 +89,7 @@ class App:
         then: str = None,
         use_horovod: bool = None,
         distribute_strategy_fn: typing.Callable[[], tf.distribute.Strategy] = None,
-        args: typing.Dict[str, typing.Dict[str, typing.Any]] = None,
+        args: dict[str, dict[str, typing.Any]] = None,
     ):
         """コマンドの追加用デコレーター。
 
@@ -227,13 +227,11 @@ class Command:
     name: str
     entrypoint: typing.Callable[..., None]
     logfile: bool = True
-    then: typing.Optional[str] = None
+    then: str | None = None
     use_horovod: bool = False
-    distribute_strategy_fn: typing.Optional[
-        typing.Callable[[], tf.distribute.Strategy]
-    ] = None
-    distribute_strategy: typing.Optional[tf.distribute.Strategy] = None
-    args: typing.Optional[typing.Dict[str, typing.Dict[str, typing.Any]]] = None
+    distribute_strategy_fn: None | (typing.Callable[[], tf.distribute.Strategy]) = None
+    distribute_strategy: tf.distribute.Strategy | None = None
+    args: dict[str, dict[str, typing.Any]] | None = None
 
     def run(self, kwargs) -> None:
         """コマンドの実行。"""

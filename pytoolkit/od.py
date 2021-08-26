@@ -40,7 +40,7 @@ class ObjectsAnnotation:
     @staticmethod
     def create_dataset(
         labels: typing.Sequence[ObjectsAnnotation],
-        class_names: typing.List[str] = None,
+        class_names: list[str] = None,
     ) -> tk.data.Dataset:
         """ObjectsAnnotationの配列からDatasetを作成する。
 
@@ -490,8 +490,8 @@ def is_in_box(boxes_a, boxes_b):
 
 def plot_objects(
     base_image: np.ndarray,
-    classes: typing.Optional[np.ndarray],
-    confs: typing.Optional[np.ndarray],
+    classes: np.ndarray | None,
+    confs: np.ndarray | None,
     bboxes: np.ndarray,
     class_names: typing.Sequence[str] = None,
     conf_threshold: float = 0.0,

@@ -27,7 +27,7 @@ def multi_run(
 
 def hpo(
     func: typing.Callable[..., tk.evaluations.EvalsType],
-    params: typing.Dict[str, typing.Tuple[str, typing.Dict[str, typing.Any]]],
+    params: dict[str, tuple[str, dict[str, typing.Any]]],
     score_name: str,
     direction: str = "minimize",
     n_trials: int = 100,

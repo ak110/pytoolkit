@@ -16,16 +16,14 @@ import pytoolkit as tk
 logger = logging.getLogger(__name__)
 
 
-def label_encoding(
-    values: typing.Union[pd.Series, np.ndarray], values_set: typing.Iterable
-):
+def label_encoding(values: pd.Series | np.ndarray, values_set: typing.Iterable):
     """ラベルエンコーディング。"""
     return pd.Series(values).map({v: i for i, v in enumerate(values_set)})
 
 
 def target_encoding(
-    values: typing.Union[pd.Series, np.ndarray],
-    values_train: typing.Union[pd.Series, np.ndarray],
+    values: pd.Series | np.ndarray,
+    values_train: pd.Series | np.ndarray,
     target_train: np.ndarray,
     min_samples_leaf: int = 3,
     smoothing: float = 1.0,
@@ -38,11 +36,11 @@ def target_encoding(
 
 
 def make_target_encoding_map(
-    values_train: typing.Union[pd.Series, np.ndarray],
+    values_train: pd.Series | np.ndarray,
     target_train: np.ndarray,
     min_samples_leaf: int = 3,
     smoothing: float = 1.0,
-) -> typing.Dict[typing.Any, np.float32]:
+) -> dict[typing.Any, np.float32]:
     """ターゲットエンコーディングの変換用dictの作成。"""
     df_tmp = pd.DataFrame()
     df_tmp["values"] = values_train
@@ -74,7 +72,7 @@ def add_col(
 
 def add_cols(
     df: pd.DataFrame,
-    column_names: typing.List[str],
+    column_names: list[str],
     values: typing.Sequence[typing.Any],
 ) -> None:
     """上書きしないようにチェックしつつ列追加。"""
@@ -86,7 +84,7 @@ def add_cols(
 
 def group_columns(
     df: pd.DataFrame, cols: typing.Sequence[str] = None
-) -> typing.Dict[str, typing.List[str]]:
+) -> dict[str, list[str]]:
     """列を型ごとにグルーピングして返す。
 
     Args:

@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import pathlib
-import typing
 
 import numpy as np
 
@@ -19,7 +18,7 @@ import pytoolkit as tk
 
 def load_coco_od(
     coco_dir: tk.typing.PathLike, use_crowded: bool = False, year: int = 2017
-) -> typing.Tuple[tk.data.Dataset, tk.data.Dataset]:
+) -> tuple[tk.data.Dataset, tk.data.Dataset]:
     """COCOの物体検出のデータを読み込む。"""
     ds_train = load_od_data(coco_dir, f"train{year}", use_crowded=use_crowded)
     ds_val = load_od_data(coco_dir, f"val{year}", use_crowded=True)

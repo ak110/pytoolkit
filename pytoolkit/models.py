@@ -103,7 +103,7 @@ def check(
 
 def load(
     path: tk.typing.PathLike,
-    custom_objects: typing.Dict[str, typing.Any] = None,
+    custom_objects: dict[str, typing.Any] = None,
     compile: bool = False,  # pylint: disable=redefined-outer-name
 ):
     """モデルの読み込み。"""
@@ -314,10 +314,10 @@ def fit(
     model: tf.keras.models.Model,
     train_iterator: tk.data.Iterator,
     val_iterator: tk.data.Iterator = None,
-    val_freq: typing.Union[int, typing.Sequence[int], str, None] = "auto",
-    class_weight: typing.Dict[int, float] = None,
+    val_freq: int | typing.Sequence[int] | str | None = "auto",
+    class_weight: dict[int, float] = None,
     epochs: int = 1800,
-    callbacks: typing.List[tf.keras.callbacks.Callback] = None,
+    callbacks: list[tf.keras.callbacks.Callback] = None,
     verbose: int = 1,
     initial_epoch: int = 0,
 ):
@@ -414,8 +414,8 @@ def make_val_freq(val_freq, epochs, train_size, val_size, max_val_per_train=0.1)
 
 
 def make_callbacks(
-    callbacks: typing.Optional[typing.List[tf.keras.callbacks.Callback]], training: bool
-) -> typing.List[tf.keras.callbacks.Callback]:
+    callbacks: list[tf.keras.callbacks.Callback] | None, training: bool
+) -> list[tf.keras.callbacks.Callback]:
     """callbacksをいい感じにする。"""
     callbacks = (callbacks or []).copy()
     if training:
@@ -430,7 +430,7 @@ def make_callbacks(
 def predict(
     model: tf.keras.models.Model,
     iterator: tk.data.Iterator,
-    callbacks: typing.List[tf.keras.callbacks.Callback] = None,
+    callbacks: list[tf.keras.callbacks.Callback] = None,
     verbose: int = 1,
     on_batch_fn: OnBatchFnType = None,
 ) -> ModelIOType:
@@ -488,7 +488,7 @@ def predict_flow(
     model: tf.keras.models.Model,
     ds: tf.data.Dataset,
     steps: int,
-    callbacks: typing.List[tf.keras.callbacks.Callback] = None,
+    callbacks: list[tf.keras.callbacks.Callback] = None,
     verbose: int = 1,
     on_batch_fn: OnBatchFnType = None,
     desc: str = "predict",
@@ -527,7 +527,7 @@ def _predict_flow(
     model: tf.keras.models.Model,
     ds: tf.data.Dataset,
     steps: int,
-    callbacks: typing.List[tf.keras.callbacks.Callback],
+    callbacks: list[tf.keras.callbacks.Callback],
     verbose: int,
     on_batch_fn: OnBatchFnType = None,
     desc: str = "predict",
@@ -562,9 +562,9 @@ def _predict_on_batch(model: tf.keras.models.Model, X):
 def evaluate(
     model: tf.keras.models.Model,
     iterator: tk.data.Iterator,
-    callbacks: typing.List[tf.keras.callbacks.Callback] = None,
+    callbacks: list[tf.keras.callbacks.Callback] = None,
     verbose: int = 1,
-) -> typing.Dict[str, float]:
+) -> dict[str, float]:
     """評価。
 
     Args:
@@ -599,7 +599,7 @@ def evaluate(
 
 
 def freeze_layers(
-    model: typing.Union[tf.keras.models.Model, tf.keras.layers.Layer], layer_class: type
+    model: tf.keras.models.Model | tf.keras.layers.Layer, layer_class: type
 ):
     """指定したレイヤーをfreezeする。"""
     for layer in model.layers:
@@ -612,11 +612,11 @@ def freeze_layers(
 def predict_on_batch_augmented(
     model: tf.keras.models.Model,
     X_batch: np.ndarray,
-    flip: typing.Tuple[bool, bool] = (False, True),
-    crop_size: typing.Tuple[int, int] = (3, 3),
-    padding_size: typing.Tuple[int, int] = (32, 32),
+    flip: tuple[bool, bool] = (False, True),
+    crop_size: tuple[int, int] = (3, 3),
+    padding_size: tuple[int, int] = (32, 32),
     padding_mode: str = "edge",
-) -> typing.Union[np.ndarray, typing.List[np.ndarray]]:
+) -> np.ndarray | list[np.ndarray]:
     """ミニバッチ1個分の推論処理＆TTA。
 
     Args:
@@ -642,7 +642,7 @@ def predict_on_batch_augmented(
         ),
         mode=padding_mode,
     )
-    X_batch2: typing.List[typing.Any] = []
+    X_batch2: list[typing.Any] = []
     for y in np.linspace(0, padding_size[0] * 2, crop_size[0], dtype=np.int32):
         for x in np.linspace(0, padding_size[1] * 2, crop_size[1], dtype=np.int32):
             X = X_batch[:, x : x + shape[1], y : y + shape[2], :]

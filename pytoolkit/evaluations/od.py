@@ -116,8 +116,8 @@ def _evaluate_coco(
     )
     class_ids = [{"id": c} for c in all_classes]
 
-    gt_anns: typing.List[typing.Dict] = []
-    pr_anns: typing.List[typing.Dict] = []
+    gt_anns: list[dict] = []
+    pr_anns: list[dict] = []
     for i, (y1, y2) in enumerate(zip(y_true, y_pred)):
         img_id = i + 1
         areas = y1.areas if y1.areas is not None else [None] * y1.num_objects
