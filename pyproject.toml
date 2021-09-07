@@ -34,7 +34,7 @@ catboost = {version = "*", optional = true}
 category_encoders = {version = "*", optional = true}
 efficientnet = {version = "*", optional = true}
 h5py = {version = "*", optional = true}
-horovod = {version = "*", optional = true}
+horovod = {extras = ["tensorflow"], version = "*", optional = true}
 ipython = {version = "*", optional = true}
 keras2onnx = {version = "*", optional = true}
 lightgbm = {version = "*", optional = true}
@@ -73,7 +73,7 @@ tests = [
 ]
 
 [tool.poetry.dev-dependencies]
-black = {version = "*", allow-prereleases = true}
+black = {version = "!=21.8b0", allow-prereleases = true}
 flake8 = "*"
 flake8-bugbear = "*"
 isort = "*"

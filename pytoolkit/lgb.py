@@ -175,7 +175,11 @@ class EvaluationLogger:
         if env.evaluation_result_list:
             # 最初だけ1, 2, 4, ... で出力。それ以降はperiod毎。
             n = env.iteration + 1
-            if ((n & (n - 1)) == 0) if n < self.period else (n % self.period == 0):
+            if n < self.period:
+                t = (n & (n - 1)) == 0
+            else:
+                t = n % self.period == 0
+            if t:
                 result = "  ".join(
                     [
                         _format_eval_result(x, show_stdv=self.show_stdv)

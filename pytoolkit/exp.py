@@ -49,7 +49,6 @@ class ExperimentLogger:
                 default=_default,
                 ensure_ascii=False,
                 indent=2,
-                separators=(",", ": "),
             ),
             encoding="utf-8",
         )

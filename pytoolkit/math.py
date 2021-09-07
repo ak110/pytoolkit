@@ -76,6 +76,7 @@ def cosine_most_similars(
     for offset in range(0, len(v1), batch_size):
         v1_batch = v1[offset : offset + batch_size]
         sims = np.inner(v1_batch, v2)
+        # pylint: disable=no-member
         indices[offset : offset + len(sims)] = sims.argmax(axis=-1)
         similarities[offset : offset + len(sims)] = sims.max(axis=-1)
 
