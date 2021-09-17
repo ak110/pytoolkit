@@ -17,7 +17,6 @@ def test_save(tmpdir, mode):
     x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.Dropout(0.25)(x)
     x = tk.layers.Resize2D((8, 8))(x)
-    x = tk.layers.GroupNormalization()(x)
     x = tk.layers.SyncBatchNormalization()(x)
     x = tk.layers.BlurPooling2D()(x)
     x = tk.layers.GeMPooling2D()(x)

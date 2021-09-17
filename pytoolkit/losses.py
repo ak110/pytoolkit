@@ -319,7 +319,7 @@ def mae(y_true, y_pred, reduce_mode="mean"):
 @tk.backend.name_scope
 def rmse(y_true, y_pred, reduce_mode="mean"):
     """root mean squared error。"""
-    return tf.math.sqrt(reduce(tf.math.square(y_pred - y_true), reduce_mode))
+    return tf.math.sqrt(reduce(tf.math.square(y_pred - y_true), reduce_mode) + 1e-7)
 
 
 @tk.backend.name_scope
