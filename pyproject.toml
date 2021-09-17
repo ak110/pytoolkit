@@ -85,6 +85,7 @@ types-requests = "*"
 [tool.poetry.scripts]
 tk-benchmark = "pytoolkit.bin.benchmark:main"
 tk-convert-model = "pytoolkit.bin.convertmodel:main"
+tk-h5ls = "pytoolkit.bin.h5ls:main"
 tk-notify = "pytoolkit.bin.notify:main"
 tk-plot-log = "pytoolkit.bin.plotlog:main"
 tk-py2nb = "pytoolkit.bin.py2nb:main"

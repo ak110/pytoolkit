@@ -80,16 +80,28 @@ class CoordChannel2D(tf.keras.layers.Layer):
 class WSConv2D(tf.keras.layers.Conv2D):
     """Weight StandardizationなConv2D <https://arxiv.org/abs/1903.10520>"""
 
-    def call(self, inputs):
-        # pylint: disable=access-member-before-definition,attribute-defined-outside-init
-        base_kernel = self.kernel  # type: ignore
-        kernel_mean = tf.math.reduce_mean(base_kernel, axis=[0, 1, 2], keepdims=True)
-        kernel_std = tf.math.reduce_std(base_kernel, axis=[0, 1, 2], keepdims=True)
-        self.kernel = (base_kernel - kernel_mean) / (kernel_std + 1e-5)
-        try:
-            return super().call(inputs)
-        finally:
-            self.kernel = base_kernel
+    def call(self, inputs, **kwargs):
+        del kwargs
+
+        # stdではなくvarにしてsqrt内にepsを入れる必要があるっぽい
+        # <https://github.com/joe-siyuan-qiao/WeightStandardization/issues/16>
+        kernel_mean = tf.math.reduce_mean(self.kernel, axis=[0, 1, 2], keepdims=True)
+        kernel_var = tf.math.reduce_variance(self.kernel, axis=[0, 1, 2], keepdims=True)
+        kernel = (self.kernel - kernel_mean) * tf.math.rsqrt(kernel_var + 1e-2)
+
+        outputs = tf.keras.backend.conv2d(
+            inputs,
+            kernel,
+            strides=self.strides,
+            padding=self.padding,
+            data_format=self.data_format,
+            dilation_rate=self.dilation_rate,
+        )
+        if self.use_bias:
+            outputs = tf.keras.backend.bias_add(outputs, self.bias, self.data_format)
+        if self.activation is not None:
+            outputs = self.activation(outputs)
+        return outputs
 
 
 @tf.keras.utils.register_keras_serializable(package="pytoolkit")
