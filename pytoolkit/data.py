@@ -502,7 +502,11 @@ def mixup(
 
     ds = ds.repeat()
     ds = ds.batch(2)
-    ds = ds.map(mixup_fn, num_parallel_calls=num_parallel_calls, deterministic=False)
+    ds = ds.map(
+        mixup_fn,
+        num_parallel_calls=num_parallel_calls,
+        deterministic=None if num_parallel_calls is None else False,
+    )
     return ds
 
 
