@@ -70,10 +70,7 @@ def evaluate_ss(
 
 
 def evaluate_ss_single(
-    yt: np.ndarray,
-    yp: np.ndarray,
-    threshold: float = 0.5,
-    multilabel: bool = False,
+    yt: np.ndarray, yp: np.ndarray, threshold: float = 0.5, multilabel: bool = False
 ) -> tuple:
     """1件分の評価のための処理。
 

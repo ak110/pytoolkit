@@ -93,3 +93,7 @@ tk-py2nb = "pytoolkit.bin.py2nb:main"
 [build-system]
 requires = ["poetry>=0.12"]
 build-backend = "poetry.masonry.api"
+
+[tool.black]
+target-version = ['py38']
+skip-magic-trailing-comma = true

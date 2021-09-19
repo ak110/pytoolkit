@@ -81,8 +81,7 @@ def cv(
         else [f"feature_{i}" for i in range(feats_train.shape[1])]
     )
     fi = np.zeros(
-        (len(columns),),
-        dtype=np.int32 if importance_type == "split" else np.float32,
+        (len(columns),), dtype=np.int32 if importance_type == "split" else np.float32
     )
     for gbm in cvbooster.boosters:
         fi += gbm.feature_importance(importance_type=importance_type)
@@ -103,8 +102,7 @@ def load(models_dir, nfold: int) -> list[lgb.Booster]:
 
 
 def predict(
-    boosters: list[lgb.Booster],
-    feats_test: pd.DataFrame | np.ndarray,
+    boosters: list[lgb.Booster], feats_test: pd.DataFrame | np.ndarray
 ) -> list[np.ndarray]:
     """推論。"""
     return [

@@ -78,8 +78,7 @@ def test_WrappedTranslateX(data_dir, save_dir):
     img = tk.ndimage.load(data_dir / "Lenna.png")
     for s in [-0.75, -0.25, +0.25, +0.75]:
         tk.ndimage.save(
-            save_dir / f"Lenna.WrappedTranslateX.{s:+.2f}.png",
-            aug.apply(img, scale=s),
+            save_dir / f"Lenna.WrappedTranslateX.{s:+.2f}.png", aug.apply(img, scale=s)
         )
 
 
@@ -89,8 +88,7 @@ def test_WrappedTranslateY(data_dir, save_dir):
     img = tk.ndimage.load(data_dir / "Lenna.png")
     for s in [-0.75, -0.25, +0.25, +0.75]:
         tk.ndimage.save(
-            save_dir / f"Lenna.WrappedTranslateY.{s:+.2f}.png",
-            aug.apply(img, scale=s),
+            save_dir / f"Lenna.WrappedTranslateY.{s:+.2f}.png", aug.apply(img, scale=s)
         )
 
 
@@ -100,8 +98,7 @@ def test_PerlinNoise(data_dir, save_dir):
     img = tk.ndimage.load(data_dir / "Lenna.png")
     for i in range(10):
         tk.ndimage.save(
-            save_dir / f"Lenna.PerlinNoise.{i}.png",
-            aug(image=img)["image"],
+            save_dir / f"Lenna.PerlinNoise.{i}.png", aug(image=img)["image"]
         )
 
 

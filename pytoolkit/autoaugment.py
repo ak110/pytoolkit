@@ -180,12 +180,7 @@ class Affine(A.ImageOnlyTransform):
         )
 
     def get_transform_init_args_names(self):
-        return (
-            "shear_x_mag",
-            "shear_y_mag",
-            "translate_x_mag",
-            "translate_y_mag",
-        )
+        return ("shear_x_mag", "shear_y_mag", "translate_x_mag", "translate_y_mag")
 
 
 class ShearX(Affine):

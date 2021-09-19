@@ -40,9 +40,7 @@ CLASS_NAMES = [
 ]
 
 
-def load_voc_od(
-    voc_dir: tk.typing.PathLike,
-) -> tuple[tk.data.Dataset, tk.data.Dataset]:
+def load_voc_od(voc_dir: tk.typing.PathLike) -> tuple[tk.data.Dataset, tk.data.Dataset]:
     """PASCAL VOCの物体検出のデータを読み込む。(07+12 trainval / 07 test)
 
     Examples:
@@ -51,19 +49,13 @@ def load_voc_od(
     """
     voc_dir = pathlib.Path(voc_dir)
     ds_train07 = load_voc_od_split(
-        data_dir=voc_dir / "VOC2007",
-        split="trainval",
-        use_difficult=False,
+        data_dir=voc_dir / "VOC2007", split="trainval", use_difficult=False
     )
     ds_train12 = load_voc_od_split(
-        data_dir=voc_dir / "VOC2012",
-        split="trainval",
-        use_difficult=False,
+        data_dir=voc_dir / "VOC2012", split="trainval", use_difficult=False
     )
     ds_val = load_voc_od_split(
-        data_dir=voc_dir / "VOC2007",
-        split="test",
-        use_difficult=True,
+        data_dir=voc_dir / "VOC2007", split="test", use_difficult=True
     )
     return tk.data.Dataset.concat(ds_train07, ds_train12), ds_val
 

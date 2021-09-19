@@ -74,11 +74,7 @@ class BlendingModel(Model):
                 return self.score_fn(dataset.labels, y_pred)
 
             study = tk.hpo.optimize(
-                params_fn,
-                score_fn,
-                direction=self.direction,
-                n_trials=100,
-                n_jobs=-1,
+                params_fn, score_fn, direction=self.direction, n_trials=100, n_jobs=-1
             )
             best_params = tk.hpo.get_best_params(study, params_fn)
             self.weights_ = np.array(

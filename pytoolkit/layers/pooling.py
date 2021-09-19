@@ -264,7 +264,7 @@ class GeMPooling2D(tf.keras.layers.Layer):
         p_regularizer=None,
         p_constraint=None,
         p_trainable=True,
-        **kargs
+        **kargs,
     ):
         super().__init__(**kargs)
         self.epsilon = epsilon

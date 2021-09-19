@@ -65,6 +65,5 @@ def test_transforms(data_dir, save_dir, klass, grayscale, mag):
     img = klass(mag, p=1)(image=img)["image"]
     assert (img.ndim == 2 or img.shape[-1] == 1) == grayscale
     tk.ndimage.save(
-        save_dir / f"transform.{klass.__name__}.{grayscale=}.{mag=}.png",
-        img,
+        save_dir / f"transform.{klass.__name__}.{grayscale=}.{mag=}.png", img
     )

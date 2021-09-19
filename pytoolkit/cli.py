@@ -6,6 +6,7 @@ import dataclasses
 import logging
 import pathlib
 import sys
+import tempfile
 import typing
 
 import tensorflow as tf
@@ -28,6 +29,7 @@ class App:
     Attributes:
         output_dir: ログ出力先ディレクトリ
         current_command: 現在実行中のコマンド名
+        temp_dir: コマンド単位で削除される一時ディレクトリ
 
     例::
 
@@ -56,6 +58,7 @@ class App:
         self.terms: list[typing.Callable[[], None]] = []
         self.commands: dict[str, Command] = {}
         self.current_command: str | None = None
+        self.temp_dir: pathlib.Path | None = None
 
     def init(self):
         """前処理の追加用デコレーター。
@@ -151,18 +154,23 @@ class App:
             assert self.current_command is not None
             command = commands[self.current_command]
 
-            self._command_init(command)
-            try:
-                command.run(kwargs)
-            except Exception as e:
-                # ログファイルを出力する(ような重要な)コマンドの場合のみ通知を送信
-                if command.logfile:
-                    tk.notifications.post(f"{type(e).__name__}: {e}")
-                # ログ出力して強制終了 (これ以上raiseしても少しトレース増えるだけなので)
-                logger.critical("Application error.", exc_info=True)
-                sys.exit(1)
-            finally:
-                self._command_term()
+            with tempfile.TemporaryDirectory() as t:
+                self.temp_dir = pathlib.Path(t)
+                try:
+                    self._command_init(command)
+                    try:
+                        command.run(kwargs)
+                    except Exception as e:
+                        # ログファイルを出力する(ような重要な)コマンドの場合のみ通知を送信
+                        if command.logfile:
+                            tk.notifications.post(f"{type(e).__name__}: {e}")
+                        # ログ出力して強制終了 (これ以上raiseしても少しトレース増えるだけなので)
+                        logger.critical("Application error.", exc_info=True)
+                        sys.exit(1)
+                    finally:
+                        self._command_term()
+                finally:
+                    self.temp_dir = None
 
             # 次のコマンド
             self.current_command = command.then

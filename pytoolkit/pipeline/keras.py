@@ -514,10 +514,7 @@ class KerasModel(Model):
         assert self.postprocessors is None  # とりあえず未対応
         ds, steps = self.val_data_loader.get_ds(dataset)
         return tk.models.predict_flow(
-            self.pred_models[fold],
-            ds=ds,
-            steps=steps,
-            on_batch_fn=self.on_batch_fn,
+            self.pred_models[fold], ds=ds, steps=steps, on_batch_fn=self.on_batch_fn
         )
 
     def create_network(self, fold: int) -> None:

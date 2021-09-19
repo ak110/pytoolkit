@@ -8,11 +8,7 @@ import pytoolkit as tk
 def test_predict(output_count, tmpdir):
     # pylint: disable=abstract-method
     dataset = tk.data.Dataset(data=np.random.randint(0, 256, size=(3, 2, 1)))
-    folds = [
-        ([0, 1], [2]),
-        ([1, 2], [0]),
-        ([2, 0], [1]),
-    ]
+    folds = [([0, 1], [2]), ([1, 2], [0]), ([2, 0], [1])]
 
     class TestModel(tk.pipeline.Model):
         def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:

@@ -71,9 +71,7 @@ def add_col(
 
 
 def add_cols(
-    df: pd.DataFrame,
-    column_names: list[str],
-    values: typing.Sequence[typing.Any],
+    df: pd.DataFrame, column_names: list[str], values: typing.Sequence[typing.Any]
 ) -> None:
     """上書きしないようにチェックしつつ列追加。"""
     for column_name in column_names:

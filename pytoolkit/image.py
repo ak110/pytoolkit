@@ -1031,8 +1031,7 @@ class GridMask(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         if self.random_color:
             # ランダムな色でマスク (オリジナル)
             color = np.array(
-                [random.randint(0, 255) for _ in range(img.shape[-1])],
-                dtype=np.uint8,
+                [random.randint(0, 255) for _ in range(img.shape[-1])], dtype=np.uint8
             )
             return (img * mask + color * (1 - mask)).astype(img.dtype)
         elif self.fill_value != 0:

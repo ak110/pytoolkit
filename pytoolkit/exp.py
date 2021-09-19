@@ -44,12 +44,7 @@ class ExperimentLogger:
             {"time": now.isoformat(), "name": self.name, "evals": evals}
         )
         data_path.write_text(
-            json.dumps(
-                data,
-                default=_default,
-                ensure_ascii=False,
-                indent=2,
-            ),
+            json.dumps(data, default=_default, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
 

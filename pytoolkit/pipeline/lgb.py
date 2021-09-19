@@ -178,10 +178,7 @@ class LGBModel(Model):
 
         pred = np.mean(
             [
-                gbm.predict(
-                    _get_data(gbm),
-                    num_iteration=gbm.best_iteration,
-                )
+                gbm.predict(_get_data(gbm), num_iteration=gbm.best_iteration)
                 for gbm in self.gbms_[fold, :]
             ],
             axis=0,

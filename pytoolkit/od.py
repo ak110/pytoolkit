@@ -39,8 +39,7 @@ class ObjectsAnnotation:
 
     @staticmethod
     def create_dataset(
-        labels: typing.Sequence[ObjectsAnnotation],
-        class_names: list[str] = None,
+        labels: typing.Sequence[ObjectsAnnotation], class_names: list[str] = None
     ) -> tk.data.Dataset:
         """ObjectsAnnotationの配列からDatasetを作成する。
 

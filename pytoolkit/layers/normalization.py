@@ -157,12 +157,10 @@ class SyncBatchNormalization(tf.keras.layers.Layer):
         self.add_update(
             [
                 self.moving_mean.assign_add(
-                    (mean - self.moving_mean) * decay,
-                    read_value=False,
+                    (mean - self.moving_mean) * decay, read_value=False
                 ),
                 self.moving_variance.assign_add(
-                    (var - self.moving_variance) * decay,
-                    read_value=False,
+                    (var - self.moving_variance) * decay, read_value=False
                 ),
             ]
         )
