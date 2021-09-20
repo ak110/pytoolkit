@@ -337,7 +337,7 @@ class DataLoader:
         assert self.num_replicas_in_sync >= 1
         global_batch_size = self.batch_size * self.num_replicas_in_sync
 
-        ds = tf.data.Dataset.from_tensor_slices(np.arange(len(dataset)))
+        ds = tf.data.Dataset.range(len(dataset))
         ds = ds.shuffle(buffer_size=len(dataset)) if shuffle else ds
         ds = ds.map(
             process1,
