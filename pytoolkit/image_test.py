@@ -130,23 +130,26 @@ def test_gray_scale(data_dir):
 def test_RandomTransform_with_bboxes():
     random.seed(1)
     image = np.zeros((32, 32, 3), dtype=np.uint8)
-    bboxes = np.array([[30, 30, 31, 31]]) / 32.0
-    classes = ["A"]
+    bboxes = np.array([[0, 0, 1, 1], [31, 31, 32, 32]]) / 32.0
+    classes = ["A", "B"]
     aug = A.Compose(
         [tk.image.RandomTransform(size=(8, 8), base_scale=4.0, with_bboxes=True)],
         bbox_params=A.BboxParams(format="albumentations", label_fields=["classes"]),
     )
-    with_bboxes_count = 0
+    a_count = 0
+    b_count = 0
     for _ in range(100):
         d = aug(image=image, bboxes=bboxes, classes=classes)
         assert d["image"].shape == (8, 8, 3)
         if len(d["bboxes"]) == 0:
             assert len(d["classes"]) == 0
         else:
-            assert len(d["bboxes"]) == 1
-            assert tuple(d["classes"]) == ("A",)
-            with_bboxes_count += 1
+            assert len(d["bboxes"]) in (1, 2)
+            if "A" in d["classes"]:
+                a_count += 1
+            if "B" in d["classes"]:
+                b_count += 1
     # 100回中何回bboxが出力されたか。
     # (挙動が変わった時に気付きやすいように==にしているが、
-    #  with_bboxes=Falseの場合(≒0)より多くなれば実装は合っている)
-    assert with_bboxes_count == 53
+    #  with_bboxes=Falseの場合(≒(0, 0))より多く、かつa_count ≒ b_countになればOK)
+    assert (a_count, b_count) == (14, 16)

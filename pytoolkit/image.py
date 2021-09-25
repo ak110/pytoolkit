@@ -319,17 +319,19 @@ class RandomTransform(A.DualTransform):
 
         flip_v = self.flip[0] and random.random() <= 0.5
         flip_h = self.flip[1] and random.random() <= 0.5
-        scale_v = scale / np.sqrt(ar)
-        scale_h = scale * np.sqrt(ar)
+        scale = np.array([scale / np.sqrt(ar), scale * np.sqrt(ar)])
         degrees = (
             random.uniform(self.rotate_range[0], self.rotate_range[1])
             if random.random() <= self.rotate_prob
             else 0
         )
-        pos_v = random.uniform(-0.5, +0.5)
-        pos_h = random.uniform(-0.5, +0.5)
-        translate_v = random.uniform(-self.translate[0], self.translate[0])
-        translate_h = random.uniform(-self.translate[1], self.translate[1])
+        pos = np.array([random.uniform(-0.5, +0.5), random.uniform(-0.5, +0.5)])
+        translate = np.array(
+            [
+                random.uniform(-self.translate[0], self.translate[0]),
+                random.uniform(-self.translate[1], self.translate[1]),
+            ]
+        )
         # 左上から時計回りに座標を用意
         src_points = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32)
         if self.mode == "normal":
@@ -368,28 +370,21 @@ class RandomTransform(A.DualTransform):
             dst_points = dst_points[[1, 0, 3, 2]]
         if flip_v:
             dst_points = dst_points[[3, 2, 1, 0]]
-        # 移動
-        src_points[:, 0] -= translate_h
-        src_points[:, 1] -= translate_v
-        # (0.5, 0.5)が中心になるように移動
+        # 原点が中心になるように移動
         src_points -= 0.5
         # 回転
         theta = degrees * np.pi * 2 / 360
         c, s = np.cos(theta), np.sin(theta)
         r = np.array([[c, -s], [s, c]], dtype=np.float32)
         src_points = np.dot(r, src_points.T).T
-        # スケール変換 (scale>1なら拡大、scale<1なら縮小)
-        src_points[:, 0] /= scale_h
-        src_points[:, 1] /= scale_v
-        src_points[:, 0] += (1 - 1 / scale_h) * pos_h  # スケール変換で余った分のランダム移動
-        src_points[:, 1] += (1 - 1 / scale_v) * pos_v  # スケール変換で余った分のランダム移動
-        # 移動を戻す
-        src_points += 0.5
+        # スケール変換
+        src_points /= scale
+        # 移動
+        # スケール変換で余った分 + 最初に0.5動かした分 + translate分
+        src_points += (1 - 1 / scale) * pos + 0.5 + translate / scale
         # 変換行列の作成
-        src_points[:, 0] *= img.shape[1]
-        src_points[:, 1] *= img.shape[0]
-        dst_points[:, 0] *= self.size[1]
-        dst_points[:, 1] *= self.size[0]
+        src_points *= [img.shape[1], img.shape[0]]
+        dst_points *= [self.size[1], self.size[0]]
         m = cv2.getPerspectiveTransform(src_points, dst_points)
         return {"m": m, "image_size": img.shape[:2]}
 
