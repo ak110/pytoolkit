@@ -5,12 +5,11 @@ import pytoolkit as tk
 
 def test_CosineAnnealing():
     s = tk.schedules.CosineAnnealing(0.1, decay_steps=100, warmup_steps=10)
-    assert s(0).numpy() == pytest.approx(0.01)
-    assert s(4).numpy() == pytest.approx(0.05)
-    assert s(9).numpy() == pytest.approx(0.1)
-    assert s(54).numpy() == pytest.approx(0.05 * 1.01)
-    assert s(99).numpy() == pytest.approx(0.001)
-    assert s(100).numpy() == pytest.approx(0.001)
+    assert s(0).numpy() == pytest.approx(0.01)  # start
+    assert s(4).numpy() == pytest.approx(0.05)  # linear 0.5
+    assert s(9).numpy() == pytest.approx(0.1)  # linear 1.0, cosine 0.0
+    assert s(54).numpy() == pytest.approx(0.05)  # cosine 0.5
+    assert s(100).numpy() == pytest.approx(0)  # cosine 1.0
 
 
 def test_LinearDecay():

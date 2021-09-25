@@ -230,6 +230,9 @@ class RandomTransform(A.DualTransform):
             img = np.transpose(resized_list, (1, 2, 0))
         return img
 
+    def apply_to_bbox(self, bbox, **params):
+        return self.apply_to_bboxes([tuple(bbox) + (1, 1, "A")], **params)[0][:4]
+
     def apply_to_bboxes(self, bboxes, m, image_size, **params):
         # pylint: disable=arguments-differ
         del params
@@ -256,18 +259,16 @@ class RandomTransform(A.DualTransform):
 
         return [tuple(bbox) + etc for bbox, etc in zip(bboxes, etc)]
 
-    def apply_to_bbox(self, bbox, **params):
-        # pylint: disable=arguments-differ
-        return self.apply_to_bboxes([tuple(bbox) + (1, 1, "A")], **params)[0][:4]
+    def apply_to_keypoint(self, keypoint, **params):
+        return self.apply_to_keypoints([keypoint], **params)[0]
 
-    def apply_to_keypoint(self, keypoint, m, **params):
+    def apply_to_keypoints(self, keypoints, m, **params):
         # pylint: disable=arguments-differ
         del params
-        xy = np.asarray(keypoint[:2])
-        xy = cv2.perspectiveTransform(
-            xy.reshape((-1, 1, 2)).astype(np.float32), m
-        ).reshape(xy.shape)
-        return tuple(xy) + tuple(keypoint[2:])
+        etc = [tuple(keypoint[2:]) for keypoint in keypoints]
+        xys = np.array([keypoint[:2] for keypoint in keypoints], dtype=np.float32)
+        xys = cv2.perspectiveTransform(xys.reshape((-1, 1, 2)), m).reshape(xys.shape)
+        return [tuple(xy) + etc for xy, etc in zip(xys, etc)]
 
     def apply_to_mask(self, img, interp=None, **params):
         # pylint: disable=arguments-differ
