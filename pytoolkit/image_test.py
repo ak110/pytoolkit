@@ -1,4 +1,6 @@
 # pylint: disable=redefined-outer-name
+import random
+
 import albumentations as A
 import numpy as np
 import pytest
@@ -123,3 +125,28 @@ def test_gray_scale(data_dir):
     for _ in range(32):
         img = aug(image=img)["image"]
         assert img.shape == (256, 256, 1)
+
+
+def test_RandomTransform_with_bboxes():
+    random.seed(1)
+    image = np.zeros((32, 32, 3), dtype=np.uint8)
+    bboxes = np.array([[30, 30, 31, 31]]) / 32.0
+    classes = ["A"]
+    aug = A.Compose(
+        [tk.image.RandomTransform(size=(8, 8), base_scale=4.0, with_bboxes=True)],
+        bbox_params=A.BboxParams(format="albumentations", label_fields=["classes"]),
+    )
+    with_bboxes_count = 0
+    for _ in range(100):
+        d = aug(image=image, bboxes=bboxes, classes=classes)
+        assert d["image"].shape == (8, 8, 3)
+        if len(d["bboxes"]) == 0:
+            assert len(d["classes"]) == 0
+        else:
+            assert len(d["bboxes"]) == 1
+            assert tuple(d["classes"]) == ("A",)
+            with_bboxes_count += 1
+    # 100回中何回bboxが出力されたか。
+    # (挙動が変わった時に気付きやすいように==にしているが、
+    #  with_bboxes=Falseの場合(≒0)より多くなれば実装は合っている)
+    assert with_bboxes_count == 53
