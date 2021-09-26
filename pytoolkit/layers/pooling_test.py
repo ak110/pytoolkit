@@ -41,14 +41,14 @@ def test_BlurPooling2D():
     y = np.array(
         [
             [
-                [[0.09765625, 0.0], [0.58593750, 0.0], [0.09765625, 0.0]],
-                [[0.58593750, 0.0], [3.51562500, 0.0], [0.58593750, 0.0]],
-                [[0.09765625, 0.0], [0.58593750, 0.0], [0.09765625, 0.0]],
+                [[0.020408162847161293, 0.0], [0.0535714291036129, 0.0], [0.0, 0.0]],
+                [[0.0535714291036129, 0.0], [0.140625, 0.0], [0.0, 0.0]],
+                [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]],
             ]
         ]
     )
-    pred = _predict_layer(tk.layers.BlurPooling2D(taps=5), X)
-    assert pred == pytest.approx(y, abs=1e-5)
+    pred = _predict_layer(tk.layers.BlurPooling2D(taps=4), X)
+    np.testing.assert_allclose(pred, y, atol=1e-5)
 
 
 def test_GeMPooling2D():

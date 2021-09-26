@@ -183,6 +183,7 @@ class BlurPooling2D(tf.keras.layers.Layer):
         super().__init__(**kwargs)
         self.taps = taps
         self.strides = tk.utils.normalize_tuple(strides, 2)
+        self.kernel = None
 
     def compute_output_shape(self, input_shape):
         assert len(input_shape) == 4
@@ -195,11 +196,9 @@ class BlurPooling2D(tf.keras.layers.Layer):
         ) // self.strides[1]
         return tuple(input_shape)
 
-    def call(self, inputs, **kwargs):
-        del kwargs
-        in_filters = inputs.shape.as_list()[-1]
-
-        pascals_tr = np.zeros((self.taps, self.taps))
+    def build(self, input_shape):
+        in_filters = int(input_shape[-1])
+        pascals_tr = np.zeros((self.taps, self.taps), dtype=np.float32)
         pascals_tr[0, 0] = 1
         for i in range(1, self.taps):
             pascals_tr[i, :] = pascals_tr[i - 1, :]
@@ -208,11 +207,24 @@ class BlurPooling2D(tf.keras.layers.Layer):
         filter2d = filter1d[np.newaxis, :] * filter1d[:, np.newaxis]
         filter2d = filter2d * (self.taps ** 2 / filter2d.sum())
         kernel = np.tile(filter2d[:, :, np.newaxis, np.newaxis], (1, 1, in_filters, 1))
-        kernel = tf.constant(kernel, dtype=inputs.dtype)
+        self.kernel = tf.constant(kernel, dtype=tf.float32)
+        super().build(input_shape)
 
-        return tf.nn.depthwise_conv2d(
+    def call(self, inputs, **kwargs):
+        del kwargs
+        kernel = tf.cast(self.kernel, inputs.dtype)
+        s = tf.shape(inputs)
+        outputs = tf.nn.depthwise_conv2d(
             inputs, kernel, strides=(1,) + self.strides + (1,), padding="SAME"
         )
+        norm = tf.ones((s[0], s[1], s[2], 1), dtype=inputs.dtype)
+        norm = tf.nn.depthwise_conv2d(
+            norm,
+            kernel[:, :, :1, :],
+            strides=(1,) + self.strides + (1,),
+            padding="SAME",
+        )
+        return outputs / norm
 
     def get_config(self):
         config = {"taps": self.taps, "strides": self.strides}
