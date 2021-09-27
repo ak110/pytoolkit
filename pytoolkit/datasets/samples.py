@@ -1,14 +1,13 @@
-"""tf.keras.datasets関連。 <https://tf.keras.io/datasets/>"""
+"""テストコードなど用サンプルデータ。"""
 
 import numpy as np
-import sklearn.datasets
 
 import pytoolkit as tk
 
 
 def load_sample_ic():
     """画像分類のサンプルデータ。num_classes=2"""
-    X_train = np.array(sklearn.datasets.load_sample_images().filenames)
+    X_train = tk.datasets.load_sample_images().data
     y_train = np.array([0, 1])
     return tk.data.Dataset(
         X_train, y_train, metadata={"class_names": ["china", "flower"]}
@@ -17,7 +16,7 @@ def load_sample_ic():
 
 def load_sample_od():
     """物体検出のサンプルデータ。num_classes=2"""
-    X_train = np.array(sklearn.datasets.load_sample_images().filenames)
+    X_train = tk.datasets.load_sample_images().data
     y_train = np.array(
         [
             tk.od.ObjectsAnnotation(

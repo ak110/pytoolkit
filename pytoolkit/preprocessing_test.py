@@ -7,11 +7,12 @@ import pytoolkit as tk
 
 @pytest.mark.parametrize("category", ["category", "ordinal", "onehot"])
 def test_features_encoder(category):
-    train_set = tk.datasets.load_boston()
-    df_train = train_set.data
-    df_train["CHAS"] = df_train["CHAS"].astype("bool")
-    df_train["RAD"] = df_train["RAD"].astype("category")  # 適切ではないがテストのための変換
-    df_train["TAX"] = df_train["TAX"].astype("object")  # 適切ではないがテストのための変換
+    train_set = tk.datasets.load_breast_cancer()
+    df_train: pd.DataFrame = train_set.data
+    # 適切ではないがテストのための変換
+    df_train["mean radius"] = df_train["mean radius"].astype("bool")
+    df_train["mean texture"] = df_train["mean texture"].astype("category")
+    df_train["mean area"] = df_train["mean area"].astype("object")
     df_test = df_train.copy()
 
     # 列の順番が変わっても結果が同じになる事を確認する
