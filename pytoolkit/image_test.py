@@ -153,3 +153,29 @@ def test_RandomTransform_with_bboxes():
     # (挙動が変わった時に気付きやすいように==にしているが、
     #  with_bboxes=Falseの場合(≒(0, 0))より多く、かつa_count ≒ b_countになればOK)
     assert (a_count, b_count) == (14, 16)
+
+
+def test_RandomTransform_edge():
+    # translateとrotateを無効にすればはみ出ないことの確認
+    random.seed(1)
+    image = np.ones((32, 32, 3), dtype=np.uint8)
+    aug = tk.image.RandomTransform(
+        size=(8, 8),
+        base_scale=4.0,
+        border_mode="zero",
+        rotate_prob=0.0,
+        translate=(0.0, 0.0),
+    )
+    for _ in range(100):
+        augmented_image = aug(image=image)["image"]
+        np.testing.assert_equal(augmented_image, np.ones_like(augmented_image))
+
+    aug = tk.image.RandomTransform(
+        size=(64, 64),
+        base_scale=0.5,
+        border_mode="zero",
+        rotate_prob=0.0,
+        translate=(0.0, 0.0),
+    )
+    augmented_image = aug(image=image)["image"]
+    assert not (augmented_image == 1).all()
