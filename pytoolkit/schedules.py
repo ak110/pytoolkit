@@ -10,7 +10,7 @@ class CosineAnnealing(tf.keras.optimizers.schedules.LearningRateSchedule):
 
     Args:
         initial_learning_rate: 初期学習率
-        decay_steps: 全体のステップ数 (len(train_set) // (batch_size * app.num_replicas_in_sync * tk.hvd.size()) * epochs)
+        decay_steps: 全体のステップ数: -(-len(train_set) // (batch_size * num_gpus)) * epochs
         warmup_steps: 最初にlinear warmupするステップ数。既定値は1000。ただし最大でdecay_steps // 8。
         name: 名前
 

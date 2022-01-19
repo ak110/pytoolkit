@@ -75,9 +75,12 @@ class RandomTransform(A.DualTransform):
         flip: 反転の有無(vertical, horizontal)
         translate: 平行移動の量(vertical, horizontal)
         border_mode: edge, reflect, wrap, zero, half, one
+        base_scale: >1で拡大、<1で縮小
         clip_bboxes: はみ出すbboxをclippingするか否か
         with_bboxes: Trueならできるだけbboxを1つ以上含むようにcropする (bboxesが必須になってしまうため既定値False)
-        mode: "normal", "preserve_aspect", "crop"
+        mode: "normal", "preserve_aspect", "preserve_pixel"
+
+    "preserve_pixel"の場合、create_test()でもランダム性が残るため注意。
 
     """
 
@@ -170,7 +173,7 @@ class RandomTransform(A.DualTransform):
         self.with_bboxes = with_bboxes
         self.mode = mode
 
-    def apply(self, img, m, interp=None, **params):
+    def apply(self, img, m, interp=None, border_mode=None, **params):
         # pylint: disable=arguments-differ
         cv2_border, borderValue = {
             "edge": (cv2.BORDER_REPLICATE, None),
@@ -187,7 +190,7 @@ class RandomTransform(A.DualTransform):
                 cv2.BORDER_CONSTANT,
                 [1, 1, 1] if img.dtype in (np.float32, np.float64) else [255, 255, 255],
             ),
-        }[self.border_mode]
+        }[border_mode or self.border_mode]
 
         if interp == "nearest":
             cv2_interp = cv2.INTER_NEAREST
@@ -270,18 +273,21 @@ class RandomTransform(A.DualTransform):
         xys = cv2.perspectiveTransform(xys.reshape((-1, 1, 2)), m).reshape(xys.shape)
         return [tuple(xy) + etc for xy, etc in zip(xys, etc)]
 
-    def apply_to_mask(self, img, interp=None, **params):
+    def apply_to_mask(self, img, interp=None, border_mode=None, **params):
         # pylint: disable=arguments-differ
-        del interp
-        return self.apply(img, interp="nearest", **params)
+        interp = "nearest"
+        if border_mode not in ("reflect", "wrap"):
+            border_mode = "zero"
+        return self.apply(img, interp=interp, border_mode=border_mode, **params)
 
     def get_params_dependent_on_targets(self, params):
         if self.with_bboxes and len(params["bboxes"]) >= 1:
             # self.with_bboxes == Trueかつ元々bboxが1個以上あるなら、
             # 出来るだけ有効なbboxが1個以上あるようになるまでretryする。
             # (ただし極端な条件の場合ランダム任せだと厳しいのでリトライの上限は適当)
+            rand = np.random.RandomState(random.getrandbits(32))
             for _ in range(100):  # retry
-                d = self._get_params(params)
+                d = self._get_params(params, rand=rand)
                 bboxes = np.asarray(
                     [
                         np.clip(bbox[:4], 0, 1)
@@ -297,39 +303,37 @@ class RandomTransform(A.DualTransform):
             d = self._get_params(params)
         return d
 
-    def _get_params(self, params):
+    def _get_params(self, params, rand=None):
         img = params["image"]
-        scale = (
-            self.base_scale
-            * np.exp(
-                random.uniform(np.log(self.scale_range[0]), np.log(self.scale_range[1]))
+        if rand is None:
+            rand = np.random.RandomState(random.getrandbits(32))
+        scale = self.base_scale
+        if rand.random() <= self.scale_prob:
+            scale *= np.exp(
+                rand.uniform(np.log(self.scale_range[0]), np.log(self.scale_range[1]))
             )
-            if random.random() <= self.scale_prob
-            else self.base_scale
-        )
         ar = (
             np.exp(
-                random.uniform(
-                    np.log(self.aspect_range[0]), np.log(self.aspect_range[1])
-                )
+                rand.uniform(np.log(self.aspect_range[0]), np.log(self.aspect_range[1]))
             )
-            if random.random() <= self.aspect_prob
+            if rand.random() <= self.aspect_prob
             else 1.0
         )
 
-        flip_v = self.flip[0] and random.random() <= 0.5
-        flip_h = self.flip[1] and random.random() <= 0.5
-        scale = np.array([scale / np.sqrt(ar), scale * np.sqrt(ar)])
+        flip_v = self.flip[0] and rand.random() <= 0.5
+        flip_h = self.flip[1] and rand.random() <= 0.5
+        scale = np.array(
+            [scale / np.sqrt(ar), scale * np.sqrt(ar)]
+        )  # (horizontal, vertical)
         degrees = (
-            random.uniform(self.rotate_range[0], self.rotate_range[1])
-            if random.random() <= self.rotate_prob
+            rand.uniform(self.rotate_range[0], self.rotate_range[1])
+            if rand.random() <= self.rotate_prob
             else 0
         )
-        pos = np.array([random.uniform(-0.5, +0.5), random.uniform(-0.5, +0.5)])
         translate = np.array(
             [
-                random.uniform(-self.translate[0], self.translate[0]),
-                random.uniform(-self.translate[1], self.translate[1]),
+                rand.uniform(-self.translate[0], self.translate[0]),
+                rand.uniform(-self.translate[1], self.translate[1]),
             ]
         )
         # 左上から時計回りに座標を用意
@@ -353,16 +357,10 @@ class RandomTransform(A.DualTransform):
                 dst_points = np.array(
                     [[xr, 0], [xr + wr, 0], [xr + wr, 1], [xr, 1]], dtype=np.float32
                 )
-        elif self.mode == "crop":
+        elif self.mode == "preserve_pixel":
             # 入力サイズによらず固定サイズでcrop
-            hr = self.size[0] / img.shape[0]
-            wr = self.size[1] / img.shape[1]
-            yr = random.uniform(0, 1 - hr)
-            xr = random.uniform(0, 1 - wr)
-            dst_points = np.array(
-                [[xr, yr], [xr + wr, yr], [xr + wr, yr + hr], [xr, yr + hr]],
-                dtype=np.float32,
-            )
+            scale *= [img.shape[0] / self.size[0], img.shape[1] / self.size[1]]
+            dst_points = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32)
         else:
             raise ValueError(f"Invalid mode: {self.mode}")
         # 反転
@@ -379,9 +377,11 @@ class RandomTransform(A.DualTransform):
         src_points = np.dot(r, src_points.T).T
         # スケール変換
         src_points /= scale
-        # 移動
-        # スケール変換で余った分 + 最初に0.5動かした分 + translate分
-        src_points += (1 - 1 / scale) * pos + 0.5 + translate / scale
+        # 最初に0.5動かした分 + translate分
+        src_points += 0.5 + translate / scale
+        # スケール変換で余った分
+        pos = np.array([rand.uniform(-0.5, +0.5), rand.uniform(-0.5, +0.5)])
+        src_points += (1 - 1 / scale) * pos
         # 変換行列の作成
         src_points *= [img.shape[1], img.shape[0]]
         dst_points *= [self.size[1], self.size[0]]

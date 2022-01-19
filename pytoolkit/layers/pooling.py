@@ -286,12 +286,7 @@ class GeMPooling2D(tf.keras.layers.Layer):
             else tf.keras.initializers.constant(3)
         )
         self.p_regularizer = tf.keras.regularizers.get(p_regularizer)
-        self.p_constraint = tf.keras.constraints.get(
-            # オーバーフロー対策で適当に制約をつける
-            p_constraint
-            if p_constraint is not None
-            else tk.constraints.Clip(1, 5)
-        )
+        self.p_constraint = tf.keras.constraints.get(p_constraint)
         self.p_trainable = p_trainable
         self.p = None
 
@@ -314,6 +309,7 @@ class GeMPooling2D(tf.keras.layers.Layer):
         del kwargs
         x = tf.cast(inputs, tf.float32)  # float16ではオーバーフローしやすいので一応
         p = tf.cast(self.p, tf.float32)
+        p = tf.clip_by_value(p, 1.0, 5.0)  # オーバーフロー対策
         x = tf.math.maximum(x, self.epsilon) ** p
         x = tf.math.reduce_mean(x, axis=(1, 2))  # GAP
         x = x ** (1 / p)

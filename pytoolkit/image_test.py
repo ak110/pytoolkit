@@ -130,15 +130,16 @@ def test_gray_scale(data_dir):
 def test_RandomTransform_with_bboxes():
     random.seed(1)
     image = np.zeros((32, 32, 3), dtype=np.uint8)
+    # 左上と右下に1個ずつboxを用意
     bboxes = np.array([[0, 0, 1, 1], [31, 31, 32, 32]]) / 32.0
     classes = ["A", "B"]
     aug = A.Compose(
-        [tk.image.RandomTransform(size=(8, 8), base_scale=4.0, with_bboxes=True)],
+        [tk.image.RandomTransform(size=(8, 8), base_scale=2.0, with_bboxes=True)],
         bbox_params=A.BboxParams(format="albumentations", label_fields=["classes"]),
     )
     a_count = 0
     b_count = 0
-    for _ in range(100):
+    for _ in range(300):
         d = aug(image=image, bboxes=bboxes, classes=classes)
         assert d["image"].shape == (8, 8, 3)
         if len(d["bboxes"]) == 0:
@@ -152,30 +153,86 @@ def test_RandomTransform_with_bboxes():
     # 100回中何回bboxが出力されたか。
     # (挙動が変わった時に気付きやすいように==にしているが、
     #  with_bboxes=Falseの場合(≒(0, 0))より多く、かつa_count ≒ b_countになればOK)
-    assert (a_count, b_count) == (14, 16)
+    assert (a_count, b_count) == (104, 104)
 
 
-def test_RandomTransform_edge():
-    # translateとrotateを無効にすればはみ出ないことの確認
+@pytest.mark.parametrize("resize", ["normal", "preserve_aspect"])
+def test_RandomTransform_crop1(resize):
+    # translateとrotateを無効にすれば出力にpaddingが含まれないことの確認 (normal, preserve_aspect)
     random.seed(1)
-    image = np.ones((32, 32, 3), dtype=np.uint8)
+    image = np.ones((32, 30, 3), dtype=np.uint8)
     aug = tk.image.RandomTransform(
-        size=(8, 8),
-        base_scale=4.0,
+        size=(8, 8),  # 40x40くらいに拡大して8x8でcrop
+        base_scale=5.0,
         border_mode="zero",
         rotate_prob=0.0,
         translate=(0.0, 0.0),
+        mode=resize,
     )
-    for _ in range(100):
+    for i in range(100):
         augmented_image = aug(image=image)["image"]
-        np.testing.assert_equal(augmented_image, np.ones_like(augmented_image))
+        assert (augmented_image == 1).all(), f"{i=} {augmented_image=}"
 
+
+@pytest.mark.parametrize("base_scale", [0.75, 1.0, 1.5])
+def test_RandomTransform_crop2(base_scale):
+    # translateとrotateを無効にすれば出力にpaddingが含まれないことの確認 (preserve_pixel)
+    random.seed(1)
+    image = np.ones((64, 60, 3), dtype=np.uint8)
     aug = tk.image.RandomTransform(
-        size=(64, 64),
-        base_scale=0.5,
+        size=(8, 8),  # 48～96四方くらい(変動あり)から8x8でcrop
+        base_scale=base_scale,
         border_mode="zero",
         rotate_prob=0.0,
         translate=(0.0, 0.0),
+        mode="preserve_pixel",
+    )
+    for i in range(100):
+        augmented_image = aug(image=image)["image"]
+        assert (augmented_image == 1).all(), f"{i=} {augmented_image=}"
+
+
+@pytest.mark.parametrize("resize", ["normal", "preserve_aspect"])
+def test_RandomTransform_pad1(resize):
+    # パディングされていることの確認 (normal, preserve_aspect)
+    random.seed(1)
+    image = np.ones((32, 30, 3), dtype=np.uint8)
+    aug = tk.image.RandomTransform(
+        size=(16, 16),  # 4x4くらいに縮小してpadding混みで出力
+        base_scale=0.25,
+        border_mode="zero",
+        translate=(0.0, 0.0),
+        mode=resize,
     )
     augmented_image = aug(image=image)["image"]
     assert not (augmented_image == 1).all()
+    assert (augmented_image == 1).any()
+    # 四辺は全てpaddingのはず
+    assert (augmented_image[:1, :, :] == 0).all()
+    assert (augmented_image[-1:, :, :] == 0).all()
+    assert (augmented_image[:, :1, :] == 0).all()
+    assert (augmented_image[:, -1:, :] == 0).all()
+
+
+@pytest.mark.parametrize("base_scale", [0.75, 1.0, 1.5])
+def test_RandomTransform_pad2(base_scale):
+    # パディングされていることの確認 (preserve_pixel)
+    random.seed(1)
+    image = np.ones((32, 30, 3), dtype=np.uint8)
+    aug = tk.image.RandomTransform(
+        size=(100, 100),  # 24～48四方くらい(変動あり)から100px四方にパディング
+        base_scale=base_scale,
+        border_mode="zero",
+        translate=(0.0, 0.0),
+        mode="preserve_pixel",
+    )
+    augmented_image = aug(image=image)["image"]
+    assert not (augmented_image == 1).all()
+    assert (augmented_image == 1).any()
+    # 四辺は全てpaddingのはず
+    edge_l = (augmented_image[:1, :, :] == 0).all()
+    edge_r = (augmented_image[-1:, :, :] == 0).all()
+    edge_t = (augmented_image[:, :1, :] == 0).all()
+    edge_b = (augmented_image[:, -1:, :] == 0).all()
+    assert edge_l or edge_r
+    assert edge_t or edge_b

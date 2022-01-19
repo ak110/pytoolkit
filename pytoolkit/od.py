@@ -508,13 +508,13 @@ def plot_objects(
         conf_threshold: この値以上のオブジェクトのみ描画する
 
     """
-    confs_ = [None] * len(bboxes) if confs is None else confs
-    classes_ = [None] * len(bboxes) if classes is None else classes
-    assert len(confs_) == len(bboxes)
-    assert len(classes_) == len(bboxes)
+    confs = [None] * len(bboxes) if confs is None else confs
+    classes = [None] * len(bboxes) if classes is None else classes
+    assert len(confs) == len(bboxes)
+    assert len(classes) == len(bboxes)
     if class_names is not None and classes is not None:
-        assert 0 <= np.min(classes_, initial=0) < len(class_names)
-        assert 0 <= np.max(classes_, initial=0) < len(class_names)
+        assert 0 <= np.min(classes, initial=0) < len(class_names)
+        assert 0 <= np.max(classes, initial=0) < len(class_names)
 
     img = tk.ndimage.load(base_image, grayscale=False)
     if max_long_side is not None and max(*img.shape[:2]) > max_long_side:
@@ -532,7 +532,10 @@ def plot_objects(
     )
     colors = np.squeeze(colors, axis=1)  # (num_classes, 1, 3) → (num_classes, 3)
 
-    for clazz, conf, bbox in zip(classes_, confs_, bboxes):
+    # 確信度の昇順に描画 (確信度が高いほど手前に出るように)
+    for clazz, conf, bbox in sorted(
+        zip(classes, confs, bboxes), key=lambda x: x[1] if x[1] is not None else 0
+    ):
         if conf is not None and conf < conf_threshold:
             continue  # skip
         if bbox[2] <= bbox[0] or bbox[3] <= bbox[1]:

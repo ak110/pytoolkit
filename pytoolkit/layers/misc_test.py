@@ -5,43 +5,6 @@ import tensorflow as tf
 import pytoolkit as tk
 
 
-@pytest.mark.parametrize("color", ["rgb", "lab", "hsv", "yuv", "ycbcr", "hed", "yiq"])
-def test_ConvertColor(color):
-    import skimage.color
-
-    if color == "hed":
-        from distutils.version import LooseVersion
-
-        if LooseVersion(skimage.__version__) < LooseVersion("0.18.0"):
-            pytest.xfail("scikit-image too old.")
-
-    rgb = np.array(
-        [
-            [[0, 0, 0], [128, 128, 128], [255, 255, 255]],
-            [[192, 0, 0], [0, 192, 0], [0, 0, 192]],
-            [[64, 64, 0], [0, 64, 64], [64, 0, 64]],
-        ],
-        dtype=np.uint8,
-    )
-
-    expected = {
-        "rgb": lambda rgb: rgb / 127.5 - 1,
-        "lab": lambda rgb: skimage.color.rgb2lab(rgb) / 100,
-        "hsv": skimage.color.rgb2hsv,
-        "yuv": skimage.color.rgb2yuv,
-        "ycbcr": lambda rgb: skimage.color.rgb2ycbcr(rgb) / 255,
-        "hed": skimage.color.rgb2hed,
-        "yiq": skimage.color.rgb2yiq,
-    }[color](rgb)
-
-    layer = tk.layers.ConvertColor(f"rgb_to_{color}")
-    actual = layer(tf.constant(np.expand_dims(rgb.astype(np.float32), 0))).numpy()[0]
-
-    assert actual.dtype == np.float32
-    assert actual.shape == expected.shape
-    assert actual == pytest.approx(expected, abs=1e-3)
-
-
 def test_ChannelPair2D():
     _predict_layer(tk.layers.ChannelPair2D(), np.zeros((1, 8, 8, 3)))
 

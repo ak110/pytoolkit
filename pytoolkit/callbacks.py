@@ -109,11 +109,11 @@ class EpochLogger(tf.keras.callbacks.Callback):
 
     def on_train_begin(self, logs=None):
         del logs
-        self.train_start_time = time.time()
+        self.train_start_time = time.perf_counter()
 
     def on_epoch_begin(self, epoch, logs=None):
         del epoch, logs
-        self.epoch_start_time = time.time()
+        self.epoch_start_time = time.perf_counter()
 
     def on_epoch_end(self, epoch, logs=None):
         assert self.train_start_time is not None
@@ -127,7 +127,7 @@ class EpochLogger(tf.keras.callbacks.Callback):
             ).numpy()
         else:
             lr = tf.keras.backend.get_value(self.model.optimizer.learning_rate)
-        now = time.time()
+        now = time.perf_counter()
         elapsed_time = now - self.epoch_start_time
         time_per_epoch = (now - self.train_start_time) / (epoch + 1)
         eta = time_per_epoch * (self.params["epochs"] - epoch - 1)

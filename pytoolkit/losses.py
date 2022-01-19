@@ -348,8 +348,8 @@ def ciou(y_true, y_pred, epsilon=1e-7):
     rb_inter = tf.math.minimum(rb_true, rb_pred)
     lt_union = tf.math.minimum(lt_true, lt_pred)
     rb_union = tf.math.maximum(rb_true, rb_pred)
-    wh_true = tf.math.maximum(rb_true - lt_true, 0.0)
-    wh_pred = tf.math.maximum(rb_pred - lt_pred, 0.0)
+    wh_true = tf.math.maximum(rb_true - lt_true, 1e-10)  # atan2のnan対策で非0
+    wh_pred = tf.math.maximum(rb_pred - lt_pred, 1e-10)
     c_true = (lt_true + rb_true) / 2
     c_pred = (lt_pred + rb_pred) / 2
 
@@ -376,7 +376,6 @@ def ciou(y_true, y_pred, epsilon=1e-7):
         atan_true = tf.math.atan2(wh_true[..., 0], wh_true[..., 1])
         atan_pred = tf.math.atan2(wh_pred[..., 0], wh_pred[..., 1])
         v = (4 / np.pi ** 2) * (atan_true - atan_pred) ** 2
-        v = tf.stop_gradient(v)
 
     with tf.name_scope("tradeoff"):
         alpha = v / ((1 - iou) + v + epsilon)
