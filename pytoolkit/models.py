@@ -450,6 +450,7 @@ def predict(
         dataset = tk.hvd.split(iterator.dataset) if use_horovod else iterator.dataset
         ds, steps = iterator.data_loader.get_ds(dataset, without_label=True)
         logger.info(f"predict: {ds.element_spec} {steps=}")
+        values: ModelIOType | None = None
         if on_batch_fn is not None:
             gen = _predict_flow(
                 model=model,

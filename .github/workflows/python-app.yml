@@ -25,15 +25,5 @@ jobs:
         sudo apt-get install graphviz # for pyplot
         poetry install --no-interaction --extras "tests tensorflow-cpu"
 
-    - name: Test with pytest
-      run: poetry run pytest pytoolkit
-    - name: Lint with pylint
-      run: poetry run pylint --jobs=4 pytoolkit
-    - name: Lint with mypy
-      run: poetry run mypy pytoolkit
-    - name: Lint with flake8
-      run: poetry run flake8 pytoolkit
-    - name: Lint with isort
-      run: poetry run isort --check --settings-path=setup.cfg pytoolkit
-    - name: Lint with black
-      run: poetry run black --check .
+    - name: Test with pyfltr
+      run: poetry run pyfltr pytoolkit

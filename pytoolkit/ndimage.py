@@ -3,6 +3,8 @@
 uint8のRGBで0～255として扱うのを前提とする。
 あとグレースケールの場合もrows×cols×1の配列で扱う。
 """
+from __future__ import annotations
+
 import io
 import pathlib
 import random
@@ -17,8 +19,7 @@ import PIL.ImageOps
 
 
 def load(
-    path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path],
-    grayscale=False,
+    path_or_array: np.ndarray | io.IOBase | str | pathlib.Path, grayscale=False
 ) -> np.ndarray:
     """画像の読み込み。"""
     if isinstance(path_or_array, np.ndarray):
@@ -81,14 +82,15 @@ def _load_pil(path_or_array):
 
 
 def get_image_size(
-    path_or_array: typing.Union[np.ndarray, io.IOBase, str, pathlib.Path]
-) -> typing.Tuple[int, int]:
+    path_or_array: np.ndarray | io.IOBase | str | pathlib.Path,
+) -> tuple[int, int]:
     """画像サイズを取得する。(H, W)"""
     if isinstance(path_or_array, np.ndarray):
         # ndarrayならそのまま画像扱い
         img = path_or_array
         assert img.dtype == np.uint8, f"ndarray dtype error: {img.dtype}"
-        return img.shape[:2]
+        assert img.ndim >= 2
+        return typing.cast(typing.Tuple[int, int], img.shape[:2])
     else:
         suffix = (
             pathlib.Path(path_or_array).suffix.lower()
@@ -98,16 +100,15 @@ def get_image_size(
         if suffix in (".npy", ".npz"):
             # .npyなら読み込んでそのまま画像扱い
             img = _load_npy(path_or_array)
-            return img.shape[:2]
+            assert img.ndim >= 2
+            return typing.cast(typing.Tuple[int, int], img.shape[:2])
         else:
             # PILで画像サイズを取得
             pil_img = _load_pil(path_or_array)
             return pil_img.height, pil_img.width
 
 
-def save(
-    path: typing.Union[str, pathlib.Path], img: np.ndarray, jpeg_quality: int = None
-):
+def save(path: str | pathlib.Path, img: np.ndarray, jpeg_quality: int = None):
     """画像の保存。
 
     やや余計なお世話だけど0～255にクリッピング(飽和)してから保存する。
@@ -182,7 +183,7 @@ def rotate(
 
 def compute_rotate(
     width: int, height: int, degrees: float, expand: bool = False
-) -> typing.Tuple[np.ndarray, int, int]:
+) -> tuple[np.ndarray, int, int]:
     """回転の変換行列を作成して返す。
 
     Args:
@@ -449,7 +450,7 @@ def auto_contrast(rgb: np.ndarray, scale=255) -> np.ndarray:
 def posterize(rgb: np.ndarray, bits) -> np.ndarray:
     """ポスタリゼーション。"""
     assert bits in range(1, 8)
-    t = np.float32(2 ** bits / 255)
+    t = np.float32(2**bits / 255)
     return to_uint8(np.round(rgb.astype(np.float32) * t) / t)
 
 
@@ -658,7 +659,7 @@ def perspective_transform(
     return rgb
 
 
-def transform_points(points: np.ndarray, m: np.ndarray) -> np.ndarray:
+def transform_points(points, m) -> np.ndarray:
     """geometric_transformの座標変換。
 
     Args:
@@ -806,10 +807,10 @@ def mix_data(sample1, sample2, r: np.float32):
 
 
 def cut_mix(
-    sample1: typing.Tuple[np.ndarray, np.ndarray],
-    sample2: typing.Tuple[np.ndarray, np.ndarray],
+    sample1: tuple[np.ndarray, np.ndarray],
+    sample2: tuple[np.ndarray, np.ndarray],
     beta: float = 1.0,
-) -> typing.Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """CutMix。 <https://arxiv.org/abs/1905.04899>
 
     Args:
@@ -824,11 +825,11 @@ def cut_mix(
     image1, label1 = sample1
     image2, label2 = sample2
     assert image1.shape == image2.shape
-    lam = random.betavariate(beta, beta)
+    lam = np.float32(random.betavariate(beta, beta))
     H, W = image1.shape[:2]
     cut_rat = np.sqrt(1.0 - lam)
-    cut_w = np.int(W * cut_rat)
-    cut_h = np.int(H * cut_rat)
+    cut_w = np.int32(W * cut_rat)
+    cut_h = np.int32(H * cut_rat)
     cx = random.randrange(W)
     cy = random.randrange(H)
     bbx1 = np.clip(cx - cut_w // 2, 0, W)

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 import pytest
 
@@ -11,7 +13,9 @@ def test_predict(output_count, tmpdir):
     folds = [([0, 1], [2]), ([1, 2], [0]), ([2, 0], [1])]
 
     class TestModel(tk.pipeline.Model):
-        def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
+        def _predict(
+            self, dataset: tk.data.Dataset, fold: int
+        ) -> np.ndarray | list[np.ndarray]:
             if output_count == 1:
                 return dataset.data
             else:

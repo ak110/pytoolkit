@@ -160,10 +160,10 @@ class SubpixelConv2D(tf.keras.layers.Layer):
 
     def compute_output_shape(self, input_shape):
         assert len(input_shape) == 4
-        assert input_shape[-1] % (self.scale ** 2) == 0
+        assert input_shape[-1] % (self.scale**2) == 0
         h = None if input_shape[1] is None else input_shape[1] * self.scale
         w = None if input_shape[2] is None else input_shape[2] * self.scale
-        return input_shape[0], h, w, input_shape[3] // (self.scale ** 2)
+        return input_shape[0], h, w, input_shape[3] // (self.scale**2)
 
     def call(self, inputs, **kwargs):
         del kwargs
@@ -205,7 +205,7 @@ class BlurPooling2D(tf.keras.layers.Layer):
             pascals_tr[i, 1:] += pascals_tr[i - 1, :-1]
         filter1d = pascals_tr[self.taps - 1, :]
         filter2d = filter1d[np.newaxis, :] * filter1d[:, np.newaxis]
-        filter2d = filter2d * (self.taps ** 2 / filter2d.sum())
+        filter2d = filter2d * (self.taps**2 / filter2d.sum())
         kernel = np.tile(filter2d[:, :, np.newaxis, np.newaxis], (1, 1, in_filters, 1))
         self.kernel = tf.constant(kernel, dtype=tf.float32)
         super().build(input_shape)

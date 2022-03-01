@@ -125,6 +125,7 @@ def predict_oof(
         if oof is None:
             oof = np.zeros((len(feats_train),) + pred.shape[1:], dtype=pred.dtype)
         oof[val_indices] = pred
+    assert oof is not None
     return oof
 
 

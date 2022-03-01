@@ -99,7 +99,7 @@ def fbeta_score(y_true, y_pred, beta=1):
     t = K.sum(y_true, axis=axes)
     prec = tp / (p + K.epsilon())
     rec = tp / (t + K.epsilon())
-    return ((1 + beta ** 2) * prec * rec) / ((beta ** 2) * prec + rec + K.epsilon())
+    return ((1 + beta**2) * prec * rec) / ((beta**2) * prec + rec + K.epsilon())
 
 
 @tk.backend.name_scope

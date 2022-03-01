@@ -68,7 +68,7 @@ class BlendingModel(Model):
                 return {f"w{i}": w[i] for i in range(self.num_models)}
 
             def score_fn(params):
-                weights = np.array([params[f"w{i}"] for i in range(self.num_models)])
+                weights = [params[f"w{i}"] for i in range(self.num_models)]
                 y_pred = np.average(data, axis=1, weights=weights)
                 assert self.score_fn is not None
                 return self.score_fn(dataset.labels, y_pred)
@@ -77,9 +77,7 @@ class BlendingModel(Model):
                 params_fn, score_fn, direction=self.direction, n_trials=100, n_jobs=-1
             )
             best_params = tk.hpo.get_best_params(study, params_fn)
-            self.weights_ = np.array(
-                [best_params[f"w{i}"] for i in range(self.num_models)]
-            )
+            self.weights_ = [best_params[f"w{i}"] for i in range(self.num_models)]
 
     def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
         assert isinstance(dataset.data, np.ndarray)

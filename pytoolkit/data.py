@@ -47,10 +47,10 @@ class Dataset:
 
     data: DataType
     labels: LabelsType = None
-    groups: np.ndarray = None
-    weights: np.ndarray = None
-    ids: np.ndarray = None
-    init_score: np.ndarray = None
+    groups: np.ndarray | None = None
+    weights: np.ndarray | None = None
+    ids: np.ndarray | None = None
+    init_score: np.ndarray | None = None
     metadata: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self):
@@ -104,7 +104,7 @@ class Dataset:
             val_set = self.slice(val_indices)
             yield train_set, val_set
 
-    def slice(self, rindex: typing.Sequence[int]) -> Dataset:
+    def slice(self, rindex: typing.Sequence[int] | np.ndarray) -> Dataset:
         """スライスを作成して返す。
 
         Args:
@@ -143,7 +143,7 @@ class Dataset:
         )
 
     @classmethod
-    def concat(cls, dataset1, dataset2) -> Dataset:
+    def concat(cls, dataset1: Dataset, dataset2: Dataset) -> Dataset:
         """Dataset同士のconcat。"""
         return cls(
             data=cls.concat_field(dataset1.data, dataset2.data),
@@ -158,7 +158,7 @@ class Dataset:
         )
 
     @classmethod
-    def slice_field(cls, d, rindex: typing.Sequence[int]):
+    def slice_field(cls, d, rindex: typing.Sequence[int] | np.ndarray):
         """値のスライスを作成して返す。"""
         if d is None:
             return None

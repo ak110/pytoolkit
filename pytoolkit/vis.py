@@ -72,12 +72,12 @@ class GradCamVisualizer:
             (source_image.shape[1], source_image.shape[0]),
             interpolation=cv2_interp,
         )
-        mask = np.uint8(256 * mask)  # [0-255]
+        mask = (256 * mask).astype(np.uint8)  # [0-255]
 
         heatmap = cv2.applyColorMap(mask, cv2.COLORMAP_CIVIDIS)
         heatmap = heatmap[..., ::-1]  # BGR to RGB
 
-        result_image = np.uint8(heatmap * alpha + source_image * (1 - alpha))
+        result_image = (heatmap * alpha + source_image * (1 - alpha)).astype(np.uint8)
         return result_image
 
     def get_mask(self, model_inputs):

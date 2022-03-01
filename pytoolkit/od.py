@@ -33,9 +33,9 @@ class ObjectsAnnotation:
     height: int
     classes: np.ndarray
     bboxes: np.ndarray
-    difficults: np.ndarray = None
-    areas: np.ndarray = None
-    crowdeds: np.ndarray = None
+    difficults: np.ndarray | None = None
+    areas: np.ndarray | None = None
+    crowdeds: np.ndarray | None = None
 
     @staticmethod
     def create_dataset(
@@ -74,11 +74,11 @@ class ObjectsAnnotation:
         self.classes = np.asarray(classes, dtype=np.int32)
         self.bboxes = np.asarray(bboxes, dtype=np.float32)
         self.difficults = (
-            np.asarray(difficults, dtype=np.bool) if difficults is not None else None
+            np.asarray(difficults, dtype=np.bool_) if difficults is not None else None
         )
         self.areas = np.asarray(areas, dtype=np.float32) if areas is not None else None
         self.crowdeds = (
-            np.asarray(crowdeds, dtype=np.bool) if crowdeds is not None else None
+            np.asarray(crowdeds, dtype=np.bool_) if crowdeds is not None else None
         )
         self.__post_init__()
 
@@ -104,7 +104,7 @@ class ObjectsAnnotation:
         ).all(), f"Value error: {self.bboxes}"
         if self.difficults is not None:
             assert (
-                self.difficults.dtype == np.bool
+                self.difficults.dtype == np.bool_
             ), f"dtype error: {self.difficults.dtype}"
             assert self.difficults.shape == (
                 self.num_objects,
@@ -115,7 +115,9 @@ class ObjectsAnnotation:
                 self.num_objects,
             ), f"Shape error: {self.areas.shape=}"
         if self.crowdeds is not None:
-            assert self.crowdeds.dtype == np.bool, f"dtype error: {self.crowdeds.dtype}"
+            assert (
+                self.crowdeds.dtype == np.bool_
+            ), f"dtype error: {self.crowdeds.dtype}"
             assert self.crowdeds.shape == (
                 self.num_objects,
             ), f"Shape error: {self.crowdeds.shape=}"
@@ -346,7 +348,7 @@ def compute_scores(
         difficults = (
             yt.difficults
             if yt.difficults is not None
-            else np.zeros((yt.num_objects,), dtype=np.bool)
+            else np.zeros((yt.num_objects,), dtype=np.bool_)
         )
         for gt_class, gt_bbox, gt_difficult in zip(yt.classes, yt.bboxes, difficults):
             pred_mask = np.logical_and(pred_enabled, yp.classes == gt_class)
@@ -508,10 +510,10 @@ def plot_objects(
         conf_threshold: この値以上のオブジェクトのみ描画する
 
     """
-    confs = [None] * len(bboxes) if confs is None else confs
-    classes = [None] * len(bboxes) if classes is None else classes
-    assert len(confs) == len(bboxes)
-    assert len(classes) == len(bboxes)
+    confs_ = np.full(len(bboxes), None) if confs is None else confs
+    classes_ = np.full(len(bboxes), None) if classes is None else classes
+    assert len(confs_) == len(bboxes)
+    assert len(classes_) == len(bboxes)
     if class_names is not None and classes is not None:
         assert 0 <= np.min(classes, initial=0) < len(class_names)
         assert 0 <= np.max(classes, initial=0) < len(class_names)
@@ -520,7 +522,9 @@ def plot_objects(
     if max_long_side is not None and max(*img.shape[:2]) > max_long_side:
         r = max_long_side / max(*img.shape[:2])
         img = cv2.resize(
-            img, int(img.shape[1] * r, img.shape[0] * r), interpolation=cv2.INTER_AREA
+            img,
+            (int(img.shape[1] * r), int(img.shape[0] * r)),
+            interpolation=cv2.INTER_AREA,
         )
     if img.ndim == 2 or img.shape[-1] == 1:
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)

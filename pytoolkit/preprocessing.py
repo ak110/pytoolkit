@@ -237,7 +237,7 @@ class FeaturesEncoder(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin)
             feats = pd.DataFrame(index=X.index)
 
             if len(self.binary_cols_) > 0:
-                feats[self.binary_cols_] = X[self.binary_cols_].astype(np.bool)
+                feats[self.binary_cols_] = X[self.binary_cols_].astype(np.bool_)
 
             if len(self.numeric_cols_) > 0:
                 feats[self.numeric_cols_] = X[self.numeric_cols_].astype(np.float32)

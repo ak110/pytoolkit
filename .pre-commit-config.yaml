@@ -6,7 +6,7 @@ default_language_version:
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.0.1
+    rev: v4.1.0
     hooks:
       - id: check-added-large-files
       - id: check-case-conflict
@@ -21,35 +21,11 @@ repos:
       - id: name-tests-test
       - id: trailing-whitespace
 
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v2.24.0
-    hooks:
-      - id: pyupgrade
-        args: ['--py38-plus']
-
   - repo: local
     hooks:
       - id: system
-        name: isort
-        entry: poetry run isort --settings-path=setup.cfg
-        types: [python]
-        require_serial: true
-        language: system
-
-  - repo: local
-    hooks:
-      - id: system
-        name: black
-        entry: poetry run black
-        types: [python]
-        require_serial: true
-        language: system
-
-  - repo: local
-    hooks:
-      - id: system
-        name: flake8
-        entry: poetry run flake8
+        name: pyfltr
+        entry: poetry run pyfltr --commands=pyupgrade,isort,black,pflake8
         types: [python]
         require_serial: true
         language: system

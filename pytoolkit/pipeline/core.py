@@ -214,7 +214,9 @@ class Model:
         """
         raise NotImplementedError()
 
-    def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
+    def _predict(
+        self, dataset: tk.data.Dataset, fold: int
+    ) -> np.ndarray | list[np.ndarray]:
         """推論結果を返す。
 
         Args:

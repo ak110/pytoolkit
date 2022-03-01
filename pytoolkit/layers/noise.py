@@ -93,7 +93,7 @@ class DropBlock2D(tf.keras.layers.Layer):
             input_shape[2] * input_shape[1], tf.float32
         )
         gamma_d = tf.cast(
-            (self.block_size ** 2)
+            (self.block_size**2)
             * (
                 (input_shape[2] - self.block_size + 1)
                 * (input_shape[1] - self.block_size + 1)

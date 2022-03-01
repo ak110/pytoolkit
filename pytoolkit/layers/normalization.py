@@ -274,7 +274,7 @@ class RMSNormalization(tf.keras.layers.Layer):
     def call(self, inputs, **kwargs):
         del kwargs
 
-        ms = tf.math.reduce_mean(inputs ** 2, axis=self.axis, keepdims=True)
+        ms = tf.math.reduce_mean(inputs**2, axis=self.axis, keepdims=True)
         outputs = inputs * tf.math.rsqrt(ms + self.epsilon)
 
         broadcast_shape = (1,) * (K.ndim(inputs) - 1) + (-1,)

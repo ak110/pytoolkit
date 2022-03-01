@@ -43,8 +43,8 @@ class LGBModel(Model):
         verbose_eval: int = 100,
         callbacks: typing.Sequence[typing.Callable[[typing.Any], None]] = None,
         cv_params: dict[str, typing.Any] = None,
-        seeds: np.ndarray = None,
-        init_score: np.ndarray = None,
+        seeds: np.ndarray | None = None,
+        init_score: np.ndarray | None = None,
         preprocessors: tk.pipeline.EstimatorListType = None,
         postprocessors: tk.pipeline.EstimatorListType = None,
     ):
@@ -57,10 +57,11 @@ class LGBModel(Model):
         self.cv_params = cv_params
         self.seeds = seeds
         self.init_score = init_score
-        self.gbms_: np.ndarray = None
+        self.gbms_: np.ndarray | None = None
 
     def _save(self, models_dir: pathlib.Path):
-        seeds = [123] if self.seeds is None else self.seeds
+        assert self.gbms_ is not None
+        seeds = np.array([123]) if self.seeds is None else self.seeds
 
         models_dir = pathlib.Path(models_dir)
         models_dir.mkdir(parents=True, exist_ok=True)
@@ -77,7 +78,7 @@ class LGBModel(Model):
     def _load(self, models_dir: pathlib.Path):
         import lightgbm as lgb
 
-        seeds = [123] if self.seeds is None else self.seeds
+        seeds = np.array([123]) if self.seeds is None else self.seeds
         self.gbms_ = np.array(
             [
                 [
@@ -132,7 +133,7 @@ class LGBModel(Model):
             free_raw_data=False,
         )
 
-        seeds = [123] if self.seeds is None else self.seeds
+        seeds = np.array([123]) if self.seeds is None else self.seeds
 
         scores: dict[str, list[float]] = {}
         self.gbms_ = np.empty((len(folds), len(seeds)), dtype=object)

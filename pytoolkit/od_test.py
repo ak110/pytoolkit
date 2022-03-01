@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 import pytest
 
@@ -74,66 +76,60 @@ def test_is_in_box():
 
 
 def test_od_accuracy():
-    y_true = np.tile(
-        np.array(
-            [
-                tk.od.ObjectsAnnotation(
-                    path=".",
-                    width=100,
-                    height=100,
-                    classes=[0, 1],
-                    bboxes=[[0.00, 0.00, 0.05, 0.05], [0.25, 0.25, 0.75, 0.75]],
-                )
-            ]
+    y_true = [
+        tk.od.ObjectsAnnotation(
+            path=".",
+            width=100,
+            height=100,
+            classes=[0, 1],
+            bboxes=[[0.00, 0.00, 0.05, 0.05], [0.25, 0.25, 0.75, 0.75]],
+        )
+        for _ in range(6)
+    ]
+    y_pred = [
+        # 一致
+        tk.od.ObjectsPrediction(
+            classes=[1, 0],
+            confs=[1, 1],
+            bboxes=[[0.25, 0.25, 0.75, 0.75], [0.00, 0.00, 0.05, 0.05]],
         ),
-        6,
-    )
-    y_pred = np.array(
-        [
-            # 一致
-            tk.od.ObjectsPrediction(
-                classes=[1, 0],
-                confs=[1, 1],
-                bboxes=[[0.25, 0.25, 0.75, 0.75], [0.00, 0.00, 0.05, 0.05]],
-            ),
-            # conf低
-            tk.od.ObjectsPrediction(
-                classes=[1, 0, 0],
-                confs=[1, 0, 1],
-                bboxes=[
-                    [0.25, 0.25, 0.75, 0.75],
-                    [0.00, 0.00, 0.05, 0.05],
-                    [0.00, 0.00, 0.05, 0.05],
-                ],
-            ),
-            # クラス違い
-            tk.od.ObjectsPrediction(
-                classes=[1, 1],
-                confs=[1, 1],
-                bboxes=[[0.25, 0.25, 0.75, 0.75], [0.00, 0.00, 0.05, 0.05]],
-            ),
-            # 重複
-            tk.od.ObjectsPrediction(
-                classes=[1, 0, 0],
-                confs=[1, 1, 1],
-                bboxes=[
-                    [0.25, 0.25, 0.75, 0.75],
-                    [0.00, 0.00, 0.05, 0.05],
-                    [0.00, 0.00, 0.05, 0.05],
-                ],
-            ),
-            # 不足
-            tk.od.ObjectsPrediction(
-                classes=[1], confs=[1], bboxes=[[0.25, 0.25, 0.75, 0.75]]
-            ),
-            # IoU低
-            tk.od.ObjectsPrediction(
-                classes=[1, 0],
-                confs=[1, 1],
-                bboxes=[[0.25, 0.25, 0.75, 0.75], [0.90, 0.90, 0.95, 0.95]],
-            ),
-        ]
-    )
+        # conf低
+        tk.od.ObjectsPrediction(
+            classes=[1, 0, 0],
+            confs=[1, 0, 1],
+            bboxes=[
+                [0.25, 0.25, 0.75, 0.75],
+                [0.00, 0.00, 0.05, 0.05],
+                [0.00, 0.00, 0.05, 0.05],
+            ],
+        ),
+        # クラス違い
+        tk.od.ObjectsPrediction(
+            classes=[1, 1],
+            confs=[1, 1],
+            bboxes=[[0.25, 0.25, 0.75, 0.75], [0.00, 0.00, 0.05, 0.05]],
+        ),
+        # 重複
+        tk.od.ObjectsPrediction(
+            classes=[1, 0, 0],
+            confs=[1, 1, 1],
+            bboxes=[
+                [0.25, 0.25, 0.75, 0.75],
+                [0.00, 0.00, 0.05, 0.05],
+                [0.00, 0.00, 0.05, 0.05],
+            ],
+        ),
+        # 不足
+        tk.od.ObjectsPrediction(
+            classes=[1], confs=[1], bboxes=[[0.25, 0.25, 0.75, 0.75]]
+        ),
+        # IoU低
+        tk.od.ObjectsPrediction(
+            classes=[1, 0],
+            confs=[1, 1],
+            bboxes=[[0.25, 0.25, 0.75, 0.75], [0.90, 0.90, 0.95, 0.95]],
+        ),
+    ]
     is_match_expected = [True, True, False, False, False, False]
     for yt, yp, m in zip(y_true, y_pred, is_match_expected):
         assert yp.is_match(yt.classes, yt.bboxes, conf_threshold=0.5) == m
@@ -141,37 +137,33 @@ def test_od_accuracy():
 
 
 def test_confusion_matrix():
-    y_true = np.array([])
-    y_pred = np.array([])
+    y_true: list[tk.od.ObjectsAnnotation] = []
+    y_pred: list[tk.od.ObjectsPrediction] = []
     cm_actual = tk.od.confusion_matrix(y_true, y_pred, num_classes=3)
     assert (cm_actual == np.zeros((4, 4), dtype=np.int32)).all()
 
-    y_true = np.array(
-        [
-            tk.od.ObjectsAnnotation(
-                path=".",
-                width=100,
-                height=100,
-                classes=[1],
-                bboxes=[[0.25, 0.25, 0.75, 0.75]],
-            )
-        ]
-    )
-    y_pred = np.array(
-        [
-            tk.od.ObjectsPrediction(
-                classes=[0, 2, 1, 1, 2],
-                confs=[0, 1, 1, 1, 1],
-                bboxes=[
-                    [0.25, 0.25, 0.75, 0.75],  # conf低
-                    [0.25, 0.25, 0.75, 0.75],  # クラス違い
-                    [0.25, 0.25, 0.75, 0.75],  # 検知
-                    [0.25, 0.25, 0.75, 0.75],  # 重複
-                    [0.95, 0.95, 0.99, 0.99],  # IoU低
-                ],
-            )
-        ]
-    )
+    y_true = [
+        tk.od.ObjectsAnnotation(
+            path=".",
+            width=100,
+            height=100,
+            classes=[1],
+            bboxes=[[0.25, 0.25, 0.75, 0.75]],
+        )
+    ]
+    y_pred = [
+        tk.od.ObjectsPrediction(
+            classes=[0, 2, 1, 1, 2],
+            confs=[0, 1, 1, 1, 1],
+            bboxes=[
+                [0.25, 0.25, 0.75, 0.75],  # conf低
+                [0.25, 0.25, 0.75, 0.75],  # クラス違い
+                [0.25, 0.25, 0.75, 0.75],  # 検知
+                [0.25, 0.25, 0.75, 0.75],  # 重複
+                [0.95, 0.95, 0.99, 0.99],  # IoU低
+            ],
+        )
+    ]
     cm_actual = tk.od.confusion_matrix(
         y_true, y_pred, conf_threshold=0.5, num_classes=3
     )

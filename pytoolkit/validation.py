@@ -9,7 +9,12 @@ import sklearn.model_selection
 
 import pytoolkit as tk
 
-FoldsType = typing.Sequence[typing.Tuple[np.ndarray, np.ndarray]]
+FoldsType = typing.Sequence[
+    typing.Tuple[
+        typing.Union[typing.Sequence[int], np.ndarray],
+        typing.Union[typing.Sequence[int], np.ndarray],
+    ]
+]
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +23,7 @@ def split(
     dataset: tk.data.Dataset,
     nfold: int,
     split_seed: int | None = 1,
-    stratify: bool | np.ndarray = None,
+    stratify: bool | np.ndarray | None = None,
 ) -> FoldsType:
     """nfold CV。
 
@@ -42,7 +47,7 @@ def split(
         if groups.dtype == object:
             # 文字列の場合、in1dが重いようなので連番を振る
             groups_map = {g: i for i, g in enumerate(np.unique(groups))}
-            assert len(groups_map) < 2 ** 31
+            assert len(groups_map) < 2**31
             groups = np.frompyfunc(groups_map.__getitem__, nin=1, nout=1)(
                 groups
             ).astype(np.int32)

@@ -8,7 +8,7 @@ import albumentations as A
 import cv2
 import numpy as np
 import PIL.Image
-import scipy.ndimage
+import scipy.ndimage.filters
 import tensorflow as tf
 
 import pytoolkit as tk
@@ -608,8 +608,8 @@ class PerlinNoise(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         else:
             freq_h = frequency * rar
             freq_v = frequency * shape[0] / shape[1] / rar
-        grad_size_h = int(freq_h * lacunarity ** octaves + 1)
-        grad_size_v = int(freq_v * lacunarity ** octaves + 1)
+        grad_size_h = int(freq_h * lacunarity**octaves + 1)
+        grad_size_v = int(freq_v * lacunarity**octaves + 1)
         gradient = random_state.uniform(-1, +1, size=(grad_size_h, grad_size_v, 2))
 
         img = np.zeros(shape, dtype=np.float32)
@@ -674,7 +674,7 @@ class PerlinNoise(A.ImageOnlyTransform):  # pylint: disable=abstract-method
             "frequency": random.uniform(*self.frequency),
             "octaves": random.randint(*self.octaves),
             "ar": np.exp(random.uniform(np.log(self.ar[0]), np.log(self.ar[1]))),
-            "seed": random.randint(0, 2 ** 32 - 1),
+            "seed": random.randint(0, 2**32 - 1),
         }
 
     def get_transform_init_args_names(self):
@@ -1166,7 +1166,7 @@ class SpeckleNoise(A.ImageOnlyTransform):  # pylint: disable=abstract-method
         # pylint: disable=arguments-differ
         rand = np.random.RandomState(random.getrandbits(32))
         noise = rand.randn(*img.shape) * scale
-        noise = scipy.ndimage.gaussian_filter(noise, 1)
+        noise = scipy.ndimage.filters.gaussian_filter(noise, 1)
         return np.uint8(np.clip(img + noise, 0, 255))
 
     def get_params(self):

@@ -52,7 +52,7 @@ def make_target_encoding_map(
     smoove = 1 / (1 + np.exp(-(c - min_samples_leaf) / smoothing))
     smoothed = prior * (1 - smoove) + s.values * smoove
     smoothed[c <= min_samples_leaf] = prior
-    d = dict(zip(s.index.values, np.float32(smoothed)))
+    d = dict(zip(s.index.values, smoothed.astype(np.float32)))
     return d
 
 
@@ -489,7 +489,7 @@ def latlon_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float
 def reduce_mem_usage(df: pd.DataFrame) -> pd.DataFrame:
     """Kaggleで有名な(?)処理。"""
     numerics = ["int16", "int32", "int64", "float32", "float64"]
-    start_mem = df.memory_usage().sum() / 1024 ** 2
+    start_mem = df.memory_usage().sum() / 1024**2
     for col in df.columns:
         col_type = df[col].dtypes
         if col_type in numerics:
@@ -517,7 +517,7 @@ def reduce_mem_usage(df: pd.DataFrame) -> pd.DataFrame:
                     df[col] = df[col].astype(np.float32)
                 else:
                     df[col] = df[col].astype(np.float64)
-    end_mem = df.memory_usage().sum() / 1024 ** 2
+    end_mem = df.memory_usage().sum() / 1024**2
     logger.info(
         f"Mem. usage decreased to {end_mem:5.2f} Mb ({(start_mem - end_mem) / start_mem:.1%} reduction)"
     )

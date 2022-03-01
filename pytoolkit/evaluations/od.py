@@ -120,8 +120,10 @@ def _evaluate_coco(
     pr_anns: list[dict] = []
     for i, (y1, y2) in enumerate(zip(y_true, y_pred)):
         img_id = i + 1
-        areas = y1.areas if y1.areas is not None else [None] * y1.num_objects
-        crowdeds = y1.crowdeds if y1.crowdeds is not None else [None] * y1.num_objects
+        areas = y1.areas if y1.areas is not None else np.full(y1.num_objects, None)
+        crowdeds = (
+            y1.crowdeds if y1.crowdeds is not None else np.full(y1.num_objects, None)
+        )
         for bbox, class_id, area, crowded in zip(
             y1.real_bboxes, y1.classes, areas, crowdeds
         ):
