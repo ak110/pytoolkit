@@ -16,6 +16,7 @@ def test_predict(output_count, tmpdir):
         def _predict(
             self, dataset: tk.data.Dataset, fold: int
         ) -> np.ndarray | list[np.ndarray]:
+            assert isinstance(dataset.data, np.ndarray)
             if output_count == 1:
                 return dataset.data
             else:
@@ -26,23 +27,24 @@ def test_predict(output_count, tmpdir):
     # predict_all
     result = model.predict_all(dataset)
     assert len(result) == len(folds)
+    assert isinstance(dataset.data, np.ndarray)
     if output_count == 1:
-        assert (result[0] == dataset.data).all()
-        assert (result[1] == dataset.data).all()
-        assert (result[2] == dataset.data).all()
+        assert np.any(result[0] == dataset.data)
+        assert np.any(result[1] == dataset.data)
+        assert np.any(result[2] == dataset.data)
     else:
-        assert (result[0][0] == dataset.data).all()
-        assert (result[1][0] == dataset.data).all()
-        assert (result[2][0] == dataset.data).all()
-        assert (result[0][1] == np.array([0, 0, 0])).all()
-        assert (result[1][1] == np.array([1, 1, 1])).all()
-        assert (result[2][1] == np.array([2, 2, 2])).all()
+        assert np.any(result[0][0] == dataset.data)
+        assert np.any(result[1][0] == dataset.data)
+        assert np.any(result[2][0] == dataset.data)
+        assert np.any(result[0][1] == np.array([0, 0, 0]))
+        assert np.any(result[1][1] == np.array([1, 1, 1]))
+        assert np.any(result[2][1] == np.array([2, 2, 2]))
 
     # predict_oof
     result = model.predict_oof(dataset, folds)
     if output_count == 1:
-        assert (result == dataset.data).all()
+        assert np.any(result == dataset.data)
     else:
         assert len(result) == 2
-        assert (result[0] == dataset.data).all()
-        assert (result[1] == np.array([1, 2, 0])).all()
+        assert np.any(result[0] == dataset.data)
+        assert np.any(result[1] == np.array([1, 2, 0]))

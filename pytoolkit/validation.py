@@ -24,7 +24,7 @@ def split(
     nfold: int,
     split_seed: int | None = 1,
     stratify: bool | np.ndarray | None = None,
-) -> FoldsType:
+) -> list[tuple[np.ndarray, np.ndarray]]:
     """nfold CV。
 
     Args:
@@ -55,14 +55,13 @@ def split(
         cv = sklearn.model_selection.KFold(
             n_splits=nfold, shuffle=shuffle, random_state=split_seed
         )
-        folds = []
-        for train_indices, val_indices in cv.split(g, g):
-            folds.append(
-                (
-                    np.where(np.in1d(groups, g[train_indices]))[0],
-                    np.where(np.in1d(groups, g[val_indices]))[0],
-                )
+        folds = [
+            (
+                np.where(np.in1d(groups, g[train_indices]))[0],
+                np.where(np.in1d(groups, g[val_indices]))[0],
             )
+            for train_indices, val_indices in cv.split(g, g)
+        ]
     else:
         if stratify is None:
             stratify = (

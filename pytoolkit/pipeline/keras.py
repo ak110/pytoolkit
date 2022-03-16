@@ -272,7 +272,9 @@ class KerasModel(Model):
         evals = tk.evaluations.mean(evals_list, weights=evals_weights)
         logger.info(f"cv: {tk.evaluations.to_str(evals)}")
 
-    def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
+    def _predict(
+        self, dataset: tk.data.Dataset, fold: int
+    ) -> np.ndarray | list[np.ndarray]:
         pred = tk.models.predict(
             self.pred_models[fold],
             self.val_data_loader.load(dataset),
@@ -476,6 +478,7 @@ class KerasModel(Model):
             metricsの文字列と値のdict
 
         """
+        assert dataset.labels is not None
         if self.score_fn is None:
             evals = self._model_evaluate(dataset, fold)
         else:

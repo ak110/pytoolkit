@@ -23,8 +23,9 @@ import pytoolkit as tk
 ModelIOType = typing.Union[
     np.ndarray, typing.List[np.ndarray], typing.Dict[str, np.ndarray]
 ]
+ModelOType = typing.Union[np.ndarray, typing.List[np.ndarray]]
 # predictで使う型
-OnBatchFnType = typing.Callable[[tf.keras.models.Model, ModelIOType], ModelIOType]
+OnBatchFnType = typing.Callable[[tf.keras.models.Model, ModelIOType], ModelOType]
 # compileで使う型
 OptimizerType = typing.Union[str, tf.keras.optimizers.Optimizer]
 LossType = typing.Union[
@@ -427,7 +428,7 @@ def predict(
     callbacks: list[tf.keras.callbacks.Callback] = None,
     verbose: int = 1,
     on_batch_fn: OnBatchFnType = None,
-) -> ModelIOType:
+) -> ModelOType:
     """推論。
 
     Args:
@@ -450,7 +451,7 @@ def predict(
         dataset = tk.hvd.split(iterator.dataset) if use_horovod else iterator.dataset
         ds, steps = iterator.data_loader.get_ds(dataset, without_label=True)
         logger.info(f"predict: {ds.element_spec} {steps=}")
-        values: ModelIOType | None = None
+        values: ModelOType | None = None
         if on_batch_fn is not None:
             gen = _predict_flow(
                 model=model,
@@ -484,7 +485,7 @@ def predict_flow(
     verbose: int = 1,
     on_batch_fn: OnBatchFnType = None,
     desc: str = "predict",
-) -> typing.Iterator[ModelIOType]:
+) -> typing.Iterator[ModelOType]:
     """推論。
 
     Args:

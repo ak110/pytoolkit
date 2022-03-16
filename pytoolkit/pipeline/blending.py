@@ -71,6 +71,7 @@ class BlendingModel(Model):
                 weights = [params[f"w{i}"] for i in range(self.num_models)]
                 y_pred = np.average(data, axis=1, weights=weights)
                 assert self.score_fn is not None
+                assert dataset.labels is not None
                 return self.score_fn(dataset.labels, y_pred)
 
             study = tk.hpo.optimize(

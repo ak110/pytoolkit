@@ -46,7 +46,7 @@ class Dataset:
     """
 
     data: DataType
-    labels: LabelsType = None
+    labels: LabelsType | None = None
     groups: np.ndarray | None = None
     weights: np.ndarray | None = None
     ids: np.ndarray | None = None

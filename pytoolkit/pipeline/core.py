@@ -119,7 +119,7 @@ class Model:
 
     def predict_oof(
         self, dataset: tk.data.Dataset, folds: tk.validation.FoldsType
-    ) -> np.ndarray:
+    ) -> np.ndarray | list[np.ndarray]:
         """out-of-foldなpredict結果を返す。
 
         Args:
@@ -137,7 +137,7 @@ class Model:
         assert len(pred_list) == len(folds)
 
         if isinstance(pred_list[0], list):  # multiple output
-            oofp = [
+            oofp: np.ndarray | list[np.ndarray] = [
                 self._get_oofp(dataset, folds, [p[i] for p in pred_list])
                 for i in range(len(pred_list[0]))
             ]
@@ -145,18 +145,22 @@ class Model:
             oofp = self._get_oofp(dataset, folds, pred_list)
         return oofp
 
-    def _get_oofp(self, dataset, folds, pred_list):
+    def _get_oofp(self, dataset, folds, pred_list) -> np.ndarray:
         oofp_shape = (len(dataset),) + pred_list[0].shape[1:]
         oofp = np.empty(oofp_shape, dtype=pred_list[0].dtype)
         for pred, (_, val_indices) in zip(pred_list, folds):
             oofp[val_indices] = pred
         return oofp
 
-    def predict_all(self, dataset: tk.data.Dataset) -> list[np.ndarray]:
+    def predict_all(
+        self, dataset: tk.data.Dataset
+    ) -> list[np.ndarray | list[np.ndarray]]:
         """全fold分の推論結果をリストで返す。"""
         return [self.predict(dataset, fold) for fold in range(self.nfold)]
 
-    def predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
+    def predict(
+        self, dataset: tk.data.Dataset, fold: int
+    ) -> np.ndarray | list[np.ndarray]:
         """推論結果を返す。
 
         Args:

@@ -510,10 +510,10 @@ def plot_objects(
         conf_threshold: この値以上のオブジェクトのみ描画する
 
     """
-    confs_ = np.full(len(bboxes), None) if confs is None else confs
-    classes_ = np.full(len(bboxes), None) if classes is None else classes
-    assert len(confs_) == len(bboxes)
-    assert len(classes_) == len(bboxes)
+    confs = np.full(len(bboxes), None) if confs is None else confs
+    classes = np.full(len(bboxes), None) if classes is None else classes
+    assert len(confs) == len(bboxes)
+    assert len(classes) == len(bboxes)
     if class_names is not None and classes is not None:
         assert 0 <= np.min(classes, initial=0) < len(class_names)
         assert 0 <= np.max(classes, initial=0) < len(class_names)

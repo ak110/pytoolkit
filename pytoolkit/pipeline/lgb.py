@@ -154,7 +154,7 @@ class LGBModel(Model):
                 logger.info(f"best iteration: {model_extractor.best_iteration}")
                 for k in eval_hist:
                     if k.endswith("-mean"):
-                        name, score = k[:-5], np.float32(eval_hist[k][-1])
+                        name, score = k[:-5], float(eval_hist[k][-1])
                         if name not in scores:
                             scores[name] = []
                         scores[name].append(score)
@@ -169,7 +169,9 @@ class LGBModel(Model):
         for k, v in scores.items():
             logger.info(f"cv(mean) {k}: {v:,.3f}")
 
-    def _predict(self, dataset: tk.data.Dataset, fold: int) -> np.ndarray:
+    def _predict(
+        self, dataset: tk.data.Dataset, fold: int
+    ) -> np.ndarray | list[np.ndarray]:
         assert self.gbms_ is not None
 
         def _get_data(gbm):
