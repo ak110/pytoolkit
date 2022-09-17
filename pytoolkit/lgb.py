@@ -59,7 +59,7 @@ def cv(
     )
 
     # ログ出力
-    cvbooster = cv_result["cvbooster"]
+    cvbooster = typing.cast(lgb.CVBooster, cv_result["cvbooster"])
     logger.info(f"lgb: best_iteration={cvbooster.best_iteration}")
     for k in cv_result:
         if k != "cvbooster":
@@ -80,10 +80,9 @@ def cv(
         if isinstance(feats_train, pd.DataFrame)
         else [f"feature_{i}" for i in range(feats_train.shape[1])]
     )
-    fi = np.zeros(
-        (len(columns),), dtype=np.int32 if importance_type == "split" else np.float32
-    )
-    for gbm in cvbooster.boosters:
+    t = np.int32 if importance_type == "split" else np.float32
+    fi: typing.Any = np.zeros((len(columns),), dtype=t)
+    for gbm in typing.cast(typing.List[lgb.Booster], cvbooster.boosters):
         fi += gbm.feature_importance(importance_type=importance_type)
     df = pd.DataFrame(data={"importance": fi}, index=columns)
     df = df.sort_values(by="importance", ascending=False)

@@ -456,7 +456,7 @@ def shuffled_score(
             data = random_state.permutation(original.values)
             X[c] = pd.Series(data=data, dtype=original.dtype)
             scores.append(score_fn(X, y))
-    return np.mean(scores)
+    return np.mean(scores).tolist()
 
 
 def latlon_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:

@@ -33,6 +33,4 @@ def nvidia_smi(*args):
     if not path.is_file():
         path = pathlib.Path("nvidia-smi")
     command = [str(path)] + list(args)
-    return subprocess.check_output(
-        command, stderr=subprocess.STDOUT, universal_newlines=True
-    )
+    return subprocess.check_output(command, stderr=subprocess.STDOUT, text=True)

@@ -222,26 +222,50 @@ def pad(rgb: np.ndarray, width: int, height: int, padding="edge") -> np.ndarray:
     return rgb
 
 
-def pad_ltrb(rgb: np.ndarray, x1: int, y1: int, x2: int, y2: int, padding="edge"):
+def pad_ltrb(
+    rgb: np.ndarray,
+    x1: int,
+    y1: int,
+    x2: int,
+    y2: int,
+    padding: typing.Literal[
+        "edge", "zero", "half", "one", "reflect", "wrap", "mean"
+    ] = "edge",
+):
     """パディング。x1/y1/x2/y2は左/上/右/下のパディング量。"""
     assert x1 >= 0 and y1 >= 0 and x2 >= 0 and y2 >= 0
     assert padding in ("edge", "zero", "half", "one", "reflect", "wrap", "mean")
-    kwargs = {}
+    mode: typing.Literal[
+        "constant",
+        "edge",
+        "linear_ramp",
+        "maximum",
+        "mean",
+        "median",
+        "minimum",
+        "reflect",
+        "symmetric",
+        "wrap",
+        "empty",
+    ]
+    constant_values: typing.Any = None
     if padding == "zero":
         mode = "constant"
     elif padding == "half":
         mode = "constant"
-        kwargs["constant_values"] = (np.uint8(127),)
+        constant_values = (np.uint8(127),)
     elif padding == "one":
         mode = "constant"
-        kwargs["constant_values"] = (np.uint8(255),)
+        constant_values = (np.uint8(255),)
     elif padding == "mean":
         mode = "constant"
-        kwargs["constant_values"] = (np.uint8(rgb.mean()),)
+        constant_values = (np.uint8(rgb.mean()),)
     else:
         mode = padding
 
-    rgb = np.pad(rgb, ((y1, y2), (x1, x2), (0, 0)), mode=mode, **kwargs)
+    rgb = np.pad(
+        rgb, ((y1, y2), (x1, x2), (0, 0)), mode=mode, constant_values=constant_values
+    )
     return rgb
 
 
@@ -826,16 +850,17 @@ def cut_mix(
     image2, label2 = sample2
     assert image1.shape == image2.shape
     lam = np.float32(random.betavariate(beta, beta))
-    H, W = image1.shape[:2]
+    H = int(image1.shape[0])
+    W = int(image1.shape[1])
     cut_rat = np.sqrt(1.0 - lam)
     cut_w = np.int32(W * cut_rat)
     cut_h = np.int32(H * cut_rat)
     cx = random.randrange(W)
     cy = random.randrange(H)
-    bbx1 = np.clip(cx - cut_w // 2, 0, W)
-    bby1 = np.clip(cy - cut_h // 2, 0, H)
-    bbx2 = np.clip(cx + cut_w // 2, 0, W)
-    bby2 = np.clip(cy + cut_h // 2, 0, H)
+    bbx1 = np.clip(cx - cut_w // 2, 0, W).tolist()
+    bby1 = np.clip(cy - cut_h // 2, 0, H).tolist()
+    bbx2 = np.clip(cx + cut_w // 2, 0, W).tolist()
+    bby2 = np.clip(cy + cut_h // 2, 0, H).tolist()
     image = np.copy(image1)  # 念のためコピー
     image[bby1:bby2, bbx1:bbx2, :] = image2[bby1:bby2, bbx1:bbx2, :]
     label = mix_data(label1, label2, lam)

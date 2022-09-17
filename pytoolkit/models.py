@@ -603,7 +603,19 @@ def predict_on_batch_augmented(
     flip: tuple[bool, bool] = (False, True),
     crop_size: tuple[int, int] = (3, 3),
     padding_size: tuple[int, int] = (32, 32),
-    padding_mode: str = "edge",
+    padding_mode: typing.Literal[
+        "constant",
+        "edge",
+        "linear_ramp",
+        "maximum",
+        "mean",
+        "median",
+        "minimum",
+        "reflect",
+        "symmetric",
+        "wrap",
+        "empty",
+    ] = "edge",
 ) -> np.ndarray | list[np.ndarray]:
     """ミニバッチ1個分の推論処理＆TTA。
 

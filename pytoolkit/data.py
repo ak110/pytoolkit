@@ -208,7 +208,7 @@ def split(dataset: Dataset, count: int, shuffle=False):
     dataset_size = len(dataset)
     sub_size = -(-dataset_size // count)  # 端数切り上げ
     assert sub_size > 0
-    indices = np.arange(dataset_size)
+    indices = np.arange(dataset_size).tolist()
     if shuffle:
         random.shuffle(indices)
     return [

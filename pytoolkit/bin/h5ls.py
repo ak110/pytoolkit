@@ -28,7 +28,7 @@ def main():
     with h5py.File(args.model_path, mode="r") as f:
         model_weights = f["model_weights"]
         layer_names = model_weights.attrs["layer_names"]
-        for layer_name in layer_names:
+        for layer_name in layer_names:  # pylint: disable=not-an-iterable
             g = model_weights[layer_name]
             weight_names = g.attrs["weight_names"]
             for weight_name in weight_names:

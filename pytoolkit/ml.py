@@ -240,8 +240,8 @@ def search_threshold(
         with joblib.Parallel(n_jobs=-1, backend="threading") as parallel:
             scores, ths = zip(*parallel([_search(fold) for fold in range(cv)]))
 
-        score = np.mean(scores)
-        th = np.mean(ths)
+        score = np.mean(scores).tolist()
+        th = np.mean(ths).tolist()
         logger.info(f"mean: score={score:.4f} threshold={th:.4f}")
         return score, th
 

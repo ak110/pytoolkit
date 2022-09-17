@@ -92,7 +92,7 @@ def load_imagenet(data_dir: tk.typing.PathLike, verbose: bool = True):
 
 def extract_class_balanced(dataset, num_classes, samples_per_class):
     """クラスごとに均等に抜き出す。dataset.labelsは[0, num_classes)の値のndarrayを前提とする。"""
-    index_list = []
+    index_list: list[np.intp] = []
     for c in range(num_classes):
         index_list.extend(np.where(dataset.labels == c)[0][:samples_per_class])
     return dataset.slice(index_list)

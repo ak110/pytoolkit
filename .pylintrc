@@ -5,7 +5,6 @@ init-hook='import sys; sys.setrecursionlimit(3 * sys.getrecursionlimit())'
 
 [MESSAGES CONTROL]
 disable=
-    bad-continuation,
     broad-except,
     duplicate-code,
     fixme,
@@ -16,7 +15,6 @@ disable=
     logging-fstring-interpolation,
     missing-docstring,
     no-else-return,
-    no-self-use,
     no-value-for-parameter,  # TF 2.2 False Positive
     too-few-public-methods,
     too-many-ancestors,
@@ -35,6 +33,7 @@ disable=
 max-line-length=256
 
 [TYPECHECK]
+generated-members=cv2.*
 ignored-modules=
     IPython,
     catboost,

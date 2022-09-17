@@ -59,6 +59,7 @@ class Model:
 
         """
         dataset = dataset.copy()
+        assert isinstance(dataset.labels, np.ndarray)
         if self.preprocessors is not None:
             dataset.data = self.preprocessors.fit_transform(
                 dataset.data, dataset.labels

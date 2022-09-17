@@ -100,6 +100,7 @@ class LGBModel(Model):
             assert isinstance(dataset.data, np.ndarray)
             assert dataset.data.ndim == 2
             num_features = dataset.data.shape[1]
+        assert isinstance(dataset.labels, np.ndarray)
 
         params = self.params.copy()
         weight = dataset.weights if dataset.weights is not None else None
@@ -114,7 +115,7 @@ class LGBModel(Model):
         if "class_weights" in params:
             if params.get("class_weights") == "balanced":
                 assert "num_class" in params, str(params)
-                class_weights = params.get("num_class") / np.bincount(dataset.labels)
+                class_weights = params["num_class"] / np.bincount(dataset.labels)
             else:
                 class_weights = params.get("class_weights")
             params.pop("class_weights")
@@ -135,7 +136,7 @@ class LGBModel(Model):
 
         seeds = np.array([123]) if self.seeds is None else self.seeds
 
-        scores: dict[str, list[float]] = {}
+        scores_list: dict[str, list[float]] = {}
         self.gbms_ = np.empty((len(folds), len(seeds)), dtype=object)
         for seed_i, seed in enumerate(seeds):
             with tk.log.trace(f"seed averaging({seed_i + 1}/{len(seeds)})"):
@@ -155,17 +156,19 @@ class LGBModel(Model):
                 for k in eval_hist:
                     if k.endswith("-mean"):
                         name, score = k[:-5], float(eval_hist[k][-1])
-                        if name not in scores:
-                            scores[name] = []
-                        scores[name].append(score)
+                        if name not in scores_list:
+                            scores_list[name] = []
+                        scores_list[name].append(score)
                         logger.info(f"cv {name}: {score}")
                 self.gbms_[:, seed_i] = model_extractor.raw_boosters
                 # 怪しいけどとりあえずいったん書き換えちゃう
                 for gbm in self.gbms_[:, seed_i]:
                     gbm.best_iteration = model_extractor.best_iteration
 
-        for name, score_list in scores.items():
-            scores[name] = np.mean(score_list)
+        scores = {
+            name: np.mean(score_list).tolist()
+            for name, score_list in scores_list.items()
+        }
         for k, v in scores.items():
             logger.info(f"cv(mean) {k}: {v:,.3f}")
 
@@ -192,6 +195,8 @@ class LGBModel(Model):
 
     def feature_importance(self, importance_type: str = "gain"):
         """Feature ImportanceをDataFrameで返す。"""
+        import lightgbm as lgb
+
         assert self.gbms_ is not None
         columns = self.gbms_[0][0].feature_name()
         for gbms_fold in self.gbms_:
@@ -199,9 +204,9 @@ class LGBModel(Model):
                 assert tuple(columns) == tuple(gbm.feature_name())
 
         t = np.int32 if importance_type == "split" else np.float32
-        fi = np.zeros((len(columns),), dtype=t)
+        fi: typing.Any = np.zeros((len(columns),), dtype=t)
         for gbms_fold in self.gbms_:
-            for gbm in gbms_fold:
+            for gbm in typing.cast(typing.Iterable[lgb.Booster], gbms_fold):
                 fi += gbm.feature_importance(importance_type=importance_type)
 
         return pd.DataFrame(data={"importance": fi}, index=columns)

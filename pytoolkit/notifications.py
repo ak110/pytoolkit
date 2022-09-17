@@ -31,7 +31,7 @@ def post_evals(evals: tk.evaluations.EvalsType, precision: int = 3):
     post(tk.evaluations.to_str(evals, multiline=True, precision=precision))
 
 
-def post(body: str, subject: str = None):
+def post(body: str, subject: str = None, timeout: float = 10.0):
     """通知。"""
     if subject is None:
         subject = " ".join([shlex.quote(a) for a in sys.argv])
@@ -58,6 +58,7 @@ def post(body: str, subject: str = None):
                     slack_url,
                     data=json.dumps(data),
                     headers={"Content-Type": "application/json"},
+                    timeout=timeout,
                 )
                 r.raise_for_status()
 
@@ -68,6 +69,7 @@ def post(body: str, subject: str = None):
                     "https://notify-api.line.me/api/notify",
                     data=data,
                     headers={"Authorization": "Bearer " + line_token},
+                    timeout=timeout,
                 )
                 r.raise_for_status()
 
