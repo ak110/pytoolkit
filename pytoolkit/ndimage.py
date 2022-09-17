@@ -248,24 +248,22 @@ def pad_ltrb(
         "wrap",
         "empty",
     ]
-    constant_values: typing.Any = None
+    kwargs: dict[str, typing.Any] = {}
     if padding == "zero":
         mode = "constant"
     elif padding == "half":
         mode = "constant"
-        constant_values = (np.uint8(127),)
+        kwargs["constant_values"] = (np.uint8(127),)
     elif padding == "one":
         mode = "constant"
-        constant_values = (np.uint8(255),)
+        kwargs["constant_values"] = (np.uint8(255),)
     elif padding == "mean":
         mode = "constant"
-        constant_values = (np.uint8(rgb.mean()),)
+        kwargs["constant_values"] = (np.uint8(rgb.mean()),)
     else:
         mode = padding
 
-    rgb = np.pad(
-        rgb, ((y1, y2), (x1, x2), (0, 0)), mode=mode, constant_values=constant_values
-    )
+    rgb = np.pad(rgb, ((y1, y2), (x1, x2), (0, 0)), mode=mode, **kwargs)  # type: ignore[call-overload]
     return rgb
 
 

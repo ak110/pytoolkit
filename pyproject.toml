@@ -25,7 +25,7 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "~3.8"
-albumentations = "*"
+albumentations = ">=1.2"
 numba = "*"
 pandas = "*"
 scikit-learn = "*"

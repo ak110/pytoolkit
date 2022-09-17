@@ -19,12 +19,12 @@ class RandomCompose(A.Compose):
 
     def __call__(self, *args, force_apply=False, **data):
         """変換の適用。"""
-        backup = self.transforms.transforms.copy()
+        backup = self.transforms.copy()  # type: ignore[has-type]
         try:
-            random.shuffle(self.transforms.transforms)
+            random.shuffle(self.transforms)  # type: ignore[has-type]
             return super().__call__(*args, force_apply=force_apply, **data)
         finally:
-            self.transforms.transforms = backup
+            self.transforms = backup
 
 
 class RandomRotate(A.DualTransform):
