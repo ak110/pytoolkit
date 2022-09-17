@@ -2202,7 +2202,7 @@ tests = ["better-exceptions", "category_encoders", "efficientnet", "keras2onnx",
 [metadata]
 lock-version = "1.1"
 python-versions = "~3.8"
-content-hash = "545d84bd84d9e1aa7acc635febecc1f50574be8d858675d8f2b277458393f80c"
+content-hash = "5ac0f0b57285604a9fcceefb93c11b50fba7e78f78b5ca583735c5c228a3ea82"
 
 [metadata.files]
 absl-py = []

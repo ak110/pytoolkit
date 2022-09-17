@@ -49,7 +49,7 @@ python-dotenv = {version = "*", optional = true}
 requests = {version = "*", optional = true}
 tensorflow = {version = "~2.8", optional = true}
 tensorflow-cpu = {version = "~2.8", optional = true}
-tf2onnx = {version = "^*", optional = true}
+tf2onnx = {version = "*", optional = true}
 tqdm = {version = "*", optional = true}
 xgboost = {version = "*", optional = true}
 
