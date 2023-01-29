@@ -28,6 +28,7 @@ def cv(
     fobj=None,
     feval=None,
     early_stopping_rounds: int = 200,
+    first_metric_only: bool = True,
     num_boost_round: int = 9999,
     verbose_eval: int = 100,
     importance_type: str = "gain",
@@ -50,10 +51,12 @@ def cv(
         folds=folds,
         fobj=fobj,
         feval=feval,
-        early_stopping_rounds=early_stopping_rounds,
         num_boost_round=num_boost_round,
         verbose_eval=None,
-        callbacks=[EvaluationLogger(period=verbose_eval)],
+        callbacks=[
+            lgb.early_stopping(early_stopping_rounds, first_metric_only),
+            EvaluationLogger(period=verbose_eval),
+        ],
         seed=1,
         return_cvbooster=True,
     )
@@ -144,8 +147,13 @@ def f1_metric(preds, data):
 def mf1_metric(preds, data):
     """LightGBM用多クラスF1スコア(マクロ平均)"""
     y_true = data.get_label()
-    num_classes = len(preds) // len(y_true)
-    preds = preds.reshape(-1, num_classes).argmax(axis=-1)
+    if preds.ndim == 1:  # for compatibility
+        num_classes = len(preds) // len(y_true)
+        preds = preds.reshape((num_classes, -1)).T
+    else:
+        assert preds.ndim == 2
+        assert len(y_true) == len(preds)
+    preds = preds.argmax(axis=-1)
     return "f1", sklearn.metrics.f1_score(y_true, preds, average="macro"), True
 
 

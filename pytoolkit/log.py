@@ -28,6 +28,7 @@ def init(
     matplotlib_level=logging.WARNING,
     pil_level=logging.INFO,
     close_tf_logger=True,
+    use_lightgbm: bool = False,
 ):
     """ルートロガーの初期化。"""
     logger = get(None)
@@ -54,6 +55,10 @@ def init(
     if close_tf_logger:
         assert tf.get_logger().propagate
         tk.log.close(tf.get_logger())
+    if use_lightgbm:
+        import lightgbm as lgb
+
+        lgb.register_logger(get("lightgbm"))
 
 
 def get(name):
