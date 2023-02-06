@@ -21,7 +21,7 @@ jobs:
         echo "$HOME/.local/bin" >> $GITHUB_PATH
     - name: Install dependencies
       run: |
-        sudo apt-get install graphviz # for pyplot
+        # sudo apt-get update && sudo apt-get install graphviz # for pyplot
         poetry install --no-interaction --extras=all
 
     - name: Test with pyfltr
