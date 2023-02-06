@@ -42,7 +42,7 @@ all = []
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.masonry.api"
+build-backend = "poetry.core.masonry.api"
 
 [tool.pyfltr]
 pyupgrade-args = ["--py310-plus"]
