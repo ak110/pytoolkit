@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pytoolkit"
-version = "0.1.0"
+version = "1.0.0"
 description = "pytoolkit: Personal Python package"
 license = "MIT"
 authors = ["aki. <mark@aur.ll.to>"]
@@ -24,73 +24,29 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = "~3.8"
-albumentations = ">=1.2"
-numba = "*"
-pandas = "*"
+python = "^3.10"
+polars = {version = "*", extras = ["all"]}
 scikit-learn = "*"
-better-exceptions = {version = "*", optional = true}
-catboost = {version = "*", optional = true}
-category_encoders = {version = "*", optional = true}
-efficientnet = {version = "*", optional = true}
-h5py = {version = "*", optional = true}
-horovod = {extras = ["tensorflow"], version = "*", optional = true}
-ipython = {version = "*", optional = true}
-keras2onnx = {version = "*", optional = true}
-lightgbm = {version = "*", optional = true}
-matplotlib = {version = "*", optional = true}
-mpi4py = {version = "*", optional = true}
-nbformat = {version = "*", optional = true}
-onnxmltools = {version = "*", optional = true}
-optuna = {version = "*", optional = true}
-pycocotools = {version = "*", optional = true}
-pydot = {version = "*", optional = true}
-python-dotenv = {version = "*", optional = true}
-requests = {version = "*", optional = true}
-tensorflow = {version = "~2.8", optional = true}
-tensorflow-cpu = {version = "~2.8", optional = true}
-tf2onnx = {version = "*", optional = true}
-tqdm = {version = "*", optional = true}
-xgboost = {version = "*", optional = true}
-
-[tool.poetry.extras]
-tensorflow = ["tensorflow"]
-tensorflow-cpu = ["tensorflow-cpu"]
-tests = [
-    "better-exceptions",
-    "category_encoders",
-    "efficientnet",
-    "image-classifiers",
-    "keras2onnx",
-    "lightgbm",
-    "nbformat",
-    "onnxmltools",
-    "pycocotools",
-    "pydot",
-    "python-dotenv",
-    "tf2onnx",
-    "tqdm",
-]
+tqdm = "*"
 
 [tool.poetry.dev-dependencies]
 pyfltr = "*"
-types-requests = "*"
+sphinx = ">=2.4.0"
+sphinx-rtd-theme = "*"
 
-[tool.poetry.scripts]
-tk-benchmark = "pytoolkit.bin.benchmark:main"
-tk-convert-model = "pytoolkit.bin.convertmodel:main"
-tk-h5ls = "pytoolkit.bin.h5ls:main"
-tk-notify = "pytoolkit.bin.notify:main"
-tk-plot-log = "pytoolkit.bin.plotlog:main"
-tk-py2nb = "pytoolkit.bin.py2nb:main"
+[tool.poetry.extras]
+all = []
+
+#[tool.poetry.scripts]
+#tk-benchmark = "pytoolkit.bin.benchmark:main"
 
 [build-system]
-requires = ["poetry>=0.12"]
+requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.masonry.api"
 
 [tool.pyfltr]
-pyupgrade_args = ["--py38-plus"]
-pylint_args = ["--jobs=4"]
+pyupgrade-args = ["--py310-plus"]
+pylint-args = ["--jobs=4"]
 
 [tool.isort]
 # https://black.readthedocs.io/en/stable/guides/using_black_with_other_tools.html#isort
@@ -99,13 +55,13 @@ profile = "black"
 
 [tool.black]
 # https://black.readthedocs.io/en/stable/usage_and_configuration/the_basics.html
-target-version = ['py38']
+target-version = ['py310']
 skip-magic-trailing-comma = true
 
 [tool.flake8]
 # https://black.readthedocs.io/en/stable/guides/using_black_with_other_tools.html#flake8
 # https://flake8.pycqa.org/en/latest/user/configuration.html
-max-line-length = 128
+max-line-length = 88
 extend-ignore = "E203,"
 
 [tool.mypy]
@@ -122,4 +78,4 @@ show_error_codes = true
 
 [tool.pytest.ini_options]
 # https://docs.pytest.org/en/latest/reference/reference.html#ini-options-ref
-addopts = "--showlocals -p no:cacheprovider"
+addopts = "--showlocals -p no:cacheprovider --durations=0"

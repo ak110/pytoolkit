@@ -1,12 +1,2 @@
 # Read the Docs用
-Pillow
-albumentations
-numba
-numpy
-opencv-python
-optuna
-pandas
-scikit-learn
-scipy
 sphinx>=2.4.0
-tensorflow-cpu>=2.6.0
