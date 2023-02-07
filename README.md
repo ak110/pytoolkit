@@ -8,4 +8,15 @@
 
 いわゆるオレオレライブラリ。
 
+## インストール
+
 `pip install https://github.com/ak110/pytoolkit.git` もしくは `git clone`して `pip install --user -e .` など。
+
+## 使い方
+
+```
+import pytoolkit
+import pytoolkit.table # optional
+
+pytoolkit.log.init("path/to/logfile.log")
+```

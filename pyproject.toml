@@ -25,17 +25,32 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.10"
-polars = {version = "*", extras = ["all"]}
+lightgbm = {version = "*", optional = true}
+pandas = {version = "*", optional = true}
+polars = {version = "*", extras = ["all"], optional = true}
+psutil = {version = "*", optional = true}
+pyarrow = {version = "*", optional = true}
 scikit-learn = "*"
 tqdm = "*"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 pyfltr = "*"
+
+[tool.poetry.group.docs]
+optional = true
+
+[tool.poetry.group.docs.dependencies]
 sphinx = ">=2.4.0"
 sphinx-rtd-theme = "*"
 
 [tool.poetry.extras]
-all = []
+all = [
+    "lightgbm",
+    "pandas",
+    "polars",
+    "psutil",
+    "pyarrow",
+]
 
 #[tool.poetry.scripts]
 #tk-benchmark = "pytoolkit.bin.benchmark:main"
