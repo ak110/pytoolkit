@@ -2,4 +2,4 @@
 # pylint: skip-file
 # flake8: noqa
 
-from . import log, pipelines
+from . import logs, pipelines

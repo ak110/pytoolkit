@@ -83,7 +83,7 @@ class Model:
 
     def evaluate(
         self, data: pd.DataFrame | pl.DataFrame, labels: npt.ArrayLike
-    ) -> float:
+    ) -> dict[str, float]:
         """推論。
 
         Args:
@@ -97,12 +97,27 @@ class Model:
         pred = self.infer(data)
         if self.metadata["task"] == "binary":
             labels = _class_to_index(labels, self.metadata["class_names"])
-            return sklearn.metrics.roc_auc_score(labels, pred)
-        if self.metadata["task"] == "multiclass":
+            return {
+                "acc": float(sklearn.metrics.accuracy_score(labels, np.round(pred))),
+                "auc": float(sklearn.metrics.roc_auc_score(labels, pred)),
+            }
+        elif self.metadata["task"] == "multiclass":
             labels = _class_to_index(labels, self.metadata["class_names"])
-            return sklearn.metrics.roc_auc_score(labels, pred, multi_class="ovo")
-        assert self.metadata["task"] == "regression"
-        return sklearn.metrics.r2_score(labels, pred)
+            return {
+                "acc": float(
+                    sklearn.metrics.accuracy_score(labels, pred.argmax(axis=-1))
+                ),
+                "auc": float(
+                    sklearn.metrics.roc_auc_score(labels, pred, multi_class="ovo")
+                ),
+            }
+        else:
+            assert self.metadata["task"] == "regression"
+            return {
+                "mae": sklearn.metrics.mean_absolute_error(labels, pred),
+                "rmse": sklearn.metrics.mean_squared_error(labels, pred) ** 0.5,
+                "r2": sklearn.metrics.r2_score(labels, pred),
+            }
 
     def infer(
         self, data: pd.DataFrame | pl.DataFrame, verbose: bool = True

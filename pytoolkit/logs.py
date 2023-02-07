@@ -41,6 +41,6 @@ def timer(name: str, logger: logging.Logger | None = None):
     start_time = time.perf_counter()
     if logger is None:
         logger = logging.getLogger(__name__)
-    logger.info(f"'{name}' start.")
+    logger.info(f"<{name}> start.")
     yield
-    logger.info(f"'{name}' done in {time.perf_counter() - start_time:.0f} s.")
+    logger.info(f"<{name}> done in {time.perf_counter() - start_time:.0f} s.")

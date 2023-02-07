@@ -4,10 +4,10 @@ pytoolkit package
 Submodules
 ----------
 
-pytoolkit.log module
---------------------
+pytoolkit.logs module
+---------------------
 
-.. automodule:: pytoolkit.log
+.. automodule:: pytoolkit.logs
    :members:
    :undoc-members:
    :show-inheritance:
@@ -16,6 +16,14 @@ pytoolkit.pipelines module
 --------------------------
 
 .. automodule:: pytoolkit.pipelines
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pytoolkit.tables module
+-----------------------
+
+.. automodule:: pytoolkit.tables
    :members:
    :undoc-members:
    :show-inheritance:
