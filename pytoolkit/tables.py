@@ -239,6 +239,7 @@ def train(
     metric=None,
     fobj=None,
     feval=None,
+    eval_train_metric: bool = False,
     hpo: bool = False,
 ) -> Model:
     """学習
@@ -275,14 +276,20 @@ def train(
         if len(class_names) == 2:
             # 2クラス分類
             metadata["task"] = "binary"
+            if params.get("metric") is None:
+                params["metric"] = ["auc", "binary_error"]
         else:
             # 多クラス分類
             metadata["task"] = "multiclass"
             params["num_class"] = len(class_names)
+            if params.get("metric") is None:
+                params["metric"] = ["auc", "multi_error"]
     else:
         # 回帰の場合
         assert labels.dtype.type is np.float32
         metadata["task"] = "regression"
+        if params.get("metric") is None:
+            params["metric"] = ["rmse", "mae"]
     params["objective"] = objective or metadata["task"]
 
     train_set = lgb.Dataset(
@@ -339,6 +346,7 @@ def train(
         feval=feval,
         num_boost_round=num_boost_round,
         verbose_eval=None,
+        seed=1,
         callbacks=[
             lgb.early_stopping(
                 min(max(int(10 / params["learning_rate"] ** 0.5), 20), 200),
@@ -346,7 +354,7 @@ def train(
             ),
             EvaluationLogger(period=verbose_eval),
         ],
-        seed=1,
+        eval_train_metric=eval_train_metric,
         return_cvbooster=True,
     )
     metadata["params"] = params
