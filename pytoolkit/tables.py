@@ -283,7 +283,7 @@ def train(
             metadata["task"] = "multiclass"
             params["num_class"] = len(class_names)
             if params.get("metric") is None:
-                params["metric"] = ["auc", "multi_error"]
+                params["metric"] = ["multi_error"]
     else:
         # 回帰の場合
         assert labels.dtype.type is np.float32
@@ -311,9 +311,10 @@ def train(
         tuner = optuna.integration.lightgbm.LightGBMTunerCV(
             params,
             train_set,
+            folds=folds,
             fobj=fobj,
             feval=feval,
-            folds=folds,
+            categorical_feature=categorical_feature,
             num_boost_round=num_boost_round,
             callbacks=[
                 lgb.early_stopping(
@@ -344,6 +345,7 @@ def train(
         folds=folds,
         fobj=fobj,
         feval=feval,
+        categorical_feature=categorical_feature,
         num_boost_round=num_boost_round,
         verbose_eval=None,
         seed=1,
