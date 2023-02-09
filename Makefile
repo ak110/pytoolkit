@@ -9,8 +9,7 @@ update:
 test:
 	poetry install --extras=all
 	poetry run pyfltr
+	$(MAKE) doc
 
-check:
-	poetry run pyfltr --commands=pyupgrade,isort,black,pflake8,mypy
+doc:
 	cd docs && ./update.sh && make html
-	CUDA_VISIBLE_DEVICES=none pyfltr --commands=pytest

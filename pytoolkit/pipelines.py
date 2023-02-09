@@ -118,7 +118,22 @@ class Step(metaclass=abc.ABCMeta):
         """
         return self._pipeline.run(step_types, run_type, cache)
 
-    # TODO: model_dir
+    def invoke_all(
+        self,
+        step_types: "typing.Type[Step] | list[typing.Type[Step]]",
+        cache: typing.Literal["use", "ignore", "disable"] = "use",
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+        """指定ステップの実行。
+
+        Args:
+            step_types: 実行するステップのクラス
+            cache: ignoreにするとキャッシュがあっても読み込まない、disableにすると保存もしない。(伝播はしない)
+
+        Returns:
+            実行結果
+
+        """
+        return self._pipeline.run_all(step_types, cache)
 
 
 # Stepのクラス
