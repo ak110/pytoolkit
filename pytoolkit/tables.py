@@ -3,11 +3,7 @@
 機械学習に詳しくないエンジニアが使うには`tf.keras`や`scikit-learn`のインターフェースもローレベル過ぎるので、
 本来このくらいであるべきなんじゃないか、という観点で作ってみたもの。
 
-TBD: 分類と回帰を分けるべきか統合するべきか… → 似たタスクなので統合。str vs float32で。
-
-TODO: lgbの便利関数は別途用意して、薄いラッパーにする？？
-
-## インターフェース
+TODO: lgbの便利関数は別途用意して、ここは薄いラッパーにする
 
 タスクごとに以下の関数が提供される。
 前提条件や引数、型などはタスクに応じて多少変わる。
@@ -22,44 +18,43 @@ TODO: lgbの便利関数は別途用意して、薄いラッパーにする？�
 
 その他、凝ったことをしたいとき用のインターフェースは個別に用意する。
 
-## サンプルコード
+Examples:
 
-```python
-import logging
-import pytoolkit.table
+    ::
 
-train_data_path = "path/to/train.csv"
-test_data_path = "path/to/test.csv"
-input_data_path = "path/to/input.csv"
+        import logging
+        import pytoolkit.table
 
-# ログの初期化
-logging.basicConfig()
+        train_data_path = "path/to/train.csv"
+        test_data_path = "path/to/test.csv"
+        input_data_path = "path/to/input.csv"
 
-# データの読み込み
-train_data, train_labels = pytoolkit.table.load_labeled_data(
-    train_data_path, "label_col_name"
-)
-test_data, test_labels = pytoolkit.table.load_labeled_data(
-    test_data_path, "label_col_name"
-)
+        # ログの初期化
+        logging.basicConfig()
 
-# 学習
-model = pytoolkit.table.train(train_data, train_labels, groups=None)
+        # データの読み込み
+        train_data, train_labels = pytoolkit.table.load_labeled_data(
+            train_data_path, "label_col_name"
+        )
+        test_data, test_labels = pytoolkit.table.load_labeled_data(
+            test_data_path, "label_col_name"
+        )
 
-# 保存・読み込み
-model.save(model_dir)
-model = pytoolkit.table.load(model_dir)
+        # 学習
+        model = pytoolkit.table.train(train_data, train_labels, groups=None)
 
-# 評価
-score = model.evaluate(test_data, test_labels)
-assert 0.0 <= score <= 1.0
+        # 保存・読み込み
+        model.save(model_dir)
+        model = pytoolkit.table.load(model_dir)
 
-# 推論
-input_data = pytoolkit.table.load_unlabeled_data(input_data_path)
-results = model.infer(input_data)
-assert isinstance(results, np.ndarray)
+        # 評価
+        score = model.evaluate(test_data, test_labels)
+        assert 0.0 <= score <= 1.0
 
-```
+        # 推論
+        input_data = pytoolkit.table.load_unlabeled_data(input_data_path)
+        results = model.infer(input_data)
+        assert isinstance(results, np.ndarray)
 
 """
 import json
@@ -87,12 +82,7 @@ lgb.register_logger(logger)
 
 
 class Model:
-    """テーブルデータのモデル。
-
-    Attributes:
-        feature_importance: feature importance。
-
-    """
+    """テーブルデータのモデル。"""
 
     def __init__(self, boosters: list[lgb.Booster], metadata: dict[str, typing.Any]):
         self.boosters = boosters
@@ -251,13 +241,27 @@ class Model:
         return oofp
 
     def get_feature_names(self) -> list[str]:
-        """列名を返す。"""
+        """列名を返す。
+
+        Returns:
+            列名の配列
+
+        """
         return self.boosters[0].feature_name()
 
     def get_feature_importance(
         self, importance_type="gain", normalize: bool = True
     ) -> npt.NDArray[np.float32]:
-        """feature importanceを返す。"""
+        """feature importanceを返す。
+
+        Args:
+            importance_type: "split" or "gain"
+            normalize: Trueの場合、合計が1になる配列を返す
+
+        Returns:
+            feature importance
+
+        """
         feature_importance = np.mean(
             [
                 gbm.feature_importance(importance_type=importance_type)
