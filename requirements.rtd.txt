@@ -1,0 +1,3 @@
+# Read the Docs用
+sphinx>=2.4.0
+sphinx-rtd-theme
