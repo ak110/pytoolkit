@@ -1,4 +1,67 @@
-"""テーブルデータ関連。"""
+"""テーブルデータの分類・回帰をするモジュール。
+
+機械学習に詳しくないエンジニアが使うには`tf.keras`や`scikit-learn`のインターフェースもローレベル過ぎるので、
+本来このくらいであるべきなんじゃないか、という観点で作ってみたもの。
+
+TBD: 分類と回帰を分けるべきか統合するべきか… → 似たタスクなので統合。str vs float32で。
+
+TODO: lgbの便利関数は別途用意して、薄いラッパーにする？？
+
+## インターフェース
+
+タスクごとに以下の関数が提供される。
+前提条件や引数、型などはタスクに応じて多少変わる。
+
+- `pytoolkit.{task}.load_labeled_data()`
+- `pytoolkit.{task}.load_unlabeled_data()`
+- `pytoolkit.{task}.train()`
+- `pytoolkit.{task}.load()`
+- `pytoolkit.{task}.Model.save()`
+- `pytoolkit.{task}.Model.evaluate()`
+- `pytoolkit.{task}.Model.infer()`
+
+その他、凝ったことをしたいとき用のインターフェースは個別に用意する。
+
+## サンプルコード
+
+```python
+import logging
+import pytoolkit.table
+
+train_data_path = "path/to/train.csv"
+test_data_path = "path/to/test.csv"
+input_data_path = "path/to/input.csv"
+
+# ログの初期化
+logging.basicConfig()
+
+# データの読み込み
+train_data, train_labels = pytoolkit.table.load_labeled_data(
+    train_data_path, "label_col_name"
+)
+test_data, test_labels = pytoolkit.table.load_labeled_data(
+    test_data_path, "label_col_name"
+)
+
+# 学習
+model = pytoolkit.table.train(train_data, train_labels, groups=None)
+
+# 保存・読み込み
+model.save(model_dir)
+model = pytoolkit.table.load(model_dir)
+
+# 評価
+score = model.evaluate(test_data, test_labels)
+assert 0.0 <= score <= 1.0
+
+# 推論
+input_data = pytoolkit.table.load_unlabeled_data(input_data_path)
+results = model.infer(input_data)
+assert isinstance(results, np.ndarray)
+
+```
+
+"""
 import json
 import logging
 import os
@@ -14,6 +77,7 @@ import psutil
 import sklearn.metrics
 import tqdm
 
+# ちょっとお行儀が悪いけどimportされた時点でlightgbmにロガーを登録しちゃう
 logger = logging.getLogger(__name__)
 logger.addFilter(
     lambda r: r.getMessage()
@@ -23,11 +87,44 @@ lgb.register_logger(logger)
 
 
 class Model:
-    """テーブルデータのモデル。"""
+    """テーブルデータのモデル。
+
+    Attributes:
+        feature_importance: feature importance。
+
+    """
 
     def __init__(self, boosters: list[lgb.Booster], metadata: dict[str, typing.Any]):
         self.boosters = boosters
         self.metadata = metadata
+
+    def save(self, model_dir: str | os.PathLike[str]) -> None:
+        """保存。
+
+        Args:
+            model_dir: 保存先ディレクトリ
+
+        """
+        model_dir = pathlib.Path(model_dir)
+        model_dir.mkdir(parents=True, exist_ok=True)
+        for fold, booster in enumerate(self.boosters):
+            booster.save_model(
+                str(model_dir / f"model.fold{fold}.txt"),
+                num_iteration=self.metadata["best_iteration"],
+            )
+
+        df_importance = pl.DataFrame(
+            {
+                "feature": self.get_feature_names(),
+                "importance[%]": self.get_feature_importance(normalize=True) * 100,
+            }
+        )
+        df_importance = df_importance.sort("importance[%]", reverse=True)
+        df_importance.write_csv(model_dir / "feature_importance.csv")
+
+        (model_dir / "metadata.json").write_text(
+            json.dumps(self.metadata, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
 
     @classmethod
     def load(cls, model_dir: str | os.PathLike[str]) -> "Model":
@@ -50,36 +147,6 @@ class Model:
                 lgb.Booster(model_file=str(model_dir / f"model.fold{fold}.txt"))
             )
         return cls(boosters, metadata)
-
-    def save(self, model_dir: str | os.PathLike[str]) -> None:
-        """保存。
-
-        Args:
-            model_dir: 保存先ディレクトリ
-
-        """
-        model_dir = pathlib.Path(model_dir)
-        model_dir.mkdir(parents=True, exist_ok=True)
-        for fold, booster in enumerate(self.boosters):
-            booster.save_model(
-                str(model_dir / f"model.fold{fold}.txt"),
-                num_iteration=self.metadata.get("best_iteration"),
-            )
-
-        df_importance = self.metadata.get("df_importance")
-        if df_importance is not None:
-            assert isinstance(df_importance, pl.DataFrame)
-            df_importance.write_csv(model_dir / "feature_importance.csv")
-            self.metadata.pop("df_importance")
-
-        oofp = self.metadata.get("oofp")
-        if oofp is not None:
-            np.save(model_dir / "oofp.npy", oofp)
-            self.metadata.pop("oofp")
-
-        (model_dir / "metadata.json").write_text(
-            json.dumps(self.metadata, ensure_ascii=False) + "\n", encoding="utf-8"
-        )
 
     def evaluate(
         self, data: pd.DataFrame | pl.DataFrame, labels: npt.ArrayLike
@@ -183,6 +250,26 @@ class Model:
         assert oofp is not None
         return oofp
 
+    def get_feature_names(self) -> list[str]:
+        """列名を返す。"""
+        return self.boosters[0].feature_name()
+
+    def get_feature_importance(
+        self, importance_type="gain", normalize: bool = True
+    ) -> npt.NDArray[np.float32]:
+        """feature importanceを返す。"""
+        feature_importance = np.mean(
+            [
+                gbm.feature_importance(importance_type=importance_type)
+                for gbm in self.boosters
+            ],
+            axis=0,
+            dtype=np.float32,
+        )
+        if normalize:
+            feature_importance /= feature_importance.sum() + 1e-7
+        return feature_importance
+
 
 def load_labeled_data(
     data_path: str | os.PathLike[str], label_col_name: str
@@ -190,7 +277,7 @@ def load_labeled_data(
     """ラベルありデータの読み込み
 
     Args:
-        data_path: データのパス(CSV, Excel)
+        data_path: データのパス(CSV, Excelなど)
 
     Returns:
         データフレーム
@@ -205,7 +292,7 @@ def load_unlabeled_data(data_path: str | os.PathLike[str]) -> pl.DataFrame:
     """ラベルなしデータの読み込み
 
     Args:
-        data_path: データのパス(CSV, Excel)
+        data_path: データのパス(CSV, Excelなど)
 
     Returns:
         データフレーム
@@ -215,6 +302,12 @@ def load_unlabeled_data(data_path: str | os.PathLike[str]) -> pl.DataFrame:
     data: pl.DataFrame
     if data_path.suffix.lower() == ".csv":
         data = pl.read_csv(data_path)
+    elif data_path.suffix.lower() == ".tsv":
+        data = pl.read_csv(data_path, sep="\t")
+    elif data_path.suffix.lower() == ".arrow":
+        data = pl.read_ipc(data_path)
+    elif data_path.suffix.lower() == ".parquet":
+        data = pl.read_parquet(data_path)
     elif data_path.suffix.lower() in (".xls", ".xlsx", ".xlsm"):
         data = pl.read_excel(data_path)  # type: ignore
     else:
@@ -232,8 +325,8 @@ def train(
     categorical_feature: str | list[str] = "auto",
     init_score: npt.ArrayLike | None = None,
     num_boost_round: int = 9999,
+    do_early_stopping: bool = True,
     first_metric_only: bool = True,
-    verbose_eval: int = 100,
     learning_rate: float = 0.1,
     objective=None,
     metric=None,
@@ -250,6 +343,7 @@ def train(
         weights: 入力データの重み
         groups: 入力データのグループ
         folds: CVの分割情報
+        do_early_stopping: Early Stoppingをするのか否か
 
     Returns:
         モデル
@@ -298,7 +392,7 @@ def train(
         weight=weights,
         group=groups,
         init_score=init_score,
-        categorical_feature=categorical_feature,
+        categorical_feature=categorical_feature,  # type: ignore
         free_raw_data=False,
     )
 
@@ -314,7 +408,7 @@ def train(
             folds=folds,
             fobj=fobj,
             feval=feval,
-            categorical_feature=categorical_feature,
+            categorical_feature=categorical_feature,  # type: ignore
             num_boost_round=num_boost_round,
             callbacks=[
                 lgb.early_stopping(
@@ -322,7 +416,9 @@ def train(
                     first_metric_only=first_metric_only,
                     verbose=False,
                 )
-            ],
+            ]
+            if do_early_stopping
+            else [],
             seed=1,
             optuna_seed=1,
         )
@@ -345,17 +441,21 @@ def train(
         folds=folds,
         fobj=fobj,
         feval=feval,
-        categorical_feature=categorical_feature,
+        categorical_feature=categorical_feature,  # type: ignore
         num_boost_round=num_boost_round,
         verbose_eval=None,
         seed=1,
-        callbacks=[
-            lgb.early_stopping(
-                min(max(int(10 / params["learning_rate"] ** 0.5), 20), 200),
-                first_metric_only=first_metric_only,
-            ),
-            EvaluationLogger(period=verbose_eval),
-        ],
+        callbacks=(
+            [
+                lgb.early_stopping(
+                    min(max(int(10 / params["learning_rate"] ** 0.5), 20), 200),
+                    first_metric_only=first_metric_only,
+                )
+            ]
+            if do_early_stopping
+            else []
+        )
+        + [EvaluationLogger()],
         eval_train_metric=eval_train_metric,
         return_cvbooster=True,
     )
@@ -372,37 +472,16 @@ def train(
     metadata["best_iteration"] = cvbooster.best_iteration
     metadata["nfold"] = len(cvbooster.boosters)
 
+    model = Model(cvbooster.boosters, metadata)
+
     # feature importance
-    feature_names = train_set.get_feature_name()
-    fi: typing.Any = np.zeros((len(feature_names),), dtype=np.float32)
-    for gbm in typing.cast(list[lgb.Booster], cvbooster.boosters):
-        fi += gbm.feature_importance(importance_type="gain")
-    fi /= fi.sum() / 100 + 1e-7
-    df_importance = pl.DataFrame({"feature": feature_names, "importance[%]": fi})
-    df_importance = df_importance.sort("importance[%]", reverse=True)
-    k = min(len(df_importance), 10)
-    logger.info(f"feature importance (top-{k}):")
-    for feature, importance in df_importance[:k].rows():
-        logger.info(f"  {feature} {importance:.0f}%")
-    metadata["df_importance"] = df_importance
+    feature_names = model.get_feature_names()
+    fi = model.get_feature_importance(normalize=True)
+    logger.info("feature importance:")
+    for i in (-fi).argsort()[: min(len(fi), 10)]:
+        logger.info(f"  {feature_names[i]}: {fi[i]:.1%}")
 
-    # out-of-fold predictions
-    oofp = None
-    if folds is not None:
-        for (_, val_indices), booster in tqdm.tqdm(
-            list(zip(folds, cvbooster.boosters)),
-            ascii=True,
-            ncols=100,
-            desc="predict_oof",
-        ):
-            pred = booster.predict(data.iloc[val_indices])
-            if oofp is None:
-                # assert pred.dtype is np.float32
-                oofp = np.zeros((len(data),) + pred.shape[1:], dtype=pred.dtype)
-            oofp[val_indices] = pred
-        metadata["oofp"] = oofp
-
-    return Model(cvbooster.boosters, metadata)
+    return model
 
 
 def _class_to_index(

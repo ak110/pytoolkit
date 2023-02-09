@@ -1,4 +1,37 @@
-"""テーブルデータのパイプライン。(experimental)"""
+"""テーブルデータのパイプライン。
+
+ここでいうパイプラインとは、pl.DataFrameを受け取り、pl.DataFrameを返すステップの連なり。
+各ステップは0個以上の依存するステップを持ち、依存するステップの出力を結合したものを受け取って
+当該ステップの処理を行う。
+
+各ステップは名前+インスタンスで扱う方が直感的な設計だが、
+冗長なコードを減らしつつ未使用のimportでlinterの警告が発生しないことを重視し、
+クラスで扱うこととした。
+
+各ステップはpytoolkit.pipelines.Stepクラスやその派生クラスを継承して実装する。
+実行はpytoolkit.pipelines.Pipelineに実行するステップのクラスを指定する。
+
+各ステップの結果はファイルにキャッシュされる。
+ステップや依存先のステップが定義されたファイルの更新日時が新しくなっていれば自動的に再計算する。
+(TODO: リファクタリングなどで意図せず再計算が発生する場合があるため、
+非常に計算に時間がかかるステップを実装する場合は、更新日時のチェックを無効化して必要に応じて手動で削除する)
+
+主にコンペでの利用を想定し、ステップの実行には"train"と"test"の二種類がある。
+また、それに伴い以下のパターンで実装を補助する派生クラスがある。
+
+- "train"と"test"で同じ処理をするステップ: TransformStep
+- "train"で事前に学習や統計情報の取得などの処理を行い、
+  その後は"train"と"test"で同じ処理をするステップ: FitTransformStep
+- コンペなどで"train"と"test"のデータを全部まとめて処理するステップ: AllDataStep
+- "train"で学習してモデルを保存してout-of-fold predictionsを出力し、
+  "test"でモデルを読み込んで推論をするステップ: ModelStep
+- 複数のステップの出力をまとめるだけのステップ: ComposeStep
+
+Pipelines.fineがTrueか否かでも必要に応じてキャッシュが別管理となる。
+HPOなどの時間がかかる処理はStepの中でself.fineがTrueの場合のみ行うよう実装し、
+コンペの提出時などだけfine=Trueで実行する。
+
+"""
 import abc
 import inspect
 import logging
@@ -19,7 +52,12 @@ class Step(metaclass=abc.ABCMeta):
     """パイプラインの各ステップ。
 
     Attributes:
-        logger: ロガー
+        name: ステップ名 (既定値: self.__class__.__name__)
+        use_file_cache: 結果をファイルにキャッシュするのか否か (既定値: True)
+        use_memory_cache: 結果をメモリにキャッシュするのか否か (既定値: True)
+        logger: ロガー (派生クラスで実装時に使う用)
+
+    派生クラスでuse_file_cacheなどを変更したい場合は__init__をオーバーライドする。
 
     """
 
@@ -29,28 +67,16 @@ class Step(metaclass=abc.ABCMeta):
     def __init__(self, pipeline: "Pipeline", depend_steps: "list[Step]") -> None:
         self._pipeline = pipeline
         self.depend_steps = depend_steps
+        self.name = self.__class__.__name__
+        self.use_file_cache = True
+        self.use_memory_cache = True
         self.logger = logging.getLogger(__name__ + "." + self.name)
         self.fine_refcount = 0
-
-    @property
-    def name(self) -> str:
-        """ステップ名"""
-        return self.__class__.__name__
 
     def run_name(self, run_type: RunType) -> str:
         """ステップの実行名を作成して返す"""
         fine_suffix = "-fine" if self._pipeline.fine and self.has_fine(run_type) else ""
         return f"{self.name}.{run_type}{fine_suffix}"
-
-    @property
-    def use_file_cache(self) -> bool:
-        """結果をファイルにキャッシュするのか否か"""
-        return True
-
-    @property
-    def use_memory_cache(self) -> bool:
-        """結果をメモリにキャッシュするのか否か"""
-        return True
 
     def has_fine(self, run_type: RunType) -> bool:
         """fine=Trueな場合に特別な処理をするのか否か"""
@@ -402,20 +428,6 @@ class AllDataStep(Step, metaclass=abc.ABCMeta):
         """処理"""
 
 
-class ComposeStep(Step):
-    """複数の特徴量をまとめたりするだけのステップ。派生クラスでdepens_onだけ定義する。"""
-
-    @property
-    def use_file_cache(self) -> bool:
-        """結果をファイルにキャッシュするのか否か"""
-        return False
-
-    def run(self, df: pl.DataFrame, run_type: RunType) -> pl.DataFrame:
-        """当該ステップの処理"""
-        del run_type  # noqa
-        return df
-
-
 class ModelStep(Step, metaclass=abc.ABCMeta):
     """機械学習モデルなど、train/testで別々の処理をするステップ。"""
 
@@ -433,3 +445,16 @@ class ModelStep(Step, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def test(self, df_test: pl.DataFrame) -> pl.DataFrame:
         """推論"""
+
+
+class ComposeStep(Step):
+    """複数の特徴量をまとめたりするだけのステップ。派生クラスでdepens_onだけ定義する。"""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.use_file_cache = False
+
+    def run(self, df: pl.DataFrame, run_type: RunType) -> pl.DataFrame:
+        """当該ステップの処理"""
+        del run_type  # noqa
+        return df

@@ -25,7 +25,9 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.10"
+ipywidgets = {version = "*", optional = true}
 lightgbm = {version = "*", optional = true}
+matplotlib = {version = "*", optional = true}
 pandas = {version = "*", optional = true}
 polars = {version = "*", extras = ["all"], optional = true}
 psutil = {version = "*", optional = true}
@@ -45,11 +47,24 @@ sphinx-rtd-theme = "*"
 
 [tool.poetry.extras]
 all = [
+    "ipywidgets",
+    "lightgbm",
+    "matplotlib",
+    "pandas",
+    "polars",
+    "psutil",
+    "pyarrow",
+]
+tables = [
     "lightgbm",
     "pandas",
     "polars",
     "psutil",
     "pyarrow",
+]
+notebooks = [
+    "ipywidgets",
+    "matplotlib",
 ]
 
 #[tool.poetry.scripts]
