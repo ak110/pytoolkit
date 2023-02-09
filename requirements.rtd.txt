@@ -1,5 +1,0 @@
-# Read the Docs用
-scikit-learn
-tqdm
-polars[all]
-sphinx>=2.4.0
