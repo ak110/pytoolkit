@@ -25,7 +25,6 @@
 - コンペなどで"train"と"test"のデータを全部まとめて処理するステップ: AllDataStep
 - "train"で学習してモデルを保存してout-of-fold predictionsを出力し、
   "test"でモデルを読み込んで推論をするステップ: ModelStep
-- 複数のステップの出力をまとめるだけのステップ: ComposeStep
 
 Pipelines.fineがTrueか否かでも必要に応じてキャッシュが別管理となる。
 HPOなどの時間がかかる処理はStepの中でself.fineがTrueの場合のみ行うよう実装し、
@@ -460,16 +459,3 @@ class ModelStep(Step, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def test(self, df_test: pl.DataFrame) -> pl.DataFrame:
         """推論"""
-
-
-class ComposeStep(Step):
-    """複数の特徴量をまとめたりするだけのステップ。派生クラスでdepens_onだけ定義する。"""
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.use_file_cache = False
-
-    def run(self, df: pl.DataFrame, run_type: RunType) -> pl.DataFrame:
-        """当該ステップの処理"""
-        del run_type  # noqa
-        return df
