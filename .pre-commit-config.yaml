@@ -25,7 +25,7 @@ repos:
     hooks:
       - id: system
         name: pyfltr
-        entry: poetry run pyfltr --commands=pyupgrade,isort,black,pflake8
+        entry: poetry run pyfltr
         types: [python]
         require_serial: true
         language: system

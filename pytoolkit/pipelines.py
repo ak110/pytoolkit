@@ -100,7 +100,7 @@ class Step(metaclass=abc.ABCMeta):
 
     def invoke(
         self,
-        step_types: "typing.Type[Step] | list[typing.Type[Step]]",
+        step_types: "type[Step] | list[type[Step]]",
         run_type: RunType | None = None,
         cache: typing.Literal["use", "ignore", "disable"] = "use",
     ) -> pl.DataFrame:
@@ -119,7 +119,7 @@ class Step(metaclass=abc.ABCMeta):
 
     def invoke_all(
         self,
-        step_types: "typing.Type[Step] | list[typing.Type[Step]]",
+        step_types: "type[Step] | list[type[Step]]",
         cache: typing.Literal["use", "ignore", "disable"] = "use",
     ) -> tuple[pl.DataFrame, pl.DataFrame]:
         """指定ステップの実行。
@@ -133,6 +133,11 @@ class Step(metaclass=abc.ABCMeta):
 
         """
         return self._pipeline.run_all(step_types, cache)
+
+    def get_root_step(self) -> "Step":
+        """ステップの依存関係の根本を返す。"""
+        assert len(self._pipeline.step_stack) > 0
+        return self._pipeline.step_stack[0]
 
 
 # Stepのクラス
@@ -161,6 +166,7 @@ class Pipeline:
         self.memory_cache: dict[tuple[StepType, RunType], pl.DataFrame] = {}
         self.steps: dict[StepType, Step] = {}
         self.run_type_stack: list[RunType] = []
+        self.step_stack: list[Step] = []
         self.logfmt = (
             "%(asctime)s [%(levelname)-5s] %(message)s"
             " <%(name)s> %(filename)s:%(lineno)d"
@@ -248,34 +254,38 @@ class Pipeline:
         run_type: RunType,
         cache: typing.Literal["use", "ignore", "disable"],
     ) -> pl.DataFrame:
-        step_run_name = step.run_name(run_type)
-        # ファイルキャッシュにあれば読んで返す
-        cache_path = self.cache_dir / f"{step_run_name}.arrow"
-        if cache == "use" and step.use_file_cache:
-            if self._is_cache_valid(step, run_type):
-                logger.info(f"'{step_run_name}' load cache: {cache_path}")
-                return pl.read_ipc(cache_path)
+        self.step_stack.append(step)
+        try:
+            step_run_name = step.run_name(run_type)
+            # ファイルキャッシュにあれば読んで返す
+            cache_path = self.cache_dir / f"{step_run_name}.arrow"
+            if cache == "use" and step.use_file_cache:
+                if self._is_cache_valid(step, run_type):
+                    logger.info(f"'{step_run_name}' load cache: {cache_path}")
+                    return pl.read_ipc(cache_path)
 
-        # メモリキャッシュにあれば返す
-        if step.use_memory_cache:
-            result = self.memory_cache.get((step.__class__, run_type))
-            if result is not None:
-                logger.info(f"'{step_run_name}' get memory cache")
-                return result
+            # メモリキャッシュにあれば返す
+            if step.use_memory_cache:
+                result = self.memory_cache.get((step.__class__, run_type))
+                if result is not None:
+                    logger.info(f"'{step_run_name}' get memory cache")
+                    return result
 
-        # ステップの実行
-        result = self._run_step(step, run_type, step_run_name)
+            # ステップの実行
+            result = self._run_step(step, run_type, step_run_name)
 
-        # メモリキャッシュに保存
-        if step.use_memory_cache:
-            self.memory_cache[(step.__class__, run_type)] = result
+            # メモリキャッシュに保存
+            if step.use_memory_cache:
+                self.memory_cache[(step.__class__, run_type)] = result
 
-        # ファイルキャッシュに保存
-        if cache in ("use", "ignore") and step.use_file_cache:
-            logger.info(f"'{step_run_name}' save cache: {cache_path}")
-            cache_path.parent.mkdir(parents=True, exist_ok=True)
-            result.write_ipc(cache_path)
-        return result
+            # ファイルキャッシュに保存
+            if cache in ("use", "ignore") and step.use_file_cache:
+                logger.info(f"'{step_run_name}' save cache: {cache_path}")
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                result.write_ipc(cache_path)
+            return result
+        finally:
+            self.step_stack.pop()
 
     def _is_cache_valid(
         self, step: Step, run_type: RunType, base_cache_time: float | None = None

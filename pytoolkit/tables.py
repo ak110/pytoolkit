@@ -338,6 +338,7 @@ def train(
     feval=None,
     eval_train_metric: bool = False,
     hpo: bool = False,
+    do_bagging: bool = True,
 ) -> Model:
     """学習
 
@@ -348,6 +349,11 @@ def train(
         groups: 入力データのグループ
         folds: CVの分割情報
         do_early_stopping: Early Stoppingをするのか否か
+        hpo: optunaによるハイパーパラメータ探索を行うのか否か
+        do_bagging: bagging_fraction, feature_fractionを設定するのか否か。
+                    ラウンド数が少ない場合はFalseの方が安定するかも。
+                    hpo=Trueなら効果なし。
+
 
     Returns:
         モデル
@@ -432,7 +438,7 @@ def train(
         params.pop("verbosity")
         params.pop("deterministic")
         logger.info(f"HPO完了: {tuner.best_score=:.3f}")
-    else:
+    elif do_bagging:
         params["bagging_freq"] = 1
         params["bagging_fraction"] = 0.8
         params["feature_fraction"] = 0.8
