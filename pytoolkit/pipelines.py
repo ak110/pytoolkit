@@ -345,6 +345,11 @@ class Pipeline:
             # ステップの実行
             step.fine_refcount = 0
             result = step.run(df, run_type)
+            # 行数チェック
+            assert (
+                len(df) == len(result) or len(df) == 0 or len(result) == 0
+            ), f"Rows error: {step.name}"
+            # fineの参照回数チェック
             if step.has_fine(run_type) == (step.fine_refcount == 0):
                 logger.fatal(
                     f"'{step_run_name}' fine refcount error: {run_type=}"
@@ -421,10 +426,8 @@ class AllDataStep(Step, metaclass=abc.ABCMeta):
             df_test = self.invoke(self.__class__.depends_on, "test")
             df_all = pl.concat(
                 [
-                    df.with_columns([pl.lit(False).alias(self.is_test_column_name)]),
-                    df_test.with_columns(
-                        [pl.lit(True).alias(self.is_test_column_name)]
-                    ),
+                    df.with_columns(pl.lit(False).alias(self.is_test_column_name)),
+                    df_test.with_columns(pl.lit(True).alias(self.is_test_column_name)),
                 ]
             )
             result_all = self.fit_transform(df_all)

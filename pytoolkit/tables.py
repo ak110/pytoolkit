@@ -362,6 +362,7 @@ def train(
     if isinstance(data, pl.DataFrame):
         data = data.to_pandas()
     labels = np.asarray(labels)
+    assert len(data) == len(labels), f"{len(data)=} {len(labels)=}"
 
     params: dict[str, typing.Any] = {
         "learning_rate": learning_rate,
@@ -387,7 +388,7 @@ def train(
             metadata["task"] = "multiclass"
             params["num_class"] = len(class_names)
             if params.get("metric") is None:
-                params["metric"] = ["multi_error"]
+                params["metric"] = ["multi_logloss", "multi_error"]
     else:
         # 回帰の場合
         assert labels.dtype.type is np.float32
