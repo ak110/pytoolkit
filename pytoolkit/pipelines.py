@@ -64,9 +64,9 @@ class Step(metaclass=abc.ABCMeta):
 
         ::
 
-            def __init__(self, *args, **kwargs) -> None:
-                super().__init__(*args, **kwargs)
-                self.use_file_cache = False
+        def __init__(self, *args, **kwargs) -> None:
+            super().__init__(*args, **kwargs)
+            self.use_file_cache = False
 
     """
 
@@ -132,7 +132,7 @@ class Step(metaclass=abc.ABCMeta):
         self,
         step_types: "type[Step] | list[type[Step]]",
         cache: typing.Literal["use", "ignore", "disable"] = "use",
-    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+    ) -> pl.DataFrame:
         """指定ステップの実行。
 
         Args:
@@ -143,7 +143,7 @@ class Step(metaclass=abc.ABCMeta):
             実行結果
 
         """
-        return self._pipeline.run_all(step_types, cache)
+        return pl.concat(self._pipeline.run_all(step_types, cache))
 
     def get_root_step(self) -> "Step":
         """ステップの依存関係の根本を返す。"""
@@ -389,7 +389,22 @@ class TransformStep(Step, metaclass=abc.ABCMeta):
 
 
 class FitTransformStep(Step, metaclass=abc.ABCMeta):
-    """特徴量作成ステップ。"""
+    """特徴量作成ステップ。
+
+    Examples:
+        ::
+
+        class XXXStep(pytoolkit.pipelines.FitTransformStep)
+
+            depends_on: list[type[pytoolkit.pipelines.Step]] = [...]
+
+            def fit(self, df_train: pl.DataFrame) -> typing.Any:
+                return {}
+
+            def transform(self, transformer, df: pl.DataFrame) -> pl.DataFrame:
+                pass
+
+    """
 
     def run(self, df: pl.DataFrame, run_type: RunType) -> pl.DataFrame:
         """当該ステップの処理"""
