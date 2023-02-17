@@ -54,13 +54,23 @@ class Step(metaclass=abc.ABCMeta):
         name: ステップ名 (既定値: self.__class__.__name__)
         use_file_cache: 結果をファイルにキャッシュするのか否か (既定値: True)
         use_memory_cache: 結果をメモリにキャッシュするのか否か (既定値: True)
+        has_fine_train: fine=Trueな場合にtrainで特別な処理を実装しているのか否か (既定値: False)
+        has_fine_test: fine=Trueな場合にtestで特別な処理を実装しているのか否か (既定値: False)
         logger: ロガー (派生クラスで実装時に使う用)
 
-    派生クラスでuse_file_cacheなどを変更したい場合は__init__をオーバーライドする。
+    Examples:
+
+        派生クラスでuse_file_cacheなどを変更したい場合は__init__をオーバーライドする。
+
+        ::
+
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+                self.use_file_cache = False
 
     """
 
-    depends_on: "list[StepType]" = []
+    depends_on: "list[type[Step]]" = []
     """依存先ステップ"""
 
     def __init__(self, pipeline: "Pipeline", depend_steps: "list[Step]") -> None:
@@ -69,6 +79,8 @@ class Step(metaclass=abc.ABCMeta):
         self.name = self.__class__.__name__
         self.use_file_cache = True
         self.use_memory_cache = True
+        self.has_fine_train = False
+        self.has_fine_test = False
         self.logger = logging.getLogger(__name__ + "." + self.name)
         self.fine_refcount = 0
 
@@ -78,9 +90,8 @@ class Step(metaclass=abc.ABCMeta):
         return f"{self.name}.{run_type}{fine_suffix}"
 
     def has_fine(self, run_type: RunType) -> bool:
-        """fine=Trueな場合に特別な処理をするのか否か"""
-        del run_type
-        return False
+        """fine=Trueな場合に特別な処理を実装しているのか否か"""
+        return self.has_fine_train if run_type == "train" else self.has_fine_test
 
     @property
     def fine(self) -> bool:
@@ -140,8 +151,8 @@ class Step(metaclass=abc.ABCMeta):
         return self._pipeline.step_stack[0]
 
 
-# Stepのクラス
-StepType = type[Step]
+# Stepのジェネリック型
+StepTypeVar = typing.TypeVar("StepTypeVar", bound=Step)
 
 
 class Pipeline:
@@ -163,8 +174,8 @@ class Pipeline:
         self.models_dir = pathlib.Path(models_dir)
         self.cache_dir = pathlib.Path(cache_dir)
         self.fine = fine
-        self.memory_cache: dict[tuple[StepType, RunType], pl.DataFrame] = {}
-        self.steps: dict[StepType, Step] = {}
+        self.memory_cache: dict[tuple[type[Step], RunType], pl.DataFrame] = {}
+        self.steps: dict[type[Step], Step] = {}
         self.run_type_stack: list[RunType] = []
         self.step_stack: list[Step] = []
         self.logfmt = (
@@ -174,7 +185,7 @@ class Pipeline:
 
     def run_all(
         self,
-        steps: StepType | list[StepType] | Step | list[Step],
+        steps: type[Step] | list[type[Step]] | Step | list[Step],
         cache: typing.Literal["use", "ignore", "disable"] = "use",
     ) -> tuple[pl.DataFrame, pl.DataFrame]:
         """ステップの実行。
@@ -195,7 +206,7 @@ class Pipeline:
 
     def run(
         self,
-        steps: StepType | list[StepType] | Step | list[Step],
+        steps: type[Step] | list[type[Step]] | Step | list[Step],
         run_type: RunType | None,
         cache: typing.Literal["use", "ignore", "disable"] = "use",
     ) -> pl.DataFrame:
@@ -225,23 +236,23 @@ class Pipeline:
             self.run_type_stack.pop()
 
     def _instantiate(
-        self, steps: StepType | list[StepType] | Step | list[Step]
+        self, steps: type[Step] | list[type[Step]] | Step | list[Step]
     ) -> list[Step]:
         """stepsのインスタンス化。"""
         if not isinstance(steps, list):
             steps = [steps]  # type: ignore[assignment]
         assert isinstance(steps, list)
-        return [s if isinstance(s, Step) else self._get_step(s) for s in steps]
+        return [s if isinstance(s, Step) else self.get_step(s) for s in steps]
 
-    def _get_step(self, step_type: StepType) -> Step:
+    def get_step(self, step_type: type[StepTypeVar]) -> StepTypeVar:
         """Stepのインスタンス化"""
         # インスタンス化済みならそれを返す
         step = self.steps.get(step_type)
         if step is not None:
-            return step
+            return typing.cast(StepTypeVar, step)
 
         # 依存関係のインスタンス化
-        depend_steps = [self._get_step(t) for t in step_type.depends_on]
+        depend_steps = [self.get_step(t) for t in step_type.depends_on]
 
         # step_typeのインスタンス化
         step = step_type(pipeline=self, depend_steps=depend_steps)
@@ -389,11 +400,15 @@ class FitTransformStep(Step, metaclass=abc.ABCMeta):
             self.save_transformer(transformer, save_path)
         else:
             transformer = self.load_transformer(save_path)
-        return self.transform(transformer, df, run_type)
+        return self.transform(transformer, df)
 
     @abc.abstractmethod
     def fit(self, df_train: pl.DataFrame) -> typing.Any:
         """訓練＆保存"""
+
+    @abc.abstractmethod
+    def transform(self, transformer, df: pl.DataFrame) -> pl.DataFrame:
+        """変換処理"""
 
     @property
     def transformer_save_path(self) -> pathlib.Path:
@@ -409,12 +424,6 @@ class FitTransformStep(Step, metaclass=abc.ABCMeta):
         """変換用情報の読み込み"""
         logger.info(f"load transformer: {save_path}")
         return joblib.load(save_path)
-
-    @abc.abstractmethod
-    def transform(
-        self, transformer, df: pl.DataFrame, run_type: RunType
-    ) -> pl.DataFrame:
-        """変換処理"""
 
 
 class AllDataStep(Step, metaclass=abc.ABCMeta):
@@ -467,8 +476,8 @@ class ModelStep(Step, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def train(self, df_train: pl.DataFrame) -> pl.DataFrame:
-        """学習してoofpを返す"""
+        """学習してモデルを保存してoofpを返す"""
 
     @abc.abstractmethod
     def test(self, df_test: pl.DataFrame) -> pl.DataFrame:
-        """推論"""
+        """モデルを読み込んで推論して結果を返す"""

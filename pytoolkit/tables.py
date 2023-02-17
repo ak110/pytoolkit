@@ -172,7 +172,7 @@ class Model:
             assert self.metadata["task"] == "regression"
             return {
                 "mae": sklearn.metrics.mean_absolute_error(labels, pred),
-                "rmse": sklearn.metrics.mean_squared_error(labels, pred) ** 0.5,
+                "rmse": sklearn.metrics.mean_squared_error(labels, pred, squared=False),
                 "r2": sklearn.metrics.r2_score(labels, pred),
             }
 
@@ -193,7 +193,7 @@ class Model:
             data = data.to_pandas()
         return np.mean(
             [
-                booster.predict(data)
+                booster.predict(data, num_iteration=self.metadata["best_iteration"])
                 for booster in tqdm.tqdm(
                     self.boosters,
                     ascii=True,
@@ -226,14 +226,16 @@ class Model:
         if isinstance(data, pl.DataFrame):
             data = data.to_pandas()
         oofp: npt.NDArray[np.float32] | None = None
-        for (_, val_indices), booster in tqdm.tqdm(
-            list(zip(folds, self.boosters, strict=True)),
+        for booster, (_, val_indices) in tqdm.tqdm(
+            list(zip(self.boosters, folds, strict=True)),
             ascii=True,
             ncols=100,
             desc="infer_oof",
             disable=not verbose,
         ):
-            pred = booster.predict(data.iloc[val_indices])
+            pred = booster.predict(
+                data.iloc[val_indices], num_iteration=self.metadata["best_iteration"]
+            )
             if oofp is None:
                 oofp = np.full((len(data),) + pred.shape[1:], np.nan, dtype=np.float32)
             oofp[val_indices] = pred.astype(np.float32)
