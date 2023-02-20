@@ -25,6 +25,7 @@
 - コンペなどで"train"と"test"のデータを全部まとめて処理するステップ: AllDataStep
 - "train"で学習してモデルを保存してout-of-fold predictionsを出力し、
   "test"でモデルを読み込んで推論をするステップ: ModelStep
+- "train"のみ実装されているステップ: TrainOnlyStep
 
 Pipelines.fineがTrueか否かでも必要に応じてキャッシュが別管理となる。
 HPOなどの時間がかかる処理はStepの中でself.fineがTrueの場合のみ行うよう実装し、
@@ -45,13 +46,16 @@ import polars as pl
 logger = logging.getLogger(__name__)
 
 RunType = typing.Literal["train", "test"]
+InvokeType = typing.Union[RunType, typing.Literal["all"]]
 
 
 class Step(metaclass=abc.ABCMeta):
     """パイプラインの各ステップ。
 
     Attributes:
-        name: ステップ名 (既定値: self.__class__.__name__)
+        module_path: ステップが定義されたファイルのパス
+        name: ステップ名 (既定値: self.module_path.stem)
+        depends_on: 依存先ステップ名の配列 (既定値: [])
         use_file_cache: 結果をファイルにキャッシュするのか否か (既定値: True)
         use_memory_cache: 結果をメモリにキャッシュするのか否か (既定値: True)
         has_fine_train: fine=Trueな場合にtrainで特別な処理を実装しているのか否か (既定値: False)
@@ -64,30 +68,27 @@ class Step(metaclass=abc.ABCMeta):
 
         ::
 
-        def __init__(self, *args, **kwargs) -> None:
-            super().__init__(*args, **kwargs)
-            self.use_file_cache = False
+            def __init__(self) -> None:
+                super().__init__()
+                self.depends_on = []
+                self.use_file_cache = True
+                self.use_memory_cache = True
+                self.has_fine_train = False
+                self.has_fine_test = False
 
     """
 
-    depends_on: "list[type[Step]]" = []
-    """依存先ステップ"""
-
-    def __init__(self, pipeline: "Pipeline", depend_steps: "list[Step]") -> None:
-        self._pipeline = pipeline
-        self.depend_steps = depend_steps
-        self.name = self.__class__.__name__
-        self.use_file_cache = True
-        self.use_memory_cache = True
-        self.has_fine_train = False
-        self.has_fine_test = False
-        self.logger = logging.getLogger(__name__ + "." + self.name)
+    def __init__(self) -> None:
+        self.pipeline: Pipeline | None = None
+        self.module_path: pathlib.Path = pathlib.Path(inspect.getfile(self.__class__))
+        self.name: str = self.module_path.stem
+        self.depends_on: list[str] = []
+        self.use_file_cache: bool = True
+        self.use_memory_cache: bool = True
+        self.has_fine_train: bool = False
+        self.has_fine_test: bool = False
+        self.logger = logging.getLogger(f"{__name__}.{self.name}")
         self.fine_refcount = 0
-
-    def run_name(self, run_type: RunType) -> str:
-        """ステップの実行名を作成して返す"""
-        fine_suffix = "-fine" if self._pipeline.fine and self.has_fine(run_type) else ""
-        return f"{self.name}.{run_type}{fine_suffix}"
 
     def has_fine(self, run_type: RunType) -> bool:
         """fine=Trueな場合に特別な処理を実装しているのか否か"""
@@ -96,14 +97,16 @@ class Step(metaclass=abc.ABCMeta):
     @property
     def fine(self) -> bool:
         """高精度な学習・推論を行うのか否か"""
+        assert self.pipeline is not None
         self.fine_refcount += 1
-        return self._pipeline.fine
+        return self.pipeline.fine
 
     @property
     def model_dir(self) -> pathlib.Path:
         """モデルを保存したりしたいときのディレクトリ"""
-        fine_suffix = "-fine" if self._pipeline.fine and self.has_fine("train") else ""
-        return self._pipeline.models_dir / (self.name + fine_suffix)
+        assert self.pipeline is not None
+        fine_suffix = "-fine" if self.pipeline.fine and self.has_fine("train") else ""
+        return self.pipeline.models_dir / (self.name + fine_suffix)
 
     @abc.abstractmethod
     def run(self, df: pl.DataFrame, run_type: RunType) -> pl.DataFrame:
@@ -111,8 +114,8 @@ class Step(metaclass=abc.ABCMeta):
 
     def invoke(
         self,
-        step_types: "type[Step] | list[type[Step]]",
-        run_type: RunType | None = None,
+        step_types: str | list[str],
+        invoke_type: InvokeType | None = None,
         cache: typing.Literal["use", "ignore", "disable"] = "use",
     ) -> pl.DataFrame:
         """指定ステップの実行。
@@ -126,33 +129,8 @@ class Step(metaclass=abc.ABCMeta):
             実行結果
 
         """
-        return self._pipeline.run(step_types, run_type, cache)
-
-    def invoke_all(
-        self,
-        step_types: "type[Step] | list[type[Step]]",
-        cache: typing.Literal["use", "ignore", "disable"] = "use",
-    ) -> pl.DataFrame:
-        """指定ステップの実行。
-
-        Args:
-            step_types: 実行するステップのクラス
-            cache: ignoreにするとキャッシュがあっても読み込まない、disableにすると保存もしない。(伝播はしない)
-
-        Returns:
-            実行結果
-
-        """
-        return pl.concat(self._pipeline.run_all(step_types, cache))
-
-    def get_root_step(self) -> "Step":
-        """ステップの依存関係の根本を返す。"""
-        assert len(self._pipeline.step_stack) > 0
-        return self._pipeline.step_stack[0]
-
-
-# Stepのジェネリック型
-StepTypeVar = typing.TypeVar("StepTypeVar", bound=Step)
+        assert self.pipeline is not None
+        return self.pipeline.invoke(step_types, invoke_type, cache)
 
 
 class Pipeline:
@@ -174,8 +152,8 @@ class Pipeline:
         self.models_dir = pathlib.Path(models_dir)
         self.cache_dir = pathlib.Path(cache_dir)
         self.fine = fine
-        self.memory_cache: dict[tuple[type[Step], RunType], pl.DataFrame] = {}
-        self.steps: dict[type[Step], Step] = {}
+        self.memory_cache: dict[tuple[str, RunType], pl.DataFrame] = {}
+        self.steps: dict[str, Step] = {}
         self.run_type_stack: list[RunType] = []
         self.step_stack: list[Step] = []
         self.logfmt = (
@@ -183,38 +161,30 @@ class Pipeline:
             " <%(name)s> %(filename)s:%(lineno)d"
         )
 
-    def run_all(
+    def add(self, step: Step) -> None:
+        """ステップの追加。"""
+        assert step.name not in self.steps, f"duplicated step name: {step.name}"
+        step.pipeline = self
+        self.steps[step.name] = step
+
+    def check(self) -> None:
+        """依存関係のチェック"""
+        for s in self.steps.values():
+            for d in s.depends_on:
+                if d not in self.steps:
+                    raise ValueError(f"'{d}' is not defined. (depend from {s.name})")
+
+    def invoke(
         self,
-        steps: type[Step] | list[type[Step]] | Step | list[Step],
-        cache: typing.Literal["use", "ignore", "disable"] = "use",
-    ) -> tuple[pl.DataFrame, pl.DataFrame]:
-        """ステップの実行。
-
-        Args:
-            steps: 実行するステップのクラス
-            run_type: 実行するステップの種類
-            cache: ignoreにするとキャッシュがあっても読み込まない、disableにすると保存もしない。(伝播はしない)
-
-        Returns:
-            処理結果(train, test)
-
-        """
-        steps = self._instantiate(steps)
-        df_train = self.run(steps, "train", cache)
-        df_test = self.run(steps, "test", cache)
-        return df_train, df_test
-
-    def run(
-        self,
-        steps: type[Step] | list[type[Step]] | Step | list[Step],
-        run_type: RunType | None,
+        steps: str | list[str] | Step | list[Step],
+        invoke_type: InvokeType | None,
         cache: typing.Literal["use", "ignore", "disable"] = "use",
     ) -> pl.DataFrame:
         """ステップの実行。
 
         Args:
-            step_type: 実行するステップのクラス (複数指定可)
-            run_type: 実行するステップの種類。省略時は現在実行中のステップ。
+            steps: 実行するステップの名前 or インスタンス。複数指定可。
+            invoke_type: 実行するステップの種類。省略時は現在実行中のステップ。
             cache: ignoreにするとキャッシュがあっても読み込まない、disableにすると保存もしない。(伝播はしない)
 
         Returns:
@@ -224,42 +194,40 @@ class Pipeline:
         steps = self._instantiate(steps)
         if len(steps) <= 0:
             return pl.DataFrame()
-        if run_type is None:
-            assert len(self.run_type_stack) > 0, "依存関係の最上位ではrun_typeは省略不可"
-            run_type = self.run_type_stack[-1]
-        self.run_type_stack.append(run_type)
+
+        if invoke_type == "all":
+            df_train = self.invoke(steps, "train", cache)
+            df_test = self.invoke(steps, "test", cache)
+            return pl.concat([df_train, df_test])
+
+        if invoke_type is None:
+            assert len(self.run_type_stack) > 0, "依存関係の最上位ではinvoke_typeは省略不可"
+            invoke_type = self.run_type_stack[-1]
+
+        self.run_type_stack.append(invoke_type)
         try:
             return pl.concat(
-                [self._run(step, run_type, cache) for step in steps], how="horizontal"
+                [self._invoke(step, invoke_type, cache) for step in steps],
+                how="horizontal",
             )
         finally:
             self.run_type_stack.pop()
 
-    def _instantiate(
-        self, steps: type[Step] | list[type[Step]] | Step | list[Step]
-    ) -> list[Step]:
-        """stepsのインスタンス化。"""
+    def _instantiate(self, steps: str | list[str] | Step | list[Step]) -> list[Step]:
+        """Stepのインスタンスを返す。"""
         if not isinstance(steps, list):
             steps = [steps]  # type: ignore[assignment]
         assert isinstance(steps, list)
         return [s if isinstance(s, Step) else self.get_step(s) for s in steps]
 
-    def get_step(self, step_type: type[StepTypeVar]) -> StepTypeVar:
-        """Stepのインスタンス化"""
-        # インスタンス化済みならそれを返す
-        step = self.steps.get(step_type)
-        if step is not None:
-            return typing.cast(StepTypeVar, step)
-
-        # 依存関係のインスタンス化
-        depend_steps = [self.get_step(t) for t in step_type.depends_on]
-
-        # step_typeのインスタンス化
-        step = step_type(pipeline=self, depend_steps=depend_steps)
-        self.steps[step_type] = step
+    def get_step(self, step_name: str) -> Step:
+        """Stepのインスタンスを返す。"""
+        step = self.steps.get(step_name)
+        if step is None:
+            raise ValueError(f"'{step_name}' is not defined.")
         return step
 
-    def _run(
+    def _invoke(
         self,
         step: Step,
         run_type: RunType,
@@ -267,31 +235,31 @@ class Pipeline:
     ) -> pl.DataFrame:
         self.step_stack.append(step)
         try:
-            step_run_name = step.run_name(run_type)
+            run_name = self._run_name(step, run_type)
             # ファイルキャッシュにあれば読んで返す
-            cache_path = self.cache_dir / f"{step_run_name}.arrow"
+            cache_path = self.cache_dir / step.name / f"{run_name}.arrow"
             if cache == "use" and step.use_file_cache:
                 if self._is_cache_valid(step, run_type):
-                    logger.info(f"'{step_run_name}' load cache: {cache_path}")
+                    logger.info(f"'{step.name}/{run_name}' load cache: {cache_path}")
                     return pl.read_ipc(cache_path)
 
             # メモリキャッシュにあれば返す
             if step.use_memory_cache:
-                result = self.memory_cache.get((step.__class__, run_type))
+                result = self.memory_cache.get((step.name, run_type))
                 if result is not None:
-                    logger.info(f"'{step_run_name}' get memory cache")
+                    logger.info(f"'{step.name}/{run_name}' get memory cache")
                     return result
 
             # ステップの実行
-            result = self._run_step(step, run_type, step_run_name)
+            result = self._run_step(step, run_type, run_name)
 
             # メモリキャッシュに保存
             if step.use_memory_cache:
-                self.memory_cache[(step.__class__, run_type)] = result
+                self.memory_cache[(step.name, run_type)] = result
 
             # ファイルキャッシュに保存
             if cache in ("use", "ignore") and step.use_file_cache:
-                logger.info(f"'{step_run_name}' save cache: {cache_path}")
+                logger.info(f"'{step.name}/{run_name}' save cache: {cache_path}")
                 cache_path.parent.mkdir(parents=True, exist_ok=True)
                 result.write_ipc(cache_path)
             return result
@@ -306,15 +274,15 @@ class Pipeline:
         if not step.use_file_cache:
             return True
         # キャッシュが無ければ無効
-        step_run_name = step.run_name(run_type)
-        cache_path = self.cache_dir / f"{step_run_name}.arrow"
+        run_name = self._run_name(step, run_type)
+        cache_path = self.cache_dir / step.name / f"{run_name}.arrow"
         if not cache_path.exists():
             return False
         # 有効期限の簡易チェック。ソースコードの方が新しければNG。
         # ソースコード上の依存関係とかまでは追えないので注意。
         cache_time = cache_path.stat().st_mtime
-        code_time = pathlib.Path(inspect.getfile(step.__class__)).stat().st_mtime
-        if cache_time <= code_time:
+        module_time = step.module_path.stat().st_mtime
+        if cache_time <= module_time:
             logger.warning(f"cache expired: {cache_path}")
             cache_path.unlink()
             return False
@@ -328,15 +296,13 @@ class Pipeline:
         # 依存先のいずれかが無効なら無効
         if any(
             not self._is_cache_valid(s, run_type, base_cache_time)
-            for s in step.depend_steps
+            for s in self._instantiate(step.depends_on)
         ):
             return False
         # ここまで来たらOK
         return True
 
-    def _run_step(
-        self, step: Step, run_type: RunType, step_run_name: str
-    ) -> pl.DataFrame:
+    def _run_step(self, step: Step, run_type: RunType, run_name: str) -> pl.DataFrame:
         """ステップの実行"""
         # ログの設定
         log_path = step.model_dir / f"{run_type}.log"
@@ -348,35 +314,56 @@ class Pipeline:
         file_handler.setFormatter(logging.Formatter(self.logfmt))
         root_logger = logging.getLogger(None)
         root_logger.addHandler(file_handler)
-        logger.info(f"'{step_run_name}' start")
+        step.logger.info(f"'{step.name}/{run_name}' start")
         start_time = time.perf_counter()
         try:
             # 依存関係の実行
-            df = self.run(step.depend_steps, run_type)
+            df = self.invoke(step.depends_on, run_type)
             # ステップの実行
             step.fine_refcount = 0
             result = step.run(df, run_type)
             # 行数チェック
             assert (
                 len(df) == len(result) or len(df) == 0 or len(result) == 0
-            ), f"Rows error: {step.name}"
+            ), f"Rows error: {step.name}/{run_name}"
             # fineの参照回数チェック
             if step.has_fine(run_type) == (step.fine_refcount == 0):
-                logger.fatal(
-                    f"'{step_run_name}' fine refcount error: {run_type=}"
+                step.logger.fatal(
+                    f"'{step.name}/{run_name}' fine refcount error: {run_type=}"
                     f" has_fine={step.has_fine(run_type)} ref={step.fine_refcount=}"
                 )
         finally:
             # ログを戻す
-            logger.info(
-                f"'{step_run_name}' done in {time.perf_counter() - start_time:.0f} s"
+            step.logger.info(
+                f"'{step.name}/{run_name}'"
+                f" done in {time.perf_counter() - start_time:.0f} s"
             )
             root_logger.removeHandler(file_handler)
         return result
 
+    def _run_name(self, step: Step, run_type: RunType) -> str:
+        """ステップの実行名を作成して返す"""
+        if self.fine and step.has_fine(run_type):
+            return f"{run_type}-fine"
+        else:
+            return run_type
+
 
 class TransformStep(Step, metaclass=abc.ABCMeta):
-    """データ変換ステップ。"""
+    """データ変換ステップ。
+
+    Examples:
+        ::
+
+            class Step(pytoolkit.pipelines.TransformStep):
+                def __init__(self):
+                    super().__init__()
+                    self.depends_on = ["xxx"]
+
+                def transform(self, df: pl.DataFrame) -> pl.DataFrame:
+                    return df
+
+    """
 
     def run(self, df: pl.DataFrame, run_type: RunType) -> pl.DataFrame:
         """当該ステップの処理"""
@@ -394,15 +381,17 @@ class FitTransformStep(Step, metaclass=abc.ABCMeta):
     Examples:
         ::
 
-        class XXXStep(pytoolkit.pipelines.FitTransformStep)
+            class Step(pytoolkit.pipelines.FitTransformStep):
+                def __init__(self):
+                    super().__init__()
+                    self.depends_on = ["xxx"]
 
-            depends_on: list[type[pytoolkit.pipelines.Step]] = [...]
+                def fit(self, df_train: pl.DataFrame) -> typing.Any:
+                    transformer = {}
+                    return transformer
 
-            def fit(self, df_train: pl.DataFrame) -> typing.Any:
-                return {}
-
-            def transform(self, transformer, df: pl.DataFrame) -> pl.DataFrame:
-                pass
+                def transform(self, transformer, df: pl.DataFrame) -> pl.DataFrame:
+                    return df
 
     """
 
@@ -442,12 +431,25 @@ class FitTransformStep(Step, metaclass=abc.ABCMeta):
 
 
 class AllDataStep(Step, metaclass=abc.ABCMeta):
-    """trainで全データを使って処理するステップ。_is_test_というbool列を追加して結合したものがdf_allとして渡される。"""
+    """trainで全データを使って処理するステップ。_is_test_というbool列を追加して結合したものがdf_allとして渡される。
+
+    Examples:
+        ::
+
+            class Step(pytoolkit.pipelines.AllDataStep):
+                def __init__(self):
+                    super().__init__()
+                    self.depends_on = ["xxx"]
+
+                def fit_transform(self, df_all: pl.DataFrame) -> pl.DataFrame:
+                    return df_all
+
+    """
 
     def run(self, df: pl.DataFrame, run_type: RunType) -> pl.DataFrame:
         """当該ステップの処理"""
         if run_type == "train":
-            df_test = self.invoke(self.__class__.depends_on, "test")
+            df_test = self.invoke(self.depends_on, "test")
             df_all = pl.concat(
                 [
                     df.with_columns(pl.lit(False).alias(self.is_test_column_name)),
@@ -480,7 +482,23 @@ class AllDataStep(Step, metaclass=abc.ABCMeta):
 
 
 class ModelStep(Step, metaclass=abc.ABCMeta):
-    """機械学習モデルなど、train/testで別々の処理をするステップ。"""
+    """機械学習モデルなど、train/testで別々の処理をするステップ。
+
+    Examples:
+        ::
+
+            class Step(pytoolkit.pipelines.ModelStep):
+                def __init__(self):
+                    super().__init__()
+                    self.depends_on = ["xxx"]
+
+                def train(self, df_train: pl.DataFrame) -> pl.DataFrame:
+                    return df_train
+
+                def test(self, df_test: pl.DataFrame) -> pl.DataFrame:
+                    return df_test
+
+    """
 
     def run(self, df: pl.DataFrame, run_type: RunType) -> pl.DataFrame:
         """当該ステップの処理"""
@@ -496,3 +514,31 @@ class ModelStep(Step, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def test(self, df_test: pl.DataFrame) -> pl.DataFrame:
         """モデルを読み込んで推論して結果を返す"""
+
+
+class TrainOnlyStep(Step, metaclass=abc.ABCMeta):
+    """グループIDやラベル周りの処理など、"train"のみ実装されているステップ。
+
+    Examples:
+        ::
+
+            class Step(pytoolkit.pipelines.TrainOnlyStep):
+                def __init__(self):
+                    super().__init__()
+                    self.depends_on = ["xxx"]
+
+                def train(self, df_train: pl.DataFrame) -> pl.DataFrame:
+                    return df_train
+
+    """
+
+    def run(self, df: pl.DataFrame, run_type: RunType) -> pl.DataFrame:
+        """当該ステップの処理"""
+        if run_type == "train":
+            return self.train(df)
+        else:
+            raise NotImplementedError()
+
+    @abc.abstractmethod
+    def train(self, df: pl.DataFrame) -> pl.DataFrame:
+        """学習してモデルを保存してoofpを返す"""

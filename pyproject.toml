@@ -24,7 +24,7 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = ">=3.10,<3.12"  # tensorflow-io-gcs-filesystem
 ipywidgets = {version = "*", optional = true}
 lightgbm = {version = "*", optional = true}
 matplotlib = {version = "*", optional = true}
@@ -33,6 +33,8 @@ polars = {version = "*", extras = ["all"], optional = true}
 psutil = {version = "*", optional = true}
 pyarrow = {version = "*", optional = true}
 scikit-learn = "*"
+tensorflow = {version = ">=2.11", optional = true}
+tensorflow-cpu = {version = ">=2.11", optional = true}
 tqdm = "*"
 
 [tool.poetry.group.dev.dependencies]
@@ -54,6 +56,17 @@ all = [
     "polars",
     "psutil",
     "pyarrow",
+    "tensorflow",
+]
+all-cpu = [
+    "ipywidgets",
+    "lightgbm",
+    "matplotlib",
+    "pandas",
+    "polars",
+    "psutil",
+    "pyarrow",
+    "tensorflow-cpu",
 ]
 tables = [
     "lightgbm",
@@ -66,6 +79,8 @@ notebooks = [
     "ipywidgets",
     "matplotlib",
 ]
+tensorflow = ["tensorflow"]
+tensorflow-cpu = ["tensorflow-cpu"]
 
 #[tool.poetry.scripts]
 #tk-benchmark = "pytoolkit.bin.benchmark:main"

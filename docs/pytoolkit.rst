@@ -1,6 +1,14 @@
 pytoolkit package
 =================
 
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   pytoolkit.tf
+
 Submodules
 ----------
 

@@ -6,6 +6,10 @@ import pytoolkit
 
 
 class InputStep(pytoolkit.pipelines.Step):
+    def __init__(self) -> None:
+        super().__init__()
+        self.name = "input_step"
+
     def run(
         self, df: pl.DataFrame, run_type: pytoolkit.pipelines.RunType
     ) -> pl.DataFrame:
@@ -15,7 +19,7 @@ class InputStep(pytoolkit.pipelines.Step):
 
 def test_step(tmpdir):
     run_type: pytoolkit.pipelines.RunType = "train"
-    df = pytoolkit.pipelines.Pipeline(tmpdir / "models", tmpdir / "cache").run(
-        InputStep, run_type
-    )
+    pipeline = pytoolkit.pipelines.Pipeline(tmpdir / "models", tmpdir / "cache")
+    pipeline.add(InputStep())
+    df = pipeline.invoke("input_step", run_type)
     assert tuple(df["run_type"].to_list()) == tuple([run_type] * 3)

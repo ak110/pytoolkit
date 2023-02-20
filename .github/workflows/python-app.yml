@@ -22,7 +22,7 @@ jobs:
     - name: Install dependencies
       run: |
         # sudo apt-get update && sudo apt-get install graphviz # for pyplot
-        poetry install --no-interaction --extras=all
+        poetry install --no-interaction --extras=all-cpu
 
     - name: Test with pyfltr
       run: poetry run pyfltr
