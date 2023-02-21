@@ -171,9 +171,11 @@ class Model:
         else:
             assert self.metadata["task"] == "regression"
             return {
-                "mae": sklearn.metrics.mean_absolute_error(labels, pred),
-                "rmse": sklearn.metrics.mean_squared_error(labels, pred, squared=False),
-                "r2": sklearn.metrics.r2_score(labels, pred),
+                "mae": float(sklearn.metrics.mean_absolute_error(labels, pred)),
+                "rmse": float(
+                    sklearn.metrics.mean_squared_error(labels, pred, squared=False)
+                ),
+                "r2": float(sklearn.metrics.r2_score(labels, pred)),
             }
 
     def infer(
@@ -191,6 +193,9 @@ class Model:
         """
         if isinstance(data, pl.DataFrame):
             data = data.to_pandas()
+        for c, values in self.metadata["encode_categoricals"].items():
+            data[c] = data[c].map(values.index, na_action="ignore")
+
         return np.mean(
             [
                 booster.predict(data, num_iteration=self.metadata["best_iteration"])
@@ -225,6 +230,9 @@ class Model:
         assert len(folds) == len(self.boosters)
         if isinstance(data, pl.DataFrame):
             data = data.to_pandas()
+        for c, values in self.metadata["encode_categoricals"].items():
+            data[c] = data[c].map(values.index, na_action="ignore")
+
         oofp: npt.NDArray[np.float32] | None = None
         for booster, (_, val_indices) in tqdm.tqdm(
             list(zip(self.boosters, folds, strict=True)),
@@ -328,7 +336,7 @@ def train(
     groups: npt.ArrayLike | None = None,
     folds: typing.Sequence[tuple[npt.NDArray[np.int32], npt.NDArray[np.int32]]]
     | None = None,
-    categorical_feature: str | list[str] = "auto",
+    categorical_feature: typing.Literal["auto"] | list[str] = "auto",
     init_score: npt.ArrayLike | None = None,
     num_boost_round: int = 9999,
     do_early_stopping: bool = True,
@@ -341,6 +349,7 @@ def train(
     eval_train_metric: bool = False,
     hpo: bool = False,
     do_bagging: bool = True,
+    encode_categoricals: bool = True,
 ) -> Model:
     """学習
 
@@ -355,6 +364,7 @@ def train(
         do_bagging: bagging_fraction, feature_fractionを設定するのか否か。
                     ラウンド数が少ない場合はFalseの方が安定するかも。
                     hpo=Trueなら効果なし。
+        encode_categoricals: categorical_featureに指定した列をエンコードするか否か
 
 
     Returns:
@@ -373,6 +383,15 @@ def train(
         "force_col_wise": True,
     }
     metadata: dict[str, typing.Any] = {}
+
+    # カテゴリ列のエンコード
+    metadata["encode_categoricals"] = {}
+    if encode_categoricals and isinstance(categorical_feature, list):
+        for c in categorical_feature:
+            values = np.sort(data[c].dropna().unique()).tolist()
+            logger.info(f"lgb: encode_categoricals({c}) => {values}")
+            metadata["encode_categoricals"][c] = values
+            data[c] = data[c].map(values.index, na_action="ignore")
 
     if isinstance(labels[0], str):
         # 分類の場合
@@ -396,7 +415,7 @@ def train(
         assert labels.dtype.type is np.float32
         metadata["task"] = "regression"
         if params.get("metric") is None:
-            params["metric"] = ["rmse", "mae"]
+            params["metric"] = ["l2", "mae", "rmse"]
     params["objective"] = objective or metadata["task"]
 
     train_set = lgb.Dataset(

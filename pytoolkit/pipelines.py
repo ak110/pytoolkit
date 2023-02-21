@@ -60,7 +60,9 @@ class Step(metaclass=abc.ABCMeta):
         use_memory_cache: 結果をメモリにキャッシュするのか否か (既定値: True)
         has_fine_train: fine=Trueな場合にtrainで特別な処理を実装しているのか否か (既定値: False)
         has_fine_test: fine=Trueな場合にtestで特別な処理を実装しているのか否か (既定値: False)
-        logger: ロガー (派生クラスで実装時に使う用)
+
+        has_fine_trainがFalseでhas_fine_testがTrueな場合はTTAなどを想定したもの。
+        モデルは共通だが推論結果のキャッシュは別となる。
 
     Examples:
 
@@ -87,8 +89,12 @@ class Step(metaclass=abc.ABCMeta):
         self.use_memory_cache: bool = True
         self.has_fine_train: bool = False
         self.has_fine_test: bool = False
-        self.logger = logging.getLogger(f"{__name__}.{self.name}")
         self.fine_refcount = 0
+
+    @property
+    def logger(self):
+        """ロガー (派生クラスで実装時に使う用)"""
+        return logging.getLogger(f"{__name__}.{self.name}")
 
     def has_fine(self, run_type: RunType) -> bool:
         """fine=Trueな場合に特別な処理を実装しているのか否か"""
@@ -111,6 +117,27 @@ class Step(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def run(self, df: pl.DataFrame, run_type: RunType) -> pl.DataFrame:
         """当該ステップの処理。Pipeline経由で呼び出される。"""
+
+    def invoke_single(
+        self,
+        step_types: str | list[str],
+        invoke_type: InvokeType | None = None,
+        cache: typing.Literal["use", "ignore", "disable"] = "use",
+    ) -> pl.Series:
+        """指定ステップの実行。(結果が1列なことがわかっているとき用の糖衣構文)
+
+        Args:
+            step_types: 実行するステップのクラス
+            run_type: 実行するステップの種類
+            cache: ignoreにするとキャッシュがあっても読み込まない、disableにすると保存もしない。(伝播はしない)
+
+        Returns:
+            実行結果
+
+        """
+        df = self.invoke(step_types, invoke_type, cache)
+        assert len(df.columns) == 1
+        return df[df.columns[0]]
 
     def invoke(
         self,
@@ -237,7 +264,7 @@ class Pipeline:
         try:
             run_name = self._run_name(step, run_type)
             # ファイルキャッシュにあれば読んで返す
-            cache_path = self.cache_dir / step.name / f"{run_name}.arrow"
+            cache_path = self._get_cache_path(step, run_type)
             if cache == "use" and step.use_file_cache:
                 if self._is_cache_valid(step, run_type):
                     logger.info(f"'{step.name}/{run_name}' load cache: {cache_path}")
@@ -274,8 +301,7 @@ class Pipeline:
         if not step.use_file_cache:
             return True
         # キャッシュが無ければ無効
-        run_name = self._run_name(step, run_type)
-        cache_path = self.cache_dir / step.name / f"{run_name}.arrow"
+        cache_path = self._get_cache_path(step, run_type)
         if not cache_path.exists():
             return False
         # 有効期限の簡易チェック。ソースコードの方が新しければNG。
@@ -340,6 +366,18 @@ class Pipeline:
             )
             root_logger.removeHandler(file_handler)
         return result
+
+    def _get_cache_path(self, step: Step, run_type: RunType) -> pathlib.Path:
+        """ファイルキャッシュのパスを作成して返す"""
+        dir_name = step.name
+        if self.fine:
+            if run_type == "train":
+                if step.has_fine("train"):
+                    dir_name += "-fine"
+            else:
+                if step.has_fine("train") or step.has_fine("test"):
+                    dir_name += "-fine"
+        return self.cache_dir / dir_name / f"{run_type}.arrow"
 
     def _run_name(self, step: Step, run_type: RunType) -> str:
         """ステップの実行名を作成して返す"""
@@ -540,5 +578,5 @@ class TrainOnlyStep(Step, metaclass=abc.ABCMeta):
             raise NotImplementedError()
 
     @abc.abstractmethod
-    def train(self, df: pl.DataFrame) -> pl.DataFrame:
+    def train(self, df_train: pl.DataFrame) -> pl.DataFrame:
         """学習してモデルを保存してoofpを返す"""

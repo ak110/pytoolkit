@@ -60,6 +60,7 @@ class CVPick(tf.keras.layers.Layer):
 
     def compute_output_shape(self, input_shape):
         """出力のshapeを返す。"""
+        assert len(input_shape) == 2
         return input_shape[0]
 
     def call(self, inputs, training=None):  # pylint: disable=arguments-differ
@@ -92,6 +93,7 @@ class CVMerge(tf.keras.layers.Layer):
 
     def compute_output_shape(self, input_shape):
         """出力のshapeを返す。"""
+        assert len(input_shape) >= 1
         return input_shape[0]
 
     def call(self, inputs, training=None):  # pylint: disable=arguments-differ
