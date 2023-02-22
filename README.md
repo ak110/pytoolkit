@@ -10,7 +10,7 @@
 
 ## インストール
 
-`pip install https://github.com/ak110/pytoolkit.git` もしくは `git clone`して `pip install --user -e .[all]` など。
+`pip install "pytoolkit[all] @ git+https://github.com/ak110/pytoolkit.git"` もしくは `git clone`して `pip install --user -e .[all]` など。
 
 ## 使い方
 
