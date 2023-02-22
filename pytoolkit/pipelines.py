@@ -60,9 +60,8 @@ class Step(metaclass=abc.ABCMeta):
         use_memory_cache: 結果をメモリにキャッシュするのか否か (既定値: True)
         has_fine_train: fine=Trueな場合にtrainで特別な処理を実装しているのか否か (既定値: False)
         has_fine_test: fine=Trueな場合にtestで特別な処理を実装しているのか否か (既定値: False)
-
-        has_fine_trainがFalseでhas_fine_testがTrueな場合はTTAなどを想定したもの。
-        モデルは共通だが推論結果のキャッシュは別となる。
+                        has_fine_trainがFalseでhas_fine_testがTrueな場合はTTAなどを想定したもの。
+                        モデルは共通だが推論結果のキャッシュは別となる。
 
     Examples:
 
@@ -330,8 +329,14 @@ class Pipeline:
 
     def _run_step(self, step: Step, run_type: RunType, run_name: str) -> pl.DataFrame:
         """ステップの実行"""
-        # ログの設定
-        log_path = step.model_dir / f"{run_type}.log"
+        # ログの設定。
+        # ステップごとに個別のファイルに書き込む。(依存先は複数個所に書き込まれる)
+        # 推論時にmodel_dir配下に書き込むのは若干気持ちが悪いので、
+        # trainのログはmodels_dir, testのログはcache_dirに出力する。
+        if run_type == "train":
+            log_path = step.model_dir / f"{run_type}.log"
+        else:
+            log_path = self._get_cache_dir(step, run_type) / f"{run_type}.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         file_handler = logging.FileHandler(
             log_path, mode="w", encoding="utf-8", delay=True
@@ -340,8 +345,9 @@ class Pipeline:
         file_handler.setFormatter(logging.Formatter(self.logfmt))
         root_logger = logging.getLogger(None)
         root_logger.addHandler(file_handler)
-        step.logger.info(f"'{step.name}/{run_name}' start")
+        # 開始ログ
         start_time = time.perf_counter()
+        step.logger.info(f"'{step.name}/{run_name}' start")
         try:
             # 依存関係の実行
             df = self.invoke(step.depends_on, run_type)
@@ -358,17 +364,20 @@ class Pipeline:
                     f"'{step.name}/{run_name}' fine refcount error: {run_type=}"
                     f" has_fine={step.has_fine(run_type)} ref={step.fine_refcount=}"
                 )
+            # 終了ログ
+            elapsed = time.perf_counter() - start_time
+            step.logger.info(f"'{step.name}/{run_name}' done in {elapsed:.0f} s")
         finally:
             # ログを戻す
-            step.logger.info(
-                f"'{step.name}/{run_name}'"
-                f" done in {time.perf_counter() - start_time:.0f} s"
-            )
             root_logger.removeHandler(file_handler)
         return result
 
     def _get_cache_path(self, step: Step, run_type: RunType) -> pathlib.Path:
-        """ファイルキャッシュのパスを作成して返す"""
+        """ファイルキャッシュのパスを返す"""
+        return self._get_cache_dir(step, run_type) / f"{run_type}.arrow"
+
+    def _get_cache_dir(self, step: Step, run_type: RunType) -> pathlib.Path:
+        """ファイルキャッシュのディレクトリを返す"""
         dir_name = step.name
         if self.fine:
             if run_type == "train":
@@ -377,10 +386,10 @@ class Pipeline:
             else:
                 if step.has_fine("train") or step.has_fine("test"):
                     dir_name += "-fine"
-        return self.cache_dir / dir_name / f"{run_type}.arrow"
+        return self.cache_dir / dir_name
 
     def _run_name(self, step: Step, run_type: RunType) -> str:
-        """ステップの実行名を作成して返す"""
+        """ステップの実行名を返す"""
         if self.fine and step.has_fine(run_type):
             return f"{run_type}-fine"
         else:
@@ -416,6 +425,9 @@ class TransformStep(Step, metaclass=abc.ABCMeta):
 class FitTransformStep(Step, metaclass=abc.ABCMeta):
     """特徴量作成ステップ。
 
+    Attributes:
+        transformer_save_name: 保存するファイル名 (既定値: "transformer.pkl")
+
     Examples:
         ::
 
@@ -433,9 +445,13 @@ class FitTransformStep(Step, metaclass=abc.ABCMeta):
 
     """
 
+    def __init__(self) -> None:
+        super().__init__()
+        self.transformer_save_name: str = "transformer.pkl"
+
     def run(self, df: pl.DataFrame, run_type: RunType) -> pl.DataFrame:
         """当該ステップの処理"""
-        save_path = self.transformer_save_path
+        save_path = self.model_dir / self.transformer_save_name
         if run_type == "train":
             transformer = self.fit(df)
             save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -452,11 +468,6 @@ class FitTransformStep(Step, metaclass=abc.ABCMeta):
     def transform(self, transformer, df: pl.DataFrame) -> pl.DataFrame:
         """変換処理"""
 
-    @property
-    def transformer_save_path(self) -> pathlib.Path:
-        """保存先パス"""
-        return self.model_dir / "transformer.pkl"
-
     def save_transformer(self, transformer, save_path: pathlib.Path) -> typing.Any:
         """変換用情報の保存"""
         logger.info(f"save transformer: {save_path}")
@@ -469,7 +480,12 @@ class FitTransformStep(Step, metaclass=abc.ABCMeta):
 
 
 class AllDataStep(Step, metaclass=abc.ABCMeta):
-    """trainで全データを使って処理するステップ。_is_test_というbool列を追加して結合したものがdf_allとして渡される。
+    """trainで全データを使って処理するステップ。
+
+    self.is_test_column_name の bool列を追加して結合したものがdf_allとして渡される。
+
+    Attributes:
+        is_test_column_name: 追加する列名 (既定値: "_is_test_")
 
     Examples:
         ::
@@ -483,6 +499,10 @@ class AllDataStep(Step, metaclass=abc.ABCMeta):
                     return df_all
 
     """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.is_test_column_name = "_is_test_"
 
     def run(self, df: pl.DataFrame, run_type: RunType) -> pl.DataFrame:
         """当該ステップの処理"""
@@ -508,11 +528,6 @@ class AllDataStep(Step, metaclass=abc.ABCMeta):
         else:
             result_test = pl.read_ipc(self.model_dir / "result_test.arrow")
             return result_test
-
-    @property
-    def is_test_column_name(self):
-        """追加する列名。"""
-        return "_is_test_"
 
     @abc.abstractmethod
     def fit_transform(self, df_all: pl.DataFrame) -> pl.DataFrame:
