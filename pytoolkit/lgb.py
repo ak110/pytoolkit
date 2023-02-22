@@ -1,4 +1,45 @@
-"""LightGBM関連。"""
+"""LightGBM関連。
+
+importしただけでlightgbm.register_loggerを呼び出すため注意。
+
+Examples:
+    ::
+
+        import pytoolkit.lgb
+        import pytoolkit.tables
+
+        train_data_path = "path/to/train.csv"
+        test_data_path = "path/to/test.csv"
+        input_data_path = "path/to/input.csv"
+
+        # ログの初期化
+        pytoolkit.logs.init()
+
+        # データの読み込み
+        train_data, train_labels = pytoolkit.tables.load_labeled_data(
+            train_data_path, "label_col_name"
+        )
+        test_data, test_labels = pytoolkit.tables.load_labeled_data(
+            test_data_path, "label_col_name"
+        )
+
+        # 学習
+        model = pytoolkit.lgb.train(train_data, train_labels, groups=None)
+
+        # 保存・読み込み
+        model.save(model_dir)
+        model = pytoolkit.lgb.load(model_dir)
+
+        # 評価
+        score = model.evaluate(test_data, test_labels)
+        assert 0.0 <= score <= 1.0
+
+        # 推論
+        input_data = pytoolkit.lgb.load_unlabeled_data(input_data_path)
+        results = model.infer(input_data)
+        assert isinstance(results, np.ndarray)
+
+"""
 import json
 import logging
 import os
@@ -14,7 +55,7 @@ import psutil
 import sklearn.metrics
 import tqdm
 
-# ちょっとお行儀が悪いけどimportされた時点でlightgbmにロガーを登録しちゃう
+# だいぶお行儀が悪いけどimportされた時点でlightgbmにロガーを登録しちゃう
 logger = logging.getLogger(__name__)
 logger.addFilter(
     lambda r: r.getMessage()
