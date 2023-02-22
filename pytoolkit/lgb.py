@@ -1,62 +1,4 @@
-"""テーブルデータの分類・回帰をするモジュール。
-
-機械学習に詳しくないエンジニアが使うには`tf.keras`や`scikit-learn`のインターフェースもローレベル過ぎるので、
-本来このくらいであるべきなんじゃないか、という観点で作ってみたもの。
-
-TODO: lgbの便利関数は別途用意して、ここは薄いラッパーにする
-
-タスクごとに以下の関数が提供される。
-前提条件や引数、型などはタスクに応じて多少変わる。
-
-- `pytoolkit.{task}.load_labeled_data()`
-- `pytoolkit.{task}.load_unlabeled_data()`
-- `pytoolkit.{task}.train()`
-- `pytoolkit.{task}.load()`
-- `pytoolkit.{task}.Model.save()`
-- `pytoolkit.{task}.Model.evaluate()`
-- `pytoolkit.{task}.Model.infer()`
-
-その他、凝ったことをしたいとき用のインターフェースは個別に用意する。
-
-Examples:
-
-    ::
-
-        import logging
-        import pytoolkit.table
-
-        train_data_path = "path/to/train.csv"
-        test_data_path = "path/to/test.csv"
-        input_data_path = "path/to/input.csv"
-
-        # ログの初期化
-        logging.basicConfig()
-
-        # データの読み込み
-        train_data, train_labels = pytoolkit.table.load_labeled_data(
-            train_data_path, "label_col_name"
-        )
-        test_data, test_labels = pytoolkit.table.load_labeled_data(
-            test_data_path, "label_col_name"
-        )
-
-        # 学習
-        model = pytoolkit.table.train(train_data, train_labels, groups=None)
-
-        # 保存・読み込み
-        model.save(model_dir)
-        model = pytoolkit.table.load(model_dir)
-
-        # 評価
-        score = model.evaluate(test_data, test_labels)
-        assert 0.0 <= score <= 1.0
-
-        # 推論
-        input_data = pytoolkit.table.load_unlabeled_data(input_data_path)
-        results = model.infer(input_data)
-        assert isinstance(results, np.ndarray)
-
-"""
+"""LightGBM関連。"""
 import json
 import logging
 import os
@@ -292,6 +234,7 @@ def load_labeled_data(
 
     Args:
         data_path: データのパス(CSV, Excelなど)
+        label_col_name: ラベルの列名
 
     Returns:
         データフレーム
@@ -533,32 +476,6 @@ def load(model_dir: str | os.PathLike[str]) -> Model:
 
     """
     return Model.load(model_dir)
-
-
-def f1_metric(preds, data):
-    """LightGBM用2クラスF1スコア"""
-    y_true = data.get_label()
-    preds = np.round(preds)
-    return "f1", sklearn.metrics.f1_score(y_true, preds), True
-
-
-def mf1_metric(preds, data):
-    """LightGBM用多クラスF1スコア(マクロ平均)"""
-    y_true = data.get_label()
-    if preds.ndim == 1:  # for compatibility
-        num_classes = len(preds) // len(y_true)
-        preds = preds.reshape((num_classes, -1)).T
-    else:
-        assert preds.ndim == 2
-        assert len(y_true) == len(preds)
-    preds = preds.argmax(axis=-1)
-    return "f1", sklearn.metrics.f1_score(y_true, preds, average="macro"), True
-
-
-def r2_metric(preds, data):
-    """LightGBM用R2"""
-    y_true = data.get_label()
-    return "r2", sklearn.metrics.r2_score(y_true, preds), True
 
 
 class EvaluationLogger:

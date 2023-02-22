@@ -2,7 +2,7 @@
 
 import polars as pl
 
-import pytoolkit
+import pytoolkit.pipelines
 
 
 class InputStep(pytoolkit.pipelines.Step):

@@ -4,19 +4,19 @@
 各ステップは0個以上の依存するステップを持ち、依存するステップの出力を結合したものを受け取って
 当該ステップの処理を行う。
 
-各ステップは名前+インスタンスで扱う方が直感的な設計だが、
-冗長なコードを減らしつつ未使用のimportでlinterの警告が発生しないことを重視し、
-クラスで扱うこととした。
-
 各ステップはpytoolkit.pipelines.Stepクラスやその派生クラスを継承して実装する。
-実行はpytoolkit.pipelines.Pipelineに実行するステップのクラスを指定する。
+基本は1ファイル1ステップで実装する。
+ステップ名の既定値は実装したクラスのモジュールのファイル名の拡張子を除く部分となる。
 
 各ステップの結果はファイルにキャッシュされる。
 ステップや依存先のステップが定義されたファイルの更新日時が新しくなっていれば自動的に再計算する。
-(TODO: リファクタリングなどで意図せず再計算が発生する場合があるため、
-非常に計算に時間がかかるステップを実装する場合は、更新日時のチェックを無効化して必要に応じて手動で削除する)
+(ソースコード上の依存関係とかまでは追えないので注意。)
+リファクタリングなどで意図せず再計算が発生する場合があるため、
+非常に計算に時間がかかるステップを実装する場合などには、
+更新日時のチェックを個別に無効化できる。
+無効化した場合、必要に応じて手動で削除する。
 
-主にコンペでの利用を想定し、ステップの実行には"train"と"test"の二種類がある。
+ステップの実行には、主にコンペでの利用を想定し、"train"と"test"の二種類がある。
 また、それに伴い以下のパターンで実装を補助する派生クラスがある。
 
 - "train"と"test"で同じ処理をするステップ: TransformStep
@@ -58,6 +58,7 @@ class Step(metaclass=abc.ABCMeta):
         depends_on: 依存先ステップ名の配列 (既定値: [])
         use_file_cache: 結果をファイルにキャッシュするのか否か (既定値: True)
         use_memory_cache: 結果をメモリにキャッシュするのか否か (既定値: True)
+        check_file_cache_time: ファイルキャッシュの簡易更新日時チェックをするのか否か (既定値: True)
         has_fine_train: fine=Trueな場合にtrainで特別な処理を実装しているのか否か (既定値: False)
         has_fine_test: fine=Trueな場合にtestで特別な処理を実装しているのか否か (既定値: False)
                         has_fine_trainがFalseでhas_fine_testがTrueな場合はTTAなどを想定したもの。
@@ -74,6 +75,7 @@ class Step(metaclass=abc.ABCMeta):
                 self.depends_on = []
                 self.use_file_cache = True
                 self.use_memory_cache = True
+                self.check_file_cache_time = True
                 self.has_fine_train = False
                 self.has_fine_test = False
 
@@ -86,6 +88,7 @@ class Step(metaclass=abc.ABCMeta):
         self.depends_on: list[str] = []
         self.use_file_cache: bool = True
         self.use_memory_cache: bool = True
+        self.check_file_cache_time: bool = True
         self.has_fine_train: bool = False
         self.has_fine_test: bool = False
         self.fine_refcount = 0
@@ -166,6 +169,7 @@ class Pipeline:
         models_dir: モデルやログの保存先ディレクトリ
         cache_dir: キャッシュの保存先ディレクトリ
         fine: 高精度な学習・推論を行うのか否か
+        check_file_cache_time:  ファイルキャッシュの簡易更新日時チェックをするのか否か (既定値: True)
 
     """
 
@@ -174,10 +178,12 @@ class Pipeline:
         models_dir: str | os.PathLike[str],
         cache_dir: str | os.PathLike[str],
         fine: bool = False,
+        check_file_cache_time: bool = True,
     ) -> None:
         self.models_dir = pathlib.Path(models_dir)
         self.cache_dir = pathlib.Path(cache_dir)
         self.fine = fine
+        self.check_file_cache_time = check_file_cache_time
         self.memory_cache: dict[tuple[str, RunType], pl.DataFrame] = {}
         self.steps: dict[str, Step] = {}
         self.run_type_stack: list[RunType] = []
@@ -303,14 +309,14 @@ class Pipeline:
         cache_path = self._get_cache_path(step, run_type)
         if not cache_path.exists():
             return False
-        # 有効期限の簡易チェック。ソースコードの方が新しければNG。
-        # ソースコード上の依存関係とかまでは追えないので注意。
+        # 有効期限の簡易チェック。
         cache_time = cache_path.stat().st_mtime
         module_time = step.module_path.stat().st_mtime
-        if cache_time <= module_time:
-            logger.warning(f"cache expired: {cache_path}")
-            cache_path.unlink()
-            return False
+        if self.check_file_cache_time and step.check_file_cache_time:
+            if cache_time <= module_time:
+                logger.warning(f"cache expired: {cache_path}")
+                cache_path.unlink()
+                return False
         # 依存元のキャッシュより依存先のキャッシュが新しければNG
         if base_cache_time is None:
             base_cache_time = cache_time  # 依存元が無い

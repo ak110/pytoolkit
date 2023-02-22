@@ -16,7 +16,8 @@
 
 ```
 import pytoolkit
-import pytoolkit.tables # optional
+import pytoolkit.pipelines # optional
+import pytoolkit.lgb # optional
 
 pytoolkit.logs.init("path/to/logfile.log")
 ```
