@@ -19,6 +19,7 @@ Submodules
    pytoolkit.logs
    pytoolkit.notebooks
    pytoolkit.pipelines
+   pytoolkit.tablurs
 
 Module contents
 ---------------

@@ -100,24 +100,27 @@ class CVMerge(tf.keras.layers.Layer):
         """処理。"""
         x_array, fold = inputs[:-1], inputs[-1]
 
-        def _run(is_train):
-            padded = [
-                _scatter(is_train, x, fold, fold_index)
-                for fold_index, x in enumerate(x_array)
-            ]
-            sum_ = tf.math.reduce_sum(tf.stack(padded, axis=0), axis=0)
-            if is_train:
-                return sum_ / (len(x_array) - 1)  # 重複数で割る
-            else:
-                return sum_  # 重複してないのでそのまま
+        def _train():
+            return _cv_merge(True, x_array, fold)
 
-        return tf.keras.backend.in_train_phase(
-            lambda: _run(True), lambda: _run(False), training
+        def _test():
+            return _cv_merge(False, x_array, fold)
+
+        return tf.keras.backend.in_train_phase(_train, _test, training)
+
+
+def _cv_merge(is_train, x_array, fold):
+    s = tf.concat([tf.shape(fold)[:1], tf.shape(x_array[0])[1:]], axis=0)
+    z = tf.zeros(s, dtype=x_array[0].dtype)
+    # 各foldの値を集約
+    padded = [
+        tf.tensor_scatter_nd_update(
+            z, tf.where((fold != fold_index) if is_train else (fold == fold_index)), x
         )
-
-
-def _scatter(is_train, x, fold, fold_index):
-    s = tf.concat([tf.shape(fold)[:1], tf.shape(x)[1:]], axis=0)
-    z = tf.zeros(s, dtype=x.dtype)
-    mask = (fold != fold_index) if is_train else (fold == fold_index)
-    return tf.tensor_scatter_nd_update(z, tf.where(mask), x)
+        for fold_index, x in enumerate(x_array)
+    ]
+    sum_ = tf.math.reduce_sum(tf.stack(padded, axis=0), axis=0)
+    if is_train:
+        return sum_ / (len(x_array) - 1)  # 重複数で割る
+    else:
+        return sum_  # 重複してないのでそのまま

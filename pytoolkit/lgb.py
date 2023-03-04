@@ -6,7 +6,7 @@ Examples:
     ::
 
         import pytoolkit.lgb
-        import pytoolkit.tables
+        import pytoolkit.tablurs
 
         train_data_path = "path/to/train.csv"
         test_data_path = "path/to/test.csv"
@@ -16,10 +16,10 @@ Examples:
         pytoolkit.logs.init()
 
         # データの読み込み
-        train_data, train_labels = pytoolkit.tables.load_labeled_data(
+        train_data, train_labels = pytoolkit.tablurs.load_labeled_data(
             train_data_path, "label_col_name"
         )
-        test_data, test_labels = pytoolkit.tables.load_labeled_data(
+        test_data, test_labels = pytoolkit.tablurs.load_labeled_data(
             test_data_path, "label_col_name"
         )
 
@@ -35,7 +35,7 @@ Examples:
         assert 0.0 <= score <= 1.0
 
         # 推論
-        input_data = pytoolkit.lgb.load_unlabeled_data(input_data_path)
+        input_data = pytoolkit.tablurs.load_unlabeled_data(input_data_path)
         results = model.infer(input_data)
         assert isinstance(results, np.ndarray)
 
@@ -92,7 +92,7 @@ class Model:
                 "importance[%]": self.get_feature_importance(normalize=True) * 100,
             }
         )
-        df_importance = df_importance.sort("importance[%]", reverse=True)
+        df_importance = df_importance.sort("importance[%]", descending=True)
         df_importance.write_csv(model_dir / "feature_importance.csv")
 
         (model_dir / "metadata.json").write_text(
@@ -348,6 +348,7 @@ def train(
         do_bagging: bagging_fraction, feature_fractionを設定するのか否か。
                     ラウンド数が少ない場合はFalseの方が安定するかも。
                     hpo=Trueなら効果なし。
+        categorical_feature: カテゴリ列
         encode_categoricals: categorical_featureに指定した列をエンコードするか否か
 
 
@@ -367,15 +368,6 @@ def train(
         "force_col_wise": True,
     }
     metadata: dict[str, typing.Any] = {}
-
-    # カテゴリ列のエンコード
-    metadata["encode_categoricals"] = {}
-    if encode_categoricals and isinstance(categorical_feature, list):
-        for c in categorical_feature:
-            values = np.sort(data[c].dropna().unique()).tolist()
-            logger.info(f"lgb: encode_categoricals({c}) => {values}")
-            metadata["encode_categoricals"][c] = values
-            data[c] = data[c].map(values.index, na_action="ignore")
 
     if isinstance(labels[0], str):
         # 分類の場合
@@ -401,6 +393,15 @@ def train(
         if params.get("metric") is None:
             params["metric"] = ["l2", "mae", "rmse"]
     params["objective"] = objective or metadata["task"]
+
+    # カテゴリ列のエンコード
+    metadata["encode_categoricals"] = {}
+    if encode_categoricals and isinstance(categorical_feature, list):
+        for c in categorical_feature:
+            values = np.sort(data[c].dropna().unique()).tolist()
+            logger.info(f"lgb: encode_categoricals({c}) => {values}")
+            metadata["encode_categoricals"][c] = values
+            data[c] = data[c].map(values.index, na_action="ignore")
 
     train_set = lgb.Dataset(
         data,
@@ -500,12 +501,6 @@ def train(
     return model
 
 
-def _class_to_index(
-    labels: npt.ArrayLike, class_names: list[str]
-) -> npt.NDArray[np.int32]:
-    return np.vectorize(class_names.index)(labels)
-
-
 def load(model_dir: str | os.PathLike[str]) -> Model:
     """学習済みモデルの読み込み
 
@@ -517,6 +512,12 @@ def load(model_dir: str | os.PathLike[str]) -> Model:
 
     """
     return Model.load(model_dir)
+
+
+def _class_to_index(
+    labels: npt.ArrayLike, class_names: list[str]
+) -> npt.NDArray[np.int32]:
+    return np.vectorize(class_names.index)(labels)
 
 
 class EvaluationLogger:
