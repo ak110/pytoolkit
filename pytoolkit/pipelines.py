@@ -280,31 +280,40 @@ class Pipeline:
     ) -> pl.DataFrame:
         self.step_stack.append(step)
         try:
-            run_name = self._run_name(step, run_type)
+            # ログ出力の先頭
+            run_name = (
+                f"{run_type}-fine"
+                if self.fine and step.has_fine(run_type)
+                else run_type
+            )
+            log_indent = "  " * (len(self.run_type_stack) - 1)
+            log_prefix = f"{log_indent}{step.name}/{run_name}>"
+
             # ファイルキャッシュにあれば読んで返す
             cache_path = self._get_cache_path(step, run_type)
             if cache == "use" and step.use_file_cache:
                 if self._is_cache_valid(step, run_type):
-                    logger.info(f"'{step.name}/{run_name}' load cache: {cache_path}")
+                    logger.info(f"{log_prefix} using file cache: {cache_path}")
                     return pl.read_ipc(cache_path)
 
             # メモリキャッシュにあれば返す
             if step.use_memory_cache:
                 result = self.memory_cache.get((step.name, run_type))
                 if result is not None:
-                    logger.info(f"'{step.name}/{run_name}' get memory cache")
+                    logger.info(f"{log_prefix} using memory cache")
                     return result
 
             # ステップの実行
-            result = self._run_step(step, run_type, run_name)
+            result = self._run_step(step, run_type, log_prefix)
 
             # メモリキャッシュに保存
             if step.use_memory_cache:
+                logger.info(f"{log_prefix} saving memory cache")
                 self.memory_cache[(step.name, run_type)] = result
 
             # ファイルキャッシュに保存
             if cache in ("use", "ignore") and step.use_file_cache:
-                logger.info(f"'{step.name}/{run_name}' save cache: {cache_path}")
+                logger.info(f"{log_prefix} saving file cache: {cache_path}")
                 cache_path.parent.mkdir(parents=True, exist_ok=True)
                 result.write_ipc(cache_path)
             return result
@@ -346,7 +355,7 @@ class Pipeline:
         # ここまで来たらOK
         return True
 
-    def _run_step(self, step: Step, run_type: RunType, run_name: str) -> pl.DataFrame:
+    def _run_step(self, step: Step, run_type: RunType, log_prefix: str) -> pl.DataFrame:
         """ステップの実行"""
         # ログの設定。
         # ステップごとに個別のファイルに書き込む。(依存先は複数個所に書き込まれる)
@@ -366,7 +375,7 @@ class Pipeline:
         root_logger.addHandler(file_handler)
         # 開始ログ
         start_time = time.perf_counter()
-        step.logger.info(f"'{step.name}/{run_name}' start")
+        step.logger.info(f"{log_prefix} start")
         try:
             # 依存関係の実行
             df = self.invoke(step.depends_on, run_type)
@@ -376,16 +385,16 @@ class Pipeline:
             # 行数チェック
             assert (
                 len(df) == len(result) or len(df) == 0 or len(result) == 0
-            ), f"Rows error: {step.name}/{run_name}"
+            ), f"{log_prefix} Rows error: {len(df)=} {len(result)=}"
             # fineの参照回数チェック
             if step.has_fine(run_type) == (step.fine_refcount == 0):
                 step.logger.fatal(
-                    f"'{step.name}/{run_name}' fine refcount error: {run_type=}"
+                    f"{log_prefix} fine refcount error: {run_type=}"
                     f" has_fine={step.has_fine(run_type)} ref={step.fine_refcount=}"
                 )
             # 終了ログ
             elapsed = time.perf_counter() - start_time
-            step.logger.info(f"'{step.name}/{run_name}' done in {elapsed:.0f} s")
+            step.logger.info(f"{log_prefix} done in {elapsed:.0f} s")
         finally:
             # ログを戻す
             root_logger.removeHandler(file_handler)
@@ -406,13 +415,6 @@ class Pipeline:
                 if step.has_fine("train") or step.has_fine("test"):
                     dir_name += "-fine"
         return self.cache_dir / dir_name
-
-    def _run_name(self, step: Step, run_type: RunType) -> str:
-        """ステップの実行名を返す"""
-        if self.fine and step.has_fine(run_type):
-            return f"{run_type}-fine"
-        else:
-            return run_type
 
 
 class TransformStep(Step, metaclass=abc.ABCMeta):
