@@ -308,7 +308,7 @@ class Pipeline:
 
             # メモリキャッシュに保存
             if step.use_memory_cache:
-                logger.info(f"{log_prefix} saving memory cache")
+                # logger.info(f"{log_prefix} saving memory cache")
                 self.memory_cache[(step.name, run_type)] = result
 
             # ファイルキャッシュに保存

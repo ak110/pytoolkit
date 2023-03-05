@@ -191,6 +191,7 @@ class Model:
                 )
             ],
             axis=0,
+            dtype=np.float32,
         )
 
     def infer_oof(
