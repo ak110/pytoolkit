@@ -210,9 +210,12 @@ class Pipeline:
 
     def add_all(self) -> None:
         """__main__と同じディレクトリの全*.pyファイルからStepを作成して追加する。"""
-        main_file = sys.modules["__main__"].__file__  # pylint: disable=no-member
-        assert main_file is not None
-        for file in pathlib.Path(main_file).parent.glob("*.py"):
+        if hasattr(sys.modules["__main__"], "__file__"):
+            assert sys.modules["__main__"].__file__ is not None
+            main_dir = pathlib.Path(sys.modules["__main__"].__file__).parent
+        else:
+            main_dir = pathlib.Path(".")
+        for file in main_dir.glob("*.py"):
             self.add_from_file(file)
 
     def add_from_file(self, file: str | os.PathLike[str]) -> None:

@@ -7,7 +7,7 @@ import polars as pl
 from IPython.display import display
 
 
-def plot_histgrams(
+def display_numerics(
     df_train: pl.DataFrame, df_test: pl.DataFrame, bins: int | str = "sturges"
 ):
     """ヒストグラムの描画ウィジェットを出力する。
@@ -17,26 +17,25 @@ def plot_histgrams(
         ::
 
             import pytoolkit.notebooks
-            pytoolkit.notebooks.plot_histgrams(df_train, df_test)
+            pytoolkit.notebooks.display_numerics(df_train, df_test)
 
     """
+    num_cols = [
+        # https://pola-rs.github.io/polars-book/user-guide/datatypes.html
+        pl.col(pl.Float32),
+        pl.col(pl.Float64),
+        pl.col(pl.Int8),
+        pl.col(pl.Int16),
+        pl.col(pl.Int32),
+        pl.col(pl.Int64),
+        pl.col(pl.UInt8),
+        pl.col(pl.UInt16),
+        pl.col(pl.UInt32),
+        pl.col(pl.UInt64),
+    ]
 
-    nums_train = df_train.select(
-        [
-            pl.col(pl.Float32),
-            pl.col(pl.Float64).cast(pl.Float32),
-            pl.col(pl.Int32),
-            pl.col(pl.Int64),
-        ]
-    )
-    nums_test = df_test.select(
-        [
-            pl.col(pl.Float32),
-            pl.col(pl.Float64).cast(pl.Float32),
-            pl.col(pl.Int32),
-            pl.col(pl.Int64),
-        ]
-    )
+    nums_train = df_train.select(num_cols)
+    nums_test = df_test.select(num_cols)
     # numeric_columns = list(set(nums_train.columns) & set(nums_test.columns))
     numeric_columns = [c for c in nums_train.columns if c in nums_test.columns]
     ignored_columns = [
@@ -45,9 +44,24 @@ def plot_histgrams(
         if c not in numeric_columns
     ]
 
-    dropdown = widgets.Dropdown(options=numeric_columns, description="columns")
+    dropdown1 = widgets.Dropdown(options=numeric_columns, description="columns")
     dropdown2 = widgets.Dropdown(options=ignored_columns, description="ignored columns")
-    output = widgets.Output()
+    output1 = widgets.Output()
+    output2 = widgets.Output()
+    output3 = widgets.Output()
+    output4 = widgets.Output()
+    all_widgets = [
+        widgets.HBox([dropdown1, dropdown2]),
+        output1,
+        widgets.HBox(
+            [
+                widgets.VBox([widgets.Label("describe"), output2]),
+                widgets.VBox([widgets.Label("train:value_counts"), output3]),
+                widgets.VBox([widgets.Label("test:value_counts"), output4]),
+            ]
+        ),
+    ]
+
     ax = plt.gca()  # get current axes
 
     def on_value_change(change) -> None:
@@ -69,32 +83,48 @@ def plot_histgrams(
             ax.stairs(test_hist, sbins, fill=True, alpha=0.5, label="test")
             ax.set_title(new_value)
             ax.legend()
-            with output:
-                output.clear_output(wait=True)
+            with output1:
+                output1.clear_output(wait=True)
                 display(ax.figure)
-                display(
-                    pl.concat(
-                        [
-                            df_train[new_value]
-                            .describe()
-                            .select(
-                                pl.col("statistic"), pl.col("value").alias("train")
-                            ),
-                            df_test[new_value]
-                            .describe()
-                            .select(pl.col("value").alias("test")),
-                        ],
-                        how="horizontal",
+            with pl.Config() as cfg:
+                cfg.set_tbl_cols(-1)
+                cfg.set_tbl_rows(-1)
+                with output2:
+                    output2.clear_output(wait=True)
+                    display(
+                        pl.concat(
+                            [
+                                df_train[new_value]
+                                .describe()
+                                .select(
+                                    pl.col("statistic"), pl.col("value").alias("train")
+                                ),
+                                df_test[new_value]
+                                .describe()
+                                .select(pl.col("value").alias("test")),
+                            ],
+                            how="horizontal",
+                        )
                     )
-                )
-                display(
-                    df_train[new_value].value_counts().sort("counts", descending=True),
-                    df_test[new_value].value_counts().sort("counts", descending=True),
-                )
+                cfg.set_tbl_rows(10)
+                with output3:
+                    output3.clear_output(wait=True)
+                    display(
+                        df_train[new_value]
+                        .value_counts()
+                        .sort("counts", descending=True)
+                    )
+                with output4:
+                    output4.clear_output(wait=True)
+                    display(
+                        df_test[new_value]
+                        .value_counts()
+                        .sort("counts", descending=True)
+                    )
 
     plt.close()
-    dropdown.observe(on_value_change)
+    dropdown1.observe(on_value_change)
     on_value_change(
         {"name": "value", "old": numeric_columns[0], "new": numeric_columns[0]}
     )
-    display(dropdown, output, dropdown2)
+    display(*all_widgets)
