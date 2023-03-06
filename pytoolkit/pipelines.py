@@ -46,10 +46,12 @@ fine:
 
 """
 import abc
+import importlib.util
 import inspect
 import logging
 import os
 import pathlib
+import sys
 import time
 import typing
 
@@ -205,6 +207,29 @@ class Pipeline:
             "%(asctime)s [%(levelname)-5s] %(message)s"
             " <%(name)s> %(filename)s:%(lineno)d"
         )
+
+    def add_all(self) -> None:
+        """__main__と同じディレクトリの全*.pyファイルからStepを作成して追加する。"""
+        main_file = sys.modules["__main__"].__file__  # pylint: disable=no-member
+        assert main_file is not None
+        for file in pathlib.Path(main_file).parent.glob("*.py"):
+            self.add_from_file(file)
+
+    def add_from_file(self, file: str | os.PathLike[str]) -> None:
+        """Pythonファイルからステップを作成して追加。"""
+        file = pathlib.Path(file)
+        if file.stem in sys.modules:
+            module = sys.modules[file.stem]
+        else:
+            spec = importlib.util.spec_from_file_location(file.stem, file)
+            if spec is None:
+                raise ImportError(str(file))
+            assert spec.loader is not None
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            sys.modules[file.stem] = module
+        for _, c in inspect.getmembers(module, inspect.isclass):
+            self.add(c())
 
     def add(self, step: Step) -> None:
         """ステップの追加。"""

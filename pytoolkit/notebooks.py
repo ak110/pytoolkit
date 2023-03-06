@@ -21,21 +21,31 @@ def plot_histgrams(
 
     """
 
-    floats_train = df_train.select(
-        [pl.col(pl.Float32), pl.col(pl.Float64).cast(pl.Float32)]
+    nums_train = df_train.select(
+        [
+            pl.col(pl.Float32),
+            pl.col(pl.Float64).cast(pl.Float32),
+            pl.col(pl.Int32),
+            pl.col(pl.Int64),
+        ]
     )
-    floats_test = df_test.select(
-        [pl.col(pl.Float32), pl.col(pl.Float64).cast(pl.Float32)]
+    nums_test = df_test.select(
+        [
+            pl.col(pl.Float32),
+            pl.col(pl.Float64).cast(pl.Float32),
+            pl.col(pl.Int32),
+            pl.col(pl.Int64),
+        ]
     )
-    # float_columns = list(set(floats_train.columns) & set(floats_test.columns))
-    float_columns = [c for c in floats_train.columns if c in floats_test.columns]
+    # numeric_columns = list(set(nums_train.columns) & set(nums_test.columns))
+    numeric_columns = [c for c in nums_train.columns if c in nums_test.columns]
     ignored_columns = [
         c
         for c in np.unique(list(df_train.columns) + list(df_test.columns))
-        if c not in float_columns
+        if c not in numeric_columns
     ]
 
-    dropdown = widgets.Dropdown(options=float_columns, description="columns")
+    dropdown = widgets.Dropdown(options=numeric_columns, description="columns")
     dropdown2 = widgets.Dropdown(options=ignored_columns, description="ignored columns")
     output = widgets.Output()
     ax = plt.gca()  # get current axes
@@ -62,8 +72,29 @@ def plot_histgrams(
             with output:
                 output.clear_output(wait=True)
                 display(ax.figure)
+                display(
+                    pl.concat(
+                        [
+                            df_train[new_value]
+                            .describe()
+                            .select(
+                                pl.col("statistic"), pl.col("value").alias("train")
+                            ),
+                            df_test[new_value]
+                            .describe()
+                            .select(pl.col("value").alias("test")),
+                        ],
+                        how="horizontal",
+                    )
+                )
+                display(
+                    df_train[new_value].value_counts().sort("counts", descending=True),
+                    df_test[new_value].value_counts().sort("counts", descending=True),
+                )
 
     plt.close()
     dropdown.observe(on_value_change)
-    on_value_change({"name": "value", "old": float_columns[0], "new": float_columns[0]})
+    on_value_change(
+        {"name": "value", "old": numeric_columns[0], "new": numeric_columns[0]}
+    )
     display(dropdown, output, dropdown2)
