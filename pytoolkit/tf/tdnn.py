@@ -51,6 +51,7 @@ import polars as pl
 import sklearn.metrics
 import sklearn.model_selection
 import tensorflow as tf
+import tensorflow_addons as tfa
 
 import pytoolkit.tf
 
@@ -380,13 +381,11 @@ def train(
     train_steps = -(-len(features) // global_batch_size)
     train_model.summary(print_fn=logger.info)
     train_model.compile(
-        tf.keras.optimizers.Adam(3e-5 * global_batch_size**0.5, weight_decay=1e-5)
-        if early_stopping
-        else tf.keras.optimizers.Adam(
-            tf.keras.optimizers.schedules.CosineDecay(
-                initial_learning_rate=1e-4 * global_batch_size**0.5,
-                decay_steps=train_steps * epochs,
-            ),
+        tfa.optimizers.RectifiedAdam(
+            1e-4 * global_batch_size**0.5,
+            min_lr=1e-6 * global_batch_size**0.5,
+            warmup_proportion=0.1,
+            total_steps=train_steps * epochs,
             weight_decay=1e-5,
         ),
         loss,
@@ -403,7 +402,13 @@ def train(
         verbose=1,
         callbacks=[
             tf.keras.callbacks.EarlyStopping(
-                patience=10, min_delta=0.001, restore_best_weights=True, verbose=True
+                patience=max(
+                    10, int(epochs * train_model.optimizer.warmup_proportion) + 1
+                ),
+                min_delta=0.001,
+                restore_best_weights=True,
+                verbose=1,
+                # start_from_epoch=int(epochs * 0.1),
             )
         ]
         if early_stopping

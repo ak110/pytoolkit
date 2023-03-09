@@ -34,6 +34,7 @@ psutil = {version = "*", optional = true}
 pyarrow = {version = "*", optional = true}
 scikit-learn = "*"
 tensorflow = {version = ">=2.11", optional = true}
+tensorflow-addons = {version = "*", optional = true}
 tensorflow-cpu = {version = ">=2.11", optional = true}
 tqdm = "*"
 
@@ -57,6 +58,7 @@ all = [
     "psutil",
     "pyarrow",
     "tensorflow",
+    "tensorflow-addons",
 ]
 all-cpu = [
     "ipywidgets",
@@ -67,8 +69,9 @@ all-cpu = [
     "psutil",
     "pyarrow",
     "tensorflow-cpu",
+    "tensorflow-addons",
 ]
-tables = [
+tablurs = [
     "lightgbm",
     "pandas",
     "polars",
@@ -79,8 +82,8 @@ notebooks = [
     "ipywidgets",
     "matplotlib",
 ]
-tensorflow = ["tensorflow"]
-tensorflow-cpu = ["tensorflow-cpu"]
+tf = ["tensorflow", "tensorflow-addons"]
+tf-cpu = ["tensorflow-cpu", "tensorflow-addons"]
 
 #[tool.poetry.scripts]
 #tk-benchmark = "pytoolkit.bin.benchmark:main"
