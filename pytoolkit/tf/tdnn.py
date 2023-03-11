@@ -383,7 +383,7 @@ def train(
     train_model.compile(
         tfa.optimizers.RectifiedAdam(
             1e-4 * global_batch_size**0.5,
-            min_lr=1e-6 * global_batch_size**0.5,
+            min_lr=1e-5 * global_batch_size**0.5,
             warmup_proportion=0.1,
             total_steps=train_steps * epochs,
             weight_decay=1e-5,
