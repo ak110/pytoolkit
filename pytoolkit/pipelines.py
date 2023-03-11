@@ -317,6 +317,13 @@ class Pipeline:
             log_indent = "  " * (len(self.run_type_stack) - 1)
             log_prefix = f"{log_indent}{step.name}/{run_name}>"
 
+            # メモリキャッシュにあれば返す
+            if cache == "use" and step.use_memory_cache:
+                result = self.memory_cache.get((step.name, run_type))
+                if result is not None:
+                    logger.info(f"{log_prefix} using memory cache")
+                    return result
+
             # ファイルキャッシュにあれば読んで返す
             cache_path = self._get_cache_path(step, run_type)
             if cache == "use" and step.use_file_cache:
@@ -324,26 +331,20 @@ class Pipeline:
                     logger.info(f"{log_prefix} using file cache: {cache_path}")
                     return pl.read_ipc(cache_path)
 
-            # メモリキャッシュにあれば返す
-            if step.use_memory_cache:
-                result = self.memory_cache.get((step.name, run_type))
-                if result is not None:
-                    logger.info(f"{log_prefix} using memory cache")
-                    return result
-
             # ステップの実行
             result = self._run_step(step, run_type, log_prefix)
-
-            # メモリキャッシュに保存
-            if step.use_memory_cache:
-                # logger.info(f"{log_prefix} saving memory cache")
-                self.memory_cache[(step.name, run_type)] = result
 
             # ファイルキャッシュに保存
             if cache in ("use", "ignore") and step.use_file_cache:
                 logger.info(f"{log_prefix} saving file cache: {cache_path}")
                 cache_path.parent.mkdir(parents=True, exist_ok=True)
                 result.write_ipc(cache_path)
+
+            # メモリキャッシュに保存
+            if step.use_memory_cache:
+                # logger.info(f"{log_prefix} saving memory cache")
+                self.memory_cache[(step.name, run_type)] = result
+
             return result
         finally:
             self.step_stack.pop()

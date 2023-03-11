@@ -8,9 +8,17 @@ from IPython.display import display
 
 
 def describe(
-    df_train: pl.DataFrame, df_test: pl.DataFrame, bins: int | str = "sturges"
+    df_train: pl.DataFrame,
+    df_test: pl.DataFrame,
+    bins: int | str = "sturges",
+    labels: tuple[str, str] = ("train", "test"),
 ):
     """ヒストグラムの描画ウィジェットを出力する。
+
+    Args:
+        bins: ヒストグラムのbin数の指定。
+              <https://numpy.org/doc/stable/reference/generated/numpy.histogram.html>
+        labels: 1個目と2個目のdfの表示名。(既定値は("train", "test"))
 
     Examples:
 
@@ -41,8 +49,8 @@ def describe(
         widgets.HBox(
             [
                 widgets.VBox([widgets.Label("describe"), output2]),
-                widgets.VBox([widgets.Label("train:value_counts"), output3]),
-                widgets.VBox([widgets.Label("test:value_counts"), output4]),
+                widgets.VBox([widgets.Label(labels[0] + ":value_counts"), output3]),
+                widgets.VBox([widgets.Label(labels[1] + ":value_counts"), output4]),
             ]
         ),
     ]
@@ -71,7 +79,7 @@ def describe(
                 pl.UInt32,
                 pl.UInt64,
             ):
-                _plot_hist(ax, df_train, df_test, new_value, bins)
+                _plot_hist(new_value)
             display(ax.figure)
         with pl.Config() as cfg:
             cfg.set_tbl_cols(-1)
@@ -84,11 +92,11 @@ def describe(
                             df_train[new_value]
                             .describe()
                             .select(
-                                pl.col("statistic"), pl.col("value").alias("train")
+                                pl.col("statistic"), pl.col("value").alias(labels[0])
                             ),
                             df_test[new_value]
                             .describe()
-                            .select(pl.col("value").alias("test")),
+                            .select(pl.col("value").alias(labels[1])),
                         ],
                         how="horizontal",
                     )
@@ -105,27 +113,26 @@ def describe(
                     df_test[new_value].value_counts().sort("counts", descending=True)
                 )
 
+    def _plot_hist(new_value):
+        """ヒストグラムの描画"""
+        train_values = df_train[new_value].drop_nulls().drop_nans().to_numpy()
+        test_values = df_test[new_value].drop_nulls().drop_nans().to_numpy()
+        assert len(train_values) > 0 or len(test_values) > 0, "データが空"
+        sbins = np.histogram_bin_edges(
+            np.concatenate([train_values, test_values]), bins=bins
+        )
+        train_hist, _ = np.histogram(train_values, bins=sbins)
+        test_hist, _ = np.histogram(test_values, bins=sbins)
+        train_hist = train_hist.astype(np.float32) / (train_hist.sum() + 1e-7)
+        test_hist = test_hist.astype(np.float32) / (test_hist.sum() + 1e-7)
+        ax.stairs(train_hist, sbins, fill=True, alpha=0.5, label=labels[0])
+        ax.stairs(test_hist, sbins, fill=True, alpha=0.5, label=labels[1])
+        ax.set_title(new_value)
+        ax.legend()
+
     plt.close()
     dropdown1.observe(on_value_change)
     on_value_change(
         {"name": "value", "old": describe_columns[0], "new": describe_columns[0]}
     )
     display(*all_widgets)
-
-
-def _plot_hist(ax, df_train, df_test, new_value, bins):
-    """ヒストグラムの描画"""
-    train_values = df_train[new_value].drop_nulls().drop_nans().to_numpy()
-    test_values = df_test[new_value].drop_nulls().drop_nans().to_numpy()
-    assert len(train_values) > 0 or len(test_values) > 0, "データが空"
-    sbins = np.histogram_bin_edges(
-        np.concatenate([train_values, test_values]), bins=bins
-    )
-    train_hist, _ = np.histogram(train_values, bins=sbins)
-    test_hist, _ = np.histogram(test_values, bins=sbins)
-    train_hist = train_hist.astype(np.float32) / (train_hist.sum() + 1e-7)
-    test_hist = test_hist.astype(np.float32) / (test_hist.sum() + 1e-7)
-    ax.stairs(train_hist, sbins, fill=True, alpha=0.5, label="train")
-    ax.stairs(test_hist, sbins, fill=True, alpha=0.5, label="test")
-    ax.set_title(new_value)
-    ax.legend()
