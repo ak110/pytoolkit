@@ -171,7 +171,7 @@ class Model:
             verbose: 進捗表示の有無
 
         Returns:
-            推論結果
+            推論結果(分類ならshape=(num_samples,num_classes), 回帰ならshape=(num_samples,))
 
         """
         if isinstance(data, pl.DataFrame):
@@ -179,7 +179,7 @@ class Model:
         for c, values in self.metadata["encode_categoricals"].items():
             data[c] = data[c].map(values.index, na_action="ignore")
 
-        return np.mean(
+        pred = np.mean(
             [
                 booster.predict(data, num_iteration=self.metadata["best_iteration"])
                 for booster in tqdm.tqdm(
@@ -193,6 +193,9 @@ class Model:
             axis=0,
             dtype=np.float32,
         )
+        if self.metadata["task"] == "binary":
+            pred = np.stack([1 - pred, pred], axis=-1)
+        return pred
 
     def infer_oof(
         self,
@@ -208,7 +211,7 @@ class Model:
             verbose: 進捗表示の有無
 
         Returns:
-            推論結果
+            推論結果(分類ならshape=(num_samples,num_classes), 回帰ならshape=(num_samples,))
 
         """
         assert len(folds) == len(self.boosters)
@@ -232,6 +235,9 @@ class Model:
                 oofp = np.full((len(data),) + pred.shape[1:], np.nan, dtype=np.float32)
             oofp[val_indices] = pred.astype(np.float32)
         assert oofp is not None
+        if self.metadata["task"] == "binary":
+            oofp = np.stack([1 - oofp, oofp], axis=-1)
+            assert oofp is not None
         return oofp
 
     def get_feature_names(self) -> list[str]:
