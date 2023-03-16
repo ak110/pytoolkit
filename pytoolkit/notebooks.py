@@ -80,7 +80,10 @@ def describe(
                 pl.UInt64,
             ):
                 _plot_hist(new_value)
-            display(ax.figure)
+                output1.layout.display = "block"
+                display(ax.figure)
+            else:
+                output1.layout.display = "none"
         with pl.Config() as cfg:
             cfg.set_tbl_cols(-1)
             cfg.set_tbl_rows(-1)

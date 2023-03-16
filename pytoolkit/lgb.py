@@ -31,8 +31,9 @@ Examples:
         model = pytoolkit.lgb.load(model_dir)
 
         # 評価
-        score = model.evaluate(test_data, test_labels)
-        assert 0.0 <= score <= 1.0
+        evals = model.evaluate(test_data, test_labels)
+        assert 0.0 <= evals["acc"] <= 1.0
+        assert 0.0 <= evals["auc"] <= 1.0
 
         # 推論
         input_data = pytoolkit.tablurs.load_unlabeled_data(input_data_path)
@@ -64,10 +65,22 @@ logger.addFilter(
 lgb.register_logger(logger)
 
 
+class ModelMetadata(typing.TypedDict):
+    """モデルのメタデータの型定義。"""
+
+    task: typing.Literal["binary", "multiclass", "regression"]
+    categorical_values: dict[str, list[typing.Any]]
+    class_names: list[typing.Any] | None
+    params: dict[str, typing.Any]
+    nfold: int
+    best_iteration: int
+    cv_scores: dict[str, float]
+
+
 class Model:
     """テーブルデータのモデル。"""
 
-    def __init__(self, boosters: list[lgb.Booster], metadata: dict[str, typing.Any]):
+    def __init__(self, boosters: list[lgb.Booster], metadata: ModelMetadata):
         self.boosters = boosters
         self.metadata = metadata
 
@@ -111,7 +124,7 @@ class Model:
 
         """
         model_dir = pathlib.Path(model_dir)
-        metadata: dict[str, typing.Any] = json.loads(
+        metadata: ModelMetadata = json.loads(
             (model_dir / "metadata.json").read_text(encoding="utf-8")
         )
         boosters: list[lgb.Booster] = []
@@ -136,12 +149,14 @@ class Model:
         """
         pred = self.infer(data)
         if self.metadata["task"] == "binary":
+            assert self.metadata["class_names"] is not None
             labels = _class_to_index(labels, self.metadata["class_names"])
             return {
                 "acc": float(sklearn.metrics.accuracy_score(labels, np.round(pred))),
                 "auc": float(sklearn.metrics.roc_auc_score(labels, pred)),
             }
         elif self.metadata["task"] == "multiclass":
+            assert self.metadata["class_names"] is not None
             labels = _class_to_index(labels, self.metadata["class_names"])
             return {
                 "acc": float(
@@ -176,7 +191,7 @@ class Model:
         """
         if isinstance(data, pl.DataFrame):
             data = data.to_pandas()
-        for c, values in self.metadata["encode_categoricals"].items():
+        for c, values in self.metadata["categorical_values"].items():
             data[c] = data[c].map(values.index, na_action="ignore")
 
         pred = np.mean(
@@ -217,7 +232,7 @@ class Model:
         assert len(folds) == len(self.boosters)
         if isinstance(data, pl.DataFrame):
             data = data.to_pandas()
-        for c, values in self.metadata["encode_categoricals"].items():
+        for c, values in self.metadata["categorical_values"].items():
             data[c] = data[c].map(values.index, na_action="ignore")
 
         oofp: npt.NDArray[np.float32] | None = None
@@ -239,6 +254,14 @@ class Model:
             oofp = np.stack([1 - oofp, oofp], axis=-1)
             assert oofp is not None
         return oofp
+
+    def infers_to_labels(self, pred: npt.NDArray[np.float32]) -> npt.NDArray:
+        """推論結果(infer, infer_oof)からクラス名などを返す。"""
+        assert self.metadata["task"] in ("binary", "multiclass")
+        assert self.metadata["class_names"] is not None
+        class_names = np.array(self.metadata["class_names"])
+        assert pred.shape == (len(pred), len(class_names))
+        return class_names[np.argmax(pred, axis=-1)]
 
     def get_feature_names(self) -> list[str]:
         """列名を返す。
@@ -327,6 +350,7 @@ def train(
     groups: npt.ArrayLike | None = None,
     folds: typing.Sequence[tuple[npt.NDArray[np.int32], npt.NDArray[np.int32]]]
     | None = None,
+    task: typing.Literal["classification", "regression", "auto"] = "auto",
     categorical_feature: typing.Literal["auto"] | list[str] = "auto",
     init_score: npt.ArrayLike | None = None,
     num_boost_round: int = 9999,
@@ -374,40 +398,41 @@ def train(
         "nthread": psutil.cpu_count(logical=False),
         "force_col_wise": True,
     }
-    metadata: dict[str, typing.Any] = {}
 
-    if isinstance(labels[0], str):
+    class_names: list[typing.Any] | None = None
+    task_: typing.Literal["binary", "multiclass", "regression"]
+    if task == "classification" or isinstance(labels[0], str):
         # 分類の場合
-        class_names: list[str] = np.sort(np.unique(labels)).tolist()
-        metadata["class_names"] = class_names
+        class_names = np.sort(np.unique(labels)).tolist()
+        assert class_names is not None
         labels = _class_to_index(labels, class_names)
         assert len(class_names) >= 2
         if len(class_names) == 2:
             # 2クラス分類
-            metadata["task"] = "binary"
+            task_ = "binary"
             if params.get("metric") is None:
                 params["metric"] = ["auc", "binary_error"]
         else:
             # 多クラス分類
-            metadata["task"] = "multiclass"
+            task_ = "multiclass"
             params["num_class"] = len(class_names)
             if params.get("metric") is None:
                 params["metric"] = ["multi_logloss", "multi_error"]
     else:
         # 回帰の場合
         assert labels.dtype.type is np.float32
-        metadata["task"] = "regression"
+        task_ = "regression"
         if params.get("metric") is None:
             params["metric"] = ["l2", "mae", "rmse"]
-    params["objective"] = objective or metadata["task"]
+    params["objective"] = objective or task_
 
     # カテゴリ列のエンコード
-    metadata["encode_categoricals"] = {}
+    categorical_values: dict[str, list[typing.Any]] = {}
     if encode_categoricals and isinstance(categorical_feature, list):
         for c in categorical_feature:
             values = np.sort(data[c].dropna().unique()).tolist()
             logger.info(f"lgb: encode_categoricals({c}) => {values}")
-            metadata["encode_categoricals"][c] = values
+            categorical_values[c] = values
             data[c] = data[c].map(values.index, na_action="ignore")
 
     train_set = lgb.Dataset(
@@ -483,20 +508,29 @@ def train(
         eval_train_metric=eval_train_metric,
         return_cvbooster=True,
     )
-    metadata["params"] = params
 
     # ログ出力
     cvbooster = typing.cast(lgb.CVBooster, cv_result["cvbooster"])
     logger.info(f"lgb: best_iteration={cvbooster.best_iteration}")
+    cv_scores: dict[str, float] = {}
     for k in cv_result:
         if k != "cvbooster":
             score = float(cv_result[k][-1])
             logger.info(f"lgb: {k}={score:.3f}")
-            metadata[k] = score
-    metadata["best_iteration"] = cvbooster.best_iteration
-    metadata["nfold"] = len(cvbooster.boosters)
+            cv_scores[k] = score
 
-    model = Model(cvbooster.boosters, metadata)
+    model = Model(
+        cvbooster.boosters,
+        ModelMetadata(
+            task=task_,
+            categorical_values=categorical_values,
+            class_names=class_names,
+            params=params,
+            nfold=len(cvbooster.boosters),
+            best_iteration=cvbooster.best_iteration,
+            cv_scores=cv_scores,
+        ),
+    )
 
     # feature importance
     feature_names = model.get_feature_names()
@@ -522,7 +556,7 @@ def load(model_dir: str | os.PathLike[str]) -> Model:
 
 
 def _class_to_index(
-    labels: npt.ArrayLike, class_names: list[str]
+    labels: npt.ArrayLike, class_names: list[typing.Any]
 ) -> npt.NDArray[np.int32]:
     return np.vectorize(class_names.index)(labels)
 
