@@ -39,7 +39,7 @@ def load_unlabeled_data(data_path: str | os.PathLike[str]) -> pl.DataFrame:
     if data_path.suffix.lower() == ".csv":
         data = pl.read_csv(data_path)
     elif data_path.suffix.lower() == ".tsv":
-        data = pl.read_csv(data_path, sep="\t")
+        data = pl.read_csv(data_path, separator="\t")
     elif data_path.suffix.lower() == ".arrow":
         data = pl.read_ipc(data_path)
     elif data_path.suffix.lower() == ".parquet":
