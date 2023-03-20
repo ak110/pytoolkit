@@ -410,6 +410,7 @@ class Pipeline:
         step.logger.info(f"{log_prefix} start")
         try:
             # 依存関係の実行
+            step.logger.info(f"{log_prefix} depends_on={step.depends_on}")
             df = self.invoke(step.depends_on, run_type)
             # ステップの実行
             step.fine_refcount = 0
