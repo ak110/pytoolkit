@@ -53,12 +53,13 @@ import sklearn.model_selection
 import tensorflow as tf
 import tensorflow_addons as tfa
 
+import pytoolkit.base
 import pytoolkit.tf
 
 logger = logging.getLogger(__name__)
 
 
-class Model:
+class Model(pytoolkit.base.BaseModel):
     """テーブルデータのモデル。"""
 
     def __init__(
@@ -195,6 +196,22 @@ class Model:
         )
         ds = _create_dataset(features, global_batch_size, folds=folds)
         return self.train_model.predict(ds, verbose=1 if verbose else 0)
+
+    def infers_to_labels(self, pred: npt.NDArray[np.float32]) -> npt.NDArray:
+        """推論結果(infer, infer_oof)からクラス名などを返す。
+
+        Args:
+            pred: 推論結果
+
+        Returns:
+            クラス名など
+
+        """
+        assert self.metadata["task"] in ("binary", "multiclass")
+        assert self.metadata["class_names"] is not None
+        class_names = np.array(self.metadata["class_names"])
+        assert pred.shape == (len(pred), len(class_names))
+        return class_names[np.argmax(pred, axis=-1)]
 
     def get_feature_names(self) -> list[str]:
         """列名を返す。

@@ -56,6 +56,8 @@ import psutil
 import sklearn.metrics
 import tqdm
 
+import pytoolkit.base
+
 # だいぶお行儀が悪いけどimportされた時点でlightgbmにロガーを登録しちゃう
 logger = logging.getLogger(__name__)
 logger.addFilter(
@@ -77,7 +79,7 @@ class ModelMetadata(typing.TypedDict):
     cv_scores: dict[str, float]
 
 
-class Model:
+class Model(pytoolkit.base.BaseModel):
     """テーブルデータのモデル。"""
 
     def __init__(self, boosters: list[lgb.Booster], metadata: ModelMetadata):
@@ -191,6 +193,7 @@ class Model:
         """
         if isinstance(data, pl.DataFrame):
             data = data.to_pandas()
+        data = data[self.get_feature_names()]
         for c, values in self.metadata["categorical_values"].items():
             data[c] = data[c].map(values.index, na_action="ignore")
 
@@ -232,6 +235,7 @@ class Model:
         assert len(folds) == len(self.boosters)
         if isinstance(data, pl.DataFrame):
             data = data.to_pandas()
+        data = data[self.get_feature_names()]
         for c, values in self.metadata["categorical_values"].items():
             data[c] = data[c].map(values.index, na_action="ignore")
 
@@ -256,7 +260,15 @@ class Model:
         return oofp
 
     def infers_to_labels(self, pred: npt.NDArray[np.float32]) -> npt.NDArray:
-        """推論結果(infer, infer_oof)からクラス名などを返す。"""
+        """推論結果(infer, infer_oof)からクラス名などを返す。
+
+        Args:
+            pred: 推論結果
+
+        Returns:
+            クラス名など
+
+        """
         assert self.metadata["task"] in ("binary", "multiclass")
         assert self.metadata["class_names"] is not None
         class_names = np.array(self.metadata["class_names"])
@@ -320,6 +332,7 @@ def train(
     hpo: bool = False,
     do_bagging: bool = True,
     encode_categoricals: bool = True,
+    seed: int = 1,
 ) -> Model:
     """学習
 
@@ -336,7 +349,7 @@ def train(
                     hpo=Trueなら効果なし。
         categorical_feature: カテゴリ列
         encode_categoricals: categorical_featureに指定した列をエンコードするか否か
-
+        seed: 乱数シード
 
     Returns:
         モデル
@@ -423,8 +436,8 @@ def train(
             ]
             if do_early_stopping
             else [],
-            seed=1,
-            optuna_seed=1,
+            seed=seed,
+            optuna_seed=seed,
         )
         tuner.run()
         params.update(tuner.best_params)
@@ -448,7 +461,7 @@ def train(
         categorical_feature=categorical_feature,  # type: ignore
         num_boost_round=num_boost_round,
         verbose_eval=None,
-        seed=1,
+        seed=seed,
         callbacks=(
             [
                 lgb.early_stopping(

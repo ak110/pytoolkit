@@ -58,6 +58,8 @@ import sklearn.metrics
 import sklearn.model_selection
 import tqdm
 
+import pytoolkit.base
+
 logger = logging.getLogger(__name__)
 
 
@@ -65,11 +67,12 @@ class ModelMetadata(typing.TypedDict):
     """モデルのメタデータの型定義。"""
 
     task: typing.Literal["binary", "multiclass", "regression"]
+    columns: list[str]
     class_names: list[typing.Any] | None
     nfold: int
 
 
-class Model:
+class Model(pytoolkit.base.BaseModel):
     """テーブルデータのモデル。"""
 
     def __init__(
@@ -113,7 +116,7 @@ class Model:
         return cls(estimators, metadata)
 
     def evaluate(
-        self, data: pd.DataFrame | pl.DataFrame | npt.NDArray, labels: npt.ArrayLike
+        self, data: pd.DataFrame | pl.DataFrame, labels: npt.ArrayLike
     ) -> dict[str, float]:
         """推論。
 
@@ -155,7 +158,7 @@ class Model:
             }
 
     def infer(
-        self, data: pd.DataFrame | pl.DataFrame | npt.NDArray, verbose: bool = True
+        self, data: pd.DataFrame | pl.DataFrame, verbose: bool = True
     ) -> npt.NDArray[np.float32]:
         """推論。
 
@@ -167,7 +170,9 @@ class Model:
             推論結果(分類ならshape=(num_samples,num_classes), 回帰ならshape=(num_samples,))
 
         """
-        data = _preprocess(data)
+        if isinstance(data, pl.DataFrame):
+            data = data.to_pandas()
+        data = data[self.metadata["columns"]].to_numpy()
 
         pred = np.mean(
             [
@@ -191,7 +196,7 @@ class Model:
 
     def infer_oof(
         self,
-        data: pd.DataFrame | pl.DataFrame | npt.NDArray,
+        data: pd.DataFrame | pl.DataFrame,
         folds: typing.Sequence[tuple[npt.NDArray[np.int32], npt.NDArray[np.int32]]],
         verbose: bool = True,
     ) -> npt.NDArray[np.float32]:
@@ -207,7 +212,9 @@ class Model:
 
         """
         assert len(folds) == len(self.estimators)
-        data = _preprocess(data)
+        if isinstance(data, pl.DataFrame):
+            data = data.to_pandas()
+        data = data[self.metadata["columns"]].to_numpy()
 
         oofp: npt.NDArray[np.float32] | None = None
         for estimator, (_, val_indices) in tqdm.tqdm(
@@ -232,7 +239,15 @@ class Model:
         return oofp
 
     def infers_to_labels(self, pred: npt.NDArray[np.float32]) -> npt.NDArray:
-        """推論結果(infer, infer_oof)からクラス名などを返す。"""
+        """推論結果(infer, infer_oof)からクラス名などを返す。
+
+        Args:
+            pred: 推論結果
+
+        Returns:
+            クラス名など
+
+        """
         assert self.metadata["task"] in ("binary", "multiclass")
         assert self.metadata["class_names"] is not None
         class_names = np.array(self.metadata["class_names"])
@@ -241,7 +256,7 @@ class Model:
 
 
 def train(
-    data: pd.DataFrame | pl.DataFrame | npt.NDArray,
+    data: pd.DataFrame | pl.DataFrame,
     labels: npt.ArrayLike,
     groups: npt.ArrayLike | None = None,
     folds: typing.Sequence[tuple[npt.NDArray[np.int32], npt.NDArray[np.int32]]]
@@ -269,7 +284,10 @@ def train(
         モデル
 
     """
-    data = _preprocess(data)
+    if isinstance(data, pl.DataFrame):
+        data = data.to_pandas()
+    columns = data.columns.to_list()
+    data = data.to_numpy()
     labels = np.asarray(labels)
     assert len(data) == len(labels), f"{len(data)=} {len(labels)=}"
 
@@ -325,7 +343,10 @@ def train(
     model = Model(
         scores["estimator"],
         ModelMetadata(
-            task=task_, class_names=class_names, nfold=len(scores["estimator"])
+            task=task_,
+            columns=columns,
+            class_names=class_names,
+            nfold=len(scores["estimator"]),
         ),
     )
 
@@ -349,11 +370,3 @@ def _class_to_index(
     labels: npt.ArrayLike, class_names: list[typing.Any]
 ) -> npt.NDArray[np.int32]:
     return np.vectorize(class_names.index)(labels)
-
-
-def _preprocess(data: pd.DataFrame | pl.DataFrame | npt.NDArray) -> npt.NDArray:
-    if isinstance(data, pl.DataFrame):
-        data = data.to_numpy()
-    elif isinstance(data, pd.DataFrame):
-        data = data.to_numpy()
-    return data
