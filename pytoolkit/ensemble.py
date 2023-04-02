@@ -49,6 +49,7 @@ class Model:
 
         Args:
             model_dir: 保存先ディレクトリ
+            model_type: モデルの型 (pytoolkit.lgb.Modelなど)
 
         Returns:
             モデル
@@ -120,3 +121,19 @@ class Model:
         """
         assert len(self.models) > 0
         return self.models[0].infers_to_labels(pred)
+
+
+def load(
+    model_dir: str | os.PathLike[str], model_type: type[pytoolkit.base.BaseModel]
+) -> Model:
+    """モデルの読み込み
+
+    Args:
+        model_dir: 保存先ディレクトリ
+        model_type: モデルの型 (pytoolkit.lgb.Modelなど)
+
+    Returns:
+        モデル
+
+    """
+    return Model.load(model_dir, model_type)

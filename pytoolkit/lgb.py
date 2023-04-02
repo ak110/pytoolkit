@@ -365,6 +365,9 @@ def train(
         "metric": metric,
         "nthread": psutil.cpu_count(logical=False),
         "force_col_wise": True,
+        "data_random_seed": seed + 0,
+        "feature_fraction_seed": seed + 1,
+        "bagging_seed": seed + 2,
     }
 
     class_names: list[typing.Any] | None = None
